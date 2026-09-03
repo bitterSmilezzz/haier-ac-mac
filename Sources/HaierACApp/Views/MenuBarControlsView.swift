@@ -17,14 +17,38 @@ struct MenuBarControlsView: View {
                 deviceHeader(device)
                 controlRows(device)
                 Divider().overlay(Theme.hairline)
+                launchAtLoginRow
+                Divider().overlay(Theme.hairline)
                 footer
             } else {
                 notLoggedIn
+                Divider().overlay(Theme.hairline)
+                launchAtLoginRow
             }
         }
         .padding(12)
         .frame(width: 280)
         .background(Theme.canvas)
+    }
+
+    // MARK: - 开机自启
+
+    private var launchAtLoginRow: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "arrow.up.forward.app")
+                .font(.system(size: 12))
+                .foregroundStyle(Theme.inkSubtle)
+                .frame(width: 16)
+            Text("开机自启（菜单栏常驻）")
+                .font(.system(size: 12))
+                .foregroundStyle(Theme.inkMuted)
+            Spacer()
+            Toggle("", isOn: $model.launchAtLogin)
+                .labelsHidden()
+                .toggleStyle(.switch)
+                .controlSize(.mini)
+                .tint(Theme.accent)
+        }
     }
 
     // MARK: - 设备头部
