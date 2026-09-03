@@ -1,0 +1,16 @@
+# SwiftPM 构建产物
+.build/
+.swiftpm/
+
+# 打包输出
+dist/
+
+# Python
+__pycache__/
+*.pyc
+
+# macOS
+.DS_Store
+
+# 日志（含本地诊断日志，不入库）
+*.log
