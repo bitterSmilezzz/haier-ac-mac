@@ -44,7 +44,8 @@ SwiftUI App
 ## 隐私与安全
 
 - **密码不落盘**：仅用于换取访问令牌，登录后立即从内存清除
-- **Token 存 Keychain**（系统加密，`local.haierac.token`），到期自动刷新
+- **Token 存本地文件**（`~/Library/Application Support/HaierAC/credentials.json`，权限 600 仅当前用户可读写），到期自动刷新
+  - 为什么不用 Keychain：本应用为 ad-hoc 签名（个人项目每次打包重新签名），macOS 钥匙串对匿名签名调用者会反复弹出密码框；文件存储彻底消除弹窗，token 为短期凭证（10 天有效）风险可控
 - **代码零敏感信息**：无硬编码账号/手机号；验证脚本从环境变量读取凭据
 - **日志脱敏**：诊断日志（`~/Library/Logs/HaierAC/app.log`）中 token 已脱敏
 - 凭据仅与海尔官方云（zj.haier.net / uws.haier.net / wssgw.haier.net）通信

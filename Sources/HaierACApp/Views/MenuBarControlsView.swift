@@ -1,20 +1,33 @@
 import SwiftUI
 import HaierACCore
 
-/// 菜单栏迷你控制面板（类似控制中心卡片）
+/// 菜单栏小窗口控制面板（点击菜单栏图标弹出的独立窗口）
 struct MenuBarControlsView: View {
     @EnvironmentObject var model: AppModel
     @Environment(\.openWindow) private var openWindow
 
-    private var activeDevice: DeviceInfo? {
-        guard case .ready = model.phase else { return nil }
-        return model.devices.first
+    /// 当前选中的设备（支持多设备切换）
+    @State private var selectedDeviceId: String?
+
+    private var activeDevices: [DeviceInfo] {
+        guard case .ready = model.phase else { return [] }
+        return model.devices
+    }
+
+    private var currentDevice: DeviceInfo? {
+        if let selectedDeviceId, let device = activeDevices.first(where: { $0.id == selectedDeviceId }) {
+            return device
+        }
+        return activeDevices.first
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            if let device = activeDevice {
-                deviceHeader(device)
+            if let device = currentDevice {
+                windowHeader(device)
+                if activeDevices.count > 1 {
+                    devicePicker
+                }
                 controlRows(device)
                 Divider().overlay(Theme.hairline)
                 launchAtLoginRow
@@ -27,39 +40,19 @@ struct MenuBarControlsView: View {
             }
         }
         .padding(12)
-        .frame(width: 280)
+        .frame(width: 300)
         .background(Theme.canvas)
     }
 
-    // MARK: - 开机自启
+    // MARK: - 窗口头部（仿控制中心）
 
-    private var launchAtLoginRow: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "arrow.up.forward.app")
-                .font(.system(size: 12))
-                .foregroundStyle(Theme.inkSubtle)
-                .frame(width: 16)
-            Text("开机自启（菜单栏常驻）")
-                .font(.system(size: 12))
-                .foregroundStyle(Theme.inkMuted)
-            Spacer()
-            Toggle("", isOn: $model.launchAtLogin)
-                .labelsHidden()
-                .toggleStyle(.switch)
-                .controlSize(.mini)
-                .tint(Theme.accent)
-        }
-    }
-
-    // MARK: - 设备头部
-
-    private func deviceHeader(_ device: DeviceInfo) -> some View {
+    private func windowHeader(_ device: DeviceInfo) -> some View {
         HStack(spacing: 8) {
             Image(systemName: "air.conditioner.horizontal")
                 .font(.system(size: 15, weight: .medium))
                 .foregroundStyle(Theme.accent)
-            Text(device.deviceName)
-                .font(.system(size: 14, weight: .semibold))
+            Text("海尔空调")
+                .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(Theme.ink)
             Spacer()
             if let onOff = model.attribute("onOffStatus", deviceId: device.id), let isOn = onOff.boolValue {
@@ -68,9 +61,25 @@ struct MenuBarControlsView: View {
                     .foregroundStyle(isOn ? Theme.success : Theme.inkTertiary)
             }
         }
+        .padding(.bottom, 2)
     }
 
-    // MARK: - 控制行
+    /// 多设备切换
+    private var devicePicker: some View {
+        Picker("", selection: Binding(
+            get: { currentDevice?.id ?? activeDevices.first?.id ?? "" },
+            set: { selectedDeviceId = $0 }
+        )) {
+            ForEach(activeDevices) { device in
+                Text(device.deviceName).tag(device.id)
+            }
+        }
+        .pickerStyle(.menu)
+        .labelsHidden()
+        .tint(Theme.inkMuted)
+    }
+
+    // MARK: - 控制区
 
     @ViewBuilder
     private func controlRows(_ device: DeviceInfo) -> some View {
@@ -87,18 +96,15 @@ struct MenuBarControlsView: View {
             if let onOff = model.attribute("onOffStatus", deviceId: device.id), onOff.writable {
                 MenuBarToggleRow(attr: onOff, deviceId: device.id)
             }
-            // 温度
-            if let temp = model.attribute("targetTemperature", deviceId: device.id), let value = temp.doubleValue {
-                HStack {
-                    Text("目标温度")
-                        .font(.system(size: 13))
-                        .foregroundStyle(Theme.inkMuted)
-                    Spacer()
-                    Text(String(format: "%.1f°C", value))
-                        .font(.system(size: 13, weight: .medium))
-                        .monospacedDigit()
-                        .foregroundStyle(Theme.ink)
-                }
+            // 温度步进
+            if let temp = model.attribute("targetTemperature", deviceId: device.id), temp.writable,
+               case .step(let min, let max, let step) = temp.valueRange {
+                MenuBarTemperatureRow(attr: temp, deviceId: device.id, min: min, max: max, step: step)
+            }
+            // 模式
+            if let mode = model.attribute("operationMode", deviceId: device.id), mode.writable,
+               case .list(let opts) = mode.valueRange {
+                MenuBarModeRow(attr: mode, options: opts, deviceId: device.id)
             }
         }
     }
@@ -132,6 +138,26 @@ struct MenuBarControlsView: View {
         }
     }
 
+    // MARK: - 开机自启
+
+    private var launchAtLoginRow: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "arrow.up.forward.app")
+                .font(.system(size: 12))
+                .foregroundStyle(Theme.inkSubtle)
+                .frame(width: 16)
+            Text("开机自启（菜单栏常驻）")
+                .font(.system(size: 12))
+                .foregroundStyle(Theme.inkMuted)
+            Spacer()
+            Toggle("", isOn: $model.launchAtLogin)
+                .labelsHidden()
+                .toggleStyle(.switch)
+                .controlSize(.mini)
+                .tint(Theme.accent)
+        }
+    }
+
     // MARK: - 未登录态
 
     private var notLoggedIn: some View {
@@ -153,7 +179,8 @@ struct MenuBarControlsView: View {
     }
 }
 
-/// 菜单栏开关行
+// MARK: - 菜单栏开关行
+
 struct MenuBarToggleRow: View {
     @EnvironmentObject var model: AppModel
     let attr: DeviceAttribute
@@ -191,5 +218,112 @@ struct MenuBarToggleRow: View {
                         .strokeBorder(emphasized ? Theme.accent.opacity(0.4) : Theme.hairline, lineWidth: 1)
                 )
         )
+    }
+}
+
+// MARK: - 菜单栏温度行
+
+struct MenuBarTemperatureRow: View {
+    @EnvironmentObject var model: AppModel
+    let attr: DeviceAttribute
+    let deviceId: String
+    let min: Double
+    let max: Double
+    let step: Double
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "thermometer.medium")
+                .font(.system(size: 12))
+                .foregroundStyle(Theme.inkSubtle)
+                .frame(width: 16)
+            Text(attr.desc)
+                .font(.system(size: 13))
+                .foregroundStyle(Theme.inkMuted)
+            Spacer()
+            HStack(spacing: 10) {
+                Button {
+                    let current = attr.doubleValue ?? min
+                    let new = Swift.max(min, current - step)
+                    model.sendAttribute(attr.name, value: .double((new / step).rounded() * step), deviceId: deviceId)
+                } label: {
+                    Image(systemName: "minus")
+                        .font(.system(size: 10, weight: .semibold))
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(Theme.inkMuted)
+
+                Text(String(format: "%.1f°", attr.doubleValue ?? min))
+                    .font(.system(size: 13, weight: .medium))
+                    .monospacedDigit()
+                    .foregroundStyle(Theme.ink)
+                    .frame(width: 44)
+
+                Button {
+                    let current = attr.doubleValue ?? min
+                    let new = Swift.min(max, current + step)
+                    model.sendAttribute(attr.name, value: .double((new / step).rounded() * step), deviceId: deviceId)
+                } label: {
+                    Image(systemName: "plus")
+                        .font(.system(size: 10, weight: .semibold))
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(Theme.inkMuted)
+            }
+            .padding(.horizontal, 6)
+            .padding(.vertical, 4)
+            .background(
+                RoundedRectangle(cornerRadius: Theme.radiusSM, style: .continuous)
+                    .fill(Theme.surface1)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: Theme.radiusSM, style: .continuous)
+                            .strokeBorder(Theme.hairline, lineWidth: 1)
+                    )
+            )
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+    }
+}
+
+// MARK: - 菜单栏模式行
+
+struct MenuBarModeRow: View {
+    @EnvironmentObject var model: AppModel
+    let attr: DeviceAttribute
+    let options: [ListOption]
+    let deviceId: String
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "fan")
+                .font(.system(size: 12))
+                .foregroundStyle(Theme.inkSubtle)
+                .frame(width: 16)
+            Text(attr.desc)
+                .font(.system(size: 13))
+                .foregroundStyle(Theme.inkMuted)
+            Spacer()
+            Picker("", selection: Binding(
+                get: {
+                    options.first(where: { $0.data.stringValue == attr.value?.stringValue })?.data.stringValue
+                        ?? options.first?.data.stringValue ?? ""
+                },
+                set: { newValue in
+                    guard let opt = options.first(where: { $0.data.stringValue == newValue }) else { return }
+                    model.sendAttribute(attr.name, value: opt.data, deviceId: deviceId)
+                }
+            )) {
+                ForEach(options) { opt in
+                    Text(opt.desc).tag(opt.data.stringValue)
+                }
+            }
+            .pickerStyle(.menu)
+            .labelsHidden()
+            .tint(Theme.inkMuted)
+            .frame(width: 150)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 4)
     }
 }

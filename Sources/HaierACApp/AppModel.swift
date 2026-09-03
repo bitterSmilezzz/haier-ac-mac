@@ -14,6 +14,9 @@ struct ManualDevice: Identifiable, Codable, Hashable {
 /// 应用主状态模型
 @MainActor
 final class AppModel: ObservableObject {
+    /// 全局单例（AppDelegate / 窗口 / 菜单栏共享同一实例）
+    static let shared = AppModel()
+
     enum Phase: Equatable {
         case loggedOut
         case connecting
@@ -74,9 +77,13 @@ final class AppModel: ObservableObject {
 
     // MARK: - 生命周期
 
+    /// 启动时恢复会话（由 AppDelegate 在应用启动完成时调用）
     func restoreSession() {
-        guard let savedToken = KeychainStore.load(forKey: "accountToken"),
-              let savedPhone = KeychainStore.load(forKey: "phone") else { return }
+        guard client == nil else { return }  // 防重入：已有会话则跳过
+        // 一次性迁移：旧版本 Keychain 数据 → 文件存储（无弹窗方案）
+        CredentialStore.migrateFromKeychainIfNeeded()
+        guard let savedToken = CredentialStore.load(forKey: "accountToken"),
+              let savedPhone = CredentialStore.load(forKey: "phone") else { return }
         phone = savedPhone
         client = HaierCloudClient(clientId: savedPhone)
         client?.token = savedToken
@@ -101,9 +108,9 @@ final class AppModel: ObservableObject {
             client.token = info.accountToken
             self.client = client
             tokenInfo = info
-            KeychainStore.save(info.accountToken, forKey: "accountToken")
-            KeychainStore.save(info.refreshToken, forKey: "refreshToken")
-            KeychainStore.save(trimmedPhone, forKey: "phone")
+            CredentialStore.save(info.accountToken, forKey: "accountToken")
+            CredentialStore.save(info.refreshToken, forKey: "refreshToken")
+            CredentialStore.save(trimmedPhone, forKey: "phone")
             password = ""
             await connectAndLoad()
         } catch {
@@ -114,9 +121,7 @@ final class AppModel: ObservableObject {
     func logout() {
         gateway?.stop()
         gateway = nil
-        KeychainStore.delete(forKey: "accountToken")
-        KeychainStore.delete(forKey: "refreshToken")
-        KeychainStore.delete(forKey: "phone")
+        CredentialStore.deleteAll()
         devices = []
         attributes = [:]
         phone = ""
