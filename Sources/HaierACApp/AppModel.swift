@@ -1,7 +1,15 @@
 import Foundation
 import Combine
 import SwiftUI
+import ServiceManagement
 import HaierACCore
+
+/// 手动添加的设备（持久化到 UserDefaults）
+struct ManualDevice: Identifiable, Codable, Hashable {
+    let deviceId: String
+    var name: String
+    var id: String { deviceId }
+}
 
 /// 应用主状态模型
 @MainActor
@@ -26,6 +34,28 @@ final class AppModel: ObservableObject {
         }
     }
 
+    // MARK: - 设备发现与手动添加
+
+    /// 是否正在扫描局域网
+    @Published var isDiscovering = false
+    /// 最近一次发现结果
+    @Published var discoveredDevices: [DiscoveredDevice] = []
+    /// 手动添加的设备（持久化）
+    @Published var manualDevices: [ManualDevice] = [] {
+        didSet {
+            if let data = try? JSONEncoder().encode(manualDevices) {
+                UserDefaults.standard.set(data, forKey: "manualDevices")
+            }
+        }
+    }
+    /// 开机自启开关（持久化）
+    @Published var launchAtLogin: Bool {
+        didSet {
+            UserDefaults.standard.set(launchAtLogin, forKey: "launchAtLogin")
+            applyLaunchAtLogin()
+        }
+    }
+
     private var client: HaierCloudClient?
     private var gateway: HaierGatewayClient?
     private var tokenInfo: TokenInfo?
@@ -34,6 +64,12 @@ final class AppModel: ObservableObject {
     init() {
         let saved = UserDefaults.standard.string(forKey: "themeMode")
         themeMode = ThemeMode(rawValue: saved ?? "") ?? .system
+        launchAtLogin = UserDefaults.standard.bool(forKey: "launchAtLogin")
+
+        if let data = UserDefaults.standard.data(forKey: "manualDevices"),
+           let saved = try? JSONDecoder().decode([ManualDevice].self, from: data) {
+            manualDevices = saved
+        }
     }
 
     // MARK: - 生命周期
@@ -160,5 +196,65 @@ final class AppModel: ObservableObject {
     var isLoggedIn: Bool {
         if case .ready = phase { return true }
         return false
+    }
+
+    // MARK: - 局域网发现
+
+    /// 扫描当前 WiFi 下的海尔设备
+    func discoverDevices() async {
+        guard !isDiscovering else { return }
+        isDiscovering = true
+        discoveredDevices = []
+        AppLog.log("开始局域网发现")
+        let found = await DeviceDiscovery.discover(timeout: 3)
+        discoveredDevices = found
+        isDiscovering = false
+        AppLog.log("发现 \(found.count) 台设备: \(found.map { "\($0.ip)/\($0.mac)" }.joined(separator: ", "))")
+    }
+
+    /// 将发现到的设备（或手动输入 deviceId）加入列表并尝试拉取数字模型
+    func addDevice(deviceId: String, name: String) async {
+        let trimmed = deviceId.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        // 已在云端列表？无需重复添加
+        if devices.contains(where: { $0.id == trimmed }) {
+            return
+        }
+        // 已在手动列表？仅更新名称
+        if let idx = manualDevices.firstIndex(where: { $0.deviceId == trimmed }) {
+            manualDevices[idx].name = name.isEmpty ? manualDevices[idx].name : name
+            return
+        }
+        manualDevices.append(ManualDevice(deviceId: trimmed, name: name.isEmpty ? trimmed : name))
+        // 尝试拉取数字模型（验证设备可访问）
+        if let client {
+            if let attrs = try? await client.getDigitalModel(deviceId: trimmed) {
+                var map: [String: DeviceAttribute] = [:]
+                for attr in attrs where !attr.name.isEmpty {
+                    map[attr.name] = attr
+                }
+                attributes[trimmed] = map
+            }
+        }
+    }
+
+    /// 从手动列表移除设备
+    func removeManualDevice(_ device: ManualDevice) {
+        manualDevices.removeAll { $0.deviceId == device.deviceId }
+        attributes[device.deviceId] = nil
+    }
+
+    // MARK: - 开机自启
+
+    private func applyLaunchAtLogin() {
+        do {
+            if launchAtLogin {
+                try SMAppService.mainApp.register()
+            } else {
+                try SMAppService.mainApp.unregister()
+            }
+        } catch {
+            AppLog.log("自启设置失败: \(error.localizedDescription)")
+        }
     }
 }
