@@ -358,6 +358,7 @@ final class AppModel: ObservableObject {
         let cutoff = now.addingTimeInterval(-historyWindow)
         samples.removeAll { $0.timestamp < cutoff }
         temperatureHistory[deviceId] = samples
+        AppLog.log("温度采样: \(deviceId) \(temperature)°（共 \(samples.count) 条）")
     }
 
     /// 指定设备的温度序列（按时间升序；无数据时空数组）
@@ -664,6 +665,12 @@ final class AppModel: ObservableObject {
                         map[attr.name] = attr
                     }
                     attributes[deviceId] = map
+                }
+            }
+            // 初始采样：数字模型已加载，为有温度的设备记录第一条采样
+            for device in devices {
+                if let temp = Self.indoorTemperatureAttribute(in: attributes[device.id] ?? [:])?.doubleValue {
+                    recordTemperatureSample(deviceId: device.id, temperature: temp)
                 }
             }
             writeWidgetSnapshot()  // 初始状态同步到小组件
