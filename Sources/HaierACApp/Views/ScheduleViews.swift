@@ -5,6 +5,8 @@ import HaierACCore
 struct ScheduleSection: View {
     @EnvironmentObject var model: AppModel
     @State private var showAddSheet = false
+    /// 编辑模式：正在编辑的任务（nil = 新增）
+    @State private var editingAction: ScheduledAction?
 
     private var sortedActions: [ScheduledAction] {
         model.scheduledActions.sorted { $0.fireDate < $1.fireDate }
@@ -19,6 +21,7 @@ struct ScheduleSection: View {
                     .tracking(0.4)
                 Spacer()
                 Button {
+                    editingAction = nil
                     showAddSheet = true
                 } label: {
                     Label("新增", systemImage: "plus")
@@ -37,7 +40,10 @@ struct ScheduleSection: View {
             } else {
                 VStack(spacing: 0) {
                     ForEach(Array(sortedActions.enumerated()), id: \.element.id) { index, action in
-                        ScheduleRow(action: action)
+                        ScheduleRow(action: action) {
+                            editingAction = action
+                            showAddSheet = true
+                        }
                         if index < sortedActions.count - 1 {
                             Divider().overlay(Theme.hairline).padding(.leading, Theme.spaceMD)
                         }
@@ -48,7 +54,7 @@ struct ScheduleSection: View {
         }
         .padding(.horizontal, Theme.spaceLG)  // 与页面对齐（视觉修复：定时区块曾左移贴边）
         .sheet(isPresented: $showAddSheet) {
-            AddScheduleSheet()
+            AddScheduleSheet(editingAction: editingAction)
                 .environmentObject(model)
         }
     }
@@ -58,6 +64,8 @@ struct ScheduleSection: View {
 private struct ScheduleRow: View {
     @EnvironmentObject var model: AppModel
     let action: ScheduledAction
+    /// 编辑回调（点击铅笔触发）
+    var onEdit: () -> Void
 
     private var deviceName: String {
         model.devices.first(where: { $0.id == action.deviceId })?.deviceName
@@ -75,11 +83,11 @@ private struct ScheduleRow: View {
         HStack(spacing: Theme.spaceMD) {
             ZStack {
                 RoundedRectangle(cornerRadius: Theme.radiusMD, style: .continuous)
-                    .fill(action.repeatsDaily ? Theme.accent.opacity(0.12) : Theme.surface2)
+                    .fill(action.repeatLabel != nil ? Theme.accent.opacity(0.12) : Theme.surface2)
                     .frame(width: 44, height: 44)
                 Image(systemName: action.repeatLabel != nil ? "repeat" : "timer")
                     .font(.system(size: 15, weight: .medium))
-                    .foregroundStyle(action.repeatsDaily ? Theme.accent : Theme.inkMuted)
+                    .foregroundStyle(action.repeatLabel != nil ? Theme.accent : Theme.inkMuted)
             }
 
             VStack(alignment: .leading, spacing: 3) {
@@ -102,6 +110,13 @@ private struct ScheduleRow: View {
                     .background(Capsule().fill(Theme.success.opacity(0.1)))
             }
 
+            Button(action: onEdit) {
+                Image(systemName: "pencil")
+                    .font(.system(size: 11))
+                    .foregroundStyle(Theme.inkTertiary)
+            }
+            .buttonStyle(.plain)
+
             Button {
                 model.removeScheduledAction(action)
             } label: {
@@ -120,6 +135,9 @@ private struct ScheduleRow: View {
 struct AddScheduleSheet: View {
     @EnvironmentObject var model: AppModel
     @Environment(\.dismiss) private var dismiss
+
+    /// 编辑模式：传入已有任务则预填表单，保存时更新而非新增
+    var editingAction: ScheduledAction?
 
     enum Kind: String, CaseIterable {
         case schedule = "定时"
@@ -176,7 +194,7 @@ struct AddScheduleSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: Theme.spaceMD) {
-            Text("新增定时任务")
+            Text(editingAction == nil ? "新增定时任务" : "编辑定时任务")
                 .font(.system(size: 18, weight: .semibold))
                 .foregroundStyle(Theme.ink)
 
@@ -243,8 +261,8 @@ struct AddScheduleSheet: View {
                 Spacer()
                 Button("取消") { dismiss() }
                     .buttonStyle(Theme.secondaryButtonStyle())
-                Button("添加") {
-                    addAction()
+                Button(editingAction == nil ? "添加" : "保存") {
+                    saveAction()
                     dismiss()
                 }
                 .buttonStyle(Theme.primaryButtonStyle())
@@ -255,7 +273,31 @@ struct AddScheduleSheet: View {
         .frame(width: 400)
         .background(Theme.canvas)
         .onAppear {
-            // 预选第一台设备与第一个属性
+            if let editing = editingAction {
+                // 编辑模式：预填表单（定时任务的时刻、重复规则、设备、属性、值）
+                deviceId = editing.deviceId
+                attrName = editing.attrName
+                kind = .schedule
+                fireTime = editing.fireDate
+                if !editing.repeatWeekdays.isEmpty {
+                    repeatMode = .weekly
+                    repeatWeekdays = Set(editing.repeatWeekdays)
+                } else if editing.repeatsDaily {
+                    repeatMode = .daily
+                } else {
+                    repeatMode = .none
+                }
+                // 值控件预填
+                if let v = editing.attrValue {
+                    switch v {
+                    case .bool(let b): boolValue = b
+                    case .double(let d): stepValue = d
+                    case .string(let s): listValue = s
+                    default: break
+                    }
+                }
+            }
+            // 预选第一台设备与第一个属性（新增模式或编辑设备不在列表时）
             if deviceId.isEmpty, let first = selectableDevices.first {
                 deviceId = first.id
                 if let attr = writableAttrs.first {
@@ -342,8 +384,8 @@ struct AddScheduleSheet: View {
         }
     }
 
-    /// 由当前表单状态生成任务并加入模型
-    private func addAction() {
+    /// 由当前表单状态生成任务；编辑模式保留原 id 更新，新增模式创建
+    private func saveAction() {
         guard let attr = selectedAttr else { return }
         let value: AttrValue
         switch attr.valueRange {
@@ -363,6 +405,7 @@ struct AddScheduleSheet: View {
 
         let fireDate: Date
         if kind == .countdown {
+            // 倒计时：从编辑前的剩余时间推算不准确，编辑时视为重设为当前起 N 分钟
             fireDate = Date().addingTimeInterval(TimeInterval(countdownMinutes * 60))
         } else {
             // 定时：所选时刻若已过则顺延到明天
@@ -389,16 +432,32 @@ struct AddScheduleSheet: View {
             name = "\(f.string(from: fireDate)) \(attr.desc)\(repeatSuffix)"
         }
 
-        model.addScheduledAction(ScheduledAction(
-            name: name,
-            deviceId: deviceId,
-            attrName: attr.name,
-            attrDesc: attr.desc,
-            attrValueJSON: json,
-            fireDate: fireDate,
-            repeatsDaily: kind == .schedule && repeatMode == .daily,
-            repeatWeekdays: kind == .schedule && repeatMode == .weekly ? repeatWeekdays.sorted() : [],
-            enabled: true
-        ))
+        if let editing = editingAction {
+            // 编辑：保留 id 与 enabled，更新其余字段
+            model.updateScheduledAction(ScheduledAction(
+                id: editing.id,
+                name: name,
+                deviceId: deviceId,
+                attrName: attr.name,
+                attrDesc: attr.desc,
+                attrValueJSON: json,
+                fireDate: fireDate,
+                repeatsDaily: kind == .schedule && repeatMode == .daily,
+                repeatWeekdays: kind == .schedule && repeatMode == .weekly ? repeatWeekdays.sorted() : [],
+                enabled: editing.enabled
+            ))
+        } else {
+            model.addScheduledAction(ScheduledAction(
+                name: name,
+                deviceId: deviceId,
+                attrName: attr.name,
+                attrDesc: attr.desc,
+                attrValueJSON: json,
+                fireDate: fireDate,
+                repeatsDaily: kind == .schedule && repeatMode == .daily,
+                repeatWeekdays: kind == .schedule && repeatMode == .weekly ? repeatWeekdays.sorted() : [],
+                enabled: true
+            ))
+        }
     }
 }

@@ -244,6 +244,14 @@ final class AppModel: ObservableObject {
         wakeScheduler()
     }
 
+    /// 更新已有调度任务（编辑模式；保留 id 与 enabled 状态）
+    func updateScheduledAction(_ action: ScheduledAction) {
+        guard let idx = scheduledActions.firstIndex(where: { $0.id == action.id }) else { return }
+        scheduledActions[idx] = action
+        AppLog.log("更新调度: \(action.name) @ \(action.fireDate)")
+        wakeScheduler()
+    }
+
     /// 任务列表变化后唤醒调度器，立即按新时间重新休眠（不用等封顶延迟）
     private func wakeScheduler() {
         guard schedulerTask != nil else { return }
