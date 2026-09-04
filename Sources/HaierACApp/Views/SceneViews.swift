@@ -5,6 +5,8 @@ import HaierACCore
 struct SceneSection: View {
     @EnvironmentObject var model: AppModel
     @State private var showAddSheet = false
+    /// 编辑模式：正在编辑的情景（nil = 新增）
+    @State private var editingScene: AppModel.ScenePreset?
     /// 应用情景时的目标设备（空 = 第一台设备）
     @State private var targetDeviceId: String = ""
 
@@ -17,6 +19,7 @@ struct SceneSection: View {
                     .tracking(0.4)
                 Spacer()
                 Button {
+                    editingScene = nil
                     showAddSheet = true
                 } label: {
                     Label("自定义", systemImage: "plus")
@@ -56,7 +59,10 @@ struct SceneSection: View {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: Theme.spaceSM) {
                         ForEach(model.scenes) { scene in
-                            SceneCard(scene: scene, targetDeviceId: targetDeviceId)
+                            SceneCard(scene: scene, targetDeviceId: targetDeviceId) {
+                                editingScene = scene
+                                showAddSheet = true
+                            }
                         }
                     }
                 }
@@ -64,7 +70,7 @@ struct SceneSection: View {
         }
         .padding(.horizontal, Theme.spaceLG)  // 与页面对齐（视觉修复：情景区曾左移贴边）
         .sheet(isPresented: $showAddSheet) {
-            AddSceneSheet()
+            AddSceneSheet(editingScene: editingScene)
                 .environmentObject(model)
         }
     }
@@ -75,6 +81,8 @@ private struct SceneCard: View {
     @EnvironmentObject var model: AppModel
     let scene: AppModel.ScenePreset
     let targetDeviceId: String
+    /// 编辑回调（点击铅笔触发）
+    var onEdit: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -83,6 +91,12 @@ private struct SceneCard: View {
                     .font(.system(size: 18))
                     .foregroundStyle(Theme.accent)
                 Spacer()
+                Button(action: onEdit) {
+                    Image(systemName: "pencil")
+                        .font(.system(size: 9))
+                        .foregroundStyle(Theme.inkTertiary)
+                }
+                .buttonStyle(.plain)
                 Button {
                     model.removeScene(scene)
                 } label: {
@@ -150,6 +164,9 @@ struct AddSceneSheet: View {
     @EnvironmentObject var model: AppModel
     @Environment(\.dismiss) private var dismiss
 
+    /// 编辑模式：传入已有情景则预填表单，保存时更新而非新增
+    var editingScene: AppModel.ScenePreset?
+
     @State private var sceneName = ""
     @State private var sceneIcon = "sparkles"
 
@@ -185,7 +202,7 @@ struct AddSceneSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: Theme.spaceMD) {
-            Text("自定义情景")
+            Text(editingScene == nil ? "自定义情景" : "编辑情景")
                 .font(.system(size: 18, weight: .semibold))
                 .foregroundStyle(Theme.ink)
 
@@ -304,6 +321,12 @@ struct AddSceneSheet: View {
         .frame(width: 400)
         .background(Theme.canvas)
         .onAppear {
+            if let editing = editingScene {
+                // 编辑模式：预填名称、图标、动作列表
+                sceneName = editing.name
+                sceneIcon = editing.icon
+                pendingActions = editing.actions
+            }
             if deviceId.isEmpty, let first = selectableDevices.first {
                 deviceId = first.id
                 if let attr = writableAttrs.first { attrName = attr.name }
@@ -380,10 +403,16 @@ struct AddSceneSheet: View {
     }
 
     private func saveScene() {
-        model.addScene(
-            name: sceneName.trimmingCharacters(in: .whitespaces),
-            icon: sceneIcon,
-            actions: pendingActions
-        )
+        let name = sceneName.trimmingCharacters(in: .whitespaces)
+        if let editing = editingScene {
+            model.updateScene(AppModel.ScenePreset(
+                id: editing.id,
+                name: name,
+                icon: sceneIcon,
+                actions: pendingActions
+            ))
+        } else {
+            model.addScene(name: name, icon: sceneIcon, actions: pendingActions)
+        }
     }
 }

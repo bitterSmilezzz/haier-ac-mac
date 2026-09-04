@@ -489,6 +489,13 @@ final class AppModel: ObservableObject {
         scenes.removeAll { $0.id == scene.id }
     }
 
+    /// 更新已有情景（编辑模式；保留 id）
+    func updateScene(_ scene: ScenePreset) {
+        guard let idx = scenes.firstIndex(where: { $0.id == scene.id }) else { return }
+        scenes[idx] = scene
+        AppLog.log("更新情景: \(scene.name) (\(scene.actions.count) 个动作)")
+    }
+
     /// 一键应用情景：逐个下发动作（静默，不回 toast）。
     /// - 动作 deviceId 为空时默认作用于第一台设备（可在 UI 中选目标设备）；
     /// - `allDevices=true` 时，空 deviceId 的动作会下发给所有设备（批量场景）。
