@@ -103,6 +103,7 @@ private struct SceneCard: View {
                 .foregroundStyle(Theme.inkSubtle)
                 .lineLimit(2, reservesSpace: true)
 
+            // 一键应用（目标设备）
             Button {
                 model.applyScene(scene, targetDeviceId: targetDeviceId)
             } label: {
@@ -118,9 +119,28 @@ private struct SceneCard: View {
             }
             .buttonStyle(.plain)
             .disabled(!model.gatewayConnected)
+
+            // 应用到所有设备（仅多设备时显示）
+            if model.devices.count + model.manualDevices.count > 1 {
+                Button {
+                    model.applyScene(scene, allDevices: true)
+                } label: {
+                    Text("应用到全部设备")
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(Theme.accentHover)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 5)
+                        .background(
+                            RoundedRectangle(cornerRadius: Theme.radiusSM, style: .continuous)
+                                .fill(Theme.accent.opacity(0.08))
+                        )
+                }
+                .buttonStyle(.plain)
+                .disabled(!model.gatewayConnected)
+            }
         }
         .padding(Theme.spaceMD)
-        .frame(width: 132, height: 132)
+        .frame(width: 132)
         .background(Theme.cardBackground(Theme.surface1))
     }
 }
@@ -156,6 +176,13 @@ struct AddSceneSheet: View {
 
     private var selectedAttr: DeviceAttribute? { attrs[attrName] }
 
+    /// 自定义情景可选图标（SF Symbols）
+    private static let iconChoices = [
+        "sparkles", "moon.stars.fill", "house.fill", "house.and.flag.fill",
+        "sun.max.fill", "wind", "snowflake", "flame.fill",
+        "thermometer.sun.fill", "bed.double.fill", "zzz", "leaf.fill",
+    ]
+
     var body: some View {
         VStack(alignment: .leading, spacing: Theme.spaceMD) {
             Text("自定义情景")
@@ -173,6 +200,31 @@ struct AddSceneSheet: View {
                     RoundedRectangle(cornerRadius: Theme.radiusMD, style: .continuous)
                         .strokeBorder(Theme.hairline, lineWidth: 1)
                 )
+
+            // 图标选择
+            HStack(spacing: 8) {
+                ForEach(Self.iconChoices, id: \.self) { icon in
+                    let selected = sceneIcon == icon
+                    Button {
+                        sceneIcon = icon
+                    } label: {
+                        Image(systemName: icon)
+                            .font(.system(size: 13))
+                            .foregroundStyle(selected ? .white : Theme.inkMuted)
+                            .frame(width: 30, height: 26)
+                            .background(
+                                RoundedRectangle(cornerRadius: Theme.radiusSM, style: .continuous)
+                                    .fill(selected ? Theme.accent : Theme.surface1)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: Theme.radiusSM, style: .continuous)
+                                            .strokeBorder(selected ? .clear : Theme.hairline, lineWidth: 1)
+                                    )
+                            )
+                    }
+                    .buttonStyle(.plain)
+                }
+                Spacer()
+            }
 
             Picker("设备", selection: $deviceId) {
                 Text("请选择设备").tag("")

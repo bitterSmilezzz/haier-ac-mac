@@ -42,6 +42,9 @@ struct DeviceControlView: View {
                         // 头部信息
                         header
 
+                        // 实时状态胶囊（室内温度/模式/风速）
+                        statusPills
+
                         // 灯光/显示区（强调卡片）
                         lightSection
 
@@ -73,6 +76,71 @@ struct DeviceControlView: View {
                 .font(.system(size: 11))
                 .foregroundStyle(Theme.inkTertiary)
         }
+    }
+
+    /// 实时状态胶囊行：室内温度 / 模式 / 风速（只读，直观展示当前状态）
+    private var statusPills: some View {
+        HStack(spacing: Theme.spaceSM) {
+            // 室内温度（大字突出）
+            if let attr = AppModel.indoorTemperatureAttribute(in: attrs),
+               let temp = attr.doubleValue {
+                HStack(spacing: 4) {
+                    Image(systemName: "thermometer.medium")
+                        .font(.system(size: 12))
+                        .foregroundStyle(Theme.accentHover)
+                    Text(String(format: "%.0f°", temp))
+                        .font(.system(size: 18, weight: .semibold, design: .rounded))
+                        .monospacedDigit()
+                        .foregroundStyle(Theme.ink)
+                    Text("室内")
+                        .font(.system(size: 10))
+                        .foregroundStyle(Theme.inkSubtle)
+                }
+                .padding(.horizontal, Theme.spaceSM)
+                .padding(.vertical, 6)
+                .background(
+                    Capsule()
+                        .fill(Theme.surface2)
+                        .overlay(Capsule().strokeBorder(Theme.hairline, lineWidth: 1))
+                )
+            }
+
+            // 运行模式
+            if let mode = attrs["operationMode"],
+               case .list(let opts) = mode.valueRange,
+               let current = mode.value?.stringValue,
+               let opt = opts.first(where: { $0.data.stringValue == current }) {
+                statusPill(icon: "slider.horizontal.3", text: opt.desc)
+            }
+
+            // 风速
+            if let wind = attrs["windSpeed"],
+               case .list(let opts) = wind.valueRange,
+               let current = wind.value?.stringValue,
+               let opt = opts.first(where: { $0.data.stringValue == current }) {
+                statusPill(icon: "fan", text: opt.desc)
+            }
+
+            Spacer()
+        }
+    }
+
+    private func statusPill(icon: String, text: String) -> some View {
+        HStack(spacing: 4) {
+            Image(systemName: icon)
+                .font(.system(size: 11))
+                .foregroundStyle(Theme.inkSubtle)
+            Text(text)
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(Theme.inkMuted)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 5)
+        .background(
+            Capsule()
+                .fill(Theme.surface1)
+                .overlay(Capsule().strokeBorder(Theme.hairline, lineWidth: 1))
+        )
     }
 
     // MARK: - 灯光区（置顶强调）

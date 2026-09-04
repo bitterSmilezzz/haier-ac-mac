@@ -82,42 +82,49 @@ struct ContentView: View {
     @EnvironmentObject var model: AppModel
 
     var body: some View {
-        switch model.phase {
-        case .loggedOut:
-            LoginView()
-        case .connecting:
-            ZStack {
-                Theme.canvas.ignoresSafeArea()
-                VStack(spacing: Theme.spaceMD) {
-                    ProgressView()
-                        .controlSize(.regular)
-                        .tint(Theme.accent)
-                    Text("连接海尔智家云...")
-                        .font(.system(size: 13))
-                        .foregroundStyle(Theme.inkSubtle)
-                }
-            }
-        case .ready:
-            DeviceListView()
-        case .error(let message):
-            ZStack {
-                Theme.canvas.ignoresSafeArea()
-                VStack(spacing: Theme.spaceMD) {
-                    Image(systemName: "exclamationmark.triangle.fill")
-                        .font(.system(size: 36))
-                        .foregroundStyle(Theme.warning)
-                    Text(message)
-                        .font(.system(size: 13))
-                        .foregroundStyle(Theme.inkMuted)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal, Theme.spaceXL)
-                    Button("返回登录") {
-                        model.logout()
+        ZStack {
+            switch model.phase {
+            case .loggedOut:
+                LoginView()
+                    .transition(.opacity)
+            case .connecting:
+                ZStack {
+                    Theme.canvas.ignoresSafeArea()
+                    VStack(spacing: Theme.spaceMD) {
+                        ProgressView()
+                            .controlSize(.regular)
+                            .tint(Theme.accent)
+                        Text("连接海尔智家云...")
+                            .font(.system(size: 13))
+                            .foregroundStyle(Theme.inkSubtle)
                     }
-                    .buttonStyle(Theme.secondaryButtonStyle())
-                    .padding(.top, Theme.spaceXS)
                 }
+                .transition(.opacity)
+            case .ready:
+                DeviceListView()
+                    .transition(.opacity)
+            case .error(let message):
+                ZStack {
+                    Theme.canvas.ignoresSafeArea()
+                    VStack(spacing: Theme.spaceMD) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .font(.system(size: 36))
+                            .foregroundStyle(Theme.warning)
+                        Text(message)
+                            .font(.system(size: 13))
+                            .foregroundStyle(Theme.inkMuted)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, Theme.spaceXL)
+                        Button("返回登录") {
+                            model.logout()
+                        }
+                        .buttonStyle(Theme.secondaryButtonStyle())
+                        .padding(.top, Theme.spaceXS)
+                    }
+                }
+                .transition(.opacity)
             }
         }
+        .animation(.easeInOut(duration: 0.25), value: model.phase == .ready || model.phase == .loggedOut)
     }
 }

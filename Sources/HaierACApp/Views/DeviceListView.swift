@@ -443,6 +443,7 @@ struct DiscoveredDeviceRow: View {
 struct DeviceCard: View {
     let device: DeviceInfo
     @ObservedObject var model: AppModel
+    @State private var isHovering = false
 
     private var isOn: Bool? {
         model.attribute("onOffStatus", deviceId: device.id)?.boolValue
@@ -459,11 +460,11 @@ struct DeviceCard: View {
             // 状态图标
             ZStack {
                 RoundedRectangle(cornerRadius: Theme.radiusMD, style: .continuous)
-                    .fill(Theme.surface2)
+                    .fill(isHovering ? Theme.accent.opacity(0.14) : Theme.surface2)
                     .frame(width: 44, height: 44)
                 Image(systemName: "air.conditioner.horizontal")
                     .font(.system(size: 18, weight: .medium))
-                    .foregroundStyle(Theme.accent)
+                    .foregroundStyle(isHovering ? Theme.accentHover : Theme.accent)
             }
 
             VStack(alignment: .leading, spacing: 3) {
@@ -512,9 +513,19 @@ struct DeviceCard: View {
 
             Image(systemName: "chevron.right")
                 .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(Theme.inkTertiary)
+                .foregroundStyle(isHovering ? Theme.accentHover : Theme.inkTertiary)
         }
         .padding(Theme.spaceMD)
         .background(Theme.cardBackground(Theme.surface1))
+        .overlay(
+            RoundedRectangle(cornerRadius: Theme.radiusLG, style: .continuous)
+                .strokeBorder(isHovering ? Theme.accent.opacity(0.55) : .clear, lineWidth: 1)
+        )
+        .scaleEffect(isHovering ? 1.008 : 1)
+        .shadow(color: isHovering ? .black.opacity(0.12) : .clear, radius: 6, y: 2)
+        .animation(.easeOut(duration: 0.12), value: isHovering)
+        .onHover { hovering in
+            isHovering = hovering
+        }
     }
 }

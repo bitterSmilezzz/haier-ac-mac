@@ -2,6 +2,7 @@ import Foundation
 import Combine
 import SwiftUI
 import WidgetKit
+import UserNotifications
 import ServiceManagement
 import HaierACCore
 
@@ -25,10 +26,13 @@ struct ScheduledAction: Identifiable, Codable, Hashable {
     var attrDesc: String
     /// 属性值（JSON 编码，AttrValue 不可直接 Codable）
     var attrValueJSON: Data
-    /// 触发时刻（绝对时间；daily 重复时为下一次触发时刻）
+    /// 触发时刻（绝对时间；重复任务时为下一次触发时刻）
     var fireDate: Date
     /// 是否每天重复
     var repeatsDaily: Bool = false
+    /// 按星期重复：Calendar weekday（1=周日…7=周六）。
+    /// 非空时优先于 repeatsDaily；空 + 非 daily = 一次性任务
+    var repeatWeekdays: [Int] = []
     var enabled: Bool = true
 
     var attrValue: AttrValue? {
@@ -37,6 +41,18 @@ struct ScheduledAction: Identifiable, Codable, Hashable {
 
     static func valueJSON(_ value: AttrValue) -> Data? {
         AttrValueCodec.encode(value)
+    }
+
+    /// 重复规则的中文描述（如「每天」「每周一三五」），一次性返回 nil
+    var repeatLabel: String? {
+        if !repeatWeekdays.isEmpty {
+            let names = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"]
+            let days = repeatWeekdays.sorted().map { names[max(0, min($0 - 1, 6))] }
+            if days.count == 7 { return "每天" }
+            return "每周" + days.joined()
+        }
+        if repeatsDaily { return "每天" }
+        return nil
     }
 }
 
@@ -182,7 +198,8 @@ final class AppModel: ObservableObject {
     }
     private var schedulerTask: Task<Void, Never>?
 
-    /// 启动调度轮询（登录/恢复会话成功后调用；App 退出前持续运行）
+    /// 启动调度（登录/恢复会话成功后调用；App 退出前持续运行）。
+    /// 优化：按下一任务触发时刻精确休眠，替代固定 15s 轮询（省电、触发更准时）。
     func startScheduler() {
         guard schedulerTask == nil else { return }
         if let data = UserDefaults.standard.data(forKey: "scheduledActions"),
@@ -193,7 +210,14 @@ final class AppModel: ObservableObject {
             while !Task.isCancelled {
                 guard let self else { break }
                 self.fireDueActions()
-                try? await Task.sleep(nanoseconds: 15_000_000_000)  // 15s 轮询
+                // 计算到下一个待触发任务的时间（封顶 5 分钟，保证新增任务也能及时被拾取）
+                let now = Date()
+                let nextFire = self.scheduledActions
+                    .filter { $0.enabled && $0.fireDate > now }
+                    .map(\.fireDate)
+                    .min() ?? now.addingTimeInterval(300)
+                let delay = min(max(nextFire.timeIntervalSince(now), 1), 300)
+                try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
             }
         }
     }
@@ -211,35 +235,92 @@ final class AppModel: ObservableObject {
         }) else { return }
         scheduledActions.append(action)
         AppLog.log("新增调度: \(action.name) @ \(action.fireDate)")
+        requestNotificationPermission()  // 定时任务需要系统通知权限（用户拒绝则仅 toast 反馈）
+        wakeScheduler()
     }
 
     func removeScheduledAction(_ action: ScheduledAction) {
         scheduledActions.removeAll { $0.id == action.id }
+        wakeScheduler()
     }
 
-    /// 轮询检查：到点任务下发指令；每日重复任务自动顺延到下一天
-    private func fireDueActions() {        let now = Date()
+    /// 任务列表变化后唤醒调度器，立即按新时间重新休眠（不用等封顶延迟）
+    private func wakeScheduler() {
+        guard schedulerTask != nil else { return }
+        stopScheduler()
+        startScheduler()
+    }
+
+    /// 到点任务下发；重复任务按规则顺延（每天 / 按星期），一次性任务触发后删除
+    private func fireDueActions() {
+        let now = Date()
         let due = scheduledActions.filter { $0.enabled && $0.fireDate <= now }
         guard !due.isEmpty else { return }
+        let calendar = Calendar.current
         for action in due {
             guard let value = action.attrValue else { continue }
             AppLog.log("调度触发: \(action.name) -> \(action.deviceId).\(action.attrName)=\(value.stringValue)")
-            // 静默下发（不走操作反馈 toast，避免轮询批量触发刷屏）
+            // 静默下发（不走操作反馈 toast，避免批量触发刷屏）
             gatewayHandle?.sendControl(deviceId: action.deviceId, attributes: [action.attrName: value.jsonValue], completion: nil)
-            if action.repeatsDaily {
-                // 顺延到下一个整点重复时刻（保留原时刻的时:分）
-                var next = Calendar.current.date(byAdding: .day, value: 1, to: action.fireDate) ?? action.fireDate.addingTimeInterval(86400)
-                // 若因应用长时间未运行导致积压多个周期，只补发一次、推进到最近未来
+            // 系统通知：让用户知道定时任务已执行（即使 App 在后台）
+            Self.postScheduledActionNotification(action)
+
+            guard let idx = scheduledActions.firstIndex(where: { $0.id == action.id }) else { continue }
+
+            if !action.repeatWeekdays.isEmpty {
+                // 按星期重复：保留原时刻的时:分，顺延到下一个匹配的星期
+                let next = Self.nextFireDate(after: now, weekdays: action.repeatWeekdays, calendar: calendar)
+                scheduledActions[idx].fireDate = next
+            } else if action.repeatsDaily {
+                // 每天重复：顺延 24h；积压多个周期时只推进到最近未来（补发一次）
+                var next = calendar.date(byAdding: .day, value: 1, to: action.fireDate) ?? action.fireDate.addingTimeInterval(86400)
                 while next <= now {
-                    next = Calendar.current.date(byAdding: .day, value: 1, to: next) ?? next.addingTimeInterval(86400)
+                    next = calendar.date(byAdding: .day, value: 1, to: next) ?? next.addingTimeInterval(86400)
                 }
-                if let idx = scheduledActions.firstIndex(where: { $0.id == action.id }) {
-                    scheduledActions[idx].fireDate = next
-                }
+                scheduledActions[idx].fireDate = next
             } else {
                 scheduledActions.removeAll { $0.id == action.id }  // 一次性任务：触发后删除
             }
         }
+        wakeScheduler()  // 顺延/删除后重新计算休眠时间
+    }
+
+    /// 计算 after 之后（不含 after）第一个匹配 weekdays 的时刻，保留原 fireDate 的时:分
+    private static func nextFireDate(after date: Date, weekdays: [Int], calendar: Calendar) -> Date {
+        let fire = date
+        var candidate = calendar.date(byAdding: .day, value: 1, to: fire) ?? fire.addingTimeInterval(86400)
+        let maxAttempts = 14  // 星期集合最多覆盖 7 天，14 次必然命中
+        for _ in 0..<maxAttempts {
+            let weekday = calendar.component(.weekday, from: candidate)
+            if weekdays.contains(weekday) {
+                return candidate
+            }
+            candidate = calendar.date(byAdding: .day, value: 1, to: candidate) ?? candidate.addingTimeInterval(86400)
+        }
+        return candidate
+    }
+
+    // MARK: - 定时任务系统通知（v1.8）
+
+    /// 请求通知权限（首次添加定时任务时调用；拒绝后静默，仅靠 App 内 toast 反馈）
+    func requestNotificationPermission() {
+        let center = UNUserNotificationCenter.current()
+        center.requestAuthorization(options: [.alert, .sound]) { _, _ in }
+    }
+
+    /// 定时任务触发后发送系统通知（App 后台/菜单栏常驻时也能让用户感知）
+    private static func postScheduledActionNotification(_ action: ScheduledAction) {
+        let center = UNUserNotificationCenter.current()
+        let content = UNMutableNotificationContent()
+        content.title = "定时任务已执行"
+        content.body = "\(action.name)（\(action.attrDesc)）"
+        content.sound = .default
+        let request = UNNotificationRequest(
+            identifier: "scheduled-\(action.id.uuidString)",
+            content: content,
+            trigger: nil  // 立即发送
+        )
+        center.add(request)
     }
 
     // MARK: - 更新检查（G3）
@@ -250,6 +331,9 @@ final class AppModel: ObservableObject {
 
     /// 小组件快照写入队列：文件 I/O 不占主线程（AppModel 是 @MainActor）
     private static let snapshotQueue = DispatchQueue(label: "haierac.widget-snapshot")
+    /// 快照限流：属性推送可能很频繁（每次温度/状态变化都触发），5 秒内最多刷一次
+    private var lastSnapshotWrite = Date.distantPast
+    private static let snapshotThrottle: TimeInterval = 5
 
     /// 写入桌面小组件读取的状态快照。
     /// ⚠️ 不写 AppGroup 容器：非沙盒进程访问 `~/Library/Group Containers/<group>`
@@ -258,6 +342,10 @@ final class AppModel: ObservableObject {
     /// 只读临时例外 entitlement 访问同一路径。
     /// 数据结构与 Sources/HaierACWidget/Widget.swift 的 ACWidgetSnapshot 对齐
     func writeWidgetSnapshot() {
+        // 限流：属性推送可能每秒多次，5 秒内只落盘一次（文件 I/O + 时间线刷新都有开销）
+        let now = Date()
+        guard now.timeIntervalSince(lastSnapshotWrite) >= Self.snapshotThrottle else { return }
+        lastSnapshotWrite = now
         guard let deviceId = devices.first?.id else { return }
         let attrs = attributes[deviceId] ?? [:]
         var dict: [String: Any] = [:]
@@ -351,27 +439,33 @@ final class AppModel: ObservableObject {
     }
 
     /// 一键应用情景：逐个下发动作（静默，不回 toast）。
-    /// 动作 deviceId 为空时默认作用于第一台设备（可在 UI 中选目标设备）。
-    func applyScene(_ scene: ScenePreset, targetDeviceId: String? = nil) {
+    /// - 动作 deviceId 为空时默认作用于第一台设备（可在 UI 中选目标设备）；
+    /// - `allDevices=true` 时，空 deviceId 的动作会下发给所有设备（批量场景）。
+    func applyScene(_ scene: ScenePreset, targetDeviceId: String? = nil, allDevices: Bool = false) {
         guard gatewayConnected else {
             operationNotice = OperationNotice(text: "⚠️ 连接中断，情景未应用", isError: true)
             return
         }
         let fallbackId = targetDeviceId ?? devices.first?.id
+        // 空 deviceId 动作的目标设备列表：全部设备 or 单台
+        let emptyTargets: [String] = allDevices
+            ? devices.map(\.id) + manualDevices.map(\.deviceId)
+            : (fallbackId.map { [$0] } ?? [])
         var sent = 0
         for action in scene.actions {
             guard let value = action.value else { continue }
-            let deviceId = action.deviceId.isEmpty ? (fallbackId ?? "") : action.deviceId
-            guard !deviceId.isEmpty else { continue }
-            gatewayHandle?.sendControl(deviceId: deviceId, attributes: [action.attrName: value.jsonValue], completion: nil)
-            // 乐观更新
-            if var map = attributes[deviceId], let old = map[action.attrName] {
-                map[action.attrName] = old.updating(value: value)
-                attributes[deviceId] = map
+            let targets = action.deviceId.isEmpty ? emptyTargets : [action.deviceId]
+            for deviceId in targets where !deviceId.isEmpty {
+                gatewayHandle?.sendControl(deviceId: deviceId, attributes: [action.attrName: value.jsonValue], completion: nil)
+                // 乐观更新
+                if var map = attributes[deviceId], let old = map[action.attrName] {
+                    map[action.attrName] = old.updating(value: value)
+                    attributes[deviceId] = map
+                }
+                sent += 1
             }
-            sent += 1
         }
-        AppLog.log("应用情景: \(scene.name) (\(sent) 个动作)")
+        AppLog.log("应用情景: \(scene.name) (\(sent) 个动作, allDevices=\(allDevices))")
         operationNotice = OperationNotice(text: sent > 0 ? "✅ 情景「\(scene.name)」已下发（\(sent) 项）" : "⚠️ 情景「\(scene.name)」无可下发的动作", isError: sent == 0)
     }
 
@@ -508,17 +602,22 @@ final class AppModel: ObservableObject {
             deviceIds = devices.map(\.deviceId)
             AppLog.log("设备列表: \(devices.map { $0.deviceName }.joined(separator: ", "))")
 
-            // 拉取所有设备数字模型（初始快照）
-            for device in devices {
-                if let attrs = try? await provider.fetchDigitalModel(context: context, deviceId: device.id) {
-                    AppLog.log("数字模型 \(device.id): \(attrs.count) 个属性")
+            // 拉取所有设备数字模型（初始快照）；多设备并行以加快加载
+            await withTaskGroup(of: (String, [DeviceAttribute]).self) { group in
+                for device in devices {
+                    group.addTask {
+                        let attrs = (try? await provider.fetchDigitalModel(context: context, deviceId: device.id)) ?? []
+                        return (device.id, attrs)
+                    }
+                }
+                for await (deviceId, attrs) in group {
+                    guard generation == sessionGeneration else { return }  // 期间已登出
+                    AppLog.log("数字模型 \(deviceId): \(attrs.count) 个属性")
                     var map: [String: DeviceAttribute] = [:]
                     for attr in attrs where !attr.name.isEmpty {
                         map[attr.name] = attr
                     }
-                    attributes[device.id] = map
-                } else {
-                    AppLog.log("数字模型 \(device.id) 获取失败")
+                    attributes[deviceId] = map
                 }
             }
             writeWidgetSnapshot()  // 初始状态同步到小组件

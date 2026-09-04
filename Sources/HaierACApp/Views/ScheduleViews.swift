@@ -77,7 +77,7 @@ private struct ScheduleRow: View {
                 RoundedRectangle(cornerRadius: Theme.radiusMD, style: .continuous)
                     .fill(action.repeatsDaily ? Theme.accent.opacity(0.12) : Theme.surface2)
                     .frame(width: 44, height: 44)
-                Image(systemName: action.repeatsDaily ? "repeat" : "timer")
+                Image(systemName: action.repeatLabel != nil ? "repeat" : "timer")
                     .font(.system(size: 15, weight: .medium))
                     .foregroundStyle(action.repeatsDaily ? Theme.accent : Theme.inkMuted)
             }
@@ -86,7 +86,7 @@ private struct ScheduleRow: View {
                 Text(action.name)
                     .font(.system(size: 14, weight: .medium))
                     .foregroundStyle(Theme.ink)
-                Text("\(deviceName) · \(timeText)\(action.repeatsDaily ? " · 每天" : "")")
+                Text("\(deviceName) · \(timeText)\(action.repeatLabel.map { " · \($0)" } ?? "")")
                     .font(.system(size: 11))
                     .foregroundStyle(Theme.inkSubtle)
             }
@@ -129,7 +129,17 @@ struct AddScheduleSheet: View {
     @State private var kind: Kind = .schedule
     @State private var fireTime = Calendar.current.date(bySettingHour: 22, minute: 0, second: 0, of: Date()) ?? Date()
     @State private var countdownMinutes: Int = 30
-    @State private var repeatsDaily = false
+
+    /// 重复模式：none=一次性 / daily=每天 / weekly=按星期
+    enum RepeatMode: String, CaseIterable, Identifiable {
+        case none = "仅一次"
+        case daily = "每天"
+        case weekly = "按星期"
+        var id: String { rawValue }
+    }
+    @State private var repeatMode: RepeatMode = .none
+    /// 按星期模式选中的星期（Calendar weekday：1=周日…7=周六）
+    @State private var repeatWeekdays: Set<Int> = [2, 3, 4, 5, 6]  // 默认工作日
 
     /// 目标设备
     @State private var deviceId: String = ""
@@ -209,7 +219,22 @@ struct AddScheduleSheet: View {
             // 时间设置
             if kind == .schedule {
                 DatePicker("触发时间", selection: $fireTime, displayedComponents: .hourAndMinute)
-                Toggle("每天重复", isOn: $repeatsDaily)
+                // 重复模式
+                Picker("重复", selection: $repeatMode) {
+                    ForEach(RepeatMode.allCases) { mode in
+                        Text(mode.rawValue).tag(mode)
+                    }
+                }
+                .pickerStyle(.segmented)
+                if repeatMode == .weekly {
+                    // 星期多选（周一~周日）
+                    HStack(spacing: 6) {
+                        ForEach(2...7, id: \.self) { weekday in
+                            weekdayButton(weekday, label: ["一", "二", "三", "四", "五", "六"][weekday - 2])
+                        }
+                        weekdayButton(1, label: "日")
+                    }
+                }
             } else {
                 Stepper("\(countdownMinutes) 分钟后触发", value: $countdownMinutes, in: 1...720)
             }
@@ -240,9 +265,34 @@ struct AddScheduleSheet: View {
         }
     }
 
+    /// 星期选择小按钮（选中态高亮）
+    private func weekdayButton(_ weekday: Int, label: String) -> some View {
+        let selected = repeatWeekdays.contains(weekday)
+        return Button {
+            if selected {
+                repeatWeekdays.remove(weekday)
+            } else {
+                repeatWeekdays.insert(weekday)
+            }
+        } label: {
+            Text(label)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(selected ? .white : Theme.inkMuted)
+                .frame(width: 32, height: 28)
+                .background(
+                    RoundedRectangle(cornerRadius: Theme.radiusSM, style: .continuous)
+                        .fill(selected ? Theme.accent : Theme.surface1)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: Theme.radiusSM, style: .continuous)
+                                .strokeBorder(selected ? .clear : Theme.hairline, lineWidth: 1)
+                        )
+                )
+        }
+        .buttonStyle(.plain)
+    }
+
     @ViewBuilder
-    private func valueControl(_ attr: DeviceAttribute) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
+    private func valueControl(_ attr: DeviceAttribute) -> some View {        VStack(alignment: .leading, spacing: 8) {
             Text("将 \(attr.desc) 设为：")
                 .font(.system(size: 12))
                 .foregroundStyle(Theme.inkSubtle)
@@ -326,7 +376,17 @@ struct AddScheduleSheet: View {
         } else {
             let f = DateFormatter()
             f.dateFormat = "HH:mm"
-            name = "\(f.string(from: fireDate)) \(attr.desc)\(repeatsDaily ? "（每天）" : "")"
+            let repeatSuffix: String
+            switch repeatMode {
+            case .none: repeatSuffix = ""
+            case .daily: repeatSuffix = "（每天）"
+            case .weekly:
+                let names = ["日", "一", "二", "三", "四", "五", "六"]
+                let sorted = repeatWeekdays.sorted()
+                let label = sorted.count == 7 ? "每天" : "周" + sorted.map { names[$0 - 1] }.joined()
+                repeatSuffix = "（\(label)）"
+            }
+            name = "\(f.string(from: fireDate)) \(attr.desc)\(repeatSuffix)"
         }
 
         model.addScheduledAction(ScheduledAction(
@@ -336,7 +396,8 @@ struct AddScheduleSheet: View {
             attrDesc: attr.desc,
             attrValueJSON: json,
             fireDate: fireDate,
-            repeatsDaily: kind == .schedule && repeatsDaily,
+            repeatsDaily: kind == .schedule && repeatMode == .daily,
+            repeatWeekdays: kind == .schedule && repeatMode == .weekly ? repeatWeekdays.sorted() : [],
             enabled: true
         ))
     }
