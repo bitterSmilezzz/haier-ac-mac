@@ -70,6 +70,17 @@ struct DeviceListView: View {
             }
             Spacer()
             if batchMode {
+                // 全选 / 清空
+                Button {
+                    if selectedDeviceIds.count == batchableDevices.count {
+                        selectedDeviceIds = []
+                    } else {
+                        selectedDeviceIds = Set(batchableDevices.map(\.id))
+                    }
+                } label: {
+                    Label(selectedDeviceIds.count == batchableDevices.count ? "清空" : "全选", systemImage: selectedDeviceIds.count == batchableDevices.count ? "xmark.circle" : "checkmark.circle")
+                }
+                .buttonStyle(Theme.secondaryButtonStyle())
                 Button {
                     selectedDeviceIds = []
                     batchMode = false
