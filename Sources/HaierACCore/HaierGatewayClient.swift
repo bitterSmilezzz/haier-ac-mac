@@ -16,6 +16,9 @@ public final class HaierGatewayClient: NSObject, URLSessionWebSocketDelegate {
     public var onDisconnected: ((Error?) -> Void)?
     public var onConnected: (() -> Void)?
 
+    /// 当前是否已连接
+    public private(set) var isConnected = false
+
     public init(token: String, deviceIds: [String]) {
         self.token = token
         self.deviceIds = deviceIds
@@ -54,6 +57,7 @@ public final class HaierGatewayClient: NSObject, URLSessionWebSocketDelegate {
 
     public func urlSession(_ session: URLSession, webSocketTask: URLSessionWebSocketTask, didOpenWithProtocol protocol: String?) {
         AppLog.log("WS 已连接 (didOpen)")
+        isConnected = true
         subscribe()
         startHeartbeat()
         onConnected?()
@@ -194,6 +198,7 @@ public final class HaierGatewayClient: NSObject, URLSessionWebSocketDelegate {
     // MARK: - 断开/重连
 
     private func handleDisconnect(_ error: Error?) {
+        isConnected = false
         task?.cancel()
         task = nil
         heartbeatTask?.cancel()

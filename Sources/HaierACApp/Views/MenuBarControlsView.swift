@@ -42,6 +42,10 @@ struct MenuBarControlsView: View {
         .padding(12)
         .frame(width: 300)
         .background(Theme.canvas)
+        .overlay(alignment: .top) {
+            OperationToast()
+                .padding(.top, 4)
+        }
     }
 
     // MARK: - 窗口头部（仿控制中心）

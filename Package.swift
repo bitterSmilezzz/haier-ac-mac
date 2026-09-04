@@ -7,5 +7,7 @@ let package = Package(
     targets: [
         .target(name: "HaierACCore"),
         .executableTarget(name: "HaierACApp", dependencies: ["HaierACCore"]),
+        // 测试源码放在 Sources/HaierACCoreTests/（SwiftPM 默认查 Tests/，故显式指定 path）
+        .testTarget(name: "HaierACCoreTests", dependencies: ["HaierACCore"], path: "Sources/HaierACCoreTests"),
     ]
 )
