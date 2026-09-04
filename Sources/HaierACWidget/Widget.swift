@@ -155,6 +155,13 @@ struct ACWidgetView: View {
                     .foregroundStyle(Color.white.opacity(0.6))
             }
 
+            // 湿度（设备支持时）
+            if let humidity = snapshot?.humidity {
+                Text(String(format: "湿度 %.0f%%", humidity))
+                    .font(.system(size: 11))
+                    .foregroundStyle(Color.white.opacity(0.5))
+            }
+
             if let name = snapshot?.deviceName {
                 Text(name)
                     .font(.system(size: 10))
