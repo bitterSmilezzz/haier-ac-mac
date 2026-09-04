@@ -62,6 +62,7 @@ struct SceneSection: View {
                 }
             }
         }
+        .padding(.horizontal, Theme.spaceLG)  // 与页面对齐（视觉修复：情景区曾左移贴边）
         .sheet(isPresented: $showAddSheet) {
             AddSceneSheet()
                 .environmentObject(model)

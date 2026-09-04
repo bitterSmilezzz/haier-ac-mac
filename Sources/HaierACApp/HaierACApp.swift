@@ -1,6 +1,8 @@
 import SwiftUI
 import AppKit
-import HaierACCore/// 应用委托：启动时后台恢复会话，不自动打开主窗口
+import HaierACCore
+
+/// 应用委托：启动时后台恢复会话，不自动打开主窗口
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItemController: StatusItemController?
@@ -27,14 +29,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    /// 应用级 URL 处理（haierac://main）：窗口全部关闭时也能打开主窗口。
+    /// 视图级 onOpenURL 在无窗口时不触发，必须在这里处理。
+    func application(_ application: NSApplication, open urls: [URL]) {
+        for url in urls where url.scheme == "haierac" {
+            openMainWindow()
+        }
+    }
+
+    /// 打开（或重建）主窗口
+    func openMainWindow() {
+        NSApp.activate(ignoringOtherApps: true)
+        if let window = NSApp.windows.first(where: { $0.title == "海尔空调控制" }) {
+            window.makeKeyAndOrderFront(nil)
+        } else {
+            NotificationCenter.default.post(name: .haierOpenMainWindow, object: nil)
+        }
+    }
+
     /// 点击 Dock 图标时恢复主窗口（手动主动点击才显示）
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
         if !flag {
-            for window in NSApp.windows {
-                if window.title == "海尔空调控制" {
-                    window.makeKeyAndOrderFront(nil)
-                }
-            }
+            openMainWindow()
         }
         return true
     }
@@ -54,13 +70,6 @@ struct HaierACApp: App {
                 .preferredColorScheme(model.themeMode.colorScheme)
                 .onReceive(NotificationCenter.default.publisher(for: .haierOpenMainWindow)) { _ in
                     openWindow(id: "main")
-                }
-                // 小组件点击（haierac://main）：打开主窗口
-                .onOpenURL { url in
-                    if url.scheme == "haierac" {
-                        openWindow(id: "main")
-                        NSApp.activate(ignoringOtherApps: true)
-                    }
                 }
         }
         .windowResizability(.contentMinSize)

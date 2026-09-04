@@ -46,6 +46,7 @@ struct ScheduleSection: View {
                 .background(Theme.cardBackground(Theme.surface1))
             }
         }
+        .padding(.horizontal, Theme.spaceLG)  // 与页面对齐（视觉修复：定时区块曾左移贴边）
         .sheet(isPresented: $showAddSheet) {
             AddScheduleSheet()
                 .environmentObject(model)
