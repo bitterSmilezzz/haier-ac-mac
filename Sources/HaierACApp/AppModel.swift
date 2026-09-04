@@ -59,9 +59,26 @@ final class AppModel: ObservableObject {
         }
     }
 
-    private var client: HaierCloudClient?
-    private var gateway: HaierGatewayClient?
-    private var tokenInfo: TokenInfo?
+    // MARK: - 操作反馈（U4）
+
+    /// 最近一次操作的结果提示（主窗口/菜单栏面板显示 toast）
+    struct OperationNotice: Identifiable, Equatable {
+        let id = UUID()
+        let text: String
+        let isError: Bool
+    }
+
+    @Published var operationNotice: OperationNotice?
+    /// 待确认的操作（发送后等待网关回读）
+    private var pendingConfirm: (deviceId: String, name: String, expected: AttrValue)?
+
+    // MARK: - 更新检查（G3）
+
+    @Published var updateAvailable: (version: String, url: URL)?
+
+    private var provider: (any DeviceProvider)?
+    private var context: ProviderContext?
+    private var gatewayHandle: (any GatewayHandle)?
     private var deviceIds: [String] = []
 
     init() {
@@ -79,15 +96,20 @@ final class AppModel: ObservableObject {
 
     /// 启动时恢复会话（由 AppDelegate 在应用启动完成时调用）
     func restoreSession() {
-        guard client == nil else { return }  // 防重入：已有会话则跳过
+        guard provider == nil else { return }  // 防重入：已有会话则跳过
         // 一次性迁移：旧版本 Keychain 数据 → 文件存储（无弹窗方案）
         CredentialStore.migrateFromKeychainIfNeeded()
         guard let savedToken = CredentialStore.load(forKey: "accountToken"),
               let savedPhone = CredentialStore.load(forKey: "phone") else { return }
         phone = savedPhone
-        client = HaierCloudClient(clientId: savedPhone)
-        client?.token = savedToken
-        tokenInfo = nil
+        let provider = HaierProvider()
+        self.provider = provider
+        self.context = ProviderContext(
+            providerId: provider.providerId,
+            account: savedPhone,
+            token: savedToken,
+            refreshToken: CredentialStore.load(forKey: "refreshToken")
+        )
         phase = .connecting
         Task {
             await connectAndLoad()
@@ -102,26 +124,28 @@ final class AppModel: ObservableObject {
         }
         phase = .connecting
         do {
-            var client = HaierCloudClient(clientId: trimmedPhone)
-            let info = try await client.login(phone: trimmedPhone, password: password)
-            AppLog.log("登录成功 expiresIn=\(info.expiresIn)")
-            client.token = info.accountToken
-            self.client = client
-            tokenInfo = info
-            CredentialStore.save(info.accountToken, forKey: "accountToken")
-            CredentialStore.save(info.refreshToken, forKey: "refreshToken")
+            let provider = HaierProvider()
+            let context = try await provider.login(account: trimmedPhone, password: password)
+            self.provider = provider
+            self.context = context
+            CredentialStore.save(context.token, forKey: "accountToken")
+            if let refresh = context.refreshToken {
+                CredentialStore.save(refresh, forKey: "refreshToken")
+            }
             CredentialStore.save(trimmedPhone, forKey: "phone")
             password = ""
             await connectAndLoad()
         } catch {
-            phase = .error(error.localizedDescription)
+            phase = .error(AppModel.classifyError(error))
         }
     }
 
     func logout() {
-        gateway?.stop()
-        gateway = nil
+        gatewayHandle?.stop()
+        gatewayHandle = nil
         CredentialStore.deleteAll()
+        provider = nil
+        context = nil
         devices = []
         attributes = [:]
         phone = ""
@@ -130,15 +154,15 @@ final class AppModel: ObservableObject {
 
     private func connectAndLoad() async {
         do {
-            guard let client else { throw HaierError.invalidResponse }
-            let devices = try await client.getDevices()
+            guard let provider, let context else { throw HaierError.invalidResponse }
+            let devices = try await provider.fetchDevices(context: context)
             self.devices = devices
             deviceIds = devices.map(\.deviceId)
             AppLog.log("设备列表: \(devices.map { $0.deviceName }.joined(separator: ", "))")
 
             // 拉取所有设备数字模型（初始快照）
             for device in devices {
-                if let attrs = try? await client.getDigitalModel(deviceId: device.id) {
+                if let attrs = try? await provider.fetchDigitalModel(context: context, deviceId: device.id) {
                     AppLog.log("数字模型 \(device.id): \(attrs.count) 个属性")
                     var map: [String: DeviceAttribute] = [:]
                     for attr in attrs where !attr.name.isEmpty {
@@ -151,47 +175,132 @@ final class AppModel: ObservableObject {
             }
 
             // 连接实时网关
-            let gatewayURL = try await client.getGateway()
-            AppLog.log("网关地址: \(gatewayURL.absoluteString)")
-            let gateway = HaierGatewayClient(token: client.token, deviceIds: deviceIds)
-            self.gateway = gateway
-            gateway.onAttributes = { [weak self] deviceId, attrs in
-                AppLog.log("收到属性推送: \(deviceId) \(attrs.count) 个")
-                Task { @MainActor in
-                    guard let self else { return }
-                    var map = self.attributes[deviceId] ?? [:]
-                    for (name, attr) in attrs {
-                        map[name] = attr
+            let handle = try await provider.connectGateway(
+                context: context,
+                deviceIds: deviceIds,
+                onAttributes: { [weak self] deviceId, attrs in
+                    AppLog.log("收到属性推送: \(deviceId) \(attrs.count) 个")
+                    Task { @MainActor in
+                        guard let self else { return }
+                        var map = self.attributes[deviceId] ?? [:]
+                        for (name, attr) in attrs {
+                            map[name] = attr
+                        }
+                        self.attributes[deviceId] = map
+                        self.confirmPendingIfNeeded(deviceId: deviceId, attrs: attrs)
                     }
-                    self.attributes[deviceId] = map
+                },
+                onDisconnected: { [weak self] _ in
+                    AppLog.log("网关断开")
+                    Task { @MainActor in
+                        self?.gatewayConnected = false
+                        self?.failPendingOnDisconnect()
+                    }
                 }
-            }
-            gateway.onDisconnected = { [weak self] _ in
-                AppLog.log("网关断开")
-                Task { @MainActor in
-                    self?.gatewayConnected = false
-                }
-            }
-            gateway.start(gatewayURL: gatewayURL)
+            )
+            self.gatewayHandle = handle
+            handle.start()
             gatewayConnected = true
             phase = .ready
         } catch {
             AppLog.log("连接失败: \(error.localizedDescription)")
-            phase = .error(error.localizedDescription)
+            phase = .error(AppModel.classifyError(error))
         }
     }
 
     // MARK: - 控制
 
-    /// 发送属性控制指令（值是原始 JSON 类型）
+    /// 发送属性控制指令（值是原始 JSON 类型），并给出操作反馈
     func sendAttribute(_ name: String, value: AttrValue, deviceId: String) {
         AppLog.log("sendAttribute: \(name)=\(value.stringValue) device=\(deviceId)")
-        gateway?.sendControl(deviceId: deviceId, attributes: [name: value.jsonValue])
+
+        // 失效预案：网关未连接时明确提示，不静默失败
+        guard gatewayConnected, gatewayHandle != nil else {
+            operationNotice = OperationNotice(text: "⚠️ 连接中断，指令未发送（自动重连中）", isError: true)
+            return
+        }
+
+        gatewayHandle?.sendControl(deviceId: deviceId, attributes: [name: value.jsonValue])
         // 乐观更新
         if var map = attributes[deviceId], let old = map[name] {
             map[name] = old.updating(value: value)
             attributes[deviceId] = map
         }
+
+        // 操作反馈：显示属性中文名（如「情景灯光」）
+        let desc = attributes[deviceId]?[name]?.desc ?? name
+        operationNotice = OperationNotice(text: "已发送：\(desc)", isError: false)
+        // 记录待确认项，等网关回读确认生效
+        pendingConfirm = (deviceId, name, value)
+    }
+
+    /// 网关推送属性时调用：确认待生效操作
+    private func confirmPendingIfNeeded(deviceId: String, attrs: [String: DeviceAttribute]) {
+        guard let pending = pendingConfirm,
+              pending.deviceId == deviceId,
+              let pushed = attrs[pending.name],
+              pushed.value == pending.expected else { return }
+        pendingConfirm = nil
+        let desc = attrs[pending.name]?.desc ?? pending.name
+        operationNotice = OperationNotice(text: "✅ \(desc) 已生效", isError: false)
+    }
+
+    /// 网关断开时调用：未确认的操作标记失败
+    private func failPendingOnDisconnect() {
+        guard let pending = pendingConfirm else { return }
+        pendingConfirm = nil
+        let desc = attributes[pending.deviceId]?[pending.name]?.desc ?? pending.name
+        operationNotice = OperationNotice(text: "⚠️ \(desc) 可能未生效（连接中断）", isError: true)
+    }
+
+    /// 检查 GitHub 是否有新版本（G3 失效预案）
+    func checkForUpdates() async {
+        guard let url = URL(string: "https://api.github.com/repos/bitterSmilezzz/haier-ac-mac/releases/latest") else { return }
+        var request = URLRequest(url: url)
+        request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
+        request.setValue("HaierAC-Mac/1.2", forHTTPHeaderField: "User-Agent")
+        guard let (data, _) = try? await URLSession.shared.data(for: request),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let tag = json["tag_name"] as? String,
+              let htmlURL = json["html_url"] as? String,
+              let latestURL = URL(string: htmlURL) else { return }
+        let current = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.2.0"
+        // tag 形如 "v1.2.1"，去掉 v 前缀比较
+        let latest = tag.hasPrefix("v") ? String(tag.dropFirst()) : tag
+        if latest.compare(current, options: .numeric) == .orderedDescending {
+            updateAvailable = (latest, latestURL)
+            AppLog.log("发现新版本: \(latest) -> \(latestURL)")
+        }
+    }
+
+    /// 错误分类（G3 失效预案）：区分网络 / 账号 / 协议问题，协议类引导用户查看仓库
+    static func classifyError(_ error: Error) -> String {
+        if let haierError = error as? HaierError {
+            switch haierError {
+            case .network:
+                return "网络连接失败，请检查网络后重试"
+            case .http(let code) where code == 401 || code == 403:
+                return "账号凭据失效，请退出后重新登录"
+            case .retCode(let code, _) where code.contains("430"):
+                return "账号登录异常（\(code)），请重新登录"
+            case .retCode(let code, _):
+                // 未知业务错误：可能是海尔协议已变更
+                return "海尔云接口返回异常（\(code)）。\n若反复出现，可能是协议已变更，请到 GitHub 仓库查看更新：github.com/bitterSmilezzz/haier-ac-mac"
+            default:
+                return "请求失败：\(error.localizedDescription)"
+            }
+        }
+        if let urlError = error as? URLError {
+            switch urlError.code {
+            case .notConnectedToInternet, .networkConnectionLost:
+                return "网络连接失败，请检查网络后重试"
+            case .timedOut:
+                return "连接超时，请稍后重试"
+            default:
+                return "网络错误：\(urlError.localizedDescription)"
+            }
+        }
+        return error.localizedDescription
     }
 
     func attribute(_ name: String, deviceId: String) -> DeviceAttribute? {
@@ -232,8 +341,8 @@ final class AppModel: ObservableObject {
         }
         manualDevices.append(ManualDevice(deviceId: trimmed, name: name.isEmpty ? trimmed : name))
         // 尝试拉取数字模型（验证设备可访问）
-        if let client {
-            if let attrs = try? await client.getDigitalModel(deviceId: trimmed) {
+        if let provider, let context {
+            if let attrs = try? await provider.fetchDigitalModel(context: context, deviceId: trimmed) {
                 var map: [String: DeviceAttribute] = [:]
                 for attr in attrs where !attr.name.isEmpty {
                     map[attr.name] = attr

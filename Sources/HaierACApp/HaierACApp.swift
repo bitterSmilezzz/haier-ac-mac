@@ -8,6 +8,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         // 后台恢复登录会话（菜单栏面板可直接使用，不弹主窗口）
         AppModel.shared.restoreSession()
+        // 后台检查 GitHub 是否有新版本（G3 失效预案）
+        Task { await AppModel.shared.checkForUpdates() }
 
         // 启动后关闭自动出现的主窗口，转入后台（SwiftUI 窗口在此刻已创建完成）
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {

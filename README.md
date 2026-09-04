@@ -23,15 +23,25 @@
 ```
 SwiftUI App
 ├── HaierACCore        # 协议核心库（纯系统框架，零第三方依赖）
+│   ├── DeviceProvider     # 提供商协议：多品牌扩展位（海尔/华为/米家）
+│   ├── HaierProvider      # 海尔实现（登录/设备/数字模型/网关）
 │   ├── RequestSigner      # SHA256 请求签名（CryptoKit）
 │   ├── HaierCloudClient   # REST：登录/刷新/设备/数字模型/网关
 │   ├── HaierGatewayClient # WebSocket：订阅/心跳/控制/断线重连
 │   ├── Zlib               # 下行数据解压（系统 libz）
-│   └── KeychainStore      # Token 安全存储（Security）
+│   ├── CredentialStore    # 凭据加密存储（硬件绑定密钥 + AES-GCM）
+│   └── KeychainStore      # 旧版迁移（Keychain → 文件，一次性）
 └── HaierACApp         # SwiftUI 界面
-    ├── Views/             # 登录/设备列表/控制面板/菜单栏面板
+    ├── Views/             # 登录/设备列表/控制面板/菜单栏面板/反馈组件
     └── Theme.swift        # 设计令牌（浅色/深色双色板）
 ```
+
+## 测试与 CI
+
+```bash
+swift test    # 协议层单测（签名/解析/解码；需完整 Xcode，本机 CLT 不含 XCTest）
+```
+GitHub Actions 自动在 macos-latest 上构建 + 测试。
 
 ## 构建
 

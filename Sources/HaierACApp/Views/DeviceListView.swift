@@ -14,6 +14,7 @@ struct DeviceListView: View {
 
                 ScrollView {
                     VStack(alignment: .leading, spacing: Theme.spaceMD) {
+                        UpdateBanner()
                         header
                         cloudDevicesSection
                         manualDevicesSection
@@ -23,6 +24,10 @@ struct DeviceListView: View {
                 }
                 .navigationDestination(for: DeviceInfo.self) { device in
                     DeviceControlView(device: device)
+                }
+                .overlay(alignment: .top) {
+                    OperationToast()
+                        .padding(.top, 8)
                 }
             }
         }
