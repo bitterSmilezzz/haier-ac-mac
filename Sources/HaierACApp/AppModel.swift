@@ -428,6 +428,9 @@ final class AppModel: ObservableObject {
         if let on = attrs["onOffStatus"]?.boolValue {
             dict["powerOn"] = on
         }
+        if let hum = AppModel.indoorHumidityAttribute(in: attrs)?.doubleValue {
+            dict["humidity"] = hum
+        }
         dict["deviceName"] = devices.first?.deviceName ?? ""
         dict["updatedAt"] = ISO8601DateFormatter().string(from: Date())
         guard let data = try? JSONSerialization.data(withJSONObject: dict) else { return }

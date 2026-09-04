@@ -8,10 +8,11 @@ struct ACWidgetSnapshot: Codable {
     var temperature: Double?
     var targetTemp: Double?
     var powerOn: Bool?
+    var humidity: Double?
     var deviceName: String?
     var updatedAt: Date?
 
-    static let empty = ACWidgetSnapshot(temperature: nil, targetTemp: nil, powerOn: nil, deviceName: nil, updatedAt: nil)
+    static let empty = ACWidgetSnapshot(temperature: nil, targetTemp: nil, powerOn: nil, humidity: nil, deviceName: nil, updatedAt: nil)
 }
 
 /// 主 App 写入、Widget 读取的状态快照
@@ -26,7 +27,10 @@ enum ACSharedState {
     static func loadSnapshot() -> ACWidgetSnapshot? {
         let url = snapshotURL()
         guard let data = try? Data(contentsOf: url) else { return nil }
-        return try? JSONDecoder().decode(ACWidgetSnapshot.self, from: data)
+        let decoder = JSONDecoder()
+        // 主 App 用 ISO8601DateFormatter 写 updatedAt，这里必须用同策略解析
+        decoder.dateDecodingStrategy = .iso8601
+        return try? decoder.decode(ACWidgetSnapshot.self, from: data)
     }
 
     static func snapshotURL() -> URL {
@@ -186,7 +190,7 @@ struct ACWidgetView: View {
 
             Spacer()
 
-            // 右侧目标温度
+            // 右侧目标温度 + 湿度
             if let target = snapshot?.targetTemp {
                 VStack(spacing: 4) {
                     Image(systemName: "target")
@@ -197,6 +201,27 @@ struct ACWidgetView: View {
                         .monospacedDigit()
                         .foregroundStyle(.white)
                     Text("目标")
+                        .font(.system(size: 10))
+                        .foregroundStyle(Color.white.opacity(0.5))
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
+                .background(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(Color.white.opacity(0.08))
+                )
+            }
+            // 湿度（设备有湿度传感器时显示）
+            if let humidity = snapshot?.humidity {
+                VStack(spacing: 4) {
+                    Image(systemName: "humidity.fill")
+                        .font(.system(size: 13))
+                        .foregroundStyle(Color.white.opacity(0.5))
+                    Text(String(format: "%.0f%%", humidity))
+                        .font(.system(size: 20, weight: .semibold, design: .rounded))
+                        .monospacedDigit()
+                        .foregroundStyle(.white)
+                    Text("湿度")
                         .font(.system(size: 10))
                         .foregroundStyle(Color.white.opacity(0.5))
                 }
