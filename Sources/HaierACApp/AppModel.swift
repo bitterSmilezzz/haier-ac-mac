@@ -263,6 +263,14 @@ final class AppModel: ObservableObject {
         wakeScheduler()
     }
 
+    /// 启用/禁用调度任务（临时暂停，无需删除）
+    func setScheduledActionEnabled(_ id: UUID, enabled: Bool) {
+        guard let idx = scheduledActions.firstIndex(where: { $0.id == id }) else { return }
+        scheduledActions[idx].enabled = enabled
+        AppLog.log(enabled ? "启用调度: \(scheduledActions[idx].name)" : "暂停调度: \(scheduledActions[idx].name)")
+        wakeScheduler()
+    }
+
     /// 任务列表变化后唤醒调度器，立即按新时间重新休眠（不用等封顶延迟）
     private func wakeScheduler() {
         guard schedulerTask != nil else { return }

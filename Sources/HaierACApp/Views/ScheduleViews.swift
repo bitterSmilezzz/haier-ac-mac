@@ -101,6 +101,18 @@ private struct ScheduleRow: View {
 
             Spacer()
 
+            // 启用/禁用开关（临时暂停任务，无需删除）
+            Toggle("", isOn: Binding(
+                get: { action.enabled },
+                set: { enabled in
+                    model.setScheduledActionEnabled(action.id, enabled: enabled)
+                }
+            ))
+            .labelsHidden()
+            .toggleStyle(.switch)
+            .controlSize(.mini)
+            .tint(Theme.accent)
+
             if action.enabled {
                 Text("待触发")
                     .font(.system(size: 10, weight: .medium))
@@ -108,6 +120,13 @@ private struct ScheduleRow: View {
                     .padding(.horizontal, 8)
                     .padding(.vertical, 3)
                     .background(Capsule().fill(Theme.success.opacity(0.1)))
+            } else {
+                Text("已暂停")
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(Theme.inkTertiary)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(Capsule().fill(Theme.surface2))
             }
 
             Button(action: onEdit) {
