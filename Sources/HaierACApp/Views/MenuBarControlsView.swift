@@ -4,7 +4,6 @@ import HaierACCore
 /// 菜单栏小窗口控制面板（点击菜单栏图标弹出的独立窗口）
 struct MenuBarControlsView: View {
     @EnvironmentObject var model: AppModel
-    @Environment(\.openWindow) private var openWindow
 
     /// 当前选中的设备（支持多设备切换）
     @State private var selectedDeviceId: String?
@@ -118,7 +117,8 @@ struct MenuBarControlsView: View {
     private var footer: some View {
         HStack {
             Button {
-                openWindow(id: "main")
+                // NSPopover 环境无 openWindow，通过通知让主窗口侧打开
+                NotificationCenter.default.post(name: .haierOpenMainWindow, object: nil)
                 NSApp.activate(ignoringOtherApps: true)
             } label: {
                 Label("打开主窗口", systemImage: "macwindow")
@@ -173,7 +173,7 @@ struct MenuBarControlsView: View {
                 .font(.system(size: 13))
                 .foregroundStyle(Theme.inkMuted)
             Button("打开应用登录") {
-                openWindow(id: "main")
+                NotificationCenter.default.post(name: .haierOpenMainWindow, object: nil)
                 NSApp.activate(ignoringOtherApps: true)
             }
             .buttonStyle(Theme.primaryButtonStyle())

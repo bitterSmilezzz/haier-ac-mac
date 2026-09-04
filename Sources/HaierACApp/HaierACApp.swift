@@ -5,16 +5,25 @@ import HaierACCore
 /// 应用委托：启动时后台恢复会话，不自动打开主窗口
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
+    private var statusItemController: StatusItemController?
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         // 后台恢复登录会话（菜单栏面板可直接使用，不弹主窗口）
         AppModel.shared.restoreSession()
         // 后台检查 GitHub 是否有新版本（G3 失效预案）
         Task { await AppModel.shared.checkForUpdates() }
 
+        // 菜单栏状态项（NSStatusItem + NSPopover，无幽灵窗口）
+        let controller = StatusItemController(model: AppModel.shared)
+        controller.setup()
+        statusItemController = controller
+
         // 启动后关闭自动出现的主窗口，转入后台（SwiftUI 窗口在此刻已创建完成）
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
             for window in NSApp.windows {
-                window.close()
+                if window.title == "海尔空调控制" {
+                    window.close()
+                }
             }
             NSApp.hide(nil)
         }
@@ -24,7 +33,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
         if !flag {
             for window in NSApp.windows {
-                window.makeKeyAndOrderFront(nil)
+                if window.title == "海尔空调控制" {
+                    window.makeKeyAndOrderFront(nil)
+                }
             }
         }
         return true
@@ -35,6 +46,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 struct HaierACApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @StateObject private var model = AppModel.shared
+    @Environment(\.openWindow) private var openWindow
 
     var body: some Scene {
         WindowGroup("海尔空调控制", id: "main") {
@@ -42,18 +54,11 @@ struct HaierACApp: App {
                 .environmentObject(model)
                 .frame(minWidth: 520, minHeight: 640)
                 .preferredColorScheme(model.themeMode.colorScheme)
+                .onReceive(NotificationCenter.default.publisher(for: .haierOpenMainWindow)) { _ in
+                    openWindow(id: "main")
+                }
         }
         .windowResizability(.contentMinSize)
-
-        // 菜单栏迷你控制面板（点击菜单栏图标弹出）
-        MenuBarExtra {
-            MenuBarControlsView()
-                .environmentObject(model)
-                .preferredColorScheme(model.themeMode.colorScheme)
-        } label: {
-            Label("海尔空调", systemImage: "air.conditioner.horizontal")
-        }
-        .menuBarExtraStyle(.window)
     }
 }
 
