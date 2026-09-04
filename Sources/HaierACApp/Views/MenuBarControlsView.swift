@@ -66,6 +66,19 @@ struct MenuBarControlsView: View {
                     .monospacedDigit()
                     .foregroundStyle(Theme.ink)
             }
+            // 目标温度（小字）
+            if let target = model.attribute("targetTemperature", deviceId: device.id)?.doubleValue {
+                Text(String(format: "目标 %.0f°", target))
+                    .font(.system(size: 10))
+                    .foregroundStyle(Theme.inkSubtle)
+            }
+            // 室内湿度（设备支持时显示）
+            if let hum = AppModel.indoorHumidityAttribute(in: model.attributes[device.id] ?? [:]),
+               let value = hum.doubleValue {
+                Text(String(format: "湿度 %.0f%%", value))
+                    .font(.system(size: 10))
+                    .foregroundStyle(Theme.inkSubtle)
+            }
             if let onOff = model.attribute("onOffStatus", deviceId: device.id), let isOn = onOff.boolValue {
                 Text(isOn ? "运行中" : "已关机")
                     .font(.system(size: 11, weight: .medium))
