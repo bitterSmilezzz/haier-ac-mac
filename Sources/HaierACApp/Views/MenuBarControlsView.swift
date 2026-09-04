@@ -1,4 +1,5 @@
 import SwiftUI
+import Charts
 import HaierACCore
 
 /// 菜单栏小窗口控制面板（点击菜单栏图标弹出的独立窗口）
@@ -27,6 +28,8 @@ struct MenuBarControlsView: View {
                 if activeDevices.count > 1 {
                     devicePicker
                 }
+                // 温度趋势迷你图（有 2+ 采样时显示）
+                temperatureSparkline(device)
                 controlRows(device)
                 Divider().overlay(Theme.hairline)
                 launchAtLoginRow
@@ -86,6 +89,39 @@ struct MenuBarControlsView: View {
             }
         }
         .padding(.bottom, 2)
+    }
+
+    // MARK: - 温度趋势迷你图（菜单栏面板）
+
+    @ViewBuilder
+    private func temperatureSparkline(_ device: DeviceInfo) -> some View {
+        let samples = model.temperatureSeries(deviceId: device.id)
+        if samples.count >= 2 {
+            Chart(samples) { sample in
+                LineMark(
+                    x: .value("时间", sample.timestamp),
+                    y: .value("温度", sample.temperature)
+                )
+                .foregroundStyle(Theme.accent)
+                .interpolationMethod(.catmullRom)
+                AreaMark(
+                    x: .value("时间", sample.timestamp),
+                    y: .value("温度", sample.temperature)
+                )
+                .foregroundStyle(
+                    LinearGradient(
+                        colors: [Theme.accent.opacity(0.22), Theme.accent.opacity(0.02)],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
+                .interpolationMethod(.catmullRom)
+            }
+            .chartXAxis(.hidden)
+            .chartYAxis(.hidden)
+            .frame(height: 34)
+            .padding(.horizontal, 2)
+        }
     }
 
     /// 多设备切换
