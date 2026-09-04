@@ -554,6 +554,34 @@ final class AppModel: ObservableObject {
         pendingConfirm = (deviceId, name, value)
     }
 
+    /// 批量下发同一指令到多台设备（v1.5）；返回值：成功下发的设备数
+    @discardableResult
+    func sendAttributeToDevices(_ name: String, value: AttrValue, deviceIds: [String]) -> Int {
+        guard gatewayConnected, let handle = gatewayHandle else {
+            operationNotice = OperationNotice(text: "⚠️ 连接中断，指令未发送（自动重连中）", isError: true)
+            return 0
+        }
+        var sent = 0
+        for deviceId in deviceIds {
+            handle.sendControl(deviceId: deviceId, attributes: [name: value.jsonValue]) { [weak self] ok in
+                if !ok {
+                    Task { @MainActor in
+                        self?.operationNotice = OperationNotice(text: "⚠️ 部分设备指令发送失败", isError: true)
+                    }
+                }
+            }
+            if var map = attributes[deviceId], let old = map[name] {
+                map[name] = old.updating(value: value)
+                attributes[deviceId] = map
+            }
+            sent += 1
+        }
+        let desc = attributes[deviceIds.first ?? ""]?[name]?.desc ?? name
+        AppLog.log("批量下发: \(name)=\(value.stringValue) → \(deviceIds.count) 台设备")
+        operationNotice = OperationNotice(text: "已发送：\(desc) → \(sent) 台设备", isError: false)
+        return sent
+    }
+
     /// 网关推送属性时调用：确认待生效操作
     private func confirmPendingIfNeeded(deviceId: String, attrs: [String: DeviceAttribute]) {
         guard let pending = pendingConfirm,

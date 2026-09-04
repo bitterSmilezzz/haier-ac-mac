@@ -6,6 +6,15 @@ struct DeviceListView: View {
     @State private var showManualAdd = false
     @State private var manualDeviceId = ""
     @State private var manualName = ""
+    /// 批量选择模式（v1.5）
+    @State private var batchMode = false
+    @State private var selectedDeviceIds: Set<String> = []
+
+    /// 可批量操作的设备（云端 + 手动）
+    private var batchableDevices: [(id: String, name: String)] {
+        model.devices.map { (id: $0.id, name: $0.deviceName) } +
+        model.manualDevices.map { (id: $0.deviceId, name: $0.name) }
+    }
 
     var body: some View {
         NavigationStack {
@@ -24,6 +33,11 @@ struct DeviceListView: View {
                         SceneSection()
                         ScheduleSection()
                         discoverySection
+                        // 批量控制面板：批量模式 + 至少选中一台时显示
+                        if batchMode && !selectedDeviceIds.isEmpty {
+                            BatchControlPanel(deviceIds: Array(selectedDeviceIds))
+                                .padding(.horizontal, Theme.spaceLG)
+                        }
                     }
                     .padding(.bottom, Theme.spaceLG)
                 }
@@ -46,15 +60,32 @@ struct DeviceListView: View {
     private var header: some View {
         HStack {
             VStack(alignment: .leading, spacing: 2) {
-                Text("我的设备")
+                Text(batchMode ? "选择设备" : "我的设备")
                     .font(.system(size: 24, weight: .semibold))
                     .foregroundStyle(Theme.ink)
                     .tracking(-0.6)
-                Text("\(totalCount) 台设备 · \(model.gatewayConnected ? "实时连接" : "连接中断")")
+                Text(batchMode ? "已选 \(selectedDeviceIds.count) 台，点击卡片切换选择" : "\(totalCount) 台设备 · \(model.gatewayConnected ? "实时连接" : "连接中断")")
                     .font(.system(size: 12))
                     .foregroundStyle(Theme.inkSubtle)
             }
             Spacer()
+            if batchMode {
+                Button {
+                    selectedDeviceIds = []
+                    batchMode = false
+                } label: {
+                    Label("取消", systemImage: "xmark")
+                }
+                .buttonStyle(Theme.secondaryButtonStyle())
+            } else {
+                Button {
+                    batchMode = true
+                } label: {
+                    Label("批量控制", systemImage: "square.stack.3d.up.fill")
+                }
+                .buttonStyle(Theme.secondaryButtonStyle())
+                .disabled(batchableDevices.count < 2)
+            }
             ThemePickerMenu()
             Button {
                 model.logout()
@@ -79,13 +110,49 @@ struct DeviceListView: View {
             VStack(alignment: .leading, spacing: Theme.spaceSM) {
                 sectionTitle("云端设备（海尔智家账号）")
                 ForEach(model.devices) { device in
-                    NavigationLink(value: device) {
+                    if batchMode {
+                        // 批量模式：点击切换选中
                         DeviceCard(device: device, model: model)
+                            .overlay(alignment: .trailing) {
+                                checkmarkOverlay(isSelected: selectedDeviceIds.contains(device.id))
+                            }
+                            .contentShape(Rectangle())
+                            .onTapGesture {
+                                toggleSelection(device.id)
+                            }
+                    } else {
+                        NavigationLink(value: device) {
+                            DeviceCard(device: device, model: model)
+                        }
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(.plain)
                 }
             }
             .padding(.horizontal, Theme.spaceLG)
+        }
+    }
+
+    /// 批量选择指示：右上角圆圈勾选
+    private func checkmarkOverlay(isSelected: Bool) -> some View {
+        ZStack {
+            Circle()
+                .fill(isSelected ? Theme.accent : Theme.surface3)
+                .frame(width: 20, height: 20)
+                .overlay(Circle().strokeBorder(isSelected ? .clear : Theme.hairline, lineWidth: 1))
+            if isSelected {
+                Image(systemName: "checkmark")
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundStyle(.white)
+            }
+        }
+        .padding(Theme.spaceMD)
+    }
+
+    private func toggleSelection(_ id: String) {
+        if selectedDeviceIds.contains(id) {
+            selectedDeviceIds.remove(id)
+        } else {
+            selectedDeviceIds.insert(id)
         }
     }
 
@@ -119,13 +186,36 @@ struct DeviceListView: View {
                 sectionTitle("手动添加")
                 ForEach(model.manualDevices) { manual in
                     HStack(spacing: Theme.spaceMD) {
-                        ZStack {
-                            RoundedRectangle(cornerRadius: Theme.radiusMD, style: .continuous)
-                                .fill(Theme.surface2)
-                                .frame(width: 44, height: 44)
-                            Image(systemName: "plus.square.on.square")
-                                .font(.system(size: 16, weight: .medium))
-                                .foregroundStyle(Theme.inkSubtle)
+                        if batchMode {
+                            // 批量模式：点击切换选中
+                            Button {
+                                toggleSelection(manual.deviceId)
+                            } label: {
+                                ZStack {
+                                    RoundedRectangle(cornerRadius: Theme.radiusMD, style: .continuous)
+                                        .fill(selectedDeviceIds.contains(manual.deviceId) ? Theme.accent : Theme.surface2)
+                                        .frame(width: 44, height: 44)
+                                    if selectedDeviceIds.contains(manual.deviceId) {
+                                        Image(systemName: "checkmark")
+                                            .font(.system(size: 14, weight: .bold))
+                                            .foregroundStyle(.white)
+                                    } else {
+                                        Image(systemName: "plus.square.on.square")
+                                            .font(.system(size: 16, weight: .medium))
+                                            .foregroundStyle(Theme.inkSubtle)
+                                    }
+                                }
+                            }
+                            .buttonStyle(.plain)
+                        } else {
+                            ZStack {
+                                RoundedRectangle(cornerRadius: Theme.radiusMD, style: .continuous)
+                                    .fill(Theme.surface2)
+                                    .frame(width: 44, height: 44)
+                                Image(systemName: "plus.square.on.square")
+                                    .font(.system(size: 16, weight: .medium))
+                                    .foregroundStyle(Theme.inkSubtle)
+                            }
                         }
 
                         VStack(alignment: .leading, spacing: 3) {
