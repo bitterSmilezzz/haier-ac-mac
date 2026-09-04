@@ -5,6 +5,8 @@ import HaierACCore
 struct OperationToast: View {
     @EnvironmentObject var model: AppModel
     @State private var visible = false
+    /// toast 版本号：每次出现 +1，旧定时器通过比对版本号放弃（防止旧 toast 提前隐藏新 toast）
+    @State private var noticeGeneration = 0
 
     var body: some View {
         Group {
@@ -30,7 +32,10 @@ struct OperationToast: View {
                 .shadow(color: .black.opacity(0.3), radius: 8, y: 2)
                 .transition(.move(edge: .top).combined(with: .opacity))
                 .onAppear {
+                    let generation = noticeGeneration
                     DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
+                        // 期间有新 toast 出现（generation 已变）则不隐藏当前内容
+                        guard generation == noticeGeneration else { return }
                         withAnimation(.easeOut(duration: 0.25)) {
                             visible = false
                         }
@@ -39,6 +44,7 @@ struct OperationToast: View {
             }
         }
         .onChange(of: model.operationNotice) { _ in
+            noticeGeneration += 1
             withAnimation(.spring(duration: 0.3)) {
                 visible = model.operationNotice != nil
             }

@@ -14,7 +14,8 @@ public struct HaierProvider: DeviceProvider {
             providerId: providerId,
             account: account,
             token: info.accountToken,
-            refreshToken: info.refreshToken
+            refreshToken: info.refreshToken,
+            tokenExpiresAt: Date().addingTimeInterval(TimeInterval(info.expiresIn))
         )
     }
 
@@ -26,7 +27,8 @@ public struct HaierProvider: DeviceProvider {
             providerId: providerId,
             account: account,
             token: info.accountToken,
-            refreshToken: info.refreshToken
+            refreshToken: info.refreshToken,
+            tokenExpiresAt: Date().addingTimeInterval(TimeInterval(info.expiresIn))
         )
     }
 
@@ -45,6 +47,7 @@ public struct HaierProvider: DeviceProvider {
     public func connectGateway(
         context: ProviderContext,
         deviceIds: [String],
+        onConnected: @escaping () -> Void,
         onAttributes: @escaping AttributesCallback,
         onDisconnected: @escaping (Error?) -> Void
     ) async throws -> any GatewayHandle {
@@ -52,6 +55,7 @@ public struct HaierProvider: DeviceProvider {
         client.token = context.token
         let gatewayURL = try await client.getGateway()
         let gateway = HaierGatewayClient(token: context.token, deviceIds: deviceIds)
+        gateway.onConnected = onConnected
         gateway.onAttributes = onAttributes
         gateway.onDisconnected = onDisconnected
         return HaierGatewayHandle(gateway: gateway, url: gatewayURL)
@@ -70,6 +74,10 @@ public final class HaierGatewayHandle: GatewayHandle {
         self.url = url
     }
 
+    deinit {
+        gateway.stop()
+    }
+
     public func start() {
         gateway.start(gatewayURL: url)
     }
@@ -78,7 +86,11 @@ public final class HaierGatewayHandle: GatewayHandle {
         gateway.stop()
     }
 
-    public func sendControl(deviceId: String, attributes: [String: Any]) {
-        gateway.sendControl(deviceId: deviceId, attributes: attributes)
+    public func sendControl(deviceId: String, attributes: [String: Any], completion: ((Bool) -> Void)? = nil) {
+        gateway.sendControl(deviceId: deviceId, attributes: attributes, completion: completion)
+    }
+
+    public func updateSubscription(deviceIds: [String]) {
+        gateway.updateSubscription(deviceIds: deviceIds)
     }
 }

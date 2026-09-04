@@ -27,18 +27,31 @@ enum Zlib {
         let chunkSize = 1 << 16
         var chunk = [Bytef](repeating: 0, count: chunkSize)
 
+        // 注意：`inflate` 必须在 withUnsafeMutableBytes 闭包内调用——
+        // Swift 只保证 stream.next_out 指向的内存在该闭包作用域内有效（悬垂指针修正）。
+        var status: Int32 = Z_OK
         repeat {
-            chunk.withUnsafeMutableBytes { raw in
-                stream.next_out = raw.bindMemory(to: Bytef.self).baseAddress
+            status = chunk.withUnsafeMutableBytes { raw -> Int32 in
+                guard let base = raw.bindMemory(to: Bytef.self).baseAddress else { return Z_STREAM_ERROR }
+                stream.next_out = base
                 stream.avail_out = uInt(chunkSize)
+                return inflate(&stream, Z_NO_FLUSH)
             }
-            let status = inflate(&stream, Z_NO_FLUSH)
             guard status == Z_OK || status == Z_STREAM_END else { return nil }
+
             let produced = chunkSize - Int(stream.avail_out)
             if produced > 0 {
                 out.append(chunk, count: produced)
             }
-        } while stream.avail_out == 0
+
+            // 输出缓冲未满但流未结束 = 输入数据截断，返回失败而非半截结果
+            if status == Z_OK && stream.avail_out > 0 {
+                return nil
+            }
+            // 循环退出条件：流结束（Z_STREAM_END）。
+            // 不能用 `avail_out == 0` 作条件——输出恰好是 64KB 整数倍时
+            // avail_out 为 0 但流已结束，会多循环一次导致 Z_STREAM_ERROR（边界 bug 修正）。
+        } while status != Z_STREAM_END
 
         return out
     }

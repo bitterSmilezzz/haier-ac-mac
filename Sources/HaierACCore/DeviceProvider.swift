@@ -6,12 +6,39 @@ public struct ProviderContext {
     public let account: String
     public let token: String
     public let refreshToken: String?
+    /// token 过期时刻（由登录/刷新响应的 expiresIn 计算）；nil 表示未知（视为不过期，靠 401 兜底）
+    public let tokenExpiresAt: Date?
 
-    public init(providerId: String, account: String, token: String, refreshToken: String?) {
+    public init(providerId: String, account: String, token: String, refreshToken: String?, tokenExpiresAt: Date? = nil) {
         self.providerId = providerId
         self.account = account
         self.token = token
         self.refreshToken = refreshToken
+        self.tokenExpiresAt = tokenExpiresAt
+    }
+}
+
+/// Token 刷新决策（纯函数，便于单测）
+public enum TokenRefreshPolicy {
+    /// 距过期不足阈值时应主动刷新。expiresAt 为 nil（未知）时不主动刷新，靠 401 兜底。
+    public static func shouldRefresh(expiresAt: Date?, now: Date = Date(), threshold: TimeInterval = 12 * 3600) -> Bool {
+        guard let expiresAt else { return false }
+        return expiresAt.timeIntervalSince(now) <= threshold
+    }
+
+    /// 判断错误是否属于"凭据失效"（HTTP 401/403 或业务码 430/431 等），可触发刷新重试
+    public static func isCredentialError(_ error: Error) -> Bool {
+        if let haierError = error as? HaierError {
+            switch haierError {
+            case .http(let code):
+                return code == 401 || code == 403
+            case .retCode(let code, _):
+                return code.contains("430") || code.contains("431") || code.contains("401") || code.contains("403")
+            default:
+                return false
+            }
+        }
+        return false
     }
 }
 
@@ -23,7 +50,10 @@ public protocol GatewayHandle: AnyObject {
     var isConnected: Bool { get }
     func start()
     func stop()
-    func sendControl(deviceId: String, attributes: [String: Any])
+    /// 发送控制指令；completion 报告底层是否发送成功（不代表设备已生效）
+    func sendControl(deviceId: String, attributes: [String: Any], completion: ((Bool) -> Void)?)
+    /// 更新订阅设备列表（手动添加设备后调用）
+    func updateSubscription(deviceIds: [String])
 }
 
 /// 设备提供商协议：所有品牌（海尔/华为/米家…）接入的抽象接口。
@@ -48,6 +78,7 @@ public protocol DeviceProvider {
     func connectGateway(
         context: ProviderContext,
         deviceIds: [String],
+        onConnected: @escaping () -> Void,
         onAttributes: @escaping AttributesCallback,
         onDisconnected: @escaping (Error?) -> Void
     ) async throws -> any GatewayHandle

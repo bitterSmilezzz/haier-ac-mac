@@ -80,6 +80,8 @@ final class AppModel: ObservableObject {
     private var context: ProviderContext?
     private var gatewayHandle: (any GatewayHandle)?
     private var deviceIds: [String] = []
+    /// 会话代数：logout 时自增；异步链写回前校验，防止登出后旧任务回写状态
+    private var sessionGeneration = 0
 
     init() {
         let saved = UserDefaults.standard.string(forKey: "themeMode")
@@ -112,6 +114,8 @@ final class AppModel: ObservableObject {
         )
         phase = .connecting
         Task {
+            // token 临近过期时先静默续期，避免启动即连不上
+            await refreshTokenIfNeeded()
             await connectAndLoad()
         }
     }
@@ -128,11 +132,7 @@ final class AppModel: ObservableObject {
             let context = try await provider.login(account: trimmedPhone, password: password)
             self.provider = provider
             self.context = context
-            CredentialStore.save(context.token, forKey: "accountToken")
-            if let refresh = context.refreshToken {
-                CredentialStore.save(refresh, forKey: "refreshToken")
-            }
-            CredentialStore.save(trimmedPhone, forKey: "phone")
+            saveCredentials(context, phone: trimmedPhone)
             password = ""
             await connectAndLoad()
         } catch {
@@ -140,22 +140,62 @@ final class AppModel: ObservableObject {
         }
     }
 
-    func logout() {
-        gatewayHandle?.stop()
-        gatewayHandle = nil
-        CredentialStore.deleteAll()
-        provider = nil
-        context = nil
-        devices = []
-        attributes = [:]
-        phone = ""
-        phase = .loggedOut
+    /// 持久化会话凭据（含过期时刻，用于自动刷新决策）
+    private func saveCredentials(_ context: ProviderContext, phone: String) {
+        CredentialStore.save(context.token, forKey: "accountToken")
+        if let refresh = context.refreshToken {
+            CredentialStore.save(refresh, forKey: "refreshToken")
+        }
+        CredentialStore.save(phone, forKey: "phone")
+        if let expiresAt = context.tokenExpiresAt {
+            UserDefaults.standard.set(expiresAt.timeIntervalSince1970, forKey: "tokenExpiresAt")
+        }
+    }
+
+    /// token 临近过期/已过期时静默续期（主动刷新，避免 10 天到期必须重登）
+    @discardableResult
+    func refreshTokenIfNeeded() async -> Bool {
+        guard provider != nil, let context else { return false }
+        // 手动添加设备等场景下 context 可能无 refreshToken，跳过
+        guard let token = context.refreshToken, !token.isEmpty else { return false }
+        let saved = UserDefaults.standard.double(forKey: "tokenExpiresAt")
+        let expiresAt = saved > 0 ? Date(timeIntervalSince1970: saved) : context.tokenExpiresAt
+        guard TokenRefreshPolicy.shouldRefresh(expiresAt: expiresAt) else { return false }
+        return await refreshToken(using: token)
+    }
+
+    /// 凭据失效（401/403）时强制用 refreshToken 续期一次；成功更新内存 + 持久化
+    private func refreshTokenForced() async -> Bool {
+        guard let context, let token = context.refreshToken, !token.isEmpty else { return false }
+        return await refreshToken(using: token)
+    }
+
+    /// 用 refreshToken 换新 token；成功更新内存 + 持久化并返回 true
+    private func refreshToken(using refresh: String) async -> Bool {
+        guard let provider, let context else { return false }
+        do {
+            let newContext = try await provider.refresh(account: context.account, refreshToken: refresh)
+            self.context = newContext
+            saveCredentials(newContext, phone: context.account)
+            AppLog.log("Token 自动刷新成功")
+            return true
+        } catch {
+            AppLog.log("Token 自动刷新失败: \(error.localizedDescription)")
+            return false
+        }
     }
 
     private func connectAndLoad() async {
+        await connectAndLoad(retryingOnCredentialFailure: true)
+    }
+
+    private func connectAndLoad(retryingOnCredentialFailure: Bool) async {
+        // 会话代数：本次连接链路的身份标识；logout 后自增，旧链路不得再写回状态
+        let generation = sessionGeneration
         do {
             guard let provider, let context else { throw HaierError.invalidResponse }
             let devices = try await provider.fetchDevices(context: context)
+            guard generation == sessionGeneration else { return }  // 期间已登出
             self.devices = devices
             deviceIds = devices.map(\.deviceId)
             AppLog.log("设备列表: \(devices.map { $0.deviceName }.joined(separator: ", "))")
@@ -178,6 +218,14 @@ final class AppModel: ObservableObject {
             let handle = try await provider.connectGateway(
                 context: context,
                 deviceIds: deviceIds,
+                onConnected: { [weak self] in
+                    AppLog.log("网关已连接")
+                    Task { @MainActor in
+                        guard let self else { return }
+                        self.gatewayConnected = true
+                        self.phase = .ready
+                    }
+                },
                 onAttributes: { [weak self] deviceId, attrs in
                     AppLog.log("收到属性推送: \(deviceId) \(attrs.count) 个")
                     Task { @MainActor in
@@ -198,14 +246,36 @@ final class AppModel: ObservableObject {
                     }
                 }
             )
+            guard generation == sessionGeneration else { return }  // 期间已登出
             self.gatewayHandle = handle
             handle.start()
-            gatewayConnected = true
+            // 设备列表已就绪即可进入 ready（网关连接状态由 onConnected/onDisconnected 回调驱动）
             phase = .ready
         } catch {
             AppLog.log("连接失败: \(error.localizedDescription)")
-            phase = .error(AppModel.classifyError(error))
+            // 凭据失效：尝试用 refreshToken 强制续期一次后重连；仍失败才报错引导重登
+            if retryingOnCredentialFailure, TokenRefreshPolicy.isCredentialError(error),
+               await refreshTokenForced() {
+                await connectAndLoad(retryingOnCredentialFailure: false)
+            } else {
+                phase = .error(AppModel.classifyError(error))
+            }
         }
+    }
+
+    func logout() {
+        sessionGeneration += 1  // 使所有进行中的异步链失效
+        gatewayHandle?.stop()
+        gatewayHandle = nil
+        gatewayConnected = false
+        CredentialStore.deleteAll()
+        UserDefaults.standard.removeObject(forKey: "tokenExpiresAt")
+        provider = nil
+        context = nil
+        devices = []
+        attributes = [:]
+        phone = ""
+        phase = .loggedOut
     }
 
     // MARK: - 控制
@@ -215,12 +285,19 @@ final class AppModel: ObservableObject {
         AppLog.log("sendAttribute: \(name)=\(value.stringValue) device=\(deviceId)")
 
         // 失效预案：网关未连接时明确提示，不静默失败
-        guard gatewayConnected, gatewayHandle != nil else {
+        guard gatewayConnected, let handle = gatewayHandle else {
             operationNotice = OperationNotice(text: "⚠️ 连接中断，指令未发送（自动重连中）", isError: true)
             return
         }
 
-        gatewayHandle?.sendControl(deviceId: deviceId, attributes: [name: value.jsonValue])
+        handle.sendControl(deviceId: deviceId, attributes: [name: value.jsonValue]) { [weak self] sent in
+            Task { @MainActor in
+                guard let self else { return }
+                if !sent {
+                    self.operationNotice = OperationNotice(text: "⚠️ 指令发送失败，请稍后重试", isError: true)
+                }
+            }
+        }
         // 乐观更新
         if var map = attributes[deviceId], let old = map[name] {
             map[name] = old.updating(value: value)
@@ -258,13 +335,14 @@ final class AppModel: ObservableObject {
         guard let url = URL(string: "https://api.github.com/repos/bitterSmilezzz/haier-ac-mac/releases/latest") else { return }
         var request = URLRequest(url: url)
         request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
-        request.setValue("HaierAC-Mac/1.2", forHTTPHeaderField: "User-Agent")
+        let appVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.2.0"
+        request.setValue("HaierAC-Mac/\(appVersion)", forHTTPHeaderField: "User-Agent")
         guard let (data, _) = try? await URLSession.shared.data(for: request),
               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let tag = json["tag_name"] as? String,
               let htmlURL = json["html_url"] as? String,
               let latestURL = URL(string: htmlURL) else { return }
-        let current = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.2.0"
+        let current = appVersion
         // tag 形如 "v1.2.1"，去掉 v 前缀比较
         let latest = tag.hasPrefix("v") ? String(tag.dropFirst()) : tag
         if latest.compare(current, options: .numeric) == .orderedDescending {
@@ -330,6 +408,7 @@ final class AppModel: ObservableObject {
     func addDevice(deviceId: String, name: String) async {
         let trimmed = deviceId.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
+        let generation = sessionGeneration
         // 已在云端列表？无需重复添加
         if devices.contains(where: { $0.id == trimmed }) {
             return
@@ -343,6 +422,7 @@ final class AppModel: ObservableObject {
         // 尝试拉取数字模型（验证设备可访问）
         if let provider, let context {
             if let attrs = try? await provider.fetchDigitalModel(context: context, deviceId: trimmed) {
+                guard generation == sessionGeneration else { return }  // 期间已登出
                 var map: [String: DeviceAttribute] = [:]
                 for attr in attrs where !attr.name.isEmpty {
                     map[attr.name] = attr
@@ -350,12 +430,23 @@ final class AppModel: ObservableObject {
                 attributes[trimmed] = map
             }
         }
+        // 同步网关订阅，让手动设备也能收到属性推送与控制确认
+        resubscribeGatewayIfNeeded()
     }
 
     /// 从手动列表移除设备
     func removeManualDevice(_ device: ManualDevice) {
         manualDevices.removeAll { $0.deviceId == device.deviceId }
         attributes[device.deviceId] = nil
+        resubscribeGatewayIfNeeded()
+    }
+
+    /// 用「云端 + 手动」全量设备列表刷新网关订阅
+    private func resubscribeGatewayIfNeeded() {
+        guard let handle = gatewayHandle else { return }
+        let allIds = devices.map(\.id) + manualDevices.map(\.deviceId)
+        deviceIds = allIds
+        handle.updateSubscription(deviceIds: allIds)
     }
 
     // MARK: - 开机自启

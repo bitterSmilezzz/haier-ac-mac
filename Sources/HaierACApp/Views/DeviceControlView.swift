@@ -13,21 +13,46 @@ struct DeviceControlView: View {
         ZStack {
             Theme.canvas.ignoresSafeArea()
 
-            ScrollView {
-                VStack(alignment: .leading, spacing: Theme.spaceLG) {
-                    // 头部信息
-                    header
-
-                    // 灯光/显示区（强调卡片）
-                    lightSection
-
-                    // 常用控制
-                    commonSection
-
-                    // 全部可写属性
-                    allWritableSection
+            if attrs.isEmpty {
+                // 数字模型未加载/加载失败时的空态
+                VStack(spacing: Theme.spaceMD) {
+                    if !model.gatewayConnected {
+                        Image(systemName: "wifi.slash")
+                            .font(.system(size: 30))
+                            .foregroundStyle(Theme.warning)
+                        Text("连接中断，自动重连中...")
+                            .font(.system(size: 13))
+                            .foregroundStyle(Theme.inkSubtle)
+                    } else {
+                        ProgressView()
+                            .controlSize(.regular)
+                            .tint(Theme.accent)
+                        Text("正在获取设备状态...")
+                            .font(.system(size: 13))
+                            .foregroundStyle(Theme.inkSubtle)
+                        Text("若长时间无响应，请返回设备列表重试")
+                            .font(.system(size: 11))
+                            .foregroundStyle(Theme.inkTertiary)
+                    }
                 }
-                .padding(Theme.spaceLG)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: Theme.spaceLG) {
+                        // 头部信息
+                        header
+
+                        // 灯光/显示区（强调卡片）
+                        lightSection
+
+                        // 常用控制
+                        commonSection
+
+                        // 全部可写属性
+                        allWritableSection
+                    }
+                    .padding(Theme.spaceLG)
+                }
             }
         }
         .navigationTitle(device.deviceName)

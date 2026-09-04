@@ -13,10 +13,11 @@
   - 灯光/屏显开关（情景灯光置顶）
   - 电源、目标温度、模式、风速
   - 其余全部可写属性动态渲染（开关/选择器/滑块）
-- ☁️ **菜单栏迷你面板**：不打开主窗口即可一键开关灯光（`MenuBarExtra` 窗口样式）
+- ☁️ **菜单栏迷你面板**：不打开主窗口即可一键开关灯光（`NSStatusItem + NSPopover`，规避 macOS 26 `MenuBarExtra` 幽灵窗口缺陷）
 - 🎨 **三态主题**：跟随系统 / 浅色 / 深色（Linear 设计体系，双色板）
-- 📡 实时状态：WebSocket 网关订阅属性推送，断线自动重连
-- 🔑 Token 自动刷新（10 天有效期），Keychain 持久化
+- 📡 实时状态：WebSocket 网关订阅属性推送，断线指数退避自动重连（5s→120s），心跳故障自检
+- 🔑 Token 自动刷新（10 天有效期）：临近过期主动续期 + 凭据失效（401/403）自动续期重连，Keychain 凭据已迁移至加密文件存储
+- 🛡 健壮性：连接代际隔离（旧连接迟到回调不误杀新连接）、登出竞态防护、断线后状态恢复
 
 ## 架构
 
@@ -27,11 +28,13 @@ SwiftUI App
 │   ├── HaierProvider      # 海尔实现（登录/设备/数字模型/网关）
 │   ├── RequestSigner      # SHA256 请求签名（CryptoKit）
 │   ├── HaierCloudClient   # REST：登录/刷新/设备/数字模型/网关
-│   ├── HaierGatewayClient # WebSocket：订阅/心跳/控制/断线重连
+│   ├── HaierGatewayClient # WebSocket：订阅/心跳/控制/断线重连（连接代际隔离）
 │   ├── Zlib               # 下行数据解压（系统 libz）
 │   ├── CredentialStore    # 凭据加密存储（硬件绑定密钥 + AES-GCM）
 │   └── KeychainStore      # 旧版迁移（Keychain → 文件，一次性）
 └── HaierACApp         # SwiftUI 界面
+    ├── AppModel           # 状态机：登录/连接/控制/反馈/更新检查
+    ├── StatusItemController # 菜单栏状态项（NSStatusItem + NSPopover）
     ├── Views/             # 登录/设备列表/控制面板/菜单栏面板/反馈组件
     └── Theme.swift        # 设计令牌（浅色/深色双色板）
 ```
@@ -48,7 +51,8 @@ GitHub Actions 自动在 macos-latest 上构建 + 测试。
 要求：macOS 13+，Xcode Command Line Tools（含 Swift 6）。
 
 ```bash
-./build_app.sh    # 构建 + 打包 dist/HaierAC.app + 自动打开
+./build_app.sh            # 构建 + 打包 dist/HaierAC.app（默认 v1.3.0，不自动打开）
+./build_app.sh 1.3.0 --open   # 指定版本号 + 构建后自动打开
 ```
 
 ## 隐私与安全

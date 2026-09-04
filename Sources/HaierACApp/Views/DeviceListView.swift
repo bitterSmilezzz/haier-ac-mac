@@ -16,6 +16,9 @@ struct DeviceListView: View {
                     VStack(alignment: .leading, spacing: Theme.spaceMD) {
                         UpdateBanner()
                         header
+                        if totalCount == 0 {
+                            emptyStateCard
+                        }
                         cloudDevicesSection
                         manualDevicesSection
                         discoverySection
@@ -82,6 +85,27 @@ struct DeviceListView: View {
             }
             .padding(.horizontal, Theme.spaceLG)
         }
+    }
+
+    /// 无任何设备时的空态引导卡片
+    private var emptyStateCard: some View {
+        VStack(spacing: Theme.spaceSM) {
+            Image(systemName: "air.conditioner.horizontal")
+                .font(.system(size: 28))
+                .foregroundStyle(Theme.inkTertiary)
+            Text("还没有可控制的设备")
+                .font(.system(size: 15, weight: .medium))
+                .foregroundStyle(Theme.ink)
+            Text("账号下暂未发现空调设备。\n可尝试扫描当前 WiFi，或在下方手动输入设备的 deviceId。")
+                .font(.system(size: 12))
+                .foregroundStyle(Theme.inkSubtle)
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, Theme.spaceLG)
+        .padding(.horizontal, Theme.spaceMD)
+        .background(Theme.cardBackground(Theme.surface1))
+        .padding(.horizontal, Theme.spaceLG)
     }
 
     // MARK: - 手动设备
