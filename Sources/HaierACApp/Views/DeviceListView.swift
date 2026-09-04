@@ -6,6 +6,9 @@ struct DeviceListView: View {
     @State private var showManualAdd = false
     @State private var manualDeviceId = ""
     @State private var manualName = ""
+    /// 重命名目标设备（nil 时不显示弹窗）
+    @State private var renamingDevice: ManualDevice?
+    @State private var renameText = ""
     /// 批量选择模式（v1.5）
     @State private var batchMode = false
     @State private var selectedDeviceIds: Set<String> = []
@@ -52,6 +55,9 @@ struct DeviceListView: View {
         }
         .sheet(isPresented: $showManualAdd) {
             manualAddSheet
+        }
+        .sheet(item: $renamingDevice) { device in
+            renameSheet(device)
         }
     }
 
@@ -250,6 +256,16 @@ struct DeviceListView: View {
                         .buttonStyle(.plain)
 
                         Button {
+                            renameText = manual.name
+                            renamingDevice = manual
+                        } label: {
+                            Image(systemName: "pencil")
+                                .font(.system(size: 11))
+                                .foregroundStyle(Theme.inkTertiary)
+                        }
+                        .buttonStyle(.plain)
+
+                        Button {
                             model.removeManualDevice(manual)
                         } label: {
                             Image(systemName: "trash")
@@ -337,6 +353,48 @@ struct DeviceListView: View {
             .font(.system(size: 13, weight: .medium))
             .foregroundStyle(Theme.inkSubtle)
             .tracking(0.4)
+    }
+
+    // MARK: - 重命名弹窗
+
+    private func renameSheet(_ device: ManualDevice) -> some View {
+        VStack(alignment: .leading, spacing: Theme.spaceMD) {
+            Text("重命名设备")
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundStyle(Theme.ink)
+            Text("为「\(device.name)」设置本地显示名称（不影响云端）")
+                .font(.system(size: 12))
+                .foregroundStyle(Theme.inkSubtle)
+
+            TextField("设备名称", text: $renameText)
+                .textFieldStyle(.plain)
+                .font(.system(size: 14))
+                .foregroundStyle(Theme.ink)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(Theme.surface1)
+                .overlay(
+                    RoundedRectangle(cornerRadius: Theme.radiusMD, style: .continuous)
+                        .strokeBorder(Theme.hairline, lineWidth: 1)
+                )
+
+            HStack {
+                Spacer()
+                Button("取消") {
+                    renamingDevice = nil
+                }
+                .buttonStyle(Theme.secondaryButtonStyle())
+                Button("保存") {
+                    model.renameManualDevice(device, to: renameText)
+                    renamingDevice = nil
+                }
+                .buttonStyle(Theme.primaryButtonStyle())
+                .disabled(renameText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            }
+        }
+        .padding(Theme.spaceLG)
+        .frame(width: 360)
+        .background(Theme.canvas)
     }
 
     // MARK: - 手动添加弹窗

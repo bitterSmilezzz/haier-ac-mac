@@ -935,6 +935,15 @@ final class AppModel: ObservableObject {
         resubscribeGatewayIfNeeded()
     }
 
+    /// 重命名手动设备（本地别名，不影响云端）
+    func renameManualDevice(_ device: ManualDevice, to name: String) {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty,
+              let idx = manualDevices.firstIndex(where: { $0.deviceId == device.deviceId }) else { return }
+        manualDevices[idx].name = trimmed
+        AppLog.log("重命名手动设备: \(device.deviceId) -> \(trimmed)")
+    }
+
     /// 用「云端 + 手动」全量设备列表刷新网关订阅
     private func resubscribeGatewayIfNeeded() {
         guard let handle = gatewayHandle else { return }
