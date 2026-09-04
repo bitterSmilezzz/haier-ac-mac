@@ -55,6 +55,13 @@ struct HaierACApp: App {
                 .onReceive(NotificationCenter.default.publisher(for: .haierOpenMainWindow)) { _ in
                     openWindow(id: "main")
                 }
+                // 小组件点击（haierac://main）：打开主窗口
+                .onOpenURL { url in
+                    if url.scheme == "haierac" {
+                        openWindow(id: "main")
+                        NSApp.activate(ignoringOtherApps: true)
+                    }
+                }
         }
         .windowResizability(.contentMinSize)
         // 快捷指令/Shortcuts 集成：AppIntents.swift 中的 ACAppShortcuts 由系统自动发现，

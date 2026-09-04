@@ -1,6 +1,7 @@
 import Foundation
 import Combine
 import SwiftUI
+import WidgetKit
 import ServiceManagement
 import HaierACCore
 
@@ -220,6 +221,42 @@ final class AppModel: ObservableObject {
     // MARK: - 更新检查（G3）
 
     @Published var updateAvailable: (version: String, url: URL)?
+
+    // MARK: - 小组件快照（v1.7）
+
+    /// 写入桌面小组件读取的状态快照（AppGroup 共享容器）
+    /// 数据结构与 Sources/HaierACWidget/Widget.swift 的 ACWidgetSnapshot 对齐
+    func writeWidgetSnapshot() {
+        guard let deviceId = devices.first?.id else { return }
+        let attrs = attributes[deviceId] ?? [:]
+        var dict: [String: Any] = [:]
+        if let temp = AppModel.indoorTemperatureAttribute(in: attrs)?.doubleValue {
+            dict["temperature"] = temp
+        }
+        if let target = attrs["targetTemperature"]?.doubleValue {
+            dict["targetTemp"] = target
+        }
+        if let on = attrs["onOffStatus"]?.boolValue {
+            dict["powerOn"] = on
+        }
+        dict["deviceName"] = devices.first?.deviceName ?? ""
+        dict["updatedAt"] = ISO8601DateFormatter().string(from: Date())
+        guard let data = try? JSONSerialization.data(withJSONObject: dict) else { return }
+
+        // 主 App 非沙盒：直接写 AppGroup 容器（与 Widget 的 containerURL 同一路径）
+        let groupID = "group.local.haierac"
+        let base = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: groupID)
+            ?? FileManager.default.homeDirectoryForCurrentUser
+                .appendingPathComponent("Library/Group Containers/\(groupID)", isDirectory: true)
+        do {
+            try FileManager.default.createDirectory(at: base, withIntermediateDirectories: true)
+            try data.write(to: base.appendingPathComponent("widget-state.json"), options: .atomic)
+            // 通知系统刷新小组件时间线（未安装小组件时静默忽略）
+            WidgetCenter.shared.reloadAllTimelines()
+        } catch {
+            AppLog.log("小组件快照写入失败: \(error.localizedDescription)")
+        }
+    }
 
     // MARK: - 情景模式（v1.4）
 
@@ -455,6 +492,7 @@ final class AppModel: ObservableObject {
                     AppLog.log("数字模型 \(device.id) 获取失败")
                 }
             }
+            writeWidgetSnapshot()  // 初始状态同步到小组件
 
             // 连接实时网关
             let handle = try await provider.connectGateway(
@@ -478,6 +516,7 @@ final class AppModel: ObservableObject {
                         }
                         self.attributes[deviceId] = map
                         self.confirmPendingIfNeeded(deviceId: deviceId, attrs: attrs)
+                        self.writeWidgetSnapshot()  // 状态变化同步到小组件
                     }
                 },
                 onDisconnected: { [weak self] _ in
@@ -511,6 +550,13 @@ final class AppModel: ObservableObject {
         gatewayHandle?.stop()
         gatewayHandle = nil
         gatewayConnected = false
+        // 清空小组件快照（登出后无状态可展示）
+        let groupID = "group.local.haierac"
+        let url = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: groupID)
+            ?? FileManager.default.homeDirectoryForCurrentUser
+                .appendingPathComponent("Library/Group Containers/\(groupID)/widget-state.json")
+        try? FileManager.default.removeItem(at: url)
+        WidgetCenter.shared.reloadAllTimelines()
         CredentialStore.deleteAll()
         UserDefaults.standard.removeObject(forKey: "tokenExpiresAt")
         provider = nil
