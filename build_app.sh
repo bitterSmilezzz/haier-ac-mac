@@ -103,10 +103,28 @@ cat > "$WIDGET_APPEX/Contents/Info.plist" <<PLIST
 </plist>
 PLIST
 
-# 签名顺序：先签小组件（沙盒 + AppGroup），再签主 App（不带 --deep，
-# 使主 App 签名时嵌套代码已就绪并正确记录哈希）
-codesign --force --deep -s - --entitlements assets/Widget.entitlements "$WIDGET_APPEX"
-codesign --force -s - --entitlements assets/AppGroup.entitlements "$APP"
+# 签名顺序：先签小组件（沙盒 + Application Support 只读例外），再签主 App
+# （不带 --deep，使主 App 签名时嵌套代码已就绪并正确记录哈希）。
+# 主 App 保持非沙盒、无额外 entitlement（可自由读写文件系统）。
+# Widget 的只读例外指向当前用户的 Application Support（动态生成，避免硬编码用户名）
+# Widget 的只读例外指向当前用户的 Application Support（动态生成，避免硬编码用户名）
+WIDGET_ENTITLEMENTS="$(mktemp -d)/HaierACWidget.entitlements"
+cat > "$WIDGET_ENTITLEMENTS" <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>com.apple.security.app-sandbox</key>
+    <true/>
+    <key>com.apple.security.temporary-exception.files.absolute-path.read-only</key>
+    <array>
+        <string>$HOME/Library/Application Support/HaierAC/</string>
+    </array>
+</dict>
+</plist>
+PLIST
+codesign --force --deep -s - --entitlements "$WIDGET_ENTITLEMENTS" "$WIDGET_APPEX"
+codesign --force -s - "$APP"
 echo "✅ 构建完成: $APP (v$VERSION, 含小组件)"
 
 ZIP="dist/HaierAC-v${VERSION}-macOS.zip"

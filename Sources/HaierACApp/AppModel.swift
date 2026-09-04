@@ -32,12 +32,36 @@ struct ScheduledAction: Identifiable, Codable, Hashable {
     var enabled: Bool = true
 
     var attrValue: AttrValue? {
-        guard let any = try? JSONSerialization.jsonObject(with: attrValueJSON) else { return nil }
-        return AttrValue(any)
+        AttrValueCodec.decode(attrValueJSON)
     }
 
     static func valueJSON(_ value: AttrValue) -> Data? {
-        try? JSONSerialization.data(withJSONObject: value.jsonValue)
+        AttrValueCodec.encode(value)
+    }
+}
+
+/// AttrValue ↔ JSON 安全编解码
+///
+/// ⚠️ 不要直接用 `JSONSerialization.data(withJSONObject: value.jsonValue)`：
+/// 裸值（Int/Double/Bool/String）作为顶层时 NSJSONSerialization 抛的是
+/// Objective-C 异常（非 Swift Error），`try?`/`try!` 都拦不住，会导致 App 崩溃。
+/// 这里统一把值包进数组（合法顶层）再序列化，解码时兼容新旧两种格式。
+enum AttrValueCodec {
+    static func encode(_ value: AttrValue) -> Data? {
+        try? JSONSerialization.data(withJSONObject: [value.jsonValue])
+    }
+
+    static func decode(_ data: Data) -> AttrValue? {
+        // 新格式：数组包裹
+        if let array = try? JSONSerialization.jsonObject(with: data) as? [Any],
+           let first = array.first {
+            return AttrValue(first)
+        }
+        // 旧格式：裸值（历史上可能已落盘）
+        if let any = try? JSONSerialization.jsonObject(with: data, options: .fragmentsAllowed) {
+            return AttrValue(any)
+        }
+        return nil
     }
 }
 
@@ -224,7 +248,14 @@ final class AppModel: ObservableObject {
 
     // MARK: - 小组件快照（v1.7）
 
-    /// 写入桌面小组件读取的状态快照（AppGroup 共享容器）
+    /// 小组件快照写入队列：文件 I/O 不占主线程（AppModel 是 @MainActor）
+    private static let snapshotQueue = DispatchQueue(label: "haierac.widget-snapshot")
+
+    /// 写入桌面小组件读取的状态快照。
+    /// ⚠️ 不写 AppGroup 容器：非沙盒进程访问 `~/Library/Group Containers/<group>`
+    /// 会永久阻塞（实测 ls/touch 均挂起），导致 App 启动卡死、网关无法连接。
+    /// 改写到 App 自己的 Application Support 目录，小组件侧通过
+    /// 只读临时例外 entitlement 访问同一路径。
     /// 数据结构与 Sources/HaierACWidget/Widget.swift 的 ACWidgetSnapshot 对齐
     func writeWidgetSnapshot() {
         guard let deviceId = devices.first?.id else { return }
@@ -243,19 +274,18 @@ final class AppModel: ObservableObject {
         dict["updatedAt"] = ISO8601DateFormatter().string(from: Date())
         guard let data = try? JSONSerialization.data(withJSONObject: dict) else { return }
 
-        // 主 App 非沙盒：直接写 AppGroup 容器（与 Widget 的 containerURL 同一路径）
-        let groupID = "group.local.haierac"
-        let base = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: groupID)
-            ?? FileManager.default.homeDirectoryForCurrentUser
-                .appendingPathComponent("Library/Group Containers/\(groupID)", isDirectory: true)
-        do {
-            try FileManager.default.createDirectory(at: base, withIntermediateDirectories: true)
-            try data.write(to: base.appendingPathComponent("widget-state.json"), options: .atomic)
-            // 通知系统刷新小组件时间线（未安装小组件时静默忽略）
-            WidgetCenter.shared.reloadAllTimelines()
-        } catch {
-            AppLog.log("小组件快照写入失败: \(error.localizedDescription)")
+        let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+            .appendingPathComponent("HaierAC", isDirectory: true)
+        Self.snapshotQueue.async {
+            do {
+                try FileManager.default.createDirectory(at: base, withIntermediateDirectories: true)
+                try data.write(to: base.appendingPathComponent("widget-state.json"), options: .atomic)
+            } catch {
+                AppLog.log("小组件快照写入失败: \(error.localizedDescription)")
+            }
         }
+        // 通知系统刷新小组件时间线（未安装小组件时静默忽略）
+        WidgetCenter.shared.reloadAllTimelines()
     }
 
     // MARK: - 情景模式（v1.4）
@@ -276,8 +306,7 @@ final class AppModel: ObservableObject {
         var valueJSON: Data
 
         var value: AttrValue? {
-            guard let any = try? JSONSerialization.jsonObject(with: valueJSON) else { return nil }
-            return AttrValue(any)
+            AttrValueCodec.decode(valueJSON)
         }
     }
 
@@ -299,15 +328,15 @@ final class AppModel: ObservableObject {
     /// 内置默认情景（属性名为海尔数字模型通用名；设备不支持时静默跳过）
     static let defaultScenes: [ScenePreset] = [
         ScenePreset(name: "睡眠", icon: "moon.stars.fill", actions: [
-            SceneAction(deviceId: "", attrName: "targetTemperature", attrDesc: "目标温度", valueJSON: try! JSONSerialization.data(withJSONObject: 26)),
-            SceneAction(deviceId: "", attrName: "windSpeed", attrDesc: "风速", valueJSON: try! JSONSerialization.data(withJSONObject: "low")),
+            SceneAction(deviceId: "", attrName: "targetTemperature", attrDesc: "目标温度", valueJSON: AttrValueCodec.encode(.double(26)) ?? Data()),
+            SceneAction(deviceId: "", attrName: "windSpeed", attrDesc: "风速", valueJSON: AttrValueCodec.encode(.string("low")) ?? Data()),
         ]),
         ScenePreset(name: "离家", icon: "house.fill", actions: [
-            SceneAction(deviceId: "", attrName: "onOffStatus", attrDesc: "电源", valueJSON: try! JSONSerialization.data(withJSONObject: false)),
+            SceneAction(deviceId: "", attrName: "onOffStatus", attrDesc: "电源", valueJSON: AttrValueCodec.encode(.bool(false)) ?? Data()),
         ]),
         ScenePreset(name: "回家", icon: "house.and.flag.fill", actions: [
-            SceneAction(deviceId: "", attrName: "onOffStatus", attrDesc: "电源", valueJSON: try! JSONSerialization.data(withJSONObject: true)),
-            SceneAction(deviceId: "", attrName: "targetTemperature", attrDesc: "目标温度", valueJSON: try! JSONSerialization.data(withJSONObject: 24)),
+            SceneAction(deviceId: "", attrName: "onOffStatus", attrDesc: "电源", valueJSON: AttrValueCodec.encode(.bool(true)) ?? Data()),
+            SceneAction(deviceId: "", attrName: "targetTemperature", attrDesc: "目标温度", valueJSON: AttrValueCodec.encode(.double(24)) ?? Data()),
         ]),
     ]
 
@@ -550,12 +579,11 @@ final class AppModel: ObservableObject {
         gatewayHandle?.stop()
         gatewayHandle = nil
         gatewayConnected = false
-        // 清空小组件快照（登出后无状态可展示）
-        let groupID = "group.local.haierac"
-        let url = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: groupID)
-            ?? FileManager.default.homeDirectoryForCurrentUser
-                .appendingPathComponent("Library/Group Containers/\(groupID)/widget-state.json")
-        try? FileManager.default.removeItem(at: url)
+        // 清空小组件快照（登出后无状态可展示）。
+        // ⚠️ 不能碰 Group Containers（非沙盒访问会挂起），快照现在在 Application Support
+        let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+            .appendingPathComponent("HaierAC", isDirectory: true)
+        try? FileManager.default.removeItem(at: base.appendingPathComponent("widget-state.json"))
         WidgetCenter.shared.reloadAllTimelines()
         CredentialStore.deleteAll()
         UserDefaults.standard.removeObject(forKey: "tokenExpiresAt")

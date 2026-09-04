@@ -14,9 +14,12 @@ struct ACWidgetSnapshot: Codable {
     static let empty = ACWidgetSnapshot(temperature: nil, targetTemp: nil, powerOn: nil, deviceName: nil, updatedAt: nil)
 }
 
-/// AppGroup 容器（与主 App 共享；主 App 非沙盒直接写文件系统，Widget 沙盒走 containerURL）
+/// 主 App 写入、Widget 读取的状态快照
+/// ⚠️ 不用 AppGroup 容器：非沙盒主 App 访问 `~/Library/Group Containers/<group>`
+/// 会永久阻塞（实测挂起）。改为 App 的 Application Support 目录共享：
+/// 主 App 直接写，Widget（沙盒）通过只读临时例外 entitlement 读取同一路径。
 enum ACSharedState {
-    static let groupID = "group.local.haierac"
+    /// 与主 App HaierACApp/AppModel.swift writeWidgetSnapshot() 的写入路径保持一致
     static let fileName = "widget-state.json"
 
     /// 读取最新快照；失败返回 nil（Widget 显示占位）
@@ -27,12 +30,13 @@ enum ACSharedState {
     }
 
     static func snapshotURL() -> URL {
-        // Widget 沙盒内 containerURL 可用；主 App 非沙盒回退到硬编码路径
-        if let container = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: groupID) {
-            return container.appendingPathComponent(fileName)
-        }
-        let home = FileManager.default.homeDirectoryForCurrentUser
-        return home.appendingPathComponent("Library/Group Containers/\(groupID)/\(fileName)")
+        // 沙盒小组件：home 指向容器（containerURL 不可用），
+        // 用真实用户名拼 Application Support 路径，
+        // 读权限由 Widget.entitlements 的 absolute-path 只读例外授予
+        // （与主 App writeWidgetSnapshot() 的写入路径保持一致）。
+        let user = NSUserName()
+        let base = URL(fileURLWithPath: "/Users/\(user)/Library/Application Support/HaierAC", isDirectory: true)
+        return base.appendingPathComponent(fileName)
     }
 }
 
