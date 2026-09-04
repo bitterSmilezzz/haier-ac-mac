@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import Combine
 import HaierACCore
 
 /// 菜单栏状态项控制器：NSStatusItem + NSPopover（替代 MenuBarExtra）
@@ -13,6 +14,7 @@ final class StatusItemController: NSObject {
     private var statusItem: NSStatusItem?
     private var popover: NSPopover?
     private let model: AppModel
+    private var cancellables: Set<AnyCancellable> = []
 
     init(model: AppModel) {
         self.model = model
@@ -21,15 +23,37 @@ final class StatusItemController: NSObject {
 
     /// 创建状态栏图标（启动时调用一次）
     func setup() {
-        let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
+        let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         if let button = item.button {
             button.image = NSImage(systemSymbolName: "air.conditioner.horizontal", accessibilityDescription: "海尔空调")
             button.image?.isTemplate = true
+            button.imagePosition = .imageLeft
             button.target = self
             button.action = #selector(togglePopover(_:))
             button.sendAction(on: [.leftMouseUp, .rightMouseUp])
         }
         statusItem = item
+        refreshTemperature()
+
+        // 温度/开关变化时刷新菜单栏标题
+        model.$attributes
+            .combineLatest(model.$menuBarDeviceId, model.$menuBarShowTemperature, model.$devices)
+            .sink { [weak self] _ in
+                Task { @MainActor in self?.refreshTemperature() }
+            }
+            .store(in: &cancellables)
+    }
+
+    /// 菜单栏图标旁显示当前温度（如 26°）
+    private func refreshTemperature() {
+        guard let button = statusItem?.button else { return }
+        if let text = model.menuBarTemperatureText {
+            button.title = " \(text)"
+            button.imagePosition = .imageLeft
+        } else {
+            button.title = ""
+        }
+        statusItem?.length = NSStatusItem.variableLength
     }
 
     @objc private func togglePopover(_ sender: Any?) {
@@ -83,6 +107,10 @@ final class StatusItemController: NSObject {
         launchItem.target = self
         menu.addItem(launchItem)
 
+        let tempItem = NSMenuItem(title: model.menuBarShowTemperature ? "菜单栏显示温度：开" : "菜单栏显示温度：关", action: #selector(toggleMenuBarTemperature), keyEquivalent: "")
+        tempItem.target = self
+        menu.addItem(tempItem)
+
         let themeMenu = NSMenu()
         for mode in ThemeMode.allCases {
             let item = NSMenuItem(title: mode.label, action: #selector(setTheme(_:)), keyEquivalent: "")
@@ -117,6 +145,11 @@ final class StatusItemController: NSObject {
 
     @objc private func toggleLaunchAtLogin() {
         model.launchAtLogin.toggle()
+    }
+
+    @objc private func toggleMenuBarTemperature() {
+        model.menuBarShowTemperature.toggle()
+        refreshTemperature()
     }
 
     @objc private func setTheme(_ sender: NSMenuItem) {

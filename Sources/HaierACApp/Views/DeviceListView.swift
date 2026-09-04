@@ -21,6 +21,8 @@ struct DeviceListView: View {
                         }
                         cloudDevicesSection
                         manualDevicesSection
+                        SceneSection()
+                        ScheduleSection()
                         discoverySection
                     }
                     .padding(.bottom, Theme.spaceLG)
@@ -356,6 +358,12 @@ struct DeviceCard: View {
         model.attribute("onOffStatus", deviceId: device.id)?.boolValue
     }
 
+    /// 当前室内温度（无数据时 nil）
+    private var indoorTemp: Double? {
+        guard let attr = AppModel.indoorTemperatureAttribute(in: model.attributes[device.id] ?? [:]) else { return nil }
+        return attr.doubleValue
+    }
+
     var body: some View {
         HStack(spacing: Theme.spaceMD) {
             // 状态图标
@@ -379,6 +387,20 @@ struct DeviceCard: View {
             }
 
             Spacer()
+
+            // 当前室内温度（大字，感知最强的信息）
+            if let temp = indoorTemp {
+                HStack(spacing: 2) {
+                    Text(String(format: "%.0f", temp))
+                        .font(.system(size: 24, weight: .semibold, design: .rounded))
+                        .monospacedDigit()
+                        .foregroundStyle(Theme.ink)
+                    Text("°")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(Theme.inkTertiary)
+                        .padding(.bottom, 6)
+                }
+            }
 
             // 状态徽标
             if let isOn {

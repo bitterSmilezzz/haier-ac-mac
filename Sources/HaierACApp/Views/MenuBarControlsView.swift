@@ -58,6 +58,14 @@ struct MenuBarControlsView: View {
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(Theme.ink)
             Spacer()
+            // 当前室内温度（大字）
+            if let attr = AppModel.indoorTemperatureAttribute(in: model.attributes[device.id] ?? [:]),
+               let temp = attr.doubleValue {
+                Text(String(format: "%.0f°", temp))
+                    .font(.system(size: 17, weight: .semibold, design: .rounded))
+                    .monospacedDigit()
+                    .foregroundStyle(Theme.ink)
+            }
             if let onOff = model.attribute("onOffStatus", deviceId: device.id), let isOn = onOff.boolValue {
                 Text(isOn ? "运行中" : "已关机")
                     .font(.system(size: 11, weight: .medium))
@@ -71,7 +79,11 @@ struct MenuBarControlsView: View {
     private var devicePicker: some View {
         Picker("", selection: Binding(
             get: { currentDevice?.id ?? activeDevices.first?.id ?? "" },
-            set: { selectedDeviceId = $0 }
+            set: { id in
+                selectedDeviceId = id
+                // 菜单栏温度跟随面板选中的设备
+                model.menuBarDeviceId = id
+            }
         )) {
             ForEach(activeDevices) { device in
                 Text(device.deviceName).tag(device.id)

@@ -11,6 +11,35 @@ struct ManualDevice: Identifiable, Codable, Hashable {
     var id: String { deviceId }
 }
 
+/// 本地调度任务（定时/倒计时）：到点后向指定设备发送属性指令
+/// 注意：本地调度仅在 App 运行时生效（菜单栏常驻/开机自启时通常满足）；
+/// 任务不落云端，App 退出/睡眠期间到点的任务会顺延到下次唤醒补发。
+struct ScheduledAction: Identifiable, Codable, Hashable {
+    var id = UUID()
+    /// 显示名称（如「晚上 10 点关机」）
+    var name: String
+    var deviceId: String
+    var attrName: String
+    /// 属性显示名（UI 展示用）
+    var attrDesc: String
+    /// 属性值（JSON 编码，AttrValue 不可直接 Codable）
+    var attrValueJSON: Data
+    /// 触发时刻（绝对时间；daily 重复时为下一次触发时刻）
+    var fireDate: Date
+    /// 是否每天重复
+    var repeatsDaily: Bool = false
+    var enabled: Bool = true
+
+    var attrValue: AttrValue? {
+        guard let any = try? JSONSerialization.jsonObject(with: attrValueJSON) else { return nil }
+        return AttrValue(any)
+    }
+
+    static func valueJSON(_ value: AttrValue) -> Data? {
+        try? JSONSerialization.data(withJSONObject: value.jsonValue)
+    }
+}
+
 /// 应用主状态模型
 @MainActor
 final class AppModel: ObservableObject {
@@ -72,9 +101,213 @@ final class AppModel: ObservableObject {
     /// 待确认的操作（发送后等待网关回读）
     private var pendingConfirm: (deviceId: String, name: String, expected: AttrValue)?
 
+    // MARK: - 菜单栏实时温度（v1.4）
+
+    /// 是否在菜单栏图标旁显示当前温度（持久化）
+    @Published var menuBarShowTemperature: Bool {
+        didSet {
+            UserDefaults.standard.set(menuBarShowTemperature, forKey: "menuBarShowTemperature")
+        }
+    }
+    /// 菜单栏温度取自哪台设备（nil = 第一台设备）
+    @Published var menuBarDeviceId: String?
+
+    /// 识别“室内温度”属性：可读、数值型，且不是目标/设定温度。
+    /// 优先名称含 indoor/室内/环境 的属性，否则回退任意温度类属性。
+    static func indoorTemperatureAttribute(in attrs: [String: DeviceAttribute]) -> DeviceAttribute? {
+        let tempAttrs = attrs.values.filter { attr in
+            guard attr.readable, attr.value != nil, attr.doubleValue != nil else { return false }
+            let n = attr.name.lowercased()
+            let d = attr.desc.lowercased()
+            // 排除目标温度/设定温度（target/set/目标/设定）
+            let isTarget = n.contains("target") || n.contains("set") || d.contains("目标") || d.contains("设定")
+            guard !isTarget else { return false }
+            // 温度类：名称含 temp/temperature/温度/环境
+            return n.contains("temp") || d.contains("温度") || d.contains("环境")
+        }
+        if tempAttrs.isEmpty { return nil }
+        // 优先“室内/环境温度”
+        if let indoor = tempAttrs.first(where: {
+            let n = $0.name.lowercased()
+            let d = $0.desc.lowercased()
+            return n.contains("indoor") || n.contains("room") || d.contains("室内") || d.contains("环境")
+        }) {
+            return indoor
+        }
+        return tempAttrs.sorted { $0.desc < $1.desc }.first
+    }
+
+    /// 当前菜单栏温度文案（如 "26.0°"），无数据时返回 nil
+    var menuBarTemperatureText: String? {
+        guard menuBarShowTemperature, let deviceId = menuBarDeviceId ?? devices.first?.id,
+              let attr = Self.indoorTemperatureAttribute(in: attributes[deviceId] ?? [:]),
+              let value = attr.doubleValue else { return nil }
+        return String(format: "%.0f°", value)
+    }
+
+    // MARK: - 本地调度（定时/倒计时，v1.4）
+
+    /// 调度任务列表（持久化到 UserDefaults）
+    @Published var scheduledActions: [ScheduledAction] = [] {
+        didSet {
+            if let data = try? JSONEncoder().encode(scheduledActions) {
+                UserDefaults.standard.set(data, forKey: "scheduledActions")
+            }
+        }
+    }
+    private var schedulerTask: Task<Void, Never>?
+
+    /// 启动调度轮询（登录/恢复会话成功后调用；App 退出前持续运行）
+    func startScheduler() {
+        guard schedulerTask == nil else { return }
+        if let data = UserDefaults.standard.data(forKey: "scheduledActions"),
+           let saved = try? JSONDecoder().decode([ScheduledAction].self, from: data) {
+            scheduledActions = saved
+        }
+        schedulerTask = Task { [weak self] in
+            while !Task.isCancelled {
+                guard let self else { break }
+                self.fireDueActions()
+                try? await Task.sleep(nanoseconds: 15_000_000_000)  // 15s 轮询
+            }
+        }
+    }
+
+    func stopScheduler() {
+        schedulerTask?.cancel()
+        schedulerTask = nil
+    }
+
+    /// 新增调度任务（fireDate 为绝对触发时刻；倒计时由调用方换算为 fireDate）
+    func addScheduledAction(_ action: ScheduledAction) {
+        // 去重：同设备同属性同触发时刻
+        guard !scheduledActions.contains(where: {
+            $0.deviceId == action.deviceId && $0.attrName == action.attrName && $0.fireDate == action.fireDate
+        }) else { return }
+        scheduledActions.append(action)
+        AppLog.log("新增调度: \(action.name) @ \(action.fireDate)")
+    }
+
+    func removeScheduledAction(_ action: ScheduledAction) {
+        scheduledActions.removeAll { $0.id == action.id }
+    }
+
+    /// 轮询检查：到点任务下发指令；每日重复任务自动顺延到下一天
+    private func fireDueActions() {        let now = Date()
+        let due = scheduledActions.filter { $0.enabled && $0.fireDate <= now }
+        guard !due.isEmpty else { return }
+        for action in due {
+            guard let value = action.attrValue else { continue }
+            AppLog.log("调度触发: \(action.name) -> \(action.deviceId).\(action.attrName)=\(value.stringValue)")
+            // 静默下发（不走操作反馈 toast，避免轮询批量触发刷屏）
+            gatewayHandle?.sendControl(deviceId: action.deviceId, attributes: [action.attrName: value.jsonValue], completion: nil)
+            if action.repeatsDaily {
+                // 顺延到下一个整点重复时刻（保留原时刻的时:分）
+                var next = Calendar.current.date(byAdding: .day, value: 1, to: action.fireDate) ?? action.fireDate.addingTimeInterval(86400)
+                // 若因应用长时间未运行导致积压多个周期，只补发一次、推进到最近未来
+                while next <= now {
+                    next = Calendar.current.date(byAdding: .day, value: 1, to: next) ?? next.addingTimeInterval(86400)
+                }
+                if let idx = scheduledActions.firstIndex(where: { $0.id == action.id }) {
+                    scheduledActions[idx].fireDate = next
+                }
+            } else {
+                scheduledActions.removeAll { $0.id == action.id }  // 一次性任务：触发后删除
+            }
+        }
+    }
+
     // MARK: - 更新检查（G3）
 
     @Published var updateAvailable: (version: String, url: URL)?
+
+    // MARK: - 情景模式（v1.4）
+
+    /// 情景模式：一组「设备 → 属性 → 值」的组合，一键下发
+    struct ScenePreset: Identifiable, Codable, Hashable {
+        var id = UUID()
+        var name: String
+        var icon: String = "sparkles"
+        /// 动作列表（deviceId → attrName → 值 JSON）
+        var actions: [SceneAction]
+    }
+
+    struct SceneAction: Codable, Hashable {
+        var deviceId: String
+        var attrName: String
+        var attrDesc: String
+        var valueJSON: Data
+
+        var value: AttrValue? {
+            guard let any = try? JSONSerialization.jsonObject(with: valueJSON) else { return nil }
+            return AttrValue(any)
+        }
+    }
+
+    /// 情景模式列表（持久化）
+    @Published var scenes: [ScenePreset] = [] {
+        didSet {
+            if let data = try? JSONEncoder().encode(scenes) {
+                UserDefaults.standard.set(data, forKey: "scenes")
+            }
+        }
+    }
+
+    /// 首次启动写入内置默认情景
+    private func seedDefaultScenesIfNeeded() {
+        guard UserDefaults.standard.data(forKey: "scenes") == nil else { return }
+        scenes = Self.defaultScenes
+    }
+
+    /// 内置默认情景（属性名为海尔数字模型通用名；设备不支持时静默跳过）
+    static let defaultScenes: [ScenePreset] = [
+        ScenePreset(name: "睡眠", icon: "moon.stars.fill", actions: [
+            SceneAction(deviceId: "", attrName: "targetTemperature", attrDesc: "目标温度", valueJSON: try! JSONSerialization.data(withJSONObject: 26)),
+            SceneAction(deviceId: "", attrName: "windSpeed", attrDesc: "风速", valueJSON: try! JSONSerialization.data(withJSONObject: "low")),
+        ]),
+        ScenePreset(name: "离家", icon: "house.fill", actions: [
+            SceneAction(deviceId: "", attrName: "onOffStatus", attrDesc: "电源", valueJSON: try! JSONSerialization.data(withJSONObject: false)),
+        ]),
+        ScenePreset(name: "回家", icon: "house.and.flag.fill", actions: [
+            SceneAction(deviceId: "", attrName: "onOffStatus", attrDesc: "电源", valueJSON: try! JSONSerialization.data(withJSONObject: true)),
+            SceneAction(deviceId: "", attrName: "targetTemperature", attrDesc: "目标温度", valueJSON: try! JSONSerialization.data(withJSONObject: 24)),
+        ]),
+    ]
+
+    /// 用当前选中设备的属性生成默认动作占位（由 UI 填充）
+    func addScene(name: String, icon: String, actions: [SceneAction]) {
+        scenes.append(ScenePreset(name: name, icon: icon, actions: actions))
+        AppLog.log("新增情景: \(name) (\(actions.count) 个动作)")
+    }
+
+    func removeScene(_ scene: ScenePreset) {
+        scenes.removeAll { $0.id == scene.id }
+    }
+
+    /// 一键应用情景：逐个下发动作（静默，不回 toast）。
+    /// 动作 deviceId 为空时默认作用于第一台设备（可在 UI 中选目标设备）。
+    func applyScene(_ scene: ScenePreset, targetDeviceId: String? = nil) {
+        guard gatewayConnected else {
+            operationNotice = OperationNotice(text: "⚠️ 连接中断，情景未应用", isError: true)
+            return
+        }
+        let fallbackId = targetDeviceId ?? devices.first?.id
+        var sent = 0
+        for action in scene.actions {
+            guard let value = action.value else { continue }
+            let deviceId = action.deviceId.isEmpty ? (fallbackId ?? "") : action.deviceId
+            guard !deviceId.isEmpty else { continue }
+            gatewayHandle?.sendControl(deviceId: deviceId, attributes: [action.attrName: value.jsonValue], completion: nil)
+            // 乐观更新
+            if var map = attributes[deviceId], let old = map[action.attrName] {
+                map[action.attrName] = old.updating(value: value)
+                attributes[deviceId] = map
+            }
+            sent += 1
+        }
+        AppLog.log("应用情景: \(scene.name) (\(sent) 个动作)")
+        operationNotice = OperationNotice(text: sent > 0 ? "✅ 情景「\(scene.name)」已下发（\(sent) 项）" : "⚠️ 情景「\(scene.name)」无可下发的动作", isError: sent == 0)
+    }
 
     private var provider: (any DeviceProvider)?
     private var context: ProviderContext?
@@ -87,10 +320,17 @@ final class AppModel: ObservableObject {
         let saved = UserDefaults.standard.string(forKey: "themeMode")
         themeMode = ThemeMode(rawValue: saved ?? "") ?? .system
         launchAtLogin = UserDefaults.standard.bool(forKey: "launchAtLogin")
+        menuBarShowTemperature = UserDefaults.standard.object(forKey: "menuBarShowTemperature") as? Bool ?? true
 
         if let data = UserDefaults.standard.data(forKey: "manualDevices"),
            let saved = try? JSONDecoder().decode([ManualDevice].self, from: data) {
             manualDevices = saved
+        }
+        if let data = UserDefaults.standard.data(forKey: "scenes"),
+           let saved = try? JSONDecoder().decode([ScenePreset].self, from: data) {
+            scenes = saved
+        } else {
+            seedDefaultScenesIfNeeded()
         }
     }
 
@@ -118,6 +358,7 @@ final class AppModel: ObservableObject {
             await refreshTokenIfNeeded()
             await connectAndLoad()
         }
+        startScheduler()  // 登录态调度轮询（无论本次连接成功与否，任务列表可用）
     }
 
     func login() async {
@@ -135,6 +376,7 @@ final class AppModel: ObservableObject {
             saveCredentials(context, phone: trimmedPhone)
             password = ""
             await connectAndLoad()
+            startScheduler()  // 登录成功：启动调度轮询
         } catch {
             phase = .error(AppModel.classifyError(error))
         }
@@ -265,6 +507,7 @@ final class AppModel: ObservableObject {
 
     func logout() {
         sessionGeneration += 1  // 使所有进行中的异步链失效
+        stopScheduler()
         gatewayHandle?.stop()
         gatewayHandle = nil
         gatewayConnected = false
