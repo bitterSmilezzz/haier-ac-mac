@@ -125,6 +125,12 @@ struct DeviceControlView: View {
                 statusPill(icon: "fan", text: opt.desc)
             }
 
+            // 室内湿度（设备有湿度传感器时显示）
+            if let hum = AppModel.indoorHumidityAttribute(in: attrs),
+               let value = hum.doubleValue {
+                statusPill(icon: "humidity.fill", text: String(format: "湿度 %.0f%%", value))
+            }
+
             Spacer()
         }
     }

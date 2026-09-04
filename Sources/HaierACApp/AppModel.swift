@@ -178,6 +178,17 @@ final class AppModel: ObservableObject {
         return tempAttrs.sorted { $0.desc < $1.desc }.first
     }
 
+    /// 识别“室内湿度”属性：可读、数值型，名称/描述含湿度/humidity。
+    /// 设备无湿度传感器时返回 nil（UI 自动隐藏）。
+    static func indoorHumidityAttribute(in attrs: [String: DeviceAttribute]) -> DeviceAttribute? {
+        attrs.values.first { attr in
+            guard attr.readable, attr.value != nil, attr.doubleValue != nil else { return false }
+            let n = attr.name.lowercased()
+            let d = attr.desc.lowercased()
+            return n.contains("humidity") || n.contains("humid") || d.contains("湿度")
+        }
+    }
+
     /// 当前菜单栏温度文案（如 "26.0°"），无数据时返回 nil
     var menuBarTemperatureText: String? {
         guard menuBarShowTemperature, let deviceId = menuBarDeviceId ?? devices.first?.id,

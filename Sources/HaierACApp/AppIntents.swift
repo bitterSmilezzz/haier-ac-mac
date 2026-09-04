@@ -147,6 +147,33 @@ struct ApplyACSceneIntent: AppIntent {
     }
 }
 
+// MARK: - 查询温度
+
+struct GetACTemperatureIntent: AppIntent {
+    static var title: LocalizedStringResource = "查询空调温度"
+    static var description = IntentDescription("查询空调当前室内温度", categoryName: "空调控制")
+
+    @Parameter(title: "设备名称", description: "可选；留空使用第一台设备")
+    var deviceName: String?
+
+    @MainActor
+    func perform() async throws -> some IntentResult & ProvidesDialog {
+        let model = AppModel.shared
+        guard let deviceId = resolveDeviceId(named: deviceName) else {
+            throw ACIntentError.message("没有可控制的空调设备")
+        }
+        guard let attr = AppModel.indoorTemperatureAttribute(in: model.attributes[deviceId] ?? [:]),
+              let temp = attr.doubleValue else {
+            throw ACIntentError.message("暂未获取到室内温度")
+        }
+        let name = model.devices.first(where: { $0.id == deviceId })?.deviceName
+            ?? model.manualDevices.first(where: { $0.deviceId == deviceId })?.name
+            ?? "空调"
+        let text = String(format: "%.0f°", temp)
+        return .result(value: text, dialog: "\(name)当前室内温度 \(text)")
+    }
+}
+
 // MARK: - 快捷指令库入口
 
 struct ACAppShortcuts: AppShortcutsProvider {
@@ -188,6 +215,15 @@ struct ACAppShortcuts: AppShortcutsProvider {
                     shortTitle: "应用情景",
                     systemImageName: "sparkles"
                 ),
+                AppShortcut(
+                    intent: GetACTemperatureIntent(),
+                    phrases: [
+                        "用 \(.applicationName) 查询温度",
+                        "\(.applicationName) 现在多少度",
+                    ],
+                    shortTitle: "查询温度",
+                    systemImageName: "thermometer.sun.fill"
+                ),
             ]
         } else {
             return [
@@ -215,6 +251,12 @@ struct ACAppShortcuts: AppShortcutsProvider {
                     intent: ApplyACSceneIntent(),
                     phrases: [
                         "用 \(.applicationName) 应用情景",
+                    ]
+                ),
+                AppShortcut(
+                    intent: GetACTemperatureIntent(),
+                    phrases: [
+                        "用 \(.applicationName) 查询温度",
                     ]
                 ),
             ]
