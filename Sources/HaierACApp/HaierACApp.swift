@@ -115,6 +115,10 @@ struct ContentView: View {
                             .foregroundStyle(Theme.inkMuted)
                             .multilineTextAlignment(.center)
                             .padding(.horizontal, Theme.spaceXL)
+                        Button("重试") {
+                            model.retryConnection()
+                        }
+                        .buttonStyle(Theme.primaryButtonStyle())
                         Button("返回登录") {
                             model.logout()
                         }

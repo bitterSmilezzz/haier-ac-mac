@@ -577,6 +577,19 @@ final class AppModel: ObservableObject {
 
     // MARK: - 生命周期
 
+    /// 错误页「重试」：会话仍有效时直接重连（无需重新登录）
+    func retryConnection() {
+        guard provider != nil, context != nil else {
+            phase = .loggedOut
+            return
+        }
+        phase = .connecting
+        Task {
+            await refreshTokenIfNeeded()
+            await connectAndLoad()
+        }
+    }
+
     /// 启动时恢复会话（由 AppDelegate 在应用启动完成时调用）
     func restoreSession() {
         guard provider == nil else { return }  // 防重入：已有会话则跳过
