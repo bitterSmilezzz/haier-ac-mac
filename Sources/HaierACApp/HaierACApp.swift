@@ -1,8 +1,6 @@
 import SwiftUI
 import AppKit
-import HaierACCore
-
-/// 应用委托：启动时后台恢复会话，不自动打开主窗口
+import HaierACCore/// 应用委托：启动时后台恢复会话，不自动打开主窗口
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItemController: StatusItemController?
@@ -59,6 +57,8 @@ struct HaierACApp: App {
                 }
         }
         .windowResizability(.contentMinSize)
+        // 快捷指令/Shortcuts 集成：AppIntents.swift 中的 ACAppShortcuts 由系统自动发现，
+        // 无需场景修饰符（本 SDK 的 AppIntents 接口不暴露 Scene.appIntents）
     }
 }
 
