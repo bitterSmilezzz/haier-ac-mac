@@ -1,4 +1,5 @@
 import SwiftUI
+import Charts
 import HaierACCore
 
 struct DeviceControlView: View {
@@ -50,6 +51,9 @@ struct DeviceControlView: View {
 
                         // 常用控制
                         commonSection
+
+                        // 温度趋势（24h 历史曲线）
+                        temperatureTrendSection
 
                         // 全部可写属性
                         allWritableSection
@@ -215,6 +219,79 @@ struct DeviceControlView: View {
         Divider()
             .overlay(Theme.hairline)
             .padding(.vertical, 2)
+    }
+
+    // MARK: - 温度趋势（24h 曲线）
+
+    @ViewBuilder
+    private var temperatureTrendSection: some View {
+        let samples = model.temperatureSeries(deviceId: device.id)
+        if samples.count >= 2 {
+            VStack(alignment: .leading, spacing: Theme.spaceMD) {
+                HStack {
+                    Text("温度趋势（最近 24 小时）")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(Theme.inkSubtle)
+                        .tracking(0.4)
+                    Spacer()
+                    // 极值摘要
+                    if let min = samples.map(\.temperature).min(),
+                       let max = samples.map(\.temperature).max() {
+                        Text(String(format: "%.0f° ~ %.0f°", min, max))
+                            .font(.system(size: 11, design: .monospaced))
+                            .foregroundStyle(Theme.inkSubtle)
+                    }
+                }
+
+                Chart(samples) { sample in
+                    LineMark(
+                        x: .value("时间", sample.timestamp),
+                        y: .value("温度", sample.temperature)
+                    )
+                    .foregroundStyle(Theme.accent)
+                    .interpolationMethod(.catmullRom)
+                    AreaMark(
+                        x: .value("时间", sample.timestamp),
+                        y: .value("温度", sample.temperature)
+                    )
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [Theme.accent.opacity(0.25), Theme.accent.opacity(0.02)],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
+                    .interpolationMethod(.catmullRom)
+                }
+                .chartYAxis {
+                    AxisMarks(position: .trailing) { value in
+                        AxisGridLine().foregroundStyle(Theme.hairline)
+                        AxisValueLabel {
+                            if let v = value.as(Double.self) {
+                                Text(String(format: "%.0f°", v))
+                                    .font(.system(size: 9))
+                                    .foregroundStyle(Theme.inkTertiary)
+                            }
+                        }
+                    }
+                }
+                .chartXAxis {
+                    AxisMarks(values: .automatic(desiredCount: 6)) { value in
+                        AxisGridLine().foregroundStyle(Theme.hairline)
+                        AxisValueLabel {
+                            if let date = value.as(Date.self) {
+                                Text(date, format: .dateTime.hour())
+                                    .font(.system(size: 9))
+                                    .foregroundStyle(Theme.inkTertiary)
+                            }
+                        }
+                    }
+                }
+                .frame(height: 130)
+            }
+            .padding(Theme.spaceMD)
+            .background(Theme.cardBackground(Theme.surface1))
+        }
     }
 
     // MARK: - 全部可写属性

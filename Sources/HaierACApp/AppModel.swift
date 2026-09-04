@@ -323,6 +323,48 @@ final class AppModel: ObservableObject {
         center.add(request)
     }
 
+    // MARK: - 温度历史曲线（v1.8）
+
+    /// 单条温度采样
+    struct TemperatureSample: Codable, Hashable, Identifiable {
+        var timestamp: Date
+        var temperature: Double
+        var id: Date { timestamp }
+    }
+
+    /// 温度历史（按设备存储，持久化到 UserDefaults）
+    @Published var temperatureHistory: [String: [TemperatureSample]] = [:] {
+        didSet {
+            if let data = try? JSONEncoder().encode(temperatureHistory) {
+                UserDefaults.standard.set(data, forKey: "temperatureHistory")
+            }
+        }
+    }
+    /// 温度采样限频：5 分钟内最多记一条（属性推送可能每秒多次）
+    private var lastSampleAt: [String: Date] = [:]
+    /// 历史窗口：保留最近 24 小时
+    private let historyWindow: TimeInterval = 24 * 3600
+
+    /// 属性推送时调用：按设备记录温度采样（限频 + 窗口裁剪）
+    func recordTemperatureSample(deviceId: String, temperature: Double) {
+        let now = Date()
+        // 限频：同设备 5 分钟内不重复采样
+        if let last = lastSampleAt[deviceId], now.timeIntervalSince(last) < 300 { return }
+        lastSampleAt[deviceId] = now
+
+        var samples = temperatureHistory[deviceId] ?? []
+        samples.append(TemperatureSample(timestamp: now, temperature: temperature))
+        // 裁剪：只保留窗口内数据，避免无限增长
+        let cutoff = now.addingTimeInterval(-historyWindow)
+        samples.removeAll { $0.timestamp < cutoff }
+        temperatureHistory[deviceId] = samples
+    }
+
+    /// 指定设备的温度序列（按时间升序；无数据时空数组）
+    func temperatureSeries(deviceId: String) -> [TemperatureSample] {
+        (temperatureHistory[deviceId] ?? []).sorted { $0.timestamp < $1.timestamp }
+    }
+
     // MARK: - 更新检查（G3）
 
     @Published var updateAvailable: (version: String, url: URL)?
@@ -486,6 +528,10 @@ final class AppModel: ObservableObject {
            let saved = try? JSONDecoder().decode([ManualDevice].self, from: data) {
             manualDevices = saved
         }
+        if let data = UserDefaults.standard.data(forKey: "temperatureHistory"),
+           let saved = try? JSONDecoder().decode([String: [TemperatureSample]].self, from: data) {
+            temperatureHistory = saved
+        }
         if let data = UserDefaults.standard.data(forKey: "scenes"),
            let saved = try? JSONDecoder().decode([ScenePreset].self, from: data) {
             scenes = saved
@@ -644,6 +690,10 @@ final class AppModel: ObservableObject {
                         }
                         self.attributes[deviceId] = map
                         self.confirmPendingIfNeeded(deviceId: deviceId, attrs: attrs)
+                        // 温度历史采样（限频 5 分钟一条，24h 窗口）
+                        if let temp = AppModel.indoorTemperatureAttribute(in: map)?.doubleValue {
+                            self.recordTemperatureSample(deviceId: deviceId, temperature: temp)
+                        }
                         self.writeWidgetSnapshot()  // 状态变化同步到小组件
                     }
                 },
