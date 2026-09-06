@@ -43,7 +43,7 @@ Requires macOS 13+, Xcode Command Line Tools (Swift 6).
 
 - **Password never persisted**: used only to exchange for an access token, cleared from memory immediately after login
 - **Token stored in Keychain** (system-encrypted, `local.haierac.token`), auto-refreshed on expiry
-- **Zero hardcoded secrets**: no account/phone in code; verification scripts read credentials from environment variables
+- **Zero hardcoded secrets**: no account/phone/appKey in code; appKey is read from the `HAIER_APP_KEY` env var or a local `~/.haier-ac-appkey` file (never committed)
 - **Redacted logs**: tokens are masked in diagnostic logs (`~/Library/Logs/HaierAC/app.log`)
 - Credentials only ever talk to official Haier endpoints (zj.haier.net / uws.haier.net / wssgw.haier.net)
 
@@ -51,7 +51,7 @@ Requires macOS 13+, Xcode Command Line Tools (Swift 6).
 
 ```bash
 # 1. Verify login / devices / digital model
-HAIER_PHONE='phone' HAIER_PASSWORD='password' python3 verify_protocol.py
+HAIER_PHONE='phone' HAIER_PASSWORD='password' HAIER_APP_KEY='appKey' python3 verify_protocol.py
 
 # 2. WebSocket gateway full-property report (requires uv)
 HAIER_PHONE='phone' HAIER_PASSWORD='password' uv run --with websockets python3 websocket_verify.py 30

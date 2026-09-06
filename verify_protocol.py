@@ -8,8 +8,9 @@
 - 获取 WebSocket 网关地址（验证连通性）
 
 用法:
-    HAIER_PHONE=138xxxx HAIER_PASSWORD='xxx' python3 verify_protocol.py
+    HAIER_PHONE=138xxxx HAIER_PASSWORD='xxx' HAIER_APP_KEY=xxxx python3 verify_protocol.py
 或直接运行，交互式输入手机号和密码（密码不回显）。
+appKey 与手机号/密码一样只从环境变量或 ~/.haier-ac-appkey 读取，不入库。
 """
 
 import getpass
@@ -21,10 +22,27 @@ import sys
 import time
 import urllib.error
 import urllib.request
+from pathlib import Path
 from urllib.parse import urlparse
 
 APP_ID = "MB-UZHSH-0001"
-APP_KEY = "REPLACE_WITH_YOUR_APP_KEY"
+
+
+def _load_app_key():
+    """appKey 为开发者凭据，不入库：优先 HAIER_APP_KEY，其次 ~/.haier-ac-appkey。"""
+    env = os.environ.get("HAIER_APP_KEY")
+    if env:
+        return env.strip()
+    local = Path.home() / ".haier-ac-appkey"
+    if local.is_file():
+        try:
+            return local.read_text(encoding="utf-8").strip()
+        except OSError:
+            pass
+    return "REPLACE_WITH_YOUR_APP_KEY"
+
+
+APP_KEY = _load_app_key()
 
 LOGIN_API = "https://zj.haier.net/api-gw/oauthserver/account/v1/login"
 GET_DEVICES_API = "https://uws.haier.net/uds/v1/protected/deviceinfos"

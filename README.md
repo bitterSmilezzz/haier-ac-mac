@@ -67,7 +67,7 @@ GitHub Actions 自动在 macos-latest 上构建 + 测试。
 - **密码不落盘**：仅用于换取访问令牌，登录后立即从内存清除
 - **Token 存本地文件**（`~/Library/Application Support/HaierAC/credentials.json`，权限 600 仅当前用户可读写），到期自动刷新
   - 为什么不用 Keychain：本应用为 ad-hoc 签名（个人项目每次打包重新签名），macOS 钥匙串对匿名签名调用者会反复弹出密码框；文件存储彻底消除弹窗，token 为短期凭证（10 天有效）风险可控
-- **代码零敏感信息**：无硬编码账号/手机号；验证脚本从环境变量读取凭据
+- **代码零敏感信息**：无硬编码账号/手机号/appKey；appKey 从 `HAIER_APP_KEY` 环境变量或本地 `~/.haier-ac-appkey` 文件读取（不入库）
 - **日志脱敏**：诊断日志（`~/Library/Logs/HaierAC/app.log`）中 token 已脱敏
 - 凭据仅与海尔官方云（zj.haier.net / uws.haier.net / wssgw.haier.net）通信
 
@@ -75,7 +75,7 @@ GitHub Actions 自动在 macos-latest 上构建 + 测试。
 
 ```bash
 # 1. 协议验证：登录/设备/数字模型
-HAIER_PHONE='手机号' HAIER_PASSWORD='密码' python3 verify_protocol.py
+HAIER_PHONE='手机号' HAIER_PASSWORD='密码' HAIER_APP_KEY='appKey' python3 verify_protocol.py
 
 # 2. WebSocket 网关全量上报验证（需 uv）
 HAIER_PHONE='手机号' HAIER_PASSWORD='密码' uv run --with websockets python3 websocket_verify.py 30

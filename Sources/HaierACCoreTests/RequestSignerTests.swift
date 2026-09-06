@@ -4,7 +4,12 @@ import XCTest
 final class RequestSignerTests: XCTestCase {
     /// 参考实现：sha256(urlPath + body去空白 + appId + appKey + timestamp) 的 hex 串。
     /// 期望值由 Python hashlib（与 banto6/haier 参考实现同算法）独立计算得出。
-    func testSignKnownVectors() {
+    /// appKey 为本地注入（HAIER_APP_KEY / ~/.haier-ac-appkey），未配置时跳过。
+    func testSignKnownVectors() throws {
+        try XCTSkipIf(
+            RequestSigner.appKey == "REPLACE_WITH_YOUR_APP_KEY",
+            "appKey 未配置（HAIER_APP_KEY 或 ~/.haier-ac-appkey）"
+        )
         let cases: [(path: String, body: String, timestamp: String, expected: String)] = [
             (
                 "/dsm-appliance/v1/appliance/device/list",
