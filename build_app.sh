@@ -1,10 +1,10 @@
 #!/bin/bash
 # 构建 HaierAC.app（打包为可双击运行的 macOS 应用，含桌面小组件扩展）
-# 用法: ./build_app.sh [版本号] [--open]    例: ./build_app.sh 1.3.0 --open
+# 用法: ./build_app.sh [版本号] [--open]    例: ./build_app.sh 1.9.0 --open
 set -euo pipefail
 cd "$(dirname "$0")"
 
-VERSION="1.3.0"
+VERSION="1.9.0"
 OPEN=""
 for arg in "$@"; do
     case "$arg" in

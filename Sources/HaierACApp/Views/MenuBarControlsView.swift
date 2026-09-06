@@ -2,11 +2,12 @@ import SwiftUI
 import Charts
 import HaierACCore
 
-/// 菜单栏小窗口控制面板（点击菜单栏图标弹出的独立窗口）
+/// 菜单栏控制中心 Bento Popover
+/// 遵循 macOS 控制中心规范：毛玻璃材质底衬、Bento 网格模块、状态感知动态强调色与微触感弹簧动效
 struct MenuBarControlsView: View {
     @EnvironmentObject var model: AppModel
 
-    /// 当前选中的设备（支持多设备切换）
+    /// 当前选中的设备（多设备切换）
     @State private var selectedDeviceId: String?
 
     private var activeDevices: [DeviceInfo] {
@@ -22,168 +23,508 @@ struct MenuBarControlsView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(spacing: 10) {
             if let device = currentDevice {
-                windowHeader(device)
-                if activeDevices.count > 1 {
-                    devicePicker
+                let attrs = model.attributes[device.id] ?? [:]
+                let isPowerOn = model.attribute("onOffStatus", deviceId: device.id)?.boolValue ?? false
+                let modeDesc = model.attribute("operationMode", deviceId: device.id)?.value?.stringValue
+                let tint = Theme.modeTint(modeDesc: modeDesc, isOn: isPowerOn)
+                let modeCat = Theme.modeCategory(modeDesc: modeDesc, isOn: isPowerOn)
+
+                // 1. 顶部状态与设备 Bento
+                headerPod(device: device, attrs: attrs, isPowerOn: isPowerOn, modeCat: modeCat, tint: tint)
+
+                // 2. 快捷操作 Bento 矩阵（电源、情景灯光、屏显）
+                quickActionsPod(device: device, attrs: attrs, isPowerOn: isPowerOn, tint: tint)
+
+                // 3. 核心温控 Bento 卡片
+                temperatureBentoPod(device: device, attrs: attrs, isPowerOn: isPowerOn, tint: tint)
+
+                // 4. 模式与风速分段矩阵
+                if isPowerOn {
+                    modeAndFanPod(device: device, attrs: attrs, tint: tint)
                 }
-                // 温度趋势迷你图（有 2+ 采样时显示）
-                temperatureSparkline(device)
-                controlRows(device)
-                Divider().overlay(Theme.hairline)
+
+                // 5. 24小时走势 Sparkline
+                sparklinePod(device: device, tint: tint)
+
+                // 6. 分隔线与系统设置
+                Divider().overlay(Theme.hairlineSubtle)
+
                 launchAtLoginRow
-                Divider().overlay(Theme.hairline)
-                footer
+
+                Divider().overlay(Theme.hairlineSubtle)
+
+                // 7. 底部导航
+                footerView
             } else {
-                notLoggedIn
-                Divider().overlay(Theme.hairline)
+                notLoggedInView
+                Divider().overlay(Theme.hairlineSubtle)
                 launchAtLoginRow
             }
         }
         .padding(12)
-        .frame(width: 300)
-        .background(Theme.canvas)
+        .frame(width: 316)
+        .background(.ultraThinMaterial)
+        .overlay(
+            RoundedRectangle(cornerRadius: Theme.radiusLG, style: .continuous)
+                .strokeBorder(Theme.hairline, lineWidth: 1)
+        )
         .overlay(alignment: .top) {
             OperationToast()
                 .padding(.top, 4)
         }
     }
 
-    // MARK: - 窗口头部（仿控制中心）
+    // MARK: - 1. 顶部状态与设备 Bento
 
-    private func windowHeader(_ device: DeviceInfo) -> some View {
-        HStack(spacing: 8) {
-            Image(systemName: "air.conditioner.horizontal")
-                .font(.system(size: 15, weight: .medium))
-                .foregroundStyle(Theme.accent)
-            Text("海尔空调")
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(Theme.ink)
+    private func headerPod(
+        device: DeviceInfo,
+        attrs: [String: DeviceAttribute],
+        isPowerOn: Bool,
+        modeCat: ACModeCategory,
+        tint: Color
+    ) -> some View {
+        HStack(alignment: .center, spacing: 10) {
+            // 左侧：空调动态图标 + 设备选择
+            HStack(spacing: 8) {
+                ZStack {
+                    Circle()
+                        .fill(tint.opacity(0.16))
+                        .frame(width: 32, height: 32)
+                    Image(systemName: isPowerOn ? modeCat.icon : "power")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(tint)
+                }
+
+                VStack(alignment: .leading, spacing: 2) {
+                    if activeDevices.count > 1 {
+                        Picker("", selection: Binding(
+                            get: { currentDevice?.id ?? activeDevices.first?.id ?? "" },
+                            set: { id in
+                                selectedDeviceId = id
+                                model.menuBarDeviceId = id
+                            }
+                        )) {
+                            ForEach(activeDevices) { dev in
+                                Text(dev.deviceName).tag(dev.id)
+                            }
+                        }
+                        .pickerStyle(.menu)
+                        .labelsHidden()
+                        .tint(Theme.ink)
+                        .font(.system(size: 13, weight: .semibold))
+                    } else {
+                        Text(device.deviceName)
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(Theme.ink)
+                            .lineLimit(1)
+                    }
+
+                    HStack(spacing: 5) {
+                        Circle()
+                            .fill(model.gatewayConnected ? (isPowerOn ? Theme.success : Theme.inkTertiary) : Theme.warning)
+                            .frame(width: 6, height: 6)
+                        Text(model.gatewayConnected ? (isPowerOn ? "\(modeCat.label)中" : "已关机") : "重连中...")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(Theme.inkSubtle)
+                    }
+                }
+            }
+
             Spacer()
-            // 当前室内温度（大字）
-            if let attr = AppModel.indoorTemperatureAttribute(in: model.attributes[device.id] ?? [:]),
-               let temp = attr.doubleValue {
-                Text(String(format: "%.0f°", temp))
-                    .font(.system(size: 17, weight: .semibold, design: .rounded))
-                    .monospacedDigit()
-                    .foregroundStyle(Theme.ink)
-            }
-            // 目标温度（小字）
-            if let target = model.attribute("targetTemperature", deviceId: device.id)?.doubleValue {
-                Text(String(format: "目标 %.0f°", target))
-                    .font(.system(size: 10))
-                    .foregroundStyle(Theme.inkSubtle)
-            }
-            // 室内湿度（设备支持时显示）
-            if let hum = AppModel.indoorHumidityAttribute(in: model.attributes[device.id] ?? [:]),
-               let value = hum.doubleValue {
-                Text(String(format: "湿度 %.0f%%", value))
-                    .font(.system(size: 10))
-                    .foregroundStyle(Theme.inkSubtle)
-            }
-            if let onOff = model.attribute("onOffStatus", deviceId: device.id), let isOn = onOff.boolValue {
-                Text(isOn ? "运行中" : "已关机")
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(isOn ? Theme.success : Theme.inkTertiary)
+
+            // 右侧：室内实时温湿度显示（Status Capsule）
+            HStack(spacing: 6) {
+                if let attr = AppModel.indoorTemperatureAttribute(in: attrs),
+                   let temp = attr.doubleValue {
+                    HStack(spacing: 3) {
+                        Image(systemName: "thermometer.medium")
+                            .font(.system(size: 10))
+                            .foregroundStyle(Theme.temperatureColor(celsius: temp))
+                        Text(String(format: "%.0f°", temp))
+                            .font(.system(size: 13, weight: .bold, design: .rounded))
+                            .monospacedDigit()
+                            .foregroundStyle(Theme.ink)
+                    }
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(
+                        Capsule()
+                            .fill(Theme.surface2)
+                            .overlay(Capsule().strokeBorder(Theme.hairline, lineWidth: 1))
+                    )
+                }
+
+                if let hum = AppModel.indoorHumidityAttribute(in: attrs),
+                   let val = hum.doubleValue {
+                    HStack(spacing: 2) {
+                        Image(systemName: "humidity.fill")
+                            .font(.system(size: 9))
+                            .foregroundStyle(Color.blue)
+                        Text(String(format: "%.0f%%", val))
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(Theme.inkMuted)
+                    }
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 4)
+                    .background(
+                        Capsule()
+                            .fill(Theme.surface1)
+                            .overlay(Capsule().strokeBorder(Theme.hairline, lineWidth: 1))
+                    )
+                }
             }
         }
-        .padding(.bottom, 2)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .background(
+            RoundedRectangle(cornerRadius: Theme.radiusMD, style: .continuous)
+                .fill(Color.primary.opacity(0.04))
+        )
     }
 
-    // MARK: - 温度趋势迷你图（菜单栏面板）
+    // MARK: - 2. 快捷开关 Bento 矩阵
+
+    private func quickActionsPod(
+        device: DeviceInfo,
+        attrs: [String: DeviceAttribute],
+        isPowerOn: Bool,
+        tint: Color
+    ) -> some View {
+        HStack(spacing: 8) {
+            // 电源主开关
+            Button {
+                withAnimation(Theme.spring) {
+                    model.sendAttribute("onOffStatus", value: .bool(!isPowerOn), deviceId: device.id)
+                }
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "power")
+                        .font(.system(size: 12, weight: .bold))
+                    Text(isPowerOn ? "电源开启" : "电源已关")
+                        .font(.system(size: 11, weight: .semibold))
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 7)
+                .foregroundStyle(isPowerOn ? Color.white : Theme.inkMuted)
+                .background(
+                    RoundedRectangle(cornerRadius: Theme.radiusSM, style: .continuous)
+                        .fill(isPowerOn ? tint : Theme.surface2)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: Theme.radiusSM, style: .continuous)
+                                .strokeBorder(isPowerOn ? tint.opacity(0.4) : Theme.hairline, lineWidth: 1)
+                        )
+                )
+            }
+            .buttonStyle(.plain)
+
+            // 情景灯光（若支持）
+            if let light = attrs["lightStatus"], light.writable {
+                let isLightOn = light.boolValue ?? false
+                Button {
+                    withAnimation(Theme.spring) {
+                        model.sendAttribute("lightStatus", value: .bool(!isLightOn), deviceId: device.id)
+                    }
+                } label: {
+                    HStack(spacing: 5) {
+                        Image(systemName: isLightOn ? "lightbulb.fill" : "lightbulb")
+                            .font(.system(size: 11, weight: .medium))
+                        Text(isLightOn ? "灯光开" : "灯光关")
+                            .font(.system(size: 11, weight: .medium))
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 7)
+                    .foregroundStyle(isLightOn ? Theme.ink : Theme.inkMuted)
+                    .background(
+                        RoundedRectangle(cornerRadius: Theme.radiusSM, style: .continuous)
+                            .fill(isLightOn ? Theme.surface3 : Theme.surface1)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: Theme.radiusSM, style: .continuous)
+                                    .strokeBorder(isLightOn ? Theme.accent.opacity(0.4) : Theme.hairline, lineWidth: 1)
+                            )
+                    )
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    // MARK: - 3. 核心温控 Bento 卡片
 
     @ViewBuilder
-    private func temperatureSparkline(_ device: DeviceInfo) -> some View {
+    private func temperatureBentoPod(
+        device: DeviceInfo,
+        attrs: [String: DeviceAttribute],
+        isPowerOn: Bool,
+        tint: Color
+    ) -> some View {
+        if let temp = attrs["targetTemperature"], temp.writable,
+           case .step(let min, let max, let step) = temp.valueRange {
+            let current = temp.doubleValue ?? min
+
+            HStack(alignment: .center) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("目标温度")
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(Theme.inkSubtle)
+                    Text(String(format: "%.1f°C", current))
+                        .font(.system(size: 24, weight: .bold, design: .rounded))
+                        .monospacedDigit()
+                        .foregroundStyle(isPowerOn ? tint : Theme.inkTertiary)
+                }
+
+                Spacer()
+
+                // 加减步进胶囊
+                HStack(spacing: 12) {
+                    Button {
+                        let new = Swift.max(min, current - step)
+                        withAnimation(Theme.spring) {
+                            model.sendAttribute("targetTemperature", value: .double(Theme.roundStep(value: new, step: step)), deviceId: device.id)
+                        }
+                    } label: {
+                        Image(systemName: "minus")
+                            .font(.system(size: 12, weight: .bold))
+                            .frame(width: 28, height: 28)
+                            .background(Theme.surface2)
+                            .clipShape(Circle())
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(Theme.ink)
+                    .disabled(!isPowerOn)
+
+                    Button {
+                        let new = Swift.min(max, current + step)
+                        withAnimation(Theme.spring) {
+                            model.sendAttribute("targetTemperature", value: .double(Theme.roundStep(value: new, step: step)), deviceId: device.id)
+                        }
+                    } label: {
+                        Image(systemName: "plus")
+                            .font(.system(size: 12, weight: .bold))
+                            .frame(width: 28, height: 28)
+                            .background(Theme.surface2)
+                            .clipShape(Circle())
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(Theme.ink)
+                    .disabled(!isPowerOn)
+                }
+                .padding(3)
+                .background(
+                    Capsule()
+                        .fill(Theme.surface1)
+                        .overlay(Capsule().strokeBorder(Theme.hairline, lineWidth: 1))
+                )
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .background(
+                RoundedRectangle(cornerRadius: Theme.radiusMD, style: .continuous)
+                    .fill(Theme.surface1)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: Theme.radiusMD, style: .continuous)
+                            .strokeBorder(isPowerOn ? tint.opacity(0.3) : Theme.hairline, lineWidth: 1)
+                    )
+            )
+        }
+    }
+
+    // MARK: - 4. 模式与风速分段矩阵
+
+    @ViewBuilder
+    private func modeAndFanPod(
+        device: DeviceInfo,
+        attrs: [String: DeviceAttribute],
+        tint: Color
+    ) -> some View {
+        VStack(spacing: 8) {
+            // 模式选择分段矩阵
+            if let mode = attrs["operationMode"], mode.writable, case .list(let opts) = mode.valueRange {
+                let currentVal = mode.value?.stringValue ?? ""
+
+                HStack(spacing: 4) {
+                    ForEach(opts) { opt in
+                        let isSelected = opt.data.stringValue == currentVal
+                        let optCat = Theme.modeCategory(modeDesc: opt.desc, isOn: true)
+
+                        Button {
+                            withAnimation(Theme.springFast) {
+                                model.sendAttribute("operationMode", value: opt.data, deviceId: device.id)
+                            }
+                        } label: {
+                            VStack(spacing: 3) {
+                                Image(systemName: optCat.icon)
+                                    .font(.system(size: 11, weight: isSelected ? .bold : .regular))
+                                Text(opt.desc)
+                                    .font(.system(size: 10, weight: isSelected ? .semibold : .regular))
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 6)
+                            .foregroundStyle(isSelected ? Color.white : Theme.inkMuted)
+                            .background(
+                                RoundedRectangle(cornerRadius: Theme.radiusSM, style: .continuous)
+                                    .fill(isSelected ? tint : Color.clear)
+                            )
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(3)
+                .background(
+                    RoundedRectangle(cornerRadius: Theme.radiusMD, style: .continuous)
+                        .fill(Theme.surface1)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: Theme.radiusMD, style: .continuous)
+                                .strokeBorder(Theme.hairline, lineWidth: 1)
+                        )
+                )
+            }
+
+            // 风速选择分段胶囊
+            if let wind = attrs["windSpeed"], wind.writable, case .list(let opts) = wind.valueRange {
+                let currentVal = wind.value?.stringValue ?? ""
+
+                HStack(spacing: 4) {
+                    Image(systemName: "fan.fill")
+                        .font(.system(size: 10))
+                        .foregroundStyle(Theme.inkSubtle)
+                        .frame(width: 14)
+
+                    ForEach(opts) { opt in
+                        let isSelected = opt.data.stringValue == currentVal
+
+                        Button {
+                            withAnimation(Theme.springFast) {
+                                model.sendAttribute("windSpeed", value: opt.data, deviceId: device.id)
+                            }
+                        } label: {
+                            Text(opt.desc)
+                                .font(.system(size: 10, weight: isSelected ? .semibold : .regular))
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 4)
+                                .foregroundStyle(isSelected ? Theme.ink : Theme.inkSubtle)
+                                .background(
+                                    RoundedRectangle(cornerRadius: Theme.radiusXS, style: .continuous)
+                                        .fill(isSelected ? Theme.surface3 : Color.clear)
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: Theme.radiusXS, style: .continuous)
+                                                .strokeBorder(isSelected ? Theme.hairlineStrong : Color.clear, lineWidth: 1)
+                                        )
+                                )
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.horizontal, 6)
+                .padding(.vertical, 4)
+                .background(
+                    RoundedRectangle(cornerRadius: Theme.radiusMD, style: .continuous)
+                        .fill(Theme.surface1)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: Theme.radiusMD, style: .continuous)
+                                .strokeBorder(Theme.hairline, lineWidth: 1)
+                        )
+                )
+            }
+        }
+    }
+
+    // MARK: - 5. 24小时走势 Sparkline
+
+    @ViewBuilder
+    private func sparklinePod(device: DeviceInfo, tint: Color) -> some View {
         let samples = model.temperatureSeries(deviceId: device.id)
         if samples.count >= 2 {
-            Chart(samples) { sample in
-                LineMark(
-                    x: .value("时间", sample.timestamp),
-                    y: .value("温度", sample.temperature)
-                )
-                .foregroundStyle(Theme.accent)
-                .interpolationMethod(.catmullRom)
-                AreaMark(
-                    x: .value("时间", sample.timestamp),
-                    y: .value("温度", sample.temperature)
-                )
-                .foregroundStyle(
-                    LinearGradient(
-                        colors: [Theme.accent.opacity(0.22), Theme.accent.opacity(0.02)],
-                        startPoint: .top,
-                        endPoint: .bottom
+            let temps = samples.map(\.temperature)
+            let minTemp = temps.min() ?? 20
+            let maxTemp = temps.max() ?? 26
+
+            VStack(alignment: .leading, spacing: 4) {
+                HStack {
+                    Text("24h 室温趋势")
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(Theme.inkSubtle)
+                    Spacer()
+                    Text(String(format: "%.0f° ~ %.0f°", minTemp, maxTemp))
+                        .font(.system(size: 10))
+                        .monospacedDigit()
+                        .foregroundStyle(Theme.inkTertiary)
+                }
+
+                Chart(samples) { sample in
+                    LineMark(
+                        x: .value("时间", sample.timestamp),
+                        y: .value("温度", sample.temperature)
                     )
-                )
-                .interpolationMethod(.catmullRom)
+                    .foregroundStyle(tint)
+                    .interpolationMethod(.catmullRom)
+                    .lineStyle(StrokeStyle(lineWidth: 1.5))
+
+                    AreaMark(
+                        x: .value("时间", sample.timestamp),
+                        y: .value("温度", sample.temperature)
+                    )
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [tint.opacity(0.24), tint.opacity(0.01)],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
+                    .interpolationMethod(.catmullRom)
+                }
+                .chartXAxis(.hidden)
+                .chartYAxis(.hidden)
+                .frame(height: 32)
             }
-            .chartXAxis(.hidden)
-            .chartYAxis(.hidden)
-            .frame(height: 34)
-            .padding(.horizontal, 2)
+            .padding(8)
+            .background(
+                RoundedRectangle(cornerRadius: Theme.radiusMD, style: .continuous)
+                    .fill(Theme.surface1)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: Theme.radiusMD, style: .continuous)
+                            .strokeBorder(Theme.hairline, lineWidth: 1)
+                    )
+            )
         }
     }
 
-    /// 多设备切换
-    private var devicePicker: some View {
-        Picker("", selection: Binding(
-            get: { currentDevice?.id ?? activeDevices.first?.id ?? "" },
-            set: { id in
-                selectedDeviceId = id
-                // 菜单栏温度跟随面板选中的设备
-                model.menuBarDeviceId = id
-            }
-        )) {
-            ForEach(activeDevices) { device in
-                Text(device.deviceName).tag(device.id)
-            }
+    // MARK: - 6. 开机自启行
+
+    private var launchAtLoginRow: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "arrow.up.forward.app")
+                .font(.system(size: 11))
+                .foregroundStyle(Theme.inkSubtle)
+                .frame(width: 16)
+            Text("开机自启（常驻菜单栏）")
+                .font(.system(size: 11))
+                .foregroundStyle(Theme.inkMuted)
+            Spacer()
+            Toggle("", isOn: $model.launchAtLogin)
+                .labelsHidden()
+                .toggleStyle(.switch)
+                .controlSize(.mini)
+                .tint(Theme.accent)
         }
-        .pickerStyle(.menu)
-        .labelsHidden()
-        .tint(Theme.inkMuted)
+        .padding(.horizontal, 2)
     }
 
-    // MARK: - 控制区
+    // MARK: - 7. 底部导航
 
-    @ViewBuilder
-    private func controlRows(_ device: DeviceInfo) -> some View {
-        VStack(spacing: 8) {
-            // 情景灯光（主开关，置顶）
-            if let light = model.attribute("lightStatus", deviceId: device.id), light.writable {
-                MenuBarToggleRow(attr: light, deviceId: device.id, emphasized: true)
-            }
-            // 屏显
-            if let screen = model.attribute("screenDisplayStatus", deviceId: device.id), screen.writable {
-                MenuBarToggleRow(attr: screen, deviceId: device.id)
-            }
-            // 电源
-            if let onOff = model.attribute("onOffStatus", deviceId: device.id), onOff.writable {
-                MenuBarToggleRow(attr: onOff, deviceId: device.id)
-            }
-            // 温度步进
-            if let temp = model.attribute("targetTemperature", deviceId: device.id), temp.writable,
-               case .step(let min, let max, let step) = temp.valueRange {
-                MenuBarTemperatureRow(attr: temp, deviceId: device.id, min: min, max: max, step: step)
-            }
-            // 模式
-            if let mode = model.attribute("operationMode", deviceId: device.id), mode.writable,
-               case .list(let opts) = mode.valueRange {
-                MenuBarModeRow(attr: mode, options: opts, deviceId: device.id)
-            }
-        }
-    }
-
-    // MARK: - 底部
-
-    private var footer: some View {
+    private var footerView: some View {
         HStack {
             Button {
-                // NSPopover 环境无 openWindow，通过通知让主窗口侧打开
                 NotificationCenter.default.post(name: .haierOpenMainWindow, object: nil)
                 NSApp.activate(ignoringOtherApps: true)
             } label: {
-                Label("打开主窗口", systemImage: "macwindow")
-                    .font(.system(size: 12))
+                HStack(spacing: 4) {
+                    Image(systemName: "macwindow")
+                        .font(.system(size: 11))
+                    Text("打开主窗口")
+                        .font(.system(size: 11, weight: .medium))
+                }
             }
             .buttonStyle(.plain)
             .foregroundStyle(Theme.inkMuted)
@@ -196,199 +537,45 @@ struct MenuBarControlsView: View {
                 NSApp.terminate(nil)
             } label: {
                 Image(systemName: "power")
-                    .font(.system(size: 12))
+                    .font(.system(size: 11))
             }
             .buttonStyle(.plain)
             .foregroundStyle(Theme.inkTertiary)
         }
-    }
-
-    // MARK: - 开机自启
-
-    private var launchAtLoginRow: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "arrow.up.forward.app")
-                .font(.system(size: 12))
-                .foregroundStyle(Theme.inkSubtle)
-                .frame(width: 16)
-            Text("开机自启（菜单栏常驻）")
-                .font(.system(size: 12))
-                .foregroundStyle(Theme.inkMuted)
-            Spacer()
-            Toggle("", isOn: $model.launchAtLogin)
-                .labelsHidden()
-                .toggleStyle(.switch)
-                .controlSize(.mini)
-                .tint(Theme.accent)
-        }
+        .padding(.horizontal, 2)
     }
 
     // MARK: - 未登录态
 
-    private var notLoggedIn: some View {
+    private var notLoggedInView: some View {
         VStack(spacing: 10) {
-            Image(systemName: "snowflake")
-                .font(.system(size: 20))
-                .foregroundStyle(Theme.inkTertiary)
-            Text(model.phase == .connecting ? "连接中..." : "尚未登录")
-                .font(.system(size: 13))
+            Image(systemName: "air.conditioner.horizontal")
+                .font(.system(size: 24))
+                .foregroundStyle(Theme.accent)
+            Text(model.phase == .connecting ? "正在恢复云端连接..." : "尚未登录海尔智家")
+                .font(.system(size: 12))
                 .foregroundStyle(Theme.inkMuted)
-            Button("打开应用登录") {
+            Button("打开登录") {
                 NotificationCenter.default.post(name: .haierOpenMainWindow, object: nil)
                 NSApp.activate(ignoringOtherApps: true)
             }
             .buttonStyle(Theme.primaryButtonStyle())
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 8)
+        .padding(.vertical, 12)
     }
 }
 
-// MARK: - 菜单栏开关行
+// MARK: - SwiftUI Preview
 
-struct MenuBarToggleRow: View {
-    @EnvironmentObject var model: AppModel
-    let attr: DeviceAttribute
-    let deviceId: String
-    var emphasized: Bool = false
-
-    var body: some View {
-        HStack(spacing: 8) {
-            Image(systemName: emphasized ? "lightbulb.fill" : (attr.name == "onOffStatus" ? "power" : "display"))
-                .font(.system(size: 12))
-                .foregroundStyle(emphasized ? Theme.accentHover : Theme.inkSubtle)
-                .frame(width: 16)
-            Text(attr.desc)
-                .font(.system(size: 13, weight: emphasized ? .medium : .regular))
-                .foregroundStyle(emphasized ? Theme.ink : Theme.inkMuted)
-            Spacer()
-            Toggle("", isOn: Binding(
-                get: { attr.boolValue ?? false },
-                set: { on in
-                    model.sendAttribute(attr.name, value: .bool(on), deviceId: deviceId)
-                }
-            ))
-            .labelsHidden()
-            .toggleStyle(.switch)
-            .controlSize(.small)
-            .tint(Theme.accent)
-        }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 8)
-        .background(
-            RoundedRectangle(cornerRadius: Theme.radiusMD, style: .continuous)
-                .fill(emphasized ? Theme.surface2 : Theme.surface1)
-                .overlay(
-                    RoundedRectangle(cornerRadius: Theme.radiusMD, style: .continuous)
-                        .strokeBorder(emphasized ? Theme.accent.opacity(0.4) : Theme.hairline, lineWidth: 1)
-                )
-        )
+#if DEBUG
+struct MenuBarControlsView_Previews: PreviewProvider {
+    static var previews: some View {
+        MenuBarControlsView()
+            .environmentObject(AppModel.shared)
+            .frame(width: 316)
+            .padding()
+            .background(Color.black.opacity(0.2))
     }
 }
-
-// MARK: - 菜单栏温度行
-
-struct MenuBarTemperatureRow: View {
-    @EnvironmentObject var model: AppModel
-    let attr: DeviceAttribute
-    let deviceId: String
-    let min: Double
-    let max: Double
-    let step: Double
-
-    var body: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "thermometer.medium")
-                .font(.system(size: 12))
-                .foregroundStyle(Theme.inkSubtle)
-                .frame(width: 16)
-            Text(attr.desc)
-                .font(.system(size: 13))
-                .foregroundStyle(Theme.inkMuted)
-            Spacer()
-            HStack(spacing: 10) {
-                Button {
-                    let current = attr.doubleValue ?? min
-                    let new = Swift.max(min, current - step)
-                    model.sendAttribute(attr.name, value: .double((new / step).rounded() * step), deviceId: deviceId)
-                } label: {
-                    Image(systemName: "minus")
-                        .font(.system(size: 10, weight: .semibold))
-                }
-                .buttonStyle(.plain)
-                .foregroundStyle(Theme.inkMuted)
-
-                Text(String(format: "%.1f°", attr.doubleValue ?? min))
-                    .font(.system(size: 13, weight: .medium))
-                    .monospacedDigit()
-                    .foregroundStyle(Theme.ink)
-                    .frame(width: 44)
-
-                Button {
-                    let current = attr.doubleValue ?? min
-                    let new = Swift.min(max, current + step)
-                    model.sendAttribute(attr.name, value: .double((new / step).rounded() * step), deviceId: deviceId)
-                } label: {
-                    Image(systemName: "plus")
-                        .font(.system(size: 10, weight: .semibold))
-                }
-                .buttonStyle(.plain)
-                .foregroundStyle(Theme.inkMuted)
-            }
-            .padding(.horizontal, 6)
-            .padding(.vertical, 4)
-            .background(
-                RoundedRectangle(cornerRadius: Theme.radiusSM, style: .continuous)
-                    .fill(Theme.surface1)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: Theme.radiusSM, style: .continuous)
-                            .strokeBorder(Theme.hairline, lineWidth: 1)
-                    )
-            )
-        }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 6)
-    }
-}
-
-// MARK: - 菜单栏模式行
-
-struct MenuBarModeRow: View {
-    @EnvironmentObject var model: AppModel
-    let attr: DeviceAttribute
-    let options: [ListOption]
-    let deviceId: String
-
-    var body: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "fan")
-                .font(.system(size: 12))
-                .foregroundStyle(Theme.inkSubtle)
-                .frame(width: 16)
-            Text(attr.desc)
-                .font(.system(size: 13))
-                .foregroundStyle(Theme.inkMuted)
-            Spacer()
-            Picker("", selection: Binding(
-                get: {
-                    options.first(where: { $0.data.stringValue == attr.value?.stringValue })?.data.stringValue
-                        ?? options.first?.data.stringValue ?? ""
-                },
-                set: { newValue in
-                    guard let opt = options.first(where: { $0.data.stringValue == newValue }) else { return }
-                    model.sendAttribute(attr.name, value: opt.data, deviceId: deviceId)
-                }
-            )) {
-                ForEach(options) { opt in
-                    Text(opt.desc).tag(opt.data.stringValue)
-                }
-            }
-            .pickerStyle(.menu)
-            .labelsHidden()
-            .tint(Theme.inkMuted)
-            .frame(width: 150)
-        }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 4)
-    }
-}
+#endif

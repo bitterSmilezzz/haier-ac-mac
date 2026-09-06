@@ -1,0 +1,3 @@
+# Adopt Dynamic Semantic Mode Theming and Control Center Bento Layout
+
+We decided to dynamically tint active hero controls and glows based on the air conditioner's running mode (Cool: Ice Blue, Heat: Warm Amber, Dry: Teal, Fan: Mint Green, Off/Auto: Lavender Purple) rather than enforcing a single static brand color, and organize the MenuBar popover and detail cards into a macOS Control Center Bento grid. Air conditioning state is fundamentally thermal and sensory; dynamic semantic coloration provides instant visual orientation without requiring text reading, while Bento pods match macOS user mental models and eliminate vertical scroll fatigue.

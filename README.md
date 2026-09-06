@@ -8,15 +8,23 @@
 
 ## 功能
 
+- 🎨 **全新设计系统与控制中心风格 (v1.9.0)**：
+  - 🧊 **原生毛玻璃材质 (Vibrant Material)**：状态栏 NSPopover 全面采用 macOS 原生 Vibrant Material 毛玻璃效果与无边框微光卡片
+  - 🍱 **模块化 Bento 网格布局**：菜单栏与主窗口采用精致 Bento 布局，功能边界分明、层次聚焦
+  - 🌡️ **动态语义化模式色 (Mode Tint)**：根据空调工作模式自适应冷暖色调（制冷冰蓝、制热暖橙、除湿水青、送风薄荷、待机淡紫），卡片光晕与控制元素随状态呼吸流动
+  - 💊 **触感温控大胶囊**：取代繁冗滑条，大号步进器胶囊支持 ±0.5°C 细腻步进与即时触觉反馈
+  - 📟 **Hero Temperature Pod**：42pt 巨幅数字主温区，双层室温/湿度遥测胶囊
+  - 📈 **Swift Charts 柔光趋势图**：24h 渐变柔光 Area Trend 曲线图与实时温度呼吸脉冲点（Pulsing Beacon），菜单栏配备极简 Sparkline
+  - 📂 **分类折叠抽屉**：高级扩展设置按「风向摆风」「健康清洁」「伴眠能效」「高级硬件参数」四象限分类折叠，彻底告别冗长滚动
 - 🔐 **手机号 + 密码登录**海尔智家云（统帅/海尔/卡萨帝设备通用）
 - 🖥 **主窗口控制面板**：
   - 灯光/屏显开关（情景灯光置顶）
   - 电源、目标温度、模式、风速
   - 其余全部可写属性动态渲染（开关/选择器/滑块）
   - 📈 实时状态胶囊（室内温度/湿度/模式/风速）+ 24h 温度趋势曲线（Swift Charts）
-- ☁️ **菜单栏迷你面板**：目标温度/湿度 + 24h 温度趋势迷你图 + 一键开关灯光（`NSStatusItem + NSPopover`，规避 macOS 26 `MenuBarExtra` 幽灵窗口缺陷）
+- ☁️ **菜单栏迷你面板**：控制中心风格 Bento 弹窗，支持电源、温度胶囊加减、运行模式、风速与 24h 极简温度 Sparkline（`NSStatusItem + NSPopover`，规避 macOS 26 `MenuBarExtra` 幽灵窗口缺陷）
 - 🧩 **桌面小组件**：小/中尺寸，实时显示室内温度、目标温度、湿度、运行状态（AppGroup 共享快照，状态变化即时刷新）
-- 🎨 **三态主题**：跟随系统 / 浅色 / 深色（Linear 设计体系，双色板）
+- 🎨 **三态主题**：跟随系统 / 浅色 / 深色（macOS Native + Linear 混合设计体系，双色板）
 - 📡 实时状态：WebSocket 网关订阅属性推送，断线指数退避自动重连（5s→120s），心跳故障自检
 - 🔑 Token 自动刷新（10 天有效期）：临近过期主动续期 + 凭据失效（401/403）自动续期重连，Keychain 凭据已迁移至加密文件存储
 - ⏱ 本地调度：定时/倒计时任务（仅一次/每天/按星期多选），支持编辑/暂停/删除，到点自动下发 + 系统通知；情景模式一键应用（可指定设备或全部设备），支持编辑
@@ -42,7 +50,7 @@ SwiftUI App
     ├── StatusItemController # 菜单栏状态项（NSStatusItem + NSPopover）
     ├── Views/             # 登录/设备列表/控制面板/菜单栏面板/批量/调度/情景/反馈
     ├── AppIntents.swift   # Shortcuts/快捷指令集成
-    └── Theme.swift        # 设计令牌（浅色/深色双色板）
+    └── Theme.swift        # 设计令牌（浅色/深色双色板、动态语义模式色、Bento 卡片材质）
 └── HaierACWidget      # WidgetKit 桌面小组件（AppGroup 共享状态快照）
 ```
 
@@ -58,8 +66,8 @@ GitHub Actions 自动在 macos-latest 上构建 + 测试。
 要求：macOS 13+，Xcode Command Line Tools（含 Swift 6）。
 
 ```bash
-./build_app.sh            # 构建 + 打包 dist/HaierAC.app（默认 v1.8.2，不自动打开）
-./build_app.sh 1.8.2 --open   # 指定版本号 + 构建后自动打开
+./build_app.sh            # 构建 + 打包 dist/HaierAC.app（默认 v1.9.0，不自动打开）
+./build_app.sh 1.9.0 --open   # 指定版本号 + 构建后自动打开
 ```
 
 ## 隐私与安全

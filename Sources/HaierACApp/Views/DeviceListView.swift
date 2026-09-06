@@ -508,7 +508,7 @@ struct DiscoveredDeviceRow: View {
     }
 }
 
-/// 云端设备卡片
+/// 云端设备 Bento 卡片（支持动态模式感知光晕与温感色彩）
 struct DeviceCard: View {
     let device: DeviceInfo
     @ObservedObject var model: AppModel
@@ -525,20 +525,25 @@ struct DeviceCard: View {
     }
 
     var body: some View {
+        let isPowerOn = isOn ?? false
+        let modeDesc = model.attribute("operationMode", deviceId: device.id)?.value?.stringValue
+        let modeCat = Theme.modeCategory(modeDesc: modeDesc, isOn: isPowerOn)
+        let tint = Theme.modeTint(for: modeCat)
+
         HStack(spacing: Theme.spaceMD) {
-            // 状态图标
+            // 模式感知状态图标
             ZStack {
                 RoundedRectangle(cornerRadius: Theme.radiusMD, style: .continuous)
-                    .fill(isHovering ? Theme.accent.opacity(0.14) : Theme.surface2)
+                    .fill(isPowerOn ? tint.opacity(0.16) : Theme.surface2)
                     .frame(width: 44, height: 44)
-                Image(systemName: "air.conditioner.horizontal")
-                    .font(.system(size: 18, weight: .medium))
-                    .foregroundStyle(isHovering ? Theme.accentHover : Theme.accent)
+                Image(systemName: isPowerOn ? modeCat.icon : "power")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(isPowerOn ? tint : Theme.inkTertiary)
             }
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(device.deviceName)
-                    .font(.system(size: 15, weight: .medium))
+                    .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(Theme.ink)
                 Text(device.productNameT ?? device.deviceType ?? "")
                     .font(.system(size: 11))
@@ -548,51 +553,52 @@ struct DeviceCard: View {
 
             Spacer()
 
-            // 当前室内温度（大字，感知最强的信息）
+            // 实时室内温度（温感色彩自适应）
             if let temp = indoorTemp {
                 HStack(spacing: 2) {
                     Text(String(format: "%.0f", temp))
-                        .font(.system(size: 24, weight: .semibold, design: .rounded))
+                        .font(.system(size: 24, weight: .bold, design: .rounded))
                         .monospacedDigit()
-                        .foregroundStyle(Theme.ink)
-                    Text("°")
-                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(Theme.temperatureColor(celsius: temp))
+                    Text("°C")
+                        .font(.system(size: 12, weight: .medium))
                         .foregroundStyle(Theme.inkTertiary)
-                        .padding(.bottom, 6)
+                        .padding(.bottom, 4)
                 }
             }
 
-            // 状态徽标
+            // 运行模式与电源徽标
             if let isOn {
-                Text(isOn ? "开机" : "关机")
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(isOn ? Theme.success : Theme.inkTertiary)
+                Text(isOn ? "\(modeCat.label)中" : "待机")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(isOn ? tint : Theme.inkTertiary)
                     .padding(.horizontal, 10)
                     .padding(.vertical, 4)
                     .background(
                         Capsule()
-                            .fill(Theme.surface2)
-                            .overlay(Capsule().strokeBorder(Theme.hairline, lineWidth: 1))
+                            .fill(isOn ? tint.opacity(0.12) : Theme.surface2)
+                            .overlay(Capsule().strokeBorder(isOn ? tint.opacity(0.3) : Theme.hairline, lineWidth: 1))
                     )
             }
 
+            // 在线状态指示点
             Circle()
-                .fill(device.online ? Theme.success : Theme.inkTertiary)
+                .fill(device.online ? (isPowerOn ? Theme.success : Theme.inkTertiary) : Theme.warning)
                 .frame(width: 8, height: 8)
 
             Image(systemName: "chevron.right")
                 .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(isHovering ? Theme.accentHover : Theme.inkTertiary)
+                .foregroundStyle(isHovering ? tint : Theme.inkTertiary)
         }
         .padding(Theme.spaceMD)
-        .background(Theme.cardBackground(Theme.surface1))
+        .background(Theme.bentoCardBackground(radius: Theme.radiusLG, tint: isPowerOn ? tint : nil))
         .overlay(
             RoundedRectangle(cornerRadius: Theme.radiusLG, style: .continuous)
-                .strokeBorder(isHovering ? Theme.accent.opacity(0.55) : .clear, lineWidth: 1)
+                .strokeBorder(isHovering ? (isPowerOn ? tint.opacity(0.6) : Theme.hairlineStrong) : Color.clear, lineWidth: 1)
         )
-        .scaleEffect(isHovering ? 1.008 : 1)
-        .shadow(color: isHovering ? .black.opacity(0.12) : .clear, radius: 6, y: 2)
-        .animation(.easeOut(duration: 0.12), value: isHovering)
+        .scaleEffect(isHovering ? 1.008 : 1.0)
+        .shadow(color: isHovering ? (isPowerOn ? tint.opacity(0.15) : Color.black.opacity(0.08)) : Color.clear, radius: 8, y: 3)
+        .animation(Theme.springFast, value: isHovering)
         .onHover { hovering in
             isHovering = hovering
         }

@@ -92,6 +92,10 @@ final class StatusItemController: NSObject {
             self.popover = popover
         }
         popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+        if let window = popover.contentViewController?.view.window {
+            window.isOpaque = false
+            window.backgroundColor = .clear
+        }
     }
 
     /// 右键：上下文菜单（打开主窗口 / 开机自启 / 主题 / 退出）
