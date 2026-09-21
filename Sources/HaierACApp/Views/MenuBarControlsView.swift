@@ -174,6 +174,23 @@ struct MenuBarControlsView: View {
                             .overlay(Capsule().strokeBorder(Theme.hairline, lineWidth: 1))
                     )
                 }
+
+                // 语音控制快捷按钮
+                Button {
+                    VoiceCapsuleWindowController.shared.show()
+                } label: {
+                    Image(systemName: "mic.fill")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(Theme.accent)
+                        .padding(5)
+                        .background(
+                            Circle()
+                                .fill(Theme.surface2)
+                                .overlay(Circle().strokeBorder(Theme.hairline, lineWidth: 1))
+                        )
+                }
+                .buttonStyle(.plain)
+                .help("语音控制 (Control+Option+A)")
             }
         }
         .padding(.horizontal, 10)

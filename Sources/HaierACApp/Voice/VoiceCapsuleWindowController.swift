@@ -1,0 +1,253 @@
+import AppKit
+import SwiftUI
+import HaierACCore
+
+/// 悬浮语音胶囊窗口控制器
+@MainActor
+public final class VoiceCapsuleWindowController: NSObject, NSWindowDelegate {
+    public static let shared = VoiceCapsuleWindowController()
+
+    private var window: NSPanel?
+    private var dismissTimer: Timer?
+
+    private override init() {
+        super.init()
+        setupCommandBinding()
+    }
+
+    /// 绑定指令识别后的执行逻辑
+    private func setupCommandBinding() {
+        VoiceControlManager.shared.onCommandRecognized = { [weak self] text in
+            Task { @MainActor in
+                self?.handleVoiceInput(text)
+            }
+        }
+    }
+
+    /// 切换语音控制胶囊的显示/隐藏
+    public func toggle() {
+        if window?.isVisible == true {
+            hide()
+        } else {
+            show()
+        }
+    }
+
+    /// 显示语音控制胶囊并开始录音
+    public func show() {
+        dismissTimer?.invalidate()
+        dismissTimer = nil
+
+        let model = AppModel.shared
+        let targetName = currentDeviceDisplayName(model: model)
+
+        if window == nil {
+            createWindow(targetName: targetName)
+        } else {
+            updateContentView(targetName: targetName)
+        }
+
+        guard let window = window else { return }
+
+        // 居中偏上位置（类似 Spotlight）
+        if let screen = NSScreen.main {
+            let screenRect = screen.visibleFrame
+            let windowWidth: CGFloat = 480
+            let windowHeight: CGFloat = 190
+            let x = screenRect.midX - (windowWidth / 2)
+            let y = screenRect.maxY - windowHeight - 120
+            window.setFrame(NSRect(x: x, y: y, width: windowWidth, height: windowHeight), display: true)
+        }
+
+        window.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+
+        // 开始语音识别
+        Task {
+            await VoiceControlManager.shared.startListening()
+        }
+    }
+
+    /// 隐藏并关闭语音胶囊
+    public func hide() {
+        dismissTimer?.invalidate()
+        dismissTimer = nil
+
+        VoiceControlManager.shared.stopListening()
+        VoiceControlManager.shared.reset()
+
+        NSAnimationContext.runAnimationGroup({ context in
+            context.duration = 0.2
+            window?.animator().alphaValue = 0.0
+        }, completionHandler: {
+            Task { @MainActor in
+                VoiceCapsuleWindowController.shared.window?.orderOut(nil)
+                VoiceCapsuleWindowController.shared.window?.alphaValue = 1.0
+            }
+        })
+    }
+
+    // MARK: - 窗口创建与管理
+
+    private func createWindow(targetName: String) {
+        let panel = CustomKeyPanel(
+            contentRect: NSRect(x: 0, y: 0, width: 480, height: 190),
+            styleMask: [.borderless, .nonactivatingPanel],
+            backing: .buffered,
+            defer: false
+        )
+        panel.isFloatingPanel = true
+        panel.level = .floating
+        panel.isOpaque = false
+        panel.backgroundColor = .clear
+        panel.hasShadow = false // 由 SwiftUI 内部渲染柔和投影
+        panel.delegate = self
+        panel.isMovableByWindowBackground = true
+
+        self.window = panel
+        updateContentView(targetName: targetName)
+    }
+
+    private func updateContentView(targetName: String) {
+        let view = VoiceCapsuleView(
+            voiceManager: VoiceControlManager.shared,
+            targetDeviceName: targetName,
+            onClose: { [weak self] in
+                self?.hide()
+            },
+            onCommit: {
+                VoiceControlManager.shared.commitCurrentText()
+            }
+        )
+        window?.contentView = NSHostingView(rootView: view)
+    }
+
+    private func currentDeviceDisplayName(model: AppModel) -> String {
+        if let first = model.devices.first {
+            return first.deviceName
+        }
+        if let manual = model.manualDevices.first {
+            return manual.name
+        }
+        return "未发现空调"
+    }
+
+    // MARK: - 指令解析与执行
+
+    private func handleVoiceInput(_ text: String) {
+        let model = AppModel.shared
+        guard let result = VoiceCommandParser.parse(text) else {
+            VoiceControlManager.shared.markFailed("未能识别：“\(text)”，请换种说法试试")
+            scheduleAutoDismiss(delay: 2.5)
+            return
+        }
+
+        executeCommand(result.command, displayText: result.displayText, model: model)
+    }
+
+    private func executeCommand(_ command: VoiceCommand, displayText: String, model: AppModel) {
+        guard let deviceId = model.devices.first?.id ?? model.manualDevices.first?.deviceId else {
+            VoiceControlManager.shared.markFailed("未检测到已连接的空调设备")
+            scheduleAutoDismiss(delay: 2.0)
+            return
+        }
+
+        switch command {
+        case .setPower(let on):
+            model.sendAttribute("onOffStatus", value: .bool(on), deviceId: deviceId)
+            VoiceControlManager.shared.markSuccess(on ? "已开启空调" : "已关闭空调")
+
+        case .setTemperature(let temp):
+            model.sendAttribute("targetTemperature", value: .double(temp), deviceId: deviceId)
+            let formatted = temp.truncatingRemainder(dividingBy: 1.0) == 0 ? "\(Int(temp))" : String(format: "%.1f", temp)
+            VoiceControlManager.shared.markSuccess("已将温度调至 \(formatted)°C")
+
+        case .adjustTemperature(let delta):
+            let currentTemp = model.attributes[deviceId]?["targetTemperature"]?.doubleValue ?? 26.0
+            var newTemp = currentTemp + delta
+            newTemp = min(max(newTemp, 16.0), 30.0) // 限制在 16~30
+            model.sendAttribute("targetTemperature", value: .double(newTemp), deviceId: deviceId)
+            let formatted = newTemp.truncatingRemainder(dividingBy: 1.0) == 0 ? "\(Int(newTemp))" : String(format: "%.1f", newTemp)
+            VoiceControlManager.shared.markSuccess("已微调温度至 \(formatted)°C")
+
+        case .setMode(let modeName):
+            // 在数字模型中匹配模式
+            if let modeAttr = model.attributes[deviceId]?["operationMode"],
+               case .list(let options) = modeAttr.valueRange,
+               let match = options.first(where: { $0.desc.contains(modeName) || modeName.contains($0.desc) }) {
+                model.sendAttribute("operationMode", value: match.data, deviceId: deviceId)
+                VoiceControlManager.shared.markSuccess("已切换至「\(match.desc)」模式")
+            } else {
+                // 常见模式回退
+                let fallbackValue: String
+                switch modeName {
+                case "制冷": fallbackValue = "0"
+                case "除湿": fallbackValue = "1"
+                case "送风": fallbackValue = "2"
+                case "制热": fallbackValue = "4"
+                case "自动": fallbackValue = "6"
+                default: fallbackValue = "0"
+                }
+                model.sendAttribute("operationMode", value: .string(fallbackValue), deviceId: deviceId)
+                VoiceControlManager.shared.markSuccess("已切换至「\(modeName)」模式")
+            }
+
+        case .setWindSpeed(let speedName):
+            if let windAttr = model.attributes[deviceId]?["windSpeed"],
+               case .list(let options) = windAttr.valueRange,
+               let match = options.first(where: { $0.desc.contains(speedName) || speedName.contains($0.desc) }) {
+                model.sendAttribute("windSpeed", value: match.data, deviceId: deviceId)
+                VoiceControlManager.shared.markSuccess("已调节风速为「\(match.desc)」")
+            } else {
+                VoiceControlManager.shared.markSuccess("已调节风速")
+            }
+
+        case .queryStatus:
+            if let attr = AppModel.indoorTemperatureAttribute(in: model.attributes[deviceId] ?? [:]),
+               let temp = attr.doubleValue {
+                VoiceControlManager.shared.markSuccess("当前室内温度为 \(Int(temp))°C")
+            } else {
+                VoiceControlManager.shared.markSuccess("设备连接正常，暂未读取到室温")
+            }
+
+        case .applyScene(let sceneName):
+            if let scene = model.scenes.first(where: { $0.name.contains(sceneName) }) {
+                model.applyScene(scene)
+                VoiceControlManager.shared.markSuccess("已应用「\(scene.name)」情景")
+            } else {
+                VoiceControlManager.shared.markFailed("未找到「\(sceneName)」情景")
+            }
+        }
+
+        scheduleAutoDismiss(delay: 1.5)
+    }
+
+    private func scheduleAutoDismiss(delay: TimeInterval) {
+        dismissTimer?.invalidate()
+        dismissTimer = Timer.scheduledTimer(withTimeInterval: delay, repeats: false) { [weak self] _ in
+            Task { @MainActor in
+                self?.hide()
+            }
+        }
+    }
+}
+
+/// 支持无边框下成为 Key Window 并响应按键的 NSPanel
+private final class CustomKeyPanel: NSPanel {
+    override var canBecomeKey: Bool { true }
+    override var canBecomeMain: Bool { true }
+
+    override func keyDown(with event: NSEvent) {
+        // 按 Esc 键退出
+        if event.keyCode == 53 {
+            VoiceCapsuleWindowController.shared.hide()
+            return
+        }
+        // 按 Return / Enter 提交
+        if event.keyCode == 36 {
+            VoiceControlManager.shared.commitCurrentText()
+            return
+        }
+        super.keyDown(with: event)
+    }
+}

@@ -150,42 +150,43 @@ private struct ScheduleRow: View {
     }
 }
 
+enum ScheduleKind: String, CaseIterable {
+    case schedule = "定时"
+    case countdown = "倒计时"
+}
+
+enum ScheduleRepeatMode: String, CaseIterable, Identifiable {
+    case none = "仅一次"
+    case daily = "每天"
+    case weekly = "按星期"
+    var id: String { rawValue }
+}
+
 /// 新增调度任务弹窗：定时（每日重复可选）或倒计时
 struct AddScheduleSheet: View {
+    typealias Kind = ScheduleKind
+    typealias RepeatMode = ScheduleRepeatMode
+
     @EnvironmentObject var model: AppModel
     @Environment(\.dismiss) private var dismiss
 
     /// 编辑模式：传入已有任务则预填表单，保存时更新而非新增
     var editingAction: ScheduledAction?
 
-    enum Kind: String, CaseIterable {
-        case schedule = "定时"
-        case countdown = "倒计时"
-    }
-
     @State private var kind: Kind = .schedule
     @State private var fireTime = Calendar.current.date(bySettingHour: 22, minute: 0, second: 0, of: Date()) ?? Date()
-    @State private var countdownMinutes: Int = 30
+    @State private var countdownMinutes = 30
 
-    /// 重复模式：none=一次性 / daily=每天 / weekly=按星期
-    enum RepeatMode: String, CaseIterable, Identifiable {
-        case none = "仅一次"
-        case daily = "每天"
-        case weekly = "按星期"
-        var id: String { rawValue }
-    }
     @State private var repeatMode: RepeatMode = .none
-    /// 按星期模式选中的星期（Calendar weekday：1=周日…7=周六）
     @State private var repeatWeekdays: Set<Int> = [2, 3, 4, 5, 6]  // 默认工作日
 
     /// 目标设备
-    @State private var deviceId: String = ""
+    @State private var deviceId = ""
     /// 目标属性名（选中后驱动下方值控件）
-    @State private var attrName: String = ""
+    @State private var attrName = ""
 
-    /// 值控件状态（根据属性类型决定）
     @State private var boolValue = false
-    @State private var listValue: String = ""
+    @State private var listValue = ""
     @State private var stepValue: Double = 26
 
     private var selectableDevices: [(id: String, name: String)] {
@@ -245,7 +246,17 @@ struct AddScheduleSheet: View {
                 }
             }
             .onChange(of: attrName) { _ in
-                loadAttrDefaults()
+                if let attr = selectedAttr {
+                    switch attr.valueRange {
+                    case .list(let opts):
+                        boolValue = attr.boolValue ?? false
+                        listValue = attr.value?.stringValue ?? opts.first?.data.stringValue ?? ""
+                    case .step(let min, _, _):
+                        stepValue = attr.doubleValue ?? min
+                    case .none:
+                        break
+                    }
+                }
             }
 
             // 值控件（按属性类型渲染）
@@ -353,7 +364,8 @@ struct AddScheduleSheet: View {
     }
 
     @ViewBuilder
-    private func valueControl(_ attr: DeviceAttribute) -> some View {        VStack(alignment: .leading, spacing: 8) {
+    private func valueControl(_ attr: DeviceAttribute) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
             Text("将 \(attr.desc) 设为：")
                 .font(.system(size: 12))
                 .foregroundStyle(Theme.inkSubtle)
@@ -388,19 +400,6 @@ struct AddScheduleSheet: View {
         .padding(Theme.spaceSM)
         .background(Theme.surface1)
         .cornerRadius(Theme.radiusMD)
-    }
-
-    private func loadAttrDefaults() {
-        guard let attr = selectedAttr else { return }
-        switch attr.valueRange {
-        case .list(let opts):
-            boolValue = attr.boolValue ?? false
-            listValue = attr.value?.stringValue ?? opts.first?.data.stringValue ?? ""
-        case .step(let min, _, _):
-            stepValue = attr.doubleValue ?? min
-        case .none:
-            break
-        }
     }
 
     /// 由当前表单状态生成任务；编辑模式保留原 id 更新，新增模式创建

@@ -18,6 +18,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         controller.setup()
         statusItemController = controller
 
+        // 注册全局语音快捷键（Control + Option + A）
+        GlobalHotKeyManager.shared.onHotKeyPressed = {
+            VoiceCapsuleWindowController.shared.toggle()
+        }
+        GlobalHotKeyManager.shared.registerDefaultHotKey()
+
         // 启动后关闭自动出现的主窗口，转入后台（SwiftUI 窗口在此刻已创建完成）
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
             for window in NSApp.windows {
@@ -29,11 +35,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    /// 应用级 URL 处理（haierac://main）：窗口全部关闭时也能打开主窗口。
+    /// 应用级 URL 处理（haierac://main, haierac://voice）：窗口全部关闭时也能响应。
     /// 视图级 onOpenURL 在无窗口时不触发，必须在这里处理。
     func application(_ application: NSApplication, open urls: [URL]) {
         for url in urls where url.scheme == "haierac" {
-            openMainWindow()
+            if url.host == "voice" {
+                VoiceCapsuleWindowController.shared.show()
+            } else {
+                openMainWindow()
+            }
         }
     }
 

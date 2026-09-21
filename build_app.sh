@@ -13,6 +13,11 @@ for arg in "$@"; do
     esac
 done
 
+# 如果存在兼容的完整 SDK（解决 CommandLineTools 下缺少 SwiftUIMacros 导致的构建问题），优先选择稳定 SDK
+if [ -z "${SDKROOT:-}" ] && [ -d "/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk" ]; then
+    export SDKROOT="/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk"
+fi
+
 echo "🏗 构建 v$VERSION (release)..."
 swift build -c release
 
@@ -64,6 +69,10 @@ cat > "$APP/Contents/Info.plist" <<PLIST
         <key>NSAllowsArbitraryLoads</key>
         <true/>
     </dict>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>需要使用麦克风以支持语音控制空调</string>
+    <key>NSSpeechRecognitionUsageDescription</key>
+    <string>需要语音识别权限以理解您的空调控制口令</string>
 </dict>
 </plist>
 PLIST

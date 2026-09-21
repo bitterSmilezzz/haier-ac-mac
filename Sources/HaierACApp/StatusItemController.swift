@@ -101,6 +101,10 @@ final class StatusItemController: NSObject {
     /// 右键：上下文菜单（打开主窗口 / 开机自启 / 主题 / 退出）
     private func showContextMenu() {
         let menu = NSMenu()
+        let voiceItem = NSMenuItem(title: "语音控制... (⌃⌥A)", action: #selector(openVoiceControl), keyEquivalent: "")
+        voiceItem.target = self
+        menu.addItem(voiceItem)
+
         let openItem = NSMenuItem(title: "打开主窗口", action: #selector(openMainWindow), keyEquivalent: "")
         openItem.target = self
         menu.addItem(openItem)
@@ -135,6 +139,10 @@ final class StatusItemController: NSObject {
         statusItem?.menu = menu
         statusItem?.button?.performClick(nil)
         statusItem?.menu = nil  // 用后即拆，避免菜单残留
+    }
+
+    @objc private func openVoiceControl() {
+        VoiceCapsuleWindowController.shared.show()
     }
 
     @objc private func openMainWindow() {
