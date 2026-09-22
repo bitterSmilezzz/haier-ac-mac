@@ -31,14 +31,36 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         false
     }
 
-    /// 应用级 URL 处理（haierac://main, haierac://voice）：窗口全部关闭时也能响应。
+    /// 应用级 URL 处理（haierac://main, haierac://voice, haierac://sleep/...）：窗口全部关闭时也能响应。
     /// 视图级 onOpenURL 在无窗口时不触发，必须在这里处理。
     func application(_ application: NSApplication, open urls: [URL]) {
         for url in urls where url.scheme == "haierac" {
             if url.host == "voice" {
                 VoiceCapsuleWindowController.shared.show()
+            } else if url.host == "sleep" {
+                handleSleepURL(url)
             } else {
                 openMainWindow()
+            }
+        }
+    }
+
+    private func handleSleepURL(_ url: URL) {
+        let action = url.pathComponents.dropFirst().first ?? url.host ?? ""
+        let model = AppModel.shared
+        if action == "stop" || url.path == "/stop" {
+            model.stopSleepCurve()
+        } else if action == "start" || url.path == "/start" {
+            guard let deviceId = model.devices.first?.id ?? model.manualDevices.first?.deviceId else { return }
+            let curve = model.allSleepCurves.first ?? .standard
+            model.startSleepCurve(curve: curve, deviceId: deviceId)
+        } else if action == "toggle" || url.path == "/toggle" {
+            if model.activeSleepSession != nil {
+                model.stopSleepCurve()
+            } else {
+                guard let deviceId = model.devices.first?.id ?? model.manualDevices.first?.deviceId else { return }
+                let curve = model.allSleepCurves.first ?? .standard
+                model.startSleepCurve(curve: curve, deviceId: deviceId)
             }
         }
     }

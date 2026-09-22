@@ -274,6 +274,31 @@ struct ACWidgetView: View {
                         .fill(Color.white.opacity(0.08))
                 )
             }
+
+            // 睡眠快捷启动 Link
+            Link(destination: URL(string: "haierac://sleep/start")!) {
+                VStack(spacing: 4) {
+                    Image(systemName: "moon.stars.fill")
+                        .font(.system(size: 13))
+                        .foregroundStyle(Color(red: 0.68, green: 0.65, blue: 1.0))
+                    Text("开启")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(.white)
+                    Text("睡眠")
+                        .font(.system(size: 10))
+                        .foregroundStyle(Color.white.opacity(0.6))
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 10)
+                .background(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(Color(red: 0.55, green: 0.50, blue: 0.95).opacity(0.2))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                .strokeBorder(Color(red: 0.55, green: 0.50, blue: 0.95).opacity(0.4), lineWidth: 1)
+                        )
+                )
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .widgetURL(URL(string: "haierac://main"))
@@ -336,7 +361,7 @@ struct ACWidgetView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-        .widgetURL(URL(string: "haierac://main"))
+        .widgetURL(URL(string: "haierac://sleep/toggle"))
     }
 
     // MARK: - 智能睡眠中尺寸视图
@@ -379,56 +404,61 @@ struct ACWidgetView: View {
 
             Spacer()
 
-            // 右侧 Bento 卡片：下一阶段时间预告
-            if let nextName = snapshot?.sleepNextStageName, let fireDate = snapshot?.sleepNextFireDate {
-                let formatter = DateFormatter()
-                let _ = formatter.dateFormat = "HH:mm"
-                let timeStr = formatter.string(from: fireDate)
+            // 右侧 Bento 卡片：下一阶段时间预告与一键停止按钮
+            VStack(alignment: .trailing, spacing: 6) {
+                if let nextName = snapshot?.sleepNextStageName, let fireDate = snapshot?.sleepNextFireDate {
+                    let formatter = DateFormatter()
+                    let _ = formatter.dateFormat = "HH:mm"
+                    let timeStr = formatter.string(from: fireDate)
 
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack(spacing: 4) {
-                        Image(systemName: "clock.arrow.circlepath")
-                            .font(.system(size: 11))
-                            .foregroundStyle(Color(red: 0.68, green: 0.65, blue: 1.0))
-                        Text("下一阶段")
-                            .font(.system(size: 10, weight: .medium))
-                            .foregroundStyle(Color.white.opacity(0.7))
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "clock.arrow.circlepath")
+                                .font(.system(size: 11))
+                                .foregroundStyle(Color(red: 0.68, green: 0.65, blue: 1.0))
+                            Text("下一阶段")
+                                .font(.system(size: 10, weight: .medium))
+                                .foregroundStyle(Color.white.opacity(0.7))
+                        }
+
+                        Text(timeStr)
+                            .font(.system(size: 18, weight: .bold, design: .rounded))
+                            .monospacedDigit()
+                            .foregroundStyle(.white)
+
+                        Text(nextName)
+                            .font(.system(size: 10))
+                            .foregroundStyle(Color.white.opacity(0.6))
+                            .lineLimit(1)
                     }
-
-                    Text(timeStr)
-                        .font(.system(size: 18, weight: .bold, design: .rounded))
-                        .monospacedDigit()
-                        .foregroundStyle(.white)
-
-                    Text(nextName)
-                        .font(.system(size: 10))
-                        .foregroundStyle(Color.white.opacity(0.6))
-                        .lineLimit(1)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .fill(Color.white.opacity(0.08))
+                    )
                 }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 10)
-                .background(
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .fill(Color.white.opacity(0.08))
-                )
-            } else {
-                VStack(spacing: 4) {
-                    Image(systemName: "bed.double.fill")
-                        .font(.system(size: 14))
-                        .foregroundStyle(Color(red: 0.68, green: 0.65, blue: 1.0))
-                    Text("夜间呵护")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(.white)
-                    Text("平稳控温")
-                        .font(.system(size: 10))
-                        .foregroundStyle(Color.white.opacity(0.5))
+
+                // 一键停止睡眠模式 Link
+                Link(destination: URL(string: "haierac://sleep/stop")!) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "stop.fill")
+                            .font(.system(size: 8))
+                        Text("停止睡眠")
+                            .font(.system(size: 10, weight: .semibold))
+                    }
+                    .foregroundStyle(Color(red: 1.0, green: 0.45, blue: 0.45))
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .fill(Color.red.opacity(0.18))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                    .strokeBorder(Color.red.opacity(0.3), lineWidth: 1)
+                            )
+                    )
                 }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 10)
-                .background(
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .fill(Color.white.opacity(0.08))
-                )
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
