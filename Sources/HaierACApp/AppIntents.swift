@@ -174,6 +174,63 @@ struct GetACTemperatureIntent: AppIntent {
     }
 }
 
+// MARK: - 开启智能睡眠曲线
+
+struct StartSleepCurveIntent: AppIntent {
+    static var title: LocalizedStringResource = "开启睡眠模式"
+    static var description = IntentDescription("启动智能睡眠温阶曲线", categoryName: "空调控制")
+
+    @Parameter(title: "曲线名称", description: "内置或自定义曲线名称（如标准、轻柔、省电等），留空默认使用第一套曲线")
+    var curveName: String?
+
+    @Parameter(title: "设备名称", description: "可选；留空使用第一台设备")
+    var deviceName: String?
+
+    @MainActor
+    func perform() async throws -> some IntentResult & ProvidesDialog {
+        let deviceId = try requireGatewayAndDevice(deviceName)
+        let model = AppModel.shared
+
+        let targetCurve: SleepCurveConfig
+        if let query = curveName?.trimmingCharacters(in: .whitespacesAndNewlines), !query.isEmpty {
+            if let matched = model.allSleepCurves.first(where: { $0.name.localizedCaseInsensitiveContains(query) }) {
+                targetCurve = matched
+            } else {
+                throw ACIntentError.message("未找到名为「\(query)」的睡眠曲线")
+            }
+        } else {
+            guard let firstCurve = model.allSleepCurves.first else {
+                throw ACIntentError.message("暂无可用睡眠曲线")
+            }
+            targetCurve = firstCurve
+        }
+
+        model.startSleepCurve(curve: targetCurve, deviceId: deviceId)
+        let name = model.devices.first(where: { $0.id == deviceId })?.deviceName
+            ?? model.manualDevices.first(where: { $0.deviceId == deviceId })?.name
+            ?? "空调"
+        return .result(dialog: "已为\(name)启动「\(targetCurve.name)」智能睡眠温阶")
+    }
+}
+
+// MARK: - 停止智能睡眠曲线
+
+struct StopSleepCurveIntent: AppIntent {
+    static var title: LocalizedStringResource = "停止睡眠模式"
+    static var description = IntentDescription("停止正在运行的智能睡眠温阶曲线", categoryName: "空调控制")
+
+    @MainActor
+    func perform() async throws -> some IntentResult & ProvidesDialog {
+        let model = AppModel.shared
+        guard let session = model.activeSleepSession else {
+            return .result(dialog: "当前未运行智能睡眠温阶")
+        }
+        let curveName = session.curveConfig.name
+        model.stopSleepCurve()
+        return .result(dialog: "已停止「\(curveName)」智能睡眠温阶")
+    }
+}
+
 // MARK: - 快捷指令库入口
 
 struct ACAppShortcuts: AppShortcutsProvider {
@@ -224,6 +281,26 @@ struct ACAppShortcuts: AppShortcutsProvider {
                     shortTitle: "查询温度",
                     systemImageName: "thermometer.sun.fill"
                 ),
+                AppShortcut(
+                    intent: StartSleepCurveIntent(),
+                    phrases: [
+                        "用 \(.applicationName) 开启睡眠模式",
+                        "用 \(.applicationName) 打开睡眠模式",
+                        "用 \(.applicationName) 开启睡眠曲线",
+                    ],
+                    shortTitle: "开启睡眠模式",
+                    systemImageName: "bed.double.fill"
+                ),
+                AppShortcut(
+                    intent: StopSleepCurveIntent(),
+                    phrases: [
+                        "用 \(.applicationName) 停止睡眠模式",
+                        "用 \(.applicationName) 关闭睡眠模式",
+                        "用 \(.applicationName) 退出睡眠模式",
+                    ],
+                    shortTitle: "停止睡眠模式",
+                    systemImageName: "moon.zzz"
+                ),
             ]
         } else {
             return [
@@ -257,6 +334,22 @@ struct ACAppShortcuts: AppShortcutsProvider {
                     intent: GetACTemperatureIntent(),
                     phrases: [
                         "用 \(.applicationName) 查询温度",
+                    ]
+                ),
+                AppShortcut(
+                    intent: StartSleepCurveIntent(),
+                    phrases: [
+                        "用 \(.applicationName) 开启睡眠模式",
+                        "用 \(.applicationName) 打开睡眠模式",
+                        "用 \(.applicationName) 开启睡眠曲线",
+                    ]
+                ),
+                AppShortcut(
+                    intent: StopSleepCurveIntent(),
+                    phrases: [
+                        "用 \(.applicationName) 停止睡眠模式",
+                        "用 \(.applicationName) 关闭睡眠模式",
+                        "用 \(.applicationName) 退出睡眠模式",
                     ]
                 ),
             ]
