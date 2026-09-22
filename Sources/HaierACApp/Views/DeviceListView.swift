@@ -34,6 +34,7 @@ struct DeviceListView: View {
                         cloudDevicesSection
                         manualDevicesSection
                         SceneSection()
+                        SleepCurveSection()
                         ScheduleSection()
                         discoverySection
                         // 批量控制面板：批量模式 + 至少选中一台时显示

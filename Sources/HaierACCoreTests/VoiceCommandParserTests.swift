@@ -200,6 +200,28 @@ final class VoiceCommandParserTests: XCTestCase {
         XCTAssertEqual(c3?.command, .cancelSchedules)
     }
 
+    // MARK: - 智能睡眠温阶测试
+
+    func testSmartSleepCurve() {
+        let sc1 = VoiceCommandParser.parse("开启智能睡眠")
+        XCTAssertEqual(sc1?.command, .startSleepCurve(curveName: "标准舒适"))
+
+        let sc2 = VoiceCommandParser.parse("启动睡眠曲线")
+        XCTAssertEqual(sc2?.command, .startSleepCurve(curveName: "标准舒适"))
+
+        let sc3 = VoiceCommandParser.parse("开启儿童睡眠")
+        XCTAssertEqual(sc3?.command, .startSleepCurve(curveName: "轻柔呵护"))
+
+        let sc4 = VoiceCommandParser.parse("开启省电睡眠模式")
+        XCTAssertEqual(sc4?.command, .startSleepCurve(curveName: "清爽省电"))
+
+        let sc5 = VoiceCommandParser.parse("关闭智能睡眠")
+        XCTAssertEqual(sc5?.command, .stopSleepCurve)
+
+        let sc6 = VoiceCommandParser.parse("停止睡眠曲线")
+        XCTAssertEqual(sc6?.command, .stopSleepCurve)
+    }
+
     // MARK: - 无效输入测试
 
     func testInvalidCommands() {

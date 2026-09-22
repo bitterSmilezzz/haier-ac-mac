@@ -56,6 +56,104 @@ struct ScheduledAction: Identifiable, Codable, Hashable {
     }
 }
 
+/// 智能睡眠温阶节点
+struct SleepStage: Identifiable, Codable, Hashable {
+    var id = UUID()
+    /// 阶段名称（如“入睡舒适”、“深睡呵护”、“熟睡恒温”）
+    var name: String
+    /// 从启动时刻开始经过的分钟数（如 0, 120, 300, 480）
+    var afterMinutes: Int
+    /// 目标温度（°C）
+    var targetTemperature: Double
+    /// 建议风速（如“微风”、“自动”）
+    var windSpeed: String = "微风"
+    /// 动作完成后是否保持开机（阶段为关机时设为 false）
+    var powerOn: Bool = true
+
+    var timeLabel: String {
+        if afterMinutes == 0 { return "立即生效" }
+        if afterMinutes >= 60 && afterMinutes % 60 == 0 {
+            return "\(afterMinutes / 60)小时后"
+        } else if afterMinutes >= 60 {
+            return String(format: "%.1f小时后", Double(afterMinutes) / 60.0)
+        } else {
+            return "\(afterMinutes)分钟后"
+        }
+    }
+}
+
+/// 智能睡眠温阶曲线配置
+struct SleepCurveConfig: Identifiable, Codable, Hashable {
+    var id = UUID()
+    var name: String
+    var desc: String
+    var icon: String
+    var stages: [SleepStage]
+
+    static let standard = SleepCurveConfig(
+        name: "标准舒适",
+        desc: "入睡25°C清爽易眠，深睡阶梯升温防着凉，早晨自动关机",
+        icon: "moon.stars.fill",
+        stages: [
+            SleepStage(name: "入睡舒适", afterMinutes: 0, targetTemperature: 25.0, windSpeed: "微风", powerOn: true),
+            SleepStage(name: "深睡呵护", afterMinutes: 120, targetTemperature: 26.0, windSpeed: "微风", powerOn: true),
+            SleepStage(name: "熟睡恒温", afterMinutes: 300, targetTemperature: 27.0, windSpeed: "微风", powerOn: true),
+            SleepStage(name: "早晨关机", afterMinutes: 480, targetTemperature: 27.0, windSpeed: "微风", powerOn: false)
+        ]
+    )
+
+    static let gentle = SleepCurveConfig(
+        name: "轻柔呵护",
+        desc: "适合老人与儿童，起始26°C平缓微调，全程微风静音",
+        icon: "heart.fill",
+        stages: [
+            SleepStage(name: "温和入眠", afterMinutes: 0, targetTemperature: 26.0, windSpeed: "微风", powerOn: true),
+            SleepStage(name: "深夜防凉", afterMinutes: 90, targetTemperature: 27.0, windSpeed: "微风", powerOn: true),
+            SleepStage(name: "清晨熟睡", afterMinutes: 240, targetTemperature: 27.5, windSpeed: "微风", powerOn: true),
+            SleepStage(name: "醒来关机", afterMinutes: 420, targetTemperature: 27.5, windSpeed: "微风", powerOn: false)
+        ]
+    )
+
+    static let coolEco = SleepCurveConfig(
+        name: "清爽省电",
+        desc: "初期24°C迅速降温，随睡眠加深逐步回升至节能温度",
+        icon: "leaf.fill",
+        stages: [
+            SleepStage(name: "快速降温", afterMinutes: 0, targetTemperature: 24.0, windSpeed: "强劲", powerOn: true),
+            SleepStage(name: "入睡转柔", afterMinutes: 60, targetTemperature: 25.0, windSpeed: "微风", powerOn: true),
+            SleepStage(name: "深度睡眠", afterMinutes: 180, targetTemperature: 26.0, windSpeed: "微风", powerOn: true),
+            SleepStage(name: "节能恒温", afterMinutes: 360, targetTemperature: 27.0, windSpeed: "微风", powerOn: true)
+        ]
+    )
+
+    static let allPresets: [SleepCurveConfig] = [.standard, .gentle, .coolEco]
+}
+
+/// 正在执行的睡眠曲线会话
+struct SleepSession: Codable, Equatable {
+    var deviceId: String
+    var startedAt: Date
+    var curveConfig: SleepCurveConfig
+    var currentStageIndex: Int
+
+    var currentStage: SleepStage? {
+        guard currentStageIndex >= 0 && currentStageIndex < curveConfig.stages.count else { return nil }
+        return curveConfig.stages[currentStageIndex]
+    }
+
+    var nextStage: SleepStage? {
+        let next = currentStageIndex + 1
+        guard next < curveConfig.stages.count else { return nil }
+        return curveConfig.stages[next]
+    }
+
+    /// 下一阶段预计生效时刻
+    var nextFireDate: Date? {
+        guard let next = nextStage else { return nil }
+        return startedAt.addingTimeInterval(TimeInterval(next.afterMinutes * 60))
+    }
+}
+
 /// AttrValue ↔ JSON 安全编解码
 ///
 /// ⚠️ 不要直接用 `JSONSerialization.data(withJSONObject: value.jsonValue)`：
@@ -200,6 +298,17 @@ final class AppModel: ObservableObject {
 
     // MARK: - 本地调度（定时/倒计时，v1.4）
 
+    /// 智能睡眠温阶会话（持久化到 UserDefaults，v1.9.6）
+    @Published var activeSleepSession: SleepSession? {
+        didSet {
+            if let activeSleepSession, let data = try? JSONEncoder().encode(activeSleepSession) {
+                UserDefaults.standard.set(data, forKey: "activeSleepSession")
+            } else {
+                UserDefaults.standard.removeObject(forKey: "activeSleepSession")
+            }
+        }
+    }
+
     /// 调度任务列表（持久化到 UserDefaults）
     @Published var scheduledActions: [ScheduledAction] = [] {
         didSet {
@@ -222,12 +331,16 @@ final class AppModel: ObservableObject {
             while !Task.isCancelled {
                 guard let self else { break }
                 self.fireDueActions()
+                self.checkSleepCurveSession()
                 // 计算到下一个待触发任务的时间（封顶 5 分钟，保证新增任务也能及时被拾取）
                 let now = Date()
-                let nextFire = self.scheduledActions
+                var candidates: [Date] = self.scheduledActions
                     .filter { $0.enabled && $0.fireDate > now }
                     .map(\.fireDate)
-                    .min() ?? now.addingTimeInterval(300)
+                if let nextSleepFire = self.activeSleepSession?.nextFireDate, nextSleepFire > now {
+                    candidates.append(nextSleepFire)
+                }
+                let nextFire = candidates.min() ?? now.addingTimeInterval(300)
                 let delay = min(max(nextFire.timeIntervalSince(now), 1), 300)
                 try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
             }
@@ -326,6 +439,107 @@ final class AppModel: ObservableObject {
             candidate = calendar.date(byAdding: .day, value: 1, to: candidate) ?? candidate.addingTimeInterval(86400)
         }
         return candidate
+    }
+
+    // MARK: - 智能睡眠温阶调度（v1.9.6）
+
+    /// 开启智能睡眠温阶
+    func startSleepCurve(curve: SleepCurveConfig, deviceId: String) {
+        let now = Date()
+        let session = SleepSession(
+            deviceId: deviceId,
+            startedAt: now,
+            curveConfig: curve,
+            currentStageIndex: 0
+        )
+        self.activeSleepSession = session
+        AppLog.log("开启智能睡眠: \(curve.name) 设备=\(deviceId)")
+
+        // 立即执行第 0 阶段
+        if let initialStage = curve.stages.first {
+            applySleepStage(initialStage, deviceId: deviceId, curveName: curve.name)
+        }
+
+        requestNotificationPermission()
+        operationNotice = OperationNotice(text: "🌙 已启动「\(curve.name)」睡眠温阶曲线", isError: false)
+        wakeScheduler()
+    }
+
+    /// 停止智能睡眠温阶
+    func stopSleepCurve() {
+        guard let session = activeSleepSession else { return }
+        AppLog.log("停止智能睡眠: \(session.curveConfig.name)")
+        self.activeSleepSession = nil
+        operationNotice = OperationNotice(text: "已停止智能睡眠温阶", isError: false)
+        wakeScheduler()
+    }
+
+    /// 检查并推进智能睡眠阶段
+    private func checkSleepCurveSession() {
+        guard let session = activeSleepSession else { return }
+        let now = Date()
+        let elapsedMinutes = Int(now.timeIntervalSince(session.startedAt) / 60)
+
+        // 找出当前已到达的最晚阶段
+        var highestStageIndex = session.currentStageIndex
+        for (idx, stage) in session.curveConfig.stages.enumerated() {
+            if stage.afterMinutes <= elapsedMinutes {
+                highestStageIndex = max(highestStageIndex, idx)
+            }
+        }
+
+        if highestStageIndex > session.currentStageIndex {
+            // 推进到新阶段
+            activeSleepSession?.currentStageIndex = highestStageIndex
+            let stage = session.curveConfig.stages[highestStageIndex]
+            AppLog.log("智能睡眠推进: [\(session.curveConfig.name)] 阶段 \(highestStageIndex + 1)/\(session.curveConfig.stages.count): \(stage.name)")
+            applySleepStage(stage, deviceId: session.deviceId, curveName: session.curveConfig.name)
+
+            // 如果该阶段为关机，则自动结束当前会话
+            if !stage.powerOn {
+                AppLog.log("智能睡眠完成并关机，结束会话")
+                activeSleepSession = nil
+            }
+        }
+    }
+
+    /// 下发阶段指令并发送系统通知
+    private func applySleepStage(_ stage: SleepStage, deviceId: String, curveName: String) {
+        if !stage.powerOn {
+            // 关机
+            sendAttribute("onOffStatus", value: .bool(false), deviceId: deviceId)
+            Self.postSleepNotification(title: "🌙 智能睡眠已完成", body: "「\(curveName)」计划已达清晨唤醒时刻，空调已自动关机。")
+        } else {
+            // 确保开机
+            sendAttribute("onOffStatus", value: .bool(true), deviceId: deviceId)
+            // 设温度
+            sendAttribute("targetTemperature", value: .double(stage.targetTemperature), deviceId: deviceId)
+            // 设风速（微风/静音）
+            if let windAttr = attributes[deviceId]?["windSpeed"],
+               case .list(let options) = windAttr.valueRange,
+               let match = options.first(where: { $0.desc.contains(stage.windSpeed) || stage.windSpeed.contains($0.desc) }) {
+                sendAttribute("windSpeed", value: match.data, deviceId: deviceId)
+            }
+            let tempDesc = String(format: "%.1f°C", stage.targetTemperature).replacingOccurrences(of: ".0°C", with: "°C")
+            Self.postSleepNotification(
+                title: "🌙 智能睡眠【\(curveName)】",
+                body: "进入【\(stage.name)】阶段，已平滑调节至 \(tempDesc)（\(stage.windSpeed)）"
+            )
+        }
+    }
+
+    private static func postSleepNotification(title: String, body: String) {
+        let center = UNUserNotificationCenter.current()
+        let content = UNMutableNotificationContent()
+        content.title = title
+        content.body = body
+        content.sound = .default
+        let request = UNNotificationRequest(
+            identifier: "sleep-curve-\(UUID().uuidString)",
+            content: content,
+            trigger: nil
+        )
+        center.add(request)
     }
 
     // MARK: - 定时任务系统通知（v1.8）
@@ -577,6 +791,10 @@ final class AppModel: ObservableObject {
         } else {
             seedDefaultScenesIfNeeded()
         }
+        if let data = UserDefaults.standard.data(forKey: "activeSleepSession"),
+           let saved = try? JSONDecoder().decode(SleepSession.self, from: data) {
+            activeSleepSession = saved
+        }
 
         setupSleepWakeObservers()
     }
@@ -598,8 +816,9 @@ final class AppModel: ObservableObject {
                 AppLog.log("系统已唤醒，立即恢复连接与补发定时任务")
                 Task { @MainActor [weak self] in
                     guard let self else { return }
-                    // 1. 补发休眠期间到期的定时任务
+                    // 1. 补发休眠期间到期的定时任务与睡眠阶段推进
                     self.fireDueActions()
+                    self.checkSleepCurveSession()
                     // 2. 检查会话并重连
                     if self.provider != nil && self.context != nil {
                         await self.refreshTokenIfNeeded()
@@ -836,6 +1055,7 @@ final class AppModel: ObservableObject {
     func logout() {
         sessionGeneration += 1  // 使所有进行中的异步链失效
         stopScheduler()
+        activeSleepSession = nil
         gatewayHandle?.stop()
         gatewayHandle = nil
         gatewayConnected = false

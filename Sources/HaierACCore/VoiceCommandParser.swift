@@ -22,6 +22,10 @@ public enum VoiceCommand: Equatable {
     case schedulePower(hour: Int, minute: Int, power: Bool)
     /// 取消所有定时与倒计时
     case cancelSchedules
+    /// 启动智能睡眠温阶（curveName: 可选曲线名称）
+    case startSleepCurve(curveName: String?)
+    /// 停止智能睡眠温阶
+    case stopSleepCurve
 }
 
 /// 语音指令解析结果
@@ -61,12 +65,30 @@ public struct VoiceCommandParser {
             return VoiceParseResult(command: .cancelSchedules, displayText: "取消所有定时与倒计时")
         }
 
-        // 3. 定时与倒计时任务（放在立即开关机前，避免“30分钟后关机”被提前作为立即关机拦截）
+        // 3. 智能睡眠温阶（放在立即开关机与情景模式前）
+        if cleaned.contains("智能睡眠") || cleaned.contains("睡眠曲线") || cleaned.contains("睡眠温阶") ||
+           (cleaned.contains("睡眠") && (cleaned.contains("开启") || cleaned.contains("启动") || cleaned.contains("打开") || cleaned.contains("关") || cleaned.contains("停") || cleaned.contains("退"))) {
+            if cleaned.contains("关") || cleaned.contains("停") || cleaned.contains("退") {
+                return VoiceParseResult(command: .stopSleepCurve, displayText: "停止智能睡眠温阶")
+            } else {
+                let curveName: String?
+                if cleaned.contains("儿童") || cleaned.contains("老人") || cleaned.contains("轻柔") {
+                    curveName = "轻柔呵护"
+                } else if cleaned.contains("省电") || cleaned.contains("清爽") {
+                    curveName = "清爽省电"
+                } else {
+                    curveName = "标准舒适"
+                }
+                return VoiceParseResult(command: .startSleepCurve(curveName: curveName), displayText: "启动「\(curveName ?? "标准舒适")」睡眠温阶")
+            }
+        }
+
+        // 4. 定时与倒计时任务（放在立即开关机前，避免“30分钟后关机”被提前作为立即关机拦截）
         if let scheduleOrCountdown = parseScheduleOrCountdown(cleaned) {
             return scheduleOrCountdown
         }
 
-        // 4. 立即关机 / 开机（注意：关机判定放在开机前，避免“关闭空调”因含有“开”而被误判）
+        // 5. 立即关机 / 开机（注意：关机判定放在开机前，避免“关闭空调”因含有“开”而被误判）
         if isPowerOff(cleaned) {
             return VoiceParseResult(command: .setPower(false), displayText: "关闭空调电源")
         }
@@ -74,27 +96,27 @@ public struct VoiceCommandParser {
             return VoiceParseResult(command: .setPower(true), displayText: "打开空调电源")
         }
 
-        // 5. 相对温度微调（太冷了/太热了/高一度/低一度）
+        // 6. 相对温度微调（太冷了/太热了/高一度/低一度）
         if let relative = parseRelativeTemperature(cleaned) {
             return relative
         }
 
-        // 6. 绝对温度设定（调到26度 / 26度 / 二十六度）
+        // 7. 绝对温度设定（调到26度 / 26度 / 二十六度）
         if let absolute = parseAbsoluteTemperature(cleaned) {
             return absolute
         }
 
-        // 7. 风速调节（放在模式切换之前，避免“自动风”被“自动”误判拦截）
+        // 8. 风速调节（放在模式切换之前，避免“自动风”被“自动”误判拦截）
         if let wind = parseWindSpeed(cleaned) {
             return wind
         }
 
-        // 8. 运行模式切换
+        // 9. 运行模式切换
         if let mode = parseMode(cleaned) {
             return mode
         }
 
-        // 9. 情景模式
+        // 10. 情景模式
         if let scene = parseScene(cleaned) {
             return scene
         }

@@ -37,6 +37,11 @@ struct MenuBarControlsView: View {
                 // 2. 快捷操作 Bento 矩阵（电源、情景灯光、屏显）
                 quickActionsPod(device: device, attrs: attrs, isPowerOn: isPowerOn, tint: tint)
 
+                // 2.1 智能睡眠状态胶囊（若激活）
+                if let session = model.activeSleepSession {
+                    sleepSessionPod(session: session)
+                }
+
                 // 3. 核心温控 Bento 卡片
                 temperatureBentoPod(device: device, attrs: attrs, isPowerOn: isPowerOn, tint: tint)
 
@@ -591,6 +596,51 @@ struct MenuBarControlsView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 12)
+    }
+
+    // MARK: - 智能睡眠微型状态胶囊
+
+    private func sleepSessionPod(session: SleepSession) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: "moon.stars.fill")
+                .font(.system(size: 12))
+                .foregroundStyle(Color.dynamic(light: 0x5E6AD2, dark: 0x9B8BFF))
+
+            VStack(alignment: .leading, spacing: 1) {
+                Text("智能睡眠中 · \(session.curveConfig.name)")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(Theme.ink)
+
+                if let current = session.currentStage {
+                    Text("\(current.name) · \(String(format: "%.0f°C", current.targetTemperature))")
+                        .font(.system(size: 10))
+                        .foregroundStyle(Theme.inkSubtle)
+                }
+            }
+
+            Spacer()
+
+            Button {
+                model.stopSleepCurve()
+            } label: {
+                Text("停止")
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(Theme.danger)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(Theme.danger.opacity(0.12))
+                    .cornerRadius(Theme.radiusSM)
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(Theme.surface1)
+        .cornerRadius(Theme.radiusMD)
+        .overlay(
+            RoundedRectangle(cornerRadius: Theme.radiusMD)
+                .strokeBorder(Theme.hairline, lineWidth: 1)
+        )
     }
 }
 

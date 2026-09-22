@@ -292,6 +292,24 @@ public final class VoiceCapsuleWindowController: NSObject, NSWindowDelegate {
             } else {
                 VoiceControlManager.shared.markSuccess("当前没有正在运行的定时任务")
             }
+
+        case .startSleepCurve(let curveName):
+            let curve: SleepCurveConfig
+            if let curveName, let match = SleepCurveConfig.allPresets.first(where: { $0.name.contains(curveName) }) {
+                curve = match
+            } else {
+                curve = .standard
+            }
+            model.startSleepCurve(curve: curve, deviceId: deviceId)
+            VoiceControlManager.shared.markSuccess("已启动「\(curve.name)」睡眠温阶曲线")
+
+        case .stopSleepCurve:
+            if model.activeSleepSession != nil {
+                model.stopSleepCurve()
+                VoiceControlManager.shared.markSuccess("已停止智能睡眠温阶")
+            } else {
+                VoiceControlManager.shared.markSuccess("当前未运行睡眠温阶曲线")
+            }
         }
 
         scheduleAutoDismiss(delay: 1.5)
