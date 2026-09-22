@@ -596,6 +596,96 @@ final class AppModel: ObservableObject {
         operationNotice = OperationNotice(text: "已删除曲线「\(name)」", isError: false)
     }
 
+    // MARK: - 自定义睡眠曲线 JSON 导入与导出
+
+    /// 将曲线导出为格式化 JSON 字符串
+    func exportSleepCurveJSON(_ curve: SleepCurveConfig) -> String? {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        guard let data = try? encoder.encode(curve),
+              let jsonStr = String(data: data, encoding: .utf8) else {
+            return nil
+        }
+        return jsonStr
+    }
+
+    /// 导出所有自定义睡眠曲线为 JSON 数组字符串
+    func exportAllCustomSleepCurvesJSON() -> String? {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        guard let data = try? encoder.encode(customSleepCurves),
+              let jsonStr = String(data: data, encoding: .utf8) else {
+            return nil
+        }
+        return jsonStr
+    }
+
+    /// 从 JSON 字符串导入睡眠曲线（支持单个曲线对象或曲线数组）
+    @discardableResult
+    func importSleepCurves(from jsonString: String) throws -> [SleepCurveConfig] {
+        let data = Data(jsonString.utf8)
+        let decoder = JSONDecoder()
+
+        var importedList: [SleepCurveConfig] = []
+
+        if let list = try? decoder.decode([SleepCurveConfig].self, from: data) {
+            importedList = list
+        } else if let single = try? decoder.decode(SleepCurveConfig.self, from: data) {
+            importedList = [single]
+        } else {
+            throw NSError(domain: "SleepCurveImport", code: -1, userInfo: [NSLocalizedDescriptionKey: "无法解析睡眠曲线 JSON 格式，请检查内容是否有效。"])
+        }
+
+        var addedCount = 0
+        for var curve in importedList {
+            curve.id = UUID() // 赋予新 ID 避免与现有曲线碰撞
+            curve.isCustom = true
+            // 防止重名混乱
+            let baseName = curve.name
+            var uniqueName = baseName
+            var counter = 1
+            while allSleepCurves.contains(where: { $0.name == uniqueName }) {
+                uniqueName = "\(baseName) (导入\(counter))"
+                counter += 1
+            }
+            curve.name = uniqueName
+            customSleepCurves.append(curve)
+            addedCount += 1
+        }
+
+        AppLog.log("成功导入 \(addedCount) 套自定义睡眠曲线")
+        operationNotice = OperationNotice(text: "成功导入 \(addedCount) 套睡眠曲线配置", isError: false)
+        return importedList
+    }
+
+    /// 复制指定曲线的 JSON 到系统剪贴板
+    func copyCurveJSONToClipboard(_ curve: SleepCurveConfig) {
+        guard let jsonStr = exportSleepCurveJSON(curve) else {
+            operationNotice = OperationNotice(text: "导出失败", isError: true)
+            return
+        }
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.setString(jsonStr, forType: .string)
+        operationNotice = OperationNotice(text: "已复制「\(curve.name)」配置到剪贴板", isError: false)
+    }
+
+    /// 从系统剪贴板尝试导入曲线配置
+    @discardableResult
+    func importCurvesFromClipboard() -> Bool {
+        guard let content = NSPasteboard.general.string(forType: .string), !content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            operationNotice = OperationNotice(text: "剪贴板为空，无法导入", isError: true)
+            return false
+        }
+        do {
+            let imported = try importSleepCurves(from: content)
+            return !imported.isEmpty
+        } catch {
+            operationNotice = OperationNotice(text: error.localizedDescription, isError: true)
+            return false
+        }
+    }
+
     // MARK: - 定时任务系统通知（v1.8）
 
     /// 请求通知权限（首次添加定时任务时调用；拒绝后静默，仅靠 App 内 toast 反馈）

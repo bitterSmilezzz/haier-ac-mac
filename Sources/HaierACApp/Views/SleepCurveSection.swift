@@ -61,6 +61,19 @@ struct SleepCurveSection: View {
                         .font(.system(size: 11, weight: .medium))
                 }
                 .buttonStyle(Theme.secondaryButtonStyle())
+
+                Button {
+                    if model.importCurvesFromClipboard() {
+                        if let last = model.customSleepCurves.last {
+                            selectedConfig = last
+                        }
+                    }
+                } label: {
+                    Label("导入", systemImage: "square.and.arrow.down")
+                        .font(.system(size: 11, weight: .medium))
+                }
+                .buttonStyle(Theme.secondaryButtonStyle())
+                .help("从系统剪贴板导入睡眠曲线 JSON 配置")
             }
 
             if let session = model.activeSleepSession {
@@ -225,6 +238,19 @@ struct SleepCurveSection: View {
                         .help("编辑此自定义曲线")
 
                         Button {
+                            model.copyCurveJSONToClipboard(selectedConfig)
+                        } label: {
+                            Image(systemName: "square.and.arrow.up")
+                                .font(.system(size: 11))
+                                .foregroundStyle(Theme.inkSubtle)
+                                .frame(width: 24, height: 24)
+                                .background(Theme.surface2)
+                                .clipShape(Circle())
+                        }
+                        .buttonStyle(.plain)
+                        .help("导出/复制曲线 JSON 到剪贴板")
+
+                        Button {
                             let targetId = selectedConfig.id
                             selectedConfig = .standard
                             model.deleteCustomSleepCurve(id: targetId)
@@ -240,25 +266,40 @@ struct SleepCurveSection: View {
                         .help("删除此自定义曲线")
                     }
                 } else {
-                    Button {
-                        editingTarget = nil
-                        templateTarget = selectedConfig
-                        showCustomEditor = true
-                    } label: {
-                        HStack(spacing: 3) {
-                            Image(systemName: "doc.on.doc")
-                                .font(.system(size: 10))
-                            Text("复制")
-                                .font(.system(size: 11, weight: .medium))
+                    HStack(spacing: 4) {
+                        Button {
+                            editingTarget = nil
+                            templateTarget = selectedConfig
+                            showCustomEditor = true
+                        } label: {
+                            HStack(spacing: 3) {
+                                Image(systemName: "doc.on.doc")
+                                    .font(.system(size: 10))
+                                Text("复制")
+                                    .font(.system(size: 11, weight: .medium))
+                            }
+                            .foregroundStyle(Theme.inkSubtle)
+                            .padding(.horizontal, 8)
+                            .frame(height: 24)
+                            .background(Theme.surface2)
+                            .cornerRadius(Theme.radiusSM)
                         }
-                        .foregroundStyle(Theme.inkSubtle)
-                        .padding(.horizontal, 8)
-                        .frame(height: 24)
-                        .background(Theme.surface2)
-                        .cornerRadius(Theme.radiusSM)
+                        .buttonStyle(.plain)
+                        .help("基于「\(selectedConfig.name)」创建自定义曲线")
+
+                        Button {
+                            model.copyCurveJSONToClipboard(selectedConfig)
+                        } label: {
+                            Image(systemName: "square.and.arrow.up")
+                                .font(.system(size: 11))
+                                .foregroundStyle(Theme.inkSubtle)
+                                .frame(width: 24, height: 24)
+                                .background(Theme.surface2)
+                                .clipShape(Circle())
+                        }
+                        .buttonStyle(.plain)
+                        .help("导出预设 JSON 配置到剪贴板")
                     }
-                    .buttonStyle(.plain)
-                    .help("基于「\(selectedConfig.name)」创建自定义曲线")
                 }
             }
 

@@ -77,6 +77,27 @@ struct CustomSleepCurveSheet: View {
             }
             .buttonStyle(Theme.secondaryButtonStyle())
 
+            Menu {
+                Button {
+                    importFromClipboard()
+                } label: {
+                    Label("从剪贴板导入配置", systemImage: "arrow.down.doc")
+                }
+
+                Button {
+                    exportCurrentToClipboard()
+                } label: {
+                    Label("导出当前配置到剪贴板", systemImage: "square.and.arrow.up")
+                }
+            } label: {
+                Image(systemName: "ellipsis.circle")
+                    .font(.system(size: 14))
+                    .foregroundStyle(Theme.inkSubtle)
+            }
+            .menuStyle(.borderlessButton)
+            .fixedSize()
+            .help("导入或导出 JSON 配置")
+
             Spacer()
 
             Text(titleText)
@@ -419,5 +440,43 @@ struct CustomSleepCurveSheet: View {
     private func formatTotalDuration() -> String {
         guard let last = stages.last else { return "0小时" }
         return formatMinutes(last.afterMinutes)
+    }
+
+    private func importFromClipboard() {
+        guard let content = NSPasteboard.general.string(forType: .string), !content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            model.operationNotice = AppModel.OperationNotice(text: "剪贴板为空，无法导入", isError: true)
+            return
+        }
+        let data = Data(content.utf8)
+        let decoder = JSONDecoder()
+        if let config = try? decoder.decode(SleepCurveConfig.self, from: data) {
+            name = config.name
+            desc = config.desc
+            stages = config.stages.sorted { $0.afterMinutes < $1.afterMinutes }
+            model.operationNotice = AppModel.OperationNotice(text: "已从剪贴板导入「\(config.name)」配置", isError: false)
+        } else if let list = try? decoder.decode([SleepCurveConfig].self, from: data), let first = list.first {
+            name = first.name
+            desc = first.desc
+            stages = first.stages.sorted { $0.afterMinutes < $1.afterMinutes }
+            model.operationNotice = AppModel.OperationNotice(text: "已从剪贴板导入「\(first.name)」配置", isError: false)
+        } else {
+            model.operationNotice = AppModel.OperationNotice(text: "剪贴板内容不是有效的睡眠曲线 JSON", isError: true)
+        }
+    }
+
+    private func exportCurrentToClipboard() {
+        let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedDesc = desc.trimmingCharacters(in: .whitespacesAndNewlines)
+        let sortedStages = stages.sorted { $0.afterMinutes < $1.afterMinutes }
+
+        let tempConfig = SleepCurveConfig(
+            id: editingCurve?.id ?? UUID(),
+            name: trimmedName.isEmpty ? "专属睡眠" : trimmedName,
+            desc: trimmedDesc.isEmpty ? "自定义睡眠温阶曲线" : trimmedDesc,
+            icon: "moon.stars.fill",
+            stages: sortedStages,
+            isCustom: true
+        )
+        model.copyCurveJSONToClipboard(tempConfig)
     }
 }
