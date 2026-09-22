@@ -9,6 +9,15 @@ struct MenuBarControlsView: View {
 
     /// 当前选中的设备（多设备切换）
     @State private var selectedDeviceId: String?
+    /// 菜单栏选中的睡眠曲线方案
+    @State private var selectedSleepCurveId: UUID?
+
+    private var selectedSleepCurve: SleepCurveConfig {
+        if let id = selectedSleepCurveId, let curve = model.allSleepCurves.first(where: { $0.id == id }) {
+            return curve
+        }
+        return model.allSleepCurves.first ?? .standard
+    }
 
     private var activeDevices: [DeviceInfo] {
         guard case .ready = model.phase else { return [] }
@@ -37,10 +46,8 @@ struct MenuBarControlsView: View {
                 // 2. 快捷操作 Bento 矩阵（电源、情景灯光、屏显）
                 quickActionsPod(device: device, attrs: attrs, isPowerOn: isPowerOn, tint: tint)
 
-                // 2.1 智能睡眠状态胶囊（若激活）
-                if let session = model.activeSleepSession {
-                    sleepSessionPod(session: session)
-                }
+                // 2.1 智能睡眠快速启停模块 (运行中显示进度与停止，空闲时支持选择方案与一键启动)
+                sleepControlPod(device: device)
 
                 // 3. 核心温控 Bento 卡片
                 temperatureBentoPod(device: device, attrs: attrs, isPowerOn: isPowerOn, tint: tint)
@@ -598,49 +605,139 @@ struct MenuBarControlsView: View {
         .padding(.vertical, 12)
     }
 
-    // MARK: - 智能睡眠微型状态胶囊
+    // MARK: - 智能睡眠快速启停模块
 
-    private func sleepSessionPod(session: SleepSession) -> some View {
-        HStack(spacing: 8) {
-            Image(systemName: "moon.stars.fill")
-                .font(.system(size: 12))
-                .foregroundStyle(Color.dynamic(light: 0x5E6AD2, dark: 0x9B8BFF))
+    private func sleepControlPod(device: DeviceInfo) -> some View {
+        Group {
+            if let session = model.activeSleepSession {
+                // 运行中状态
+                HStack(spacing: 8) {
+                    Image(systemName: "moon.stars.fill")
+                        .font(.system(size: 12))
+                        .foregroundStyle(Color.dynamic(light: 0x5E6AD2, dark: 0x9B8BFF))
 
-            VStack(alignment: .leading, spacing: 1) {
-                Text("智能睡眠中 · \(session.curveConfig.name)")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(Theme.ink)
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text("智能睡眠中 · \(session.curveConfig.name)")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(Theme.ink)
 
-                if let current = session.currentStage {
-                    Text("\(current.name) · \(String(format: "%.0f°C", current.targetTemperature))")
-                        .font(.system(size: 10))
-                        .foregroundStyle(Theme.inkSubtle)
+                        if let current = session.currentStage {
+                            Text("\(current.name) · \(String(format: "%.0f°C", current.targetTemperature))")
+                                .font(.system(size: 10))
+                                .foregroundStyle(Theme.inkSubtle)
+                        }
+                    }
+
+                    Spacer()
+
+                    Button {
+                        model.stopSleepCurve()
+                    } label: {
+                        Text("停止")
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundStyle(Theme.danger)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 3)
+                            .background(Theme.danger.opacity(0.12))
+                            .cornerRadius(Theme.radiusSM)
+                    }
+                    .buttonStyle(.plain)
                 }
-            }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(
+                    LinearGradient(
+                        colors: [
+                            Color.dynamic(light: 0xF3F4FF, dark: 0x14162B),
+                            Color.dynamic(light: 0xEBEFFF, dark: 0x1B1E38)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .cornerRadius(Theme.radiusMD)
+                .overlay(
+                    RoundedRectangle(cornerRadius: Theme.radiusMD)
+                        .strokeBorder(Color.dynamic(light: 0xD0D4FF, dark: 0x2A2E50), lineWidth: 1)
+                )
+            } else {
+                // 空闲未运行状态：方案选择与一键开启
+                HStack(spacing: 8) {
+                    Image(systemName: "moon.fill")
+                        .font(.system(size: 11))
+                        .foregroundStyle(Color.dynamic(light: 0x5E6AD2, dark: 0x9B8BFF))
 
-            Spacer()
+                    // 方案选择下拉菜单
+                    Menu {
+                        ForEach(model.allSleepCurves) { curve in
+                            Button {
+                                selectedSleepCurveId = curve.id
+                            } label: {
+                                HStack {
+                                    Text(curve.name)
+                                    if curve.id == selectedSleepCurve.id {
+                                        Image(systemName: "checkmark")
+                                    }
+                                }
+                            }
+                        }
+                    } label: {
+                        HStack(spacing: 4) {
+                            Text(selectedSleepCurve.name)
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundStyle(Theme.ink)
+                                .lineLimit(1)
+                            Image(systemName: "chevron.up.chevron.down")
+                                .font(.system(size: 9))
+                                .foregroundStyle(Theme.inkTertiary)
+                        }
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 3)
+                        .background(Theme.surface2)
+                        .cornerRadius(Theme.radiusSM)
+                    }
+                    .menuStyle(.borderlessButton)
+                    .fixedSize()
 
-            Button {
-                model.stopSleepCurve()
-            } label: {
-                Text("停止")
-                    .font(.system(size: 10, weight: .medium))
-                    .foregroundStyle(Theme.danger)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 3)
-                    .background(Theme.danger.opacity(0.12))
-                    .cornerRadius(Theme.radiusSM)
+                    Spacer()
+
+                    // 一键开启按钮
+                    Button {
+                        model.startSleepCurve(curve: selectedSleepCurve, deviceId: device.id)
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "play.fill")
+                                .font(.system(size: 9))
+                            Text("开启睡眠")
+                                .font(.system(size: 10, weight: .semibold))
+                        }
+                        .foregroundStyle(Color.white)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(
+                            LinearGradient(
+                                colors: [
+                                    Color.dynamic(light: 0x5E6AD2, dark: 0x6E78E8),
+                                    Color.dynamic(light: 0x4D58C4, dark: 0x5862D6)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .cornerRadius(Theme.radiusSM)
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(Theme.surface1)
+                .cornerRadius(Theme.radiusMD)
+                .overlay(
+                    RoundedRectangle(cornerRadius: Theme.radiusMD)
+                        .strokeBorder(Theme.hairline, lineWidth: 1)
+                )
             }
-            .buttonStyle(.plain)
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 6)
-        .background(Theme.surface1)
-        .cornerRadius(Theme.radiusMD)
-        .overlay(
-            RoundedRectangle(cornerRadius: Theme.radiusMD)
-                .strokeBorder(Theme.hairline, lineWidth: 1)
-        )
     }
 }
 
