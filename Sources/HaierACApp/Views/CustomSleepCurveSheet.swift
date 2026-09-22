@@ -8,17 +8,29 @@ struct CustomSleepCurveSheet: View {
     @Environment(\.dismiss) private var dismiss
 
     let editingCurve: SleepCurveConfig?
+    let templateCurve: SleepCurveConfig?
+    var onSaved: ((SleepCurveConfig) -> Void)? = nil
 
     @State private var name: String = ""
     @State private var desc: String = ""
     @State private var stages: [SleepStage] = []
 
-    init(editingCurve: SleepCurveConfig? = nil) {
+    init(
+        editingCurve: SleepCurveConfig? = nil,
+        templateCurve: SleepCurveConfig? = nil,
+        onSaved: ((SleepCurveConfig) -> Void)? = nil
+    ) {
         self.editingCurve = editingCurve
+        self.templateCurve = templateCurve
+        self.onSaved = onSaved
         if let curve = editingCurve {
             _name = State(initialValue: curve.name)
             _desc = State(initialValue: curve.desc)
             _stages = State(initialValue: curve.stages)
+        } else if let template = templateCurve {
+            _name = State(initialValue: "\(template.name) (自定义)")
+            _desc = State(initialValue: template.desc)
+            _stages = State(initialValue: template.stages)
         } else {
             _name = State(initialValue: "我的专属睡眠")
             _desc = State(initialValue: "个性化温阶调节，贴合个人睡眠节律")
@@ -67,7 +79,7 @@ struct CustomSleepCurveSheet: View {
 
             Spacer()
 
-            Text(editingCurve == nil ? "新建睡眠温阶曲线" : "编辑睡眠曲线")
+            Text(titleText)
                 .font(.system(size: 15, weight: .semibold))
                 .foregroundStyle(Theme.ink)
 
@@ -82,6 +94,16 @@ struct CustomSleepCurveSheet: View {
         }
         .padding(.horizontal, Theme.spaceLG)
         .padding(.vertical, Theme.spaceMD)
+    }
+
+    private var titleText: String {
+        if editingCurve != nil {
+            return "编辑睡眠曲线"
+        } else if let template = templateCurve {
+            return "基于「\(template.name)」创建曲线"
+        } else {
+            return "新建睡眠温阶曲线"
+        }
     }
 
     // MARK: - 1. 实时阶梯预览
@@ -383,6 +405,7 @@ struct CustomSleepCurveSheet: View {
         } else {
             model.addCustomSleepCurve(config)
         }
+        onSaved?(config)
     }
 
     private func formatMinutes(_ minutes: Int) -> String {

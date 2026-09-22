@@ -9,6 +9,7 @@ struct SleepCurveSection: View {
     @State private var targetDeviceId: String = ""
     @State private var showCustomEditor = false
     @State private var editingTarget: SleepCurveConfig? = nil
+    @State private var templateTarget: SleepCurveConfig? = nil
 
     private var activeDevice: DeviceInfo? {
         if !targetDeviceId.isEmpty, let d = model.devices.first(where: { $0.id == targetDeviceId }) {
@@ -53,6 +54,7 @@ struct SleepCurveSection: View {
 
                 Button {
                     editingTarget = nil
+                    templateTarget = nil
                     showCustomEditor = true
                 } label: {
                     Label("自定义", systemImage: "plus")
@@ -69,8 +71,14 @@ struct SleepCurveSection: View {
         }
         .padding(.horizontal, Theme.spaceLG)
         .sheet(isPresented: $showCustomEditor) {
-            CustomSleepCurveSheet(editingCurve: editingTarget)
-                .environmentObject(model)
+            CustomSleepCurveSheet(
+                editingCurve: editingTarget,
+                templateCurve: templateTarget,
+                onSaved: { newCurve in
+                    selectedConfig = newCurve
+                }
+            )
+            .environmentObject(model)
         }
         .onChange(of: model.customSleepCurves) { _ in
             if !model.allSleepCurves.contains(where: { $0.id == selectedConfig.id }) {
@@ -203,6 +211,7 @@ struct SleepCurveSection: View {
                     HStack(spacing: 4) {
                         Button {
                             editingTarget = selectedConfig
+                            templateTarget = nil
                             showCustomEditor = true
                         } label: {
                             Image(systemName: "pencil")
@@ -213,6 +222,7 @@ struct SleepCurveSection: View {
                                 .clipShape(Circle())
                         }
                         .buttonStyle(.plain)
+                        .help("编辑此自定义曲线")
 
                         Button {
                             let targetId = selectedConfig.id
@@ -227,7 +237,28 @@ struct SleepCurveSection: View {
                                 .clipShape(Circle())
                         }
                         .buttonStyle(.plain)
+                        .help("删除此自定义曲线")
                     }
+                } else {
+                    Button {
+                        editingTarget = nil
+                        templateTarget = selectedConfig
+                        showCustomEditor = true
+                    } label: {
+                        HStack(spacing: 3) {
+                            Image(systemName: "doc.on.doc")
+                                .font(.system(size: 10))
+                            Text("复制")
+                                .font(.system(size: 11, weight: .medium))
+                        }
+                        .foregroundStyle(Theme.inkSubtle)
+                        .padding(.horizontal, 8)
+                        .frame(height: 24)
+                        .background(Theme.surface2)
+                        .cornerRadius(Theme.radiusSM)
+                    }
+                    .buttonStyle(.plain)
+                    .help("基于「\(selectedConfig.name)」创建自定义曲线")
                 }
             }
 
