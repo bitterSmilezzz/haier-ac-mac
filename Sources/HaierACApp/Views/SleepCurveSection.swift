@@ -340,6 +340,23 @@ struct SleepCurveSection: View {
                 }
             }
 
+            // 夜间环境光与静音联动
+            Toggle(isOn: $model.sleepNightDimming) {
+                HStack(spacing: 5) {
+                    Image(systemName: "moon.stars")
+                        .font(.system(size: 11))
+                        .foregroundStyle(Color.dynamic(light: 0x5E6AD2, dark: 0x9B8BFF))
+                    Text("夜间就寝联动")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(Theme.ink)
+                    Text("· 启动时自动关闭机身面板灯光与提示音")
+                        .font(.system(size: 10))
+                        .foregroundStyle(Theme.inkSubtle)
+                }
+            }
+            .toggleStyle(.checkbox)
+            .padding(.top, 2)
+
             // 启动按钮
             Button {
                 guard !effectiveDeviceId.isEmpty else { return }

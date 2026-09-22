@@ -324,6 +324,13 @@ final class AppModel: ObservableObject {
         SleepCurveConfig.allPresets + customSleepCurves
     }
 
+    /// 睡眠模式夜间熄屏与静音联动（默认开启，v1.9.12）
+    @Published var sleepNightDimming: Bool = true {
+        didSet {
+            UserDefaults.standard.set(sleepNightDimming, forKey: "sleepNightDimming")
+        }
+    }
+
     /// 调度任务列表（持久化到 UserDefaults）
     @Published var scheduledActions: [ScheduledAction] = [] {
         didSet {
@@ -475,10 +482,33 @@ final class AppModel: ObservableObject {
             applySleepStage(initialStage, deviceId: deviceId, curveName: curve.name)
         }
 
+        // 联动夜间熄屏与静音
+        if sleepNightDimming {
+            applyNightQuietMode(deviceId: deviceId)
+        }
+
         requestNotificationPermission()
-        operationNotice = OperationNotice(text: "🌙 已启动「\(curve.name)」睡眠温阶曲线", isError: false)
+        let noticeText = sleepNightDimming ? "🌙 已启动「\(curve.name)」睡眠温阶（已熄灯静音）" : "🌙 已启动「\(curve.name)」睡眠温阶曲线"
+        operationNotice = OperationNotice(text: noticeText, isError: false)
         wakeScheduler()
         writeWidgetSnapshot(force: true)
+    }
+
+    /// 执行夜间熄屏与微风静音联动
+    private func applyNightQuietMode(deviceId: String) {
+        let attrs = attributes[deviceId] ?? [:]
+        // 1. 关闭机身屏显灯光
+        if let light = attrs["lightStatus"], light.writable {
+            sendAttribute("lightStatus", value: .bool(false), deviceId: deviceId)
+            AppLog.log("智能睡眠联动: 已自动关闭空调机身指示灯")
+        }
+        // 2. 尝试关闭蜂鸣音/提示音（若设备支持）
+        for key in ["soundStatus", "echoStatus", "beepStatus", "buzzerStatus", "voiceStatus"] {
+            if let sound = attrs[key], sound.writable {
+                sendAttribute(key, value: .bool(false), deviceId: deviceId)
+                AppLog.log("智能睡眠联动: 已自动关闭蜂鸣提示音 (\(key))")
+            }
+        }
     }
 
     /// 停止智能睡眠温阶
@@ -964,6 +994,7 @@ final class AppModel: ObservableObject {
            let saved = try? JSONDecoder().decode([SleepCurveConfig].self, from: data) {
             customSleepCurves = saved
         }
+        sleepNightDimming = UserDefaults.standard.object(forKey: "sleepNightDimming") as? Bool ?? true
 
         setupSleepWakeObservers()
     }
