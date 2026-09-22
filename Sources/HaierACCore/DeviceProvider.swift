@@ -26,14 +26,14 @@ public enum TokenRefreshPolicy {
         return expiresAt.timeIntervalSince(now) <= threshold
     }
 
-    /// 判断错误是否属于"凭据失效"（HTTP 401/403 或业务码 430/431 等），可触发刷新重试
+    /// 判断错误是否属于"凭据失效"（HTTP 401/403 或业务码 430/431/D00008 等），可触发刷新重试
     public static func isCredentialError(_ error: Error) -> Bool {
         if let haierError = error as? HaierError {
             switch haierError {
             case .http(let code):
                 return code == 401 || code == 403
-            case .retCode(let code, _):
-                return code.contains("430") || code.contains("431") || code.contains("401") || code.contains("403")
+            case .retCode(let code, let info):
+                return code.contains("430") || code.contains("431") || code.contains("401") || code.contains("403") || code == "D00008" || info.contains("不合法") || info.contains("失效") || info.contains("过期")
             default:
                 return false
             }

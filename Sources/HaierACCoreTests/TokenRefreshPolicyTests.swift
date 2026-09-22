@@ -61,11 +61,12 @@ final class TokenRefreshPolicyTests: XCTestCase {
         XCTAssertFalse(TokenRefreshPolicy.isCredentialError(HaierError.http(404)))
     }
 
-    /// 业务码含 430/431/401/403 视为凭据失效
+    /// 业务码含 430/431/401/403/D00008 等视为凭据失效
     func testRetCodesAreCredentialErrors() {
         XCTAssertTrue(TokenRefreshPolicy.isCredentialError(HaierError.retCode("43001", "登录态失效")))
         XCTAssertTrue(TokenRefreshPolicy.isCredentialError(HaierError.retCode("43102", "token 过期")))
         XCTAssertTrue(TokenRefreshPolicy.isCredentialError(HaierError.retCode("401", "unauthorized")))
+        XCTAssertTrue(TokenRefreshPolicy.isCredentialError(HaierError.retCode("D00008", "用户不合法")))
     }
 
     func testOtherRetCodesAreNotCredentialErrors() {

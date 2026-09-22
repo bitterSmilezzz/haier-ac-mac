@@ -97,6 +97,7 @@ final class AppModel: ObservableObject {
     @Published var phase: Phase = .loggedOut
     @Published var phone: String = ""
     @Published var password: String = ""
+    @Published var loginError: String? = nil
     @Published var devices: [DeviceInfo] = []
     @Published var attributes: [String: [String: DeviceAttribute]] = [:]  // deviceId -> attrName -> attr
     @Published var gatewayConnected = false
@@ -619,9 +620,18 @@ final class AppModel: ObservableObject {
     }
 
     func login() async {
-        let trimmedPhone = phone.trimmingCharacters(in: .whitespacesAndNewlines)
+        loginError = nil
+        var trimmedPhone = phone.trimmingCharacters(in: .whitespacesAndNewlines)
+            .replacingOccurrences(of: " ", with: "")
+            .replacingOccurrences(of: "-", with: "")
+        if trimmedPhone.hasPrefix("+86") {
+            trimmedPhone = String(trimmedPhone.dropFirst(3))
+        } else if trimmedPhone.hasPrefix("86") && trimmedPhone.count == 13 {
+            trimmedPhone = String(trimmedPhone.dropFirst(2))
+        }
+
         guard !trimmedPhone.isEmpty, !password.isEmpty else {
-            phase = .error("请输入手机号和密码")
+            loginError = "请输入手机号和密码"
             return
         }
         phase = .connecting
@@ -632,10 +642,14 @@ final class AppModel: ObservableObject {
             self.context = context
             saveCredentials(context, phone: trimmedPhone)
             password = ""
+            loginError = nil
             await connectAndLoad()
             startScheduler()  // 登录成功：启动调度轮询
         } catch {
-            phase = .error(AppModel.classifyError(error))
+            let msg = AppModel.classifyError(error)
+            AppLog.log("登录失败: \(msg) (\(error.localizedDescription))")
+            loginError = msg
+            phase = .loggedOut
         }
     }
 
@@ -774,7 +788,14 @@ final class AppModel: ObservableObject {
                await refreshTokenForced() {
                 await connectAndLoad(retryingOnCredentialFailure: false)
             } else {
-                phase = .error(AppModel.classifyError(error))
+                if TokenRefreshPolicy.isCredentialError(error) {
+                    // 凭据彻底失效且无法刷新：清空无效凭据并返回登录界面
+                    CredentialStore.deleteAll()
+                    loginError = AppModel.classifyError(error)
+                    phase = .loggedOut
+                } else {
+                    phase = .error(AppModel.classifyError(error))
+                }
             }
         }
     }
@@ -909,12 +930,13 @@ final class AppModel: ObservableObject {
             case .network:
                 return "网络连接失败，请检查网络后重试"
             case .http(let code) where code == 401 || code == 403:
-                return "账号凭据失效，请退出后重新登录"
-            case .retCode(let code, _) where code.contains("430"):
-                return "账号登录异常（\(code)），请重新登录"
-            case .retCode(let code, _):
-                // 未知业务错误：可能是海尔协议已变更
-                return "海尔云接口返回异常（\(code)）。\n若反复出现，可能是协议已变更，请到 GitHub 仓库查看更新：github.com/bitterSmilezzz/haier-ac-mac"
+                return "账号凭据失效，请重新登录"
+            case .retCode(_, let info) where TokenRefreshPolicy.isCredentialError(haierError):
+                let detail = info.isEmpty ? "" : "（\(info)）"
+                return "账号凭据已失效\(detail)，请重新登录"
+            case .retCode(let code, let info):
+                let detail = info.isEmpty ? "" : "：\(info)"
+                return "海尔云接口返回异常（\(code)）\(detail)"
             default:
                 return "请求失败：\(error.localizedDescription)"
             }

@@ -59,6 +59,35 @@ struct LoginView: View {
                                     .strokeBorder(Theme.hairline, lineWidth: 1)
                             )
                             .cornerRadius(Theme.radiusMD)
+                            .onSubmit {
+                                if !model.phone.isEmpty && !model.password.isEmpty && model.phase != .connecting {
+                                    Task { await model.login() }
+                                }
+                            }
+                    }
+                    .onChange(of: model.phone) { _ in
+                        model.loginError = nil
+                    }
+                    .onChange(of: model.password) { _ in
+                        model.loginError = nil
+                    }
+
+                    if let error = model.loginError {
+                        HStack(alignment: .top, spacing: 6) {
+                            Image(systemName: "exclamationmark.circle.fill")
+                                .font(.system(size: 13))
+                                .foregroundStyle(Theme.danger)
+                                .padding(.top, 2)
+                            Text(error)
+                                .font(.system(size: 12))
+                                .foregroundStyle(Theme.danger)
+                                .lineLimit(3)
+                            Spacer()
+                        }
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 8)
+                        .background(Theme.danger.opacity(0.08))
+                        .cornerRadius(Theme.radiusSM)
                     }
                 }
                 .padding(Theme.spaceMD)
