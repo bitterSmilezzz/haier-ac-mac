@@ -126,6 +126,68 @@ final class VoiceCommandParserTests: XCTestCase {
         XCTAssertEqual(s2?.command, .applyScene("离家"))
     }
 
+    // MARK: - 定时与倒计时测试
+
+    func testCountdown() {
+        let c1 = VoiceCommandParser.parse("30分钟后关空调")
+        XCTAssertEqual(c1?.command, .countdownPower(minutes: 30, power: false))
+
+        let c2 = VoiceCommandParser.parse("半小时后关机")
+        XCTAssertEqual(c2?.command, .countdownPower(minutes: 30, power: false))
+
+        let c3 = VoiceCommandParser.parse("1小时后关机")
+        XCTAssertEqual(c3?.command, .countdownPower(minutes: 60, power: false))
+
+        let c4 = VoiceCommandParser.parse("一个半小时后关空调")
+        XCTAssertEqual(c4?.command, .countdownPower(minutes: 90, power: false))
+
+        let c5 = VoiceCommandParser.parse("两小时后关机")
+        XCTAssertEqual(c5?.command, .countdownPower(minutes: 120, power: false))
+
+        let c6 = VoiceCommandParser.parse("定时半小时关机")
+        XCTAssertEqual(c6?.command, .countdownPower(minutes: 30, power: false))
+
+        let c7 = VoiceCommandParser.parse("定时1小时关空调")
+        XCTAssertEqual(c7?.command, .countdownPower(minutes: 60, power: false))
+
+        let c8 = VoiceCommandParser.parse("倒计时45分钟关机")
+        XCTAssertEqual(c8?.command, .countdownPower(minutes: 45, power: false))
+
+        let c9 = VoiceCommandParser.parse("定时关机")
+        XCTAssertEqual(c9?.command, .countdownPower(minutes: 60, power: false))
+
+        let c10 = VoiceCommandParser.parse("10分钟后开空调")
+        XCTAssertEqual(c10?.command, .countdownPower(minutes: 10, power: true))
+    }
+
+    func testScheduleTime() {
+        let s1 = VoiceCommandParser.parse("晚上10点关空调")
+        XCTAssertEqual(s1?.command, .schedulePower(hour: 22, minute: 0, power: false))
+
+        let s2 = VoiceCommandParser.parse("今晚11点半关机")
+        XCTAssertEqual(s2?.command, .schedulePower(hour: 23, minute: 30, power: false))
+
+        let s3 = VoiceCommandParser.parse("明早7点开空调")
+        XCTAssertEqual(s3?.command, .schedulePower(hour: 7, minute: 0, power: true))
+
+        let s4 = VoiceCommandParser.parse("下午2点15分开机")
+        XCTAssertEqual(s4?.command, .schedulePower(hour: 14, minute: 15, power: true))
+
+        let s5 = VoiceCommandParser.parse("22:30关机")
+        XCTAssertEqual(s5?.command, .schedulePower(hour: 22, minute: 30, power: false))
+    }
+
+    func testCancelSchedules() {
+        let c1 = VoiceCommandParser.parse("取消定时")
+        XCTAssertEqual(c1?.command, .cancelSchedules)
+
+        let c2 = VoiceCommandParser.parse("取消倒计时")
+        XCTAssertEqual(c2?.command, .cancelSchedules)
+
+        let c3 = VoiceCommandParser.parse("清除定时")
+        XCTAssertEqual(c3?.command, .cancelSchedules)
+    }
+
     // MARK: - 无效输入测试
 
     func testInvalidCommands() {

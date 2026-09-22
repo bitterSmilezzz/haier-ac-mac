@@ -217,6 +217,81 @@ public final class VoiceCapsuleWindowController: NSObject, NSWindowDelegate {
             } else {
                 VoiceControlManager.shared.markFailed("未找到「\(sceneName)」情景")
             }
+
+        case .countdownPower(let minutes, let on):
+            let fireDate = Date().addingTimeInterval(TimeInterval(minutes * 60))
+            let attrVal = AttrValue.bool(on)
+            guard let valJSON = ScheduledAction.valueJSON(attrVal) else {
+                VoiceControlManager.shared.markFailed("参数构造失败")
+                scheduleAutoDismiss(delay: 2.0)
+                return
+            }
+            let timeDesc: String
+            if minutes >= 60 && minutes % 60 == 0 {
+                timeDesc = "\(minutes / 60) 小时"
+            } else {
+                timeDesc = "\(minutes) 分钟"
+            }
+            let actionName = "\(timeDesc)后\(on ? "开机" : "关机")"
+            let action = ScheduledAction(
+                name: actionName,
+                deviceId: deviceId,
+                attrName: "onOffStatus",
+                attrDesc: "开关",
+                attrValueJSON: valJSON,
+                fireDate: fireDate,
+                repeatsDaily: false,
+                repeatWeekdays: [],
+                enabled: true
+            )
+            model.addScheduledAction(action)
+            VoiceControlManager.shared.markSuccess("已设置：\(actionName)")
+
+        case .schedulePower(let hour, let minute, let on):
+            let calendar = Calendar.current
+            var components = calendar.dateComponents([.year, .month, .day], from: Date())
+            components.hour = hour
+            components.minute = minute
+            components.second = 0
+            guard var targetDate = calendar.date(from: components) else {
+                VoiceControlManager.shared.markFailed("时间解析失败")
+                scheduleAutoDismiss(delay: 2.0)
+                return
+            }
+            if targetDate <= Date() {
+                // 如果今天此时刻已过，顺延至明天
+                targetDate = calendar.date(byAdding: .day, value: 1, to: targetDate) ?? targetDate
+            }
+            let timeStr = String(format: "%02d:%02d", hour, minute)
+            let actionName = "\(timeStr) \(on ? "开机" : "关机")"
+            let attrVal = AttrValue.bool(on)
+            guard let valJSON = ScheduledAction.valueJSON(attrVal) else {
+                VoiceControlManager.shared.markFailed("参数构造失败")
+                scheduleAutoDismiss(delay: 2.0)
+                return
+            }
+            let action = ScheduledAction(
+                name: actionName,
+                deviceId: deviceId,
+                attrName: "onOffStatus",
+                attrDesc: "开关",
+                attrValueJSON: valJSON,
+                fireDate: targetDate,
+                repeatsDaily: false,
+                repeatWeekdays: [],
+                enabled: true
+            )
+            model.addScheduledAction(action)
+            VoiceControlManager.shared.markSuccess("已设定：\(actionName)")
+
+        case .cancelSchedules:
+            let count = model.scheduledActions.count
+            if count > 0 {
+                model.scheduledActions.removeAll()
+                VoiceControlManager.shared.markSuccess("已取消所有定时任务（共 \(count) 个）")
+            } else {
+                VoiceControlManager.shared.markSuccess("当前没有正在运行的定时任务")
+            }
         }
 
         scheduleAutoDismiss(delay: 1.5)

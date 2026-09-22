@@ -126,7 +126,7 @@ struct VoiceCapsuleView: View {
 
                     // 辅助提示语
                     if case .listening = voiceManager.state {
-                        Text("试试说：“打开空调”、“调到26度”、“太热了”、“切换制冷”")
+                        Text("试试说：“打开空调”、“调到26度”、“30分钟后关机”、“晚上10点关空调”")
                             .font(.system(size: 11))
                             .foregroundStyle(Theme.inkTertiary)
                             .lineLimit(1)

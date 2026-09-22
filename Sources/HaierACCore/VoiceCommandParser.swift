@@ -16,6 +16,12 @@ public enum VoiceCommand: Equatable {
     case queryStatus
     /// 应用情景模式
     case applyScene(String)
+    /// 倒计时开关机（minutes: 倒计时分钟数，power: true=开机, false=关机）
+    case countdownPower(minutes: Int, power: Bool)
+    /// 指定钟点开关机（hour: 0~23, minute: 0~59, power: true=开机, false=关机）
+    case schedulePower(hour: Int, minute: Int, power: Bool)
+    /// 取消所有定时与倒计时
+    case cancelSchedules
 }
 
 /// 语音指令解析结果
@@ -50,7 +56,17 @@ public struct VoiceCommandParser {
             return VoiceParseResult(command: .queryStatus, displayText: "查询室内温度")
         }
 
-        // 2. 关机 / 开机（注意：关机判定放在开机前，避免“关闭空调”因含有“开”而被误判）
+        // 2. 定时与倒计时取消
+        if isCancelSchedule(cleaned) {
+            return VoiceParseResult(command: .cancelSchedules, displayText: "取消所有定时与倒计时")
+        }
+
+        // 3. 定时与倒计时任务（放在立即开关机前，避免“30分钟后关机”被提前作为立即关机拦截）
+        if let scheduleOrCountdown = parseScheduleOrCountdown(cleaned) {
+            return scheduleOrCountdown
+        }
+
+        // 4. 立即关机 / 开机（注意：关机判定放在开机前，避免“关闭空调”因含有“开”而被误判）
         if isPowerOff(cleaned) {
             return VoiceParseResult(command: .setPower(false), displayText: "关闭空调电源")
         }
@@ -58,27 +74,27 @@ public struct VoiceCommandParser {
             return VoiceParseResult(command: .setPower(true), displayText: "打开空调电源")
         }
 
-        // 3. 相对温度微调（太冷了/太热了/高一度/低一度）
+        // 5. 相对温度微调（太冷了/太热了/高一度/低一度）
         if let relative = parseRelativeTemperature(cleaned) {
             return relative
         }
 
-        // 4. 绝对温度设定（调到26度 / 26度 / 二十六度）
+        // 6. 绝对温度设定（调到26度 / 26度 / 二十六度）
         if let absolute = parseAbsoluteTemperature(cleaned) {
             return absolute
         }
 
-        // 5. 风速调节（放在模式切换之前，避免“自动风”被“自动”误判拦截）
+        // 7. 风速调节（放在模式切换之前，避免“自动风”被“自动”误判拦截）
         if let wind = parseWindSpeed(cleaned) {
             return wind
         }
 
-        // 6. 运行模式切换
+        // 8. 运行模式切换
         if let mode = parseMode(cleaned) {
             return mode
         }
 
-        // 7. 情景模式
+        // 9. 情景模式
         if let scene = parseScene(cleaned) {
             return scene
         }
@@ -87,6 +103,183 @@ public struct VoiceCommandParser {
     }
 
     // MARK: - 辅助解析子函数
+
+    private static func isCancelSchedule(_ text: String) -> Bool {
+        let cancelKeywords = ["取消定时", "取消倒计时", "关闭定时", "清除定时", "删除定时", "取消预约", "别定了"]
+        return cancelKeywords.contains(where: { text.contains($0) })
+    }
+
+    private static func parseScheduleOrCountdown(_ text: String) -> VoiceParseResult? {
+        // 先判断是否为倒计时（如包含“后”、“倒计时”、“定时关/开”或“定时X分钟/小时”）
+        if text.contains("后") || text.contains("倒计时") ||
+           text.contains("定时关") || text.contains("定时开") ||
+           (text.contains("定时") && (text.contains("分") || text.contains("小时") || text.contains("钟头"))) {
+            if let minutes = parseCountdownMinutes(from: text) {
+                let isPowerOn = text.contains("开") && !text.contains("关")
+                let actionStr = isPowerOn ? "开机" : "关机"
+                let timeStr: String
+                if minutes >= 60 && minutes % 60 == 0 {
+                    timeStr = "\(minutes / 60) 小时"
+                } else {
+                    timeStr = "\(minutes) 分钟"
+                }
+                return VoiceParseResult(
+                    command: .countdownPower(minutes: minutes, power: isPowerOn),
+                    displayText: "设定 \(timeStr)后\(actionStr)"
+                )
+            }
+        }
+
+        // 再判断是否为指定具体钟点定时（如“晚上10点关机”、“明早7点开空调”）
+        // 必须包含关机/开机意图或“定时”，避免“大风一点”、“调高一点”等“一点”被误判为 1 点钟
+        if (text.contains("关") || text.contains("开") || text.contains("定时") || text.contains("预约")),
+           let time = parseScheduleTime(from: text) {
+            let isPowerOn = text.contains("开") && !text.contains("关")
+            let actionStr = isPowerOn ? "开机" : "关机"
+            let timeStr = String(format: "%02d:%02d", time.hour, time.minute)
+            return VoiceParseResult(
+                command: .schedulePower(hour: time.hour, minute: time.minute, power: isPowerOn),
+                displayText: "定时在 \(timeStr) \(actionStr)"
+            )
+        }
+
+        return nil
+    }
+
+    private static func parseCountdownMinutes(from text: String) -> Int? {
+        let normalized = convertChineseNumbers(in: text)
+
+        // 1. 特殊固定表达
+        if normalized.contains("1.5小时") || normalized.contains("1.5个钟头") {
+            return 90
+        }
+        if normalized.contains("0.5小时") || normalized.contains("0.5个钟头") || normalized.contains("半小时") {
+            return 30
+        }
+
+        var totalMinutes = 0
+        var found = false
+
+        // 匹配 X小时 或 X个钟头
+        let hourPattern = #"(\d+(?:\.\d+)?)\s*(?:小时|个钟头)"#
+        if let regex = try? NSRegularExpression(pattern: hourPattern) {
+            let ns = normalized as NSString
+            if let match = regex.matches(in: normalized, range: NSRange(location: 0, length: ns.length)).first {
+                let valStr = ns.substring(with: match.range(at: 1))
+                if let h = Double(valStr) {
+                    totalMinutes += Int(h * 60)
+                    found = true
+                }
+            }
+        }
+
+        // 匹配 Y分钟 或 Y分
+        let minPattern = #"(\d+)\s*(?:分钟|分)"#
+        if let regex = try? NSRegularExpression(pattern: minPattern) {
+            let ns = normalized as NSString
+            if let match = regex.matches(in: normalized, range: NSRange(location: 0, length: ns.length)).first {
+                let valStr = ns.substring(with: match.range(at: 1))
+                if let m = Int(valStr) {
+                    totalMinutes += m
+                    found = true
+                }
+            }
+        }
+
+        if found && totalMinutes > 0 {
+            return totalMinutes
+        }
+
+        // 纯数字 + 后 判定（如：30后关机 -> 30分钟后）
+        let numPattern = #"(\d+)\s*后"#
+        if let regex = try? NSRegularExpression(pattern: numPattern) {
+            let ns = normalized as NSString
+            if let match = regex.matches(in: normalized, range: NSRange(location: 0, length: ns.length)).first {
+                let valStr = ns.substring(with: match.range(at: 1))
+                if let num = Int(valStr) {
+                    return num <= 12 ? num * 60 : num
+                }
+            }
+        }
+
+        // 默认“定时关机”/“定时关空调” -> 默认 60 分钟
+        if text.contains("定时关") || text.contains("倒计时关") {
+            return 60
+        }
+
+        return nil
+    }
+
+    private static func parseScheduleTime(from text: String) -> (hour: Int, minute: Int)? {
+        let normalized = convertChineseNumbers(in: text)
+
+        // 必须包含“点”或“时”或者标准时间冒号，且不是“小时”
+        guard (normalized.contains("点") || normalized.contains("时") || normalized.contains(":")) && !normalized.contains("小时") else {
+            return nil
+        }
+
+        var isPM = false
+        if normalized.contains("下午") || normalized.contains("晚上") || normalized.contains("今晚") ||
+           normalized.contains("明晚") || normalized.contains("夜里") || normalized.contains("傍晚") {
+            isPM = true
+        }
+
+        var hour: Int?
+        var minute: Int = 0
+
+        // 1. 标准时间格式 22:30 或 8:00
+        let colonPattern = #"(\d{1,2}):(\d{2})"#
+        if let regex = try? NSRegularExpression(pattern: colonPattern) {
+            let ns = normalized as NSString
+            if let match = regex.matches(in: normalized, range: NSRange(location: 0, length: ns.length)).first {
+                let hStr = ns.substring(with: match.range(at: 1))
+                let mStr = ns.substring(with: match.range(at: 2))
+                if let h = Int(hStr), let m = Int(mStr) {
+                    hour = h
+                    minute = m
+                }
+            }
+        }
+
+        // 2. X点 / X时
+        if hour == nil {
+            let pointPattern = #"(\d{1,2})\s*(?:点|时)"#
+            if let regex = try? NSRegularExpression(pattern: pointPattern) {
+                let ns = normalized as NSString
+                if let match = regex.matches(in: normalized, range: NSRange(location: 0, length: ns.length)).first {
+                    let hStr = ns.substring(with: match.range(at: 1))
+                    if let h = Int(hStr) {
+                        hour = h
+                    }
+                }
+            }
+        }
+
+        guard var finalHour = hour else { return nil }
+
+        // 判断分钟
+        if minute == 0 {
+            let minPattern = #"(?:点|时)\s*(\d{1,2})\s*分?"#
+            if let regex = try? NSRegularExpression(pattern: minPattern) {
+                let ns = normalized as NSString
+                if let match = regex.matches(in: normalized, range: NSRange(location: 0, length: ns.length)).first {
+                    let mStr = ns.substring(with: match.range(at: 1))
+                    if let m = Int(mStr) {
+                        minute = m
+                    }
+                }
+            }
+        }
+
+        if isPM && finalHour < 12 {
+            finalHour += 12
+        }
+        if finalHour >= 24 {
+            finalHour = 0
+        }
+
+        return (finalHour, minute)
+    }
 
     private static func isPowerOff(_ text: String) -> Bool {
         let offKeywords = ["关空调", "关闭空调", "关掉空调", "关机", "别吹了", "停机", "关闭", "关掉"]
@@ -201,7 +394,8 @@ public struct VoiceCommandParser {
     // MARK: - 数字与汉字解析工具
 
     private static func extractTemperatureValue(from text: String) -> Double? {
-        let normalized = convertChineseNumbers(in: text)
+        var normalized = convertChineseNumbers(in: text)
+        normalized = normalized.replacingOccurrences(of: "点", with: ".")
 
         let pattern = #"([1-3]\d(?:\.[05])?)"#
         if let regex = try? NSRegularExpression(pattern: pattern) {
@@ -232,8 +426,13 @@ public struct VoiceCommandParser {
     /// 将常见的中文数字表达替换为阿拉伯数字
     private static func convertChineseNumbers(in input: String) -> String {
         var str = input
+        // 先处理时间特定的固定搭配
+        str = str.replacingOccurrences(of: "一个半小时", with: "90分钟")
+        str = str.replacingOccurrences(of: "1个半小时", with: "90分钟")
+        str = str.replacingOccurrences(of: "半小时", with: "30分钟")
+        str = str.replacingOccurrences(of: "点半", with: "点30分")
+        str = str.replacingOccurrences(of: "时半", with: "点30分")
         str = str.replacingOccurrences(of: "两", with: "2")
-        str = str.replacingOccurrences(of: "半", with: "0.5")
 
         let mapping: [(String, String)] = [
             ("三十", "30"),
@@ -252,6 +451,11 @@ public struct VoiceCommandParser {
             ("十七", "17"),
             ("十六", "16"),
             ("十五", "15"),
+            ("十四", "14"),
+            ("十三", "13"),
+            ("十二", "12"),
+            ("十一", "11"),
+            ("十", "10"),
             ("一", "1"),
             ("二", "2"),
             ("三", "3"),
@@ -262,8 +466,7 @@ public struct VoiceCommandParser {
             ("八", "8"),
             ("九", "9"),
             ("零", "0"),
-            ("点五", ".5"),
-            ("点", ".")
+            ("点五", ".5")
         ]
 
         for (cn, ar) in mapping {
