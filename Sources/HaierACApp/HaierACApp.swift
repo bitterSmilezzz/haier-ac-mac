@@ -24,15 +24,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         GlobalHotKeyManager.shared.registerDefaultHotKey()
 
-        // 启动后关闭自动出现的主窗口，转入后台（SwiftUI 窗口在此刻已创建完成）
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-            for window in NSApp.windows {
-                if window.title == "海尔空调控制" {
-                    window.close()
-                }
-            }
-            NSApp.hide(nil)
-        }
+    }
+
+    /// 关闭所有窗口后不退出应用，继续在菜单栏驻留
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
+        false
     }
 
     /// 应用级 URL 处理（haierac://main, haierac://voice）：窗口全部关闭时也能响应。
