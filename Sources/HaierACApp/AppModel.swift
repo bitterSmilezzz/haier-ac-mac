@@ -478,6 +478,7 @@ final class AppModel: ObservableObject {
         requestNotificationPermission()
         operationNotice = OperationNotice(text: "🌙 已启动「\(curve.name)」睡眠温阶曲线", isError: false)
         wakeScheduler()
+        writeWidgetSnapshot(force: true)
     }
 
     /// 停止智能睡眠温阶
@@ -487,6 +488,7 @@ final class AppModel: ObservableObject {
         self.activeSleepSession = nil
         operationNotice = OperationNotice(text: "已停止智能睡眠温阶", isError: false)
         wakeScheduler()
+        writeWidgetSnapshot(force: true)
     }
 
     /// 检查并推进智能睡眠阶段
@@ -515,6 +517,7 @@ final class AppModel: ObservableObject {
                 AppLog.log("智能睡眠完成并关机，结束会话")
                 activeSleepSession = nil
             }
+            writeWidgetSnapshot(force: true)
         }
     }
 
@@ -677,10 +680,12 @@ final class AppModel: ObservableObject {
     /// 改写到 App 自己的 Application Support 目录，小组件侧通过
     /// 只读临时例外 entitlement 访问同一路径。
     /// 数据结构与 Sources/HaierACWidget/Widget.swift 的 ACWidgetSnapshot 对齐
-    func writeWidgetSnapshot() {
+    func writeWidgetSnapshot(force: Bool = false) {
         // 限流：属性推送可能每秒多次，5 秒内只落盘一次（文件 I/O + 时间线刷新都有开销）
         let now = Date()
-        guard now.timeIntervalSince(lastSnapshotWrite) >= Self.snapshotThrottle else { return }
+        if !force {
+            guard now.timeIntervalSince(lastSnapshotWrite) >= Self.snapshotThrottle else { return }
+        }
         lastSnapshotWrite = now
         guard let deviceId = devices.first?.id else { return }
         let attrs = attributes[deviceId] ?? [:]
@@ -699,6 +704,25 @@ final class AppModel: ObservableObject {
         }
         dict["deviceName"] = devices.first?.deviceName ?? ""
         dict["updatedAt"] = ISO8601DateFormatter().string(from: Date())
+
+        // 智能睡眠温阶状态同步到小组件
+        if let session = activeSleepSession {
+            dict["isSleepActive"] = true
+            dict["sleepCurveName"] = session.curveConfig.name
+            if let current = session.currentStage {
+                dict["sleepStageName"] = current.name
+                dict["sleepTargetTemp"] = current.targetTemperature
+            }
+            if let next = session.nextStage {
+                dict["sleepNextStageName"] = next.name
+            }
+            if let fireDate = session.nextFireDate {
+                dict["sleepNextFireDate"] = ISO8601DateFormatter().string(from: fireDate)
+            }
+        } else {
+            dict["isSleepActive"] = false
+        }
+
         guard let data = try? JSONSerialization.data(withJSONObject: dict) else { return }
 
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!

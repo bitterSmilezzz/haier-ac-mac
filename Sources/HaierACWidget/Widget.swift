@@ -11,8 +11,28 @@ struct ACWidgetSnapshot: Codable {
     var humidity: Double?
     var deviceName: String?
     var updatedAt: Date?
+    // 智能睡眠温阶状态
+    var isSleepActive: Bool?
+    var sleepCurveName: String?
+    var sleepStageName: String?
+    var sleepTargetTemp: Double?
+    var sleepNextStageName: String?
+    var sleepNextFireDate: Date?
 
-    static let empty = ACWidgetSnapshot(temperature: nil, targetTemp: nil, powerOn: nil, humidity: nil, deviceName: nil, updatedAt: nil)
+    static let empty = ACWidgetSnapshot(
+        temperature: nil,
+        targetTemp: nil,
+        powerOn: nil,
+        humidity: nil,
+        deviceName: nil,
+        updatedAt: nil,
+        isSleepActive: nil,
+        sleepCurveName: nil,
+        sleepStageName: nil,
+        sleepTargetTemp: nil,
+        sleepNextStageName: nil,
+        sleepNextFireDate: nil
+    )
 }
 
 /// 主 App 写入、Widget 读取的状态快照
@@ -86,18 +106,43 @@ struct ACWidgetView: View {
     let entry: ACWidgetEntry
 
     private var snapshot: ACWidgetSnapshot? { entry.snapshot }
+    private var isSleep: Bool { snapshot?.isSleepActive == true }
     private var tempText: String {
         guard let t = snapshot?.temperature else { return "--" }
         return String(format: "%.0f°", t)
+    }
+
+    private var backgroundGradient: LinearGradient {
+        if isSleep {
+            return LinearGradient(
+                colors: [Color(red: 0.08, green: 0.06, blue: 0.16), Color(red: 0.12, green: 0.10, blue: 0.24)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        } else {
+            return LinearGradient(
+                colors: [Color(red: 0.05, green: 0.06, blue: 0.08), Color(red: 0.12, green: 0.13, blue: 0.18)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        }
     }
 
     var body: some View {
         let content = Group {
             switch family {
             case .systemSmall:
-                smallView
+                if isSleep {
+                    sleepSmallView
+                } else {
+                    smallView
+                }
             case .systemMedium:
-                mediumView
+                if isSleep {
+                    sleepMediumView
+                } else {
+                    mediumView
+                }
             default:
                 smallView
             }
@@ -105,22 +150,12 @@ struct ACWidgetView: View {
         if #available(macOS 14.0, *) {
             content
                 .containerBackground(for: .widget) {
-                    LinearGradient(
-                        colors: [Color(red: 0.05, green: 0.06, blue: 0.08), Color(red: 0.12, green: 0.13, blue: 0.18)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
+                    backgroundGradient
                 }
         } else {
             content
                 .padding(12)
-                .background(
-                    LinearGradient(
-                        colors: [Color(red: 0.05, green: 0.06, blue: 0.08), Color(red: 0.12, green: 0.13, blue: 0.18)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
+                .background(backgroundGradient)
         }
     }
 
@@ -229,6 +264,162 @@ struct ACWidgetView: View {
                         .monospacedDigit()
                         .foregroundStyle(.white)
                     Text("湿度")
+                        .font(.system(size: 10))
+                        .foregroundStyle(Color.white.opacity(0.5))
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
+                .background(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(Color.white.opacity(0.08))
+                )
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .widgetURL(URL(string: "haierac://main"))
+    }
+
+    // MARK: - 智能睡眠小尺寸视图
+
+    private var sleepSmallView: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            HStack(spacing: 5) {
+                Image(systemName: "moon.stars.fill")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(Color(red: 0.68, green: 0.65, blue: 1.0))
+                Text(snapshot?.sleepCurveName ?? "智能睡眠")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(Color(red: 0.88, green: 0.86, blue: 1.0))
+                    .lineLimit(1)
+                Spacer()
+                Circle()
+                    .fill(Color(red: 0.55, green: 0.50, blue: 0.95))
+                    .frame(width: 6, height: 6)
+            }
+
+            Spacer(minLength: 2)
+
+            if let target = snapshot?.sleepTargetTemp {
+                Text(String(format: "%.0f°", target))
+                    .font(.system(size: 38, weight: .semibold, design: .rounded))
+                    .monospacedDigit()
+                    .foregroundStyle(.white)
+            } else {
+                Text(tempText)
+                    .font(.system(size: 38, weight: .semibold, design: .rounded))
+                    .monospacedDigit()
+                    .foregroundStyle(.white)
+            }
+
+            Text(snapshot?.sleepStageName ?? "睡眠呵护中")
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(Color.white.opacity(0.85))
+                .lineLimit(1)
+
+            // 下一阶段预告
+            if let nextName = snapshot?.sleepNextStageName, let fireDate = snapshot?.sleepNextFireDate {
+                let formatter = DateFormatter()
+                let _ = formatter.dateFormat = "HH:mm"
+                let timeStr = formatter.string(from: fireDate)
+                HStack(spacing: 3) {
+                    Image(systemName: "clock.arrow.circlepath")
+                        .font(.system(size: 9))
+                    Text("\(timeStr) 进入「\(nextName)」")
+                        .font(.system(size: 10))
+                }
+                .foregroundStyle(Color.white.opacity(0.6))
+                .lineLimit(1)
+            } else {
+                Text("室内 \(tempText)")
+                    .font(.system(size: 10))
+                    .foregroundStyle(Color.white.opacity(0.5))
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+        .widgetURL(URL(string: "haierac://main"))
+    }
+
+    // MARK: - 智能睡眠中尺寸视图
+
+    private var sleepMediumView: some View {
+        HStack(spacing: 14) {
+            // 左侧：睡眠方案与当前温阶
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 5) {
+                    Image(systemName: "moon.stars.fill")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(Color(red: 0.68, green: 0.65, blue: 1.0))
+                    Text("智能睡眠 · \(snapshot?.sleepCurveName ?? "")")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(Color(red: 0.88, green: 0.86, blue: 1.0))
+                        .lineLimit(1)
+                }
+
+                if let target = snapshot?.sleepTargetTemp {
+                    Text(String(format: "%.0f°", target))
+                        .font(.system(size: 34, weight: .semibold, design: .rounded))
+                        .monospacedDigit()
+                        .foregroundStyle(.white)
+                } else {
+                    Text(tempText)
+                        .font(.system(size: 34, weight: .semibold, design: .rounded))
+                        .monospacedDigit()
+                        .foregroundStyle(.white)
+                }
+
+                HStack(spacing: 4) {
+                    Text("当前阶段：\(snapshot?.sleepStageName ?? "运行中")")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(Color.white.opacity(0.85))
+                    Text("· 室内 \(tempText)")
+                        .font(.system(size: 10))
+                        .foregroundStyle(Color.white.opacity(0.5))
+                }
+            }
+
+            Spacer()
+
+            // 右侧 Bento 卡片：下一阶段时间预告
+            if let nextName = snapshot?.sleepNextStageName, let fireDate = snapshot?.sleepNextFireDate {
+                let formatter = DateFormatter()
+                let _ = formatter.dateFormat = "HH:mm"
+                let timeStr = formatter.string(from: fireDate)
+
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "clock.arrow.circlepath")
+                            .font(.system(size: 11))
+                            .foregroundStyle(Color(red: 0.68, green: 0.65, blue: 1.0))
+                        Text("下一阶段")
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundStyle(Color.white.opacity(0.7))
+                    }
+
+                    Text(timeStr)
+                        .font(.system(size: 18, weight: .bold, design: .rounded))
+                        .monospacedDigit()
+                        .foregroundStyle(.white)
+
+                    Text(nextName)
+                        .font(.system(size: 10))
+                        .foregroundStyle(Color.white.opacity(0.6))
+                        .lineLimit(1)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
+                .background(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(Color.white.opacity(0.08))
+                )
+            } else {
+                VStack(spacing: 4) {
+                    Image(systemName: "bed.double.fill")
+                        .font(.system(size: 14))
+                        .foregroundStyle(Color(red: 0.68, green: 0.65, blue: 1.0))
+                    Text("夜间呵护")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(.white)
+                    Text("平稳控温")
                         .font(.system(size: 10))
                         .foregroundStyle(Color.white.opacity(0.5))
                 }
