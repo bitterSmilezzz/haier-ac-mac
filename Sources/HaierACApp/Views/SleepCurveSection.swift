@@ -7,6 +7,8 @@ struct SleepCurveSection: View {
     @EnvironmentObject var model: AppModel
     @State private var selectedConfig: SleepCurveConfig = .standard
     @State private var targetDeviceId: String = ""
+    @State private var showCustomEditor = false
+    @State private var editingTarget: SleepCurveConfig? = nil
 
     private var activeDevice: DeviceInfo? {
         if !targetDeviceId.isEmpty, let d = model.devices.first(where: { $0.id == targetDeviceId }) {
@@ -48,6 +50,15 @@ struct SleepCurveSection: View {
                     .background(Theme.success.opacity(0.12))
                     .clipShape(Capsule())
                 }
+
+                Button {
+                    editingTarget = nil
+                    showCustomEditor = true
+                } label: {
+                    Label("自定义", systemImage: "plus")
+                        .font(.system(size: 11, weight: .medium))
+                }
+                .buttonStyle(Theme.secondaryButtonStyle())
             }
 
             if let session = model.activeSleepSession {
@@ -57,6 +68,15 @@ struct SleepCurveSection: View {
             }
         }
         .padding(.horizontal, Theme.spaceLG)
+        .sheet(isPresented: $showCustomEditor) {
+            CustomSleepCurveSheet(editingCurve: editingTarget)
+                .environmentObject(model)
+        }
+        .onChange(of: model.customSleepCurves) { _ in
+            if !model.allSleepCurves.contains(where: { $0.id == selectedConfig.id }) {
+                selectedConfig = .standard
+            }
+        }
     }
 
     // MARK: - 运行中状态卡片
@@ -168,15 +188,48 @@ struct SleepCurveSection: View {
     // MARK: - 未运行配置卡片
 
     private var idleConfigCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            // 曲线切换 Segment
-            Picker("", selection: $selectedConfig) {
-                ForEach(SleepCurveConfig.allPresets) { cfg in
-                    Text(cfg.name).tag(cfg)
+        VStack(alignment: .leading, spacing: Theme.spaceMD) {
+            // 曲线切换与管理行
+            HStack(spacing: 8) {
+                Picker("", selection: $selectedConfig) {
+                    ForEach(model.allSleepCurves) { cfg in
+                        Text(cfg.name).tag(cfg)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+
+                if selectedConfig.isCustom {
+                    HStack(spacing: 4) {
+                        Button {
+                            editingTarget = selectedConfig
+                            showCustomEditor = true
+                        } label: {
+                            Image(systemName: "pencil")
+                                .font(.system(size: 11))
+                                .foregroundStyle(Theme.inkSubtle)
+                                .frame(width: 24, height: 24)
+                                .background(Theme.surface2)
+                                .clipShape(Circle())
+                        }
+                        .buttonStyle(.plain)
+
+                        Button {
+                            let targetId = selectedConfig.id
+                            selectedConfig = .standard
+                            model.deleteCustomSleepCurve(id: targetId)
+                        } label: {
+                            Image(systemName: "trash")
+                                .font(.system(size: 11))
+                                .foregroundStyle(Theme.danger)
+                                .frame(width: 24, height: 24)
+                                .background(Theme.danger.opacity(0.12))
+                                .clipShape(Circle())
+                        }
+                        .buttonStyle(.plain)
+                    }
                 }
             }
-            .pickerStyle(.segmented)
-            .labelsHidden()
 
             Text(selectedConfig.desc)
                 .font(.system(size: 12))

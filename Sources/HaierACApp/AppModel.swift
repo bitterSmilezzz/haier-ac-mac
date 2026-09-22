@@ -89,6 +89,7 @@ struct SleepCurveConfig: Identifiable, Codable, Hashable {
     var desc: String
     var icon: String
     var stages: [SleepStage]
+    var isCustom: Bool = false
 
     static let standard = SleepCurveConfig(
         name: "标准舒适",
@@ -307,6 +308,20 @@ final class AppModel: ObservableObject {
                 UserDefaults.standard.removeObject(forKey: "activeSleepSession")
             }
         }
+    }
+
+    /// 用户自定义睡眠温阶曲线（持久化到 UserDefaults，v1.9.7）
+    @Published var customSleepCurves: [SleepCurveConfig] = [] {
+        didSet {
+            if let data = try? JSONEncoder().encode(customSleepCurves) {
+                UserDefaults.standard.set(data, forKey: "customSleepCurves")
+            }
+        }
+    }
+
+    /// 所有可用睡眠曲线（内置预设 + 用户自定义）
+    var allSleepCurves: [SleepCurveConfig] {
+        SleepCurveConfig.allPresets + customSleepCurves
     }
 
     /// 调度任务列表（持久化到 UserDefaults）
@@ -540,6 +555,42 @@ final class AppModel: ObservableObject {
             trigger: nil
         )
         center.add(request)
+    }
+
+    // MARK: - 自定义睡眠曲线管理（v1.9.7）
+
+    func addCustomSleepCurve(_ curve: SleepCurveConfig) {
+        var newCurve = curve
+        newCurve.isCustom = true
+        customSleepCurves.append(newCurve)
+        AppLog.log("新增自定义睡眠曲线: \(newCurve.name) (\(newCurve.stages.count) 个阶段)")
+        operationNotice = OperationNotice(text: "已保存专属睡眠曲线「\(newCurve.name)」", isError: false)
+    }
+
+    func updateCustomSleepCurve(_ curve: SleepCurveConfig) {
+        guard let idx = customSleepCurves.firstIndex(where: { $0.id == curve.id }) else { return }
+        var updated = curve
+        updated.isCustom = true
+        customSleepCurves[idx] = updated
+        AppLog.log("更新自定义睡眠曲线: \(updated.name)")
+        operationNotice = OperationNotice(text: "已更新「\(updated.name)」", isError: false)
+
+        // 如果当前正在运行该曲线，同步更新配置
+        if activeSleepSession?.curveConfig.id == updated.id {
+            activeSleepSession?.curveConfig = updated
+        }
+    }
+
+    func deleteCustomSleepCurve(id: UUID) {
+        guard let idx = customSleepCurves.firstIndex(where: { $0.id == id }) else { return }
+        let name = customSleepCurves[idx].name
+        // 如果当前运行的是被删除的曲线，停止运行
+        if activeSleepSession?.curveConfig.id == id {
+            stopSleepCurve()
+        }
+        customSleepCurves.remove(at: idx)
+        AppLog.log("删除自定义睡眠曲线: \(name)")
+        operationNotice = OperationNotice(text: "已删除曲线「\(name)」", isError: false)
     }
 
     // MARK: - 定时任务系统通知（v1.8）
@@ -794,6 +845,10 @@ final class AppModel: ObservableObject {
         if let data = UserDefaults.standard.data(forKey: "activeSleepSession"),
            let saved = try? JSONDecoder().decode(SleepSession.self, from: data) {
             activeSleepSession = saved
+        }
+        if let data = UserDefaults.standard.data(forKey: "customSleepCurves"),
+           let saved = try? JSONDecoder().decode([SleepCurveConfig].self, from: data) {
+            customSleepCurves = saved
         }
 
         setupSleepWakeObservers()
