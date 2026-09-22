@@ -2,6 +2,7 @@ import Foundation
 import Speech
 import AVFoundation
 import Combine
+import HaierACCore
 
 /// 语音控制状态
 public enum VoiceControlState: Equatable {
@@ -29,6 +30,8 @@ public final class VoiceControlManager: ObservableObject {
 
     private var silenceTimer: Timer?
     private let silenceTimeout: TimeInterval = 1.2 // 停顿 1.2 秒自动提交
+    private var isTapInstalled = false
+    private var lastLevelUpdateTime: TimeInterval = 0
 
     /// 指令执行回调：解析并下发
     public var onCommandRecognized: ((String) -> Void)?
@@ -96,7 +99,10 @@ public final class VoiceControlManager: ObservableObject {
 
         if audioEngine.isRunning {
             audioEngine.stop()
+        }
+        if isTapInstalled {
             audioEngine.inputNode.removeTap(onBus: 0)
+            isTapInstalled = false
         }
 
         recognitionRequest?.endAudio()
@@ -158,11 +164,11 @@ public final class VoiceControlManager: ObservableObject {
         let inputNode = audioEngine.inputNode
         let recordingFormat = inputNode.outputFormat(forBus: 0)
 
-        // 安装音频 Tap，计算实时音量并塞入识别请求
+        // 安装音频 Tap，计算实时音量并塞入识别请求（限流 30fps，避免高频 Task 派发卡顿主线程）
         inputNode.installTap(onBus: 0, bufferSize: 1024, format: recordingFormat) { [weak self] buffer, _ in
-            self?.recognitionRequest?.append(buffer)
+            guard let self else { return }
+            self.recognitionRequest?.append(buffer)
 
-            // 计算音频均方根振幅（RMS）用于波形动态渲染
             guard let channelData = buffer.floatChannelData?[0] else { return }
             let frameLength = UInt(buffer.frameLength)
             var sum: Float = 0
@@ -171,13 +177,17 @@ public final class VoiceControlManager: ObservableObject {
                 sum += sample * sample
             }
             let rms = sqrt(sum / Float(frameLength))
-            // 归一化到 0.0 ~ 1.0
             let normalized = min(max(rms * 10.0, 0.0), 1.0)
 
-            Task { @MainActor in
-                self?.audioLevel = normalized
+            let now = ProcessInfo.processInfo.systemUptime
+            if now - self.lastLevelUpdateTime >= 0.033 {
+                self.lastLevelUpdateTime = now
+                Task { @MainActor in
+                    self.audioLevel = normalized
+                }
             }
         }
+        isTapInstalled = true
 
         audioEngine.prepare()
         try audioEngine.start()
@@ -194,7 +204,15 @@ public final class VoiceControlManager: ObservableObject {
                     self.resetSilenceTimer()
                 }
 
-                if error != nil || (result?.isFinal ?? false) {
+                if let error {
+                    if self.transcribedText.isEmpty && self.state == .listening {
+                        AppLog.log("语音识别未获内容或出错: \(error.localizedDescription)")
+                        self.state = .failed("未能识别语音，请重试")
+                        self.stopListening()
+                    } else if !self.transcribedText.isEmpty && self.state == .listening {
+                        self.commitCurrentText()
+                    }
+                } else if result?.isFinal == true {
                     // 如果识别结束且有文字，触发提交
                     if !self.transcribedText.isEmpty && self.state == .listening {
                         self.commitCurrentText()

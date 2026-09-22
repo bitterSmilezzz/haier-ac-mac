@@ -128,6 +128,17 @@ struct MenuBarControlsView: View {
                         Text(model.gatewayConnected ? (isPowerOn ? "\(modeCat.label)中" : "已关机") : "重连中...")
                             .font(.system(size: 11, weight: .medium))
                             .foregroundStyle(Theme.inkSubtle)
+                        if !model.gatewayConnected {
+                            Button {
+                                model.retryConnection()
+                            } label: {
+                                Text("立即重试")
+                                    .font(.system(size: 10, weight: .medium))
+                                    .foregroundStyle(Theme.accent)
+                                    .underline()
+                            }
+                            .buttonStyle(.plain)
+                        }
                     }
                 }
             }

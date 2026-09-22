@@ -577,6 +577,39 @@ final class AppModel: ObservableObject {
         } else {
             seedDefaultScenesIfNeeded()
         }
+
+        setupSleepWakeObservers()
+    }
+
+    // MARK: - 系统休眠与唤醒感知
+
+    private var sleepWakeCancellables: Set<AnyCancellable> = []
+
+    private func setupSleepWakeObservers() {
+        let center = NSWorkspace.shared.notificationCenter
+        center.publisher(for: NSWorkspace.willSleepNotification)
+            .sink { _ in
+                AppLog.log("系统即将休眠，保护连接状态")
+            }
+            .store(in: &sleepWakeCancellables)
+
+        center.publisher(for: NSWorkspace.didWakeNotification)
+            .sink { [weak self] _ in
+                AppLog.log("系统已唤醒，立即恢复连接与补发定时任务")
+                Task { @MainActor [weak self] in
+                    guard let self else { return }
+                    // 1. 补发休眠期间到期的定时任务
+                    self.fireDueActions()
+                    // 2. 检查会话并重连
+                    if self.provider != nil && self.context != nil {
+                        await self.refreshTokenIfNeeded()
+                        if !self.gatewayConnected {
+                            await self.connectAndLoad()
+                        }
+                    }
+                }
+            }
+            .store(in: &sleepWakeCancellables)
     }
 
     // MARK: - 生命周期

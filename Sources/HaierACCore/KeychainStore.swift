@@ -10,29 +10,6 @@ import Security
 public enum KeychainStore {
     private static let service = "local.haierac.token"
 
-    public static func save(_ value: String, forKey key: String) {
-        let data = Data(value.utf8)
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service,
-            kSecAttrAccount as String: key,
-        ]
-        SecItemDelete(query as CFDictionary)
-
-        var addQuery = query
-        addQuery[kSecValueData as String] = data
-        addQuery[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlock
-
-        // 无限制 ACL：空信任列表 = 不绑定任何应用签名
-        var access: SecAccess?
-        let status = SecAccessCreate("HaierAC" as CFString, [] as CFArray, &access)
-        if status == errSecSuccess, let access {
-            addQuery[kSecAttrAccess as String] = access
-        }
-
-        SecItemAdd(addQuery as CFDictionary, nil)
-    }
-
     public static func load(forKey key: String) -> String? {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
@@ -54,15 +31,6 @@ public enum KeychainStore {
             kSecAttrAccount as String: key,
         ]
         SecItemDelete(query as CFDictionary)
-    }
-
-    /// 将已有条目迁移为无限制 ACL（读取后调用 save 会先删后建，自动换 ACL）
-    public static func migrateAccessControl() {
-        for key in ["accountToken", "refreshToken", "phone"] {
-            if let value = load(forKey: key) {
-                save(value, forKey: key)
-            }
-        }
     }
 
     /// 清理遗留的 Keychain 条目（迁移到文件存储后不再使用 Keychain）

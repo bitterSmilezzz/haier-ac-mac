@@ -298,17 +298,8 @@ public struct VoiceCommandParser {
     }
 
     private static func parseRelativeTemperature(_ text: String) -> VoiceParseResult? {
-        // 太热了 / 好热 -> 降温 1 度
-        if text.contains("太热") || text.contains("好热") || text.contains("有点热") || text.contains("热死") {
-            return VoiceParseResult(command: .adjustTemperature(delta: -1.0), displayText: "降温 1°C")
-        }
-        // 太冷了 / 好冷 -> 升温 1 度
-        if text.contains("太冷") || text.contains("好冷") || text.contains("有点冷") || text.contains("冷死") {
-            return VoiceParseResult(command: .adjustTemperature(delta: 1.0), displayText: "升温 1°C")
-        }
-
-        // 升温 / 调高 / 加
-        if text.contains("高") || text.contains("升") || text.contains("加") || text.contains("热一点") {
+        // 优先匹配带明确方向与幅度的口令（如“太冷了调高两度”、“升温2度”、“降温两度”、“降温1度”）
+        if text.contains("高") || text.contains("升") || text.contains("加") || text.contains("热一点") || text.contains("暖和一点") {
             let delta = extractNumber(from: text) ?? 1.0
             let validDelta = (delta > 0 && delta <= 5) ? delta : 1.0
             return VoiceParseResult(
@@ -317,7 +308,6 @@ public struct VoiceCommandParser {
             )
         }
 
-        // 降温 / 调低 / 减 / 凉一点
         if text.contains("低") || text.contains("降") || text.contains("减") || text.contains("冷一点") || text.contains("凉一点") {
             let delta = extractNumber(from: text) ?? 1.0
             let validDelta = (delta > 0 && delta <= 5) ? delta : 1.0
@@ -325,6 +315,14 @@ public struct VoiceCommandParser {
                 command: .adjustTemperature(delta: -validDelta),
                 displayText: "降温 \(formatTemp(validDelta))°C"
             )
+        }
+
+        // 纯感叹词（默认调节 1 度）
+        if text.contains("太热") || text.contains("好热") || text.contains("有点热") || text.contains("热死") {
+            return VoiceParseResult(command: .adjustTemperature(delta: -1.0), displayText: "降温 1°C")
+        }
+        if text.contains("太冷") || text.contains("好冷") || text.contains("有点冷") || text.contains("冷死") {
+            return VoiceParseResult(command: .adjustTemperature(delta: 1.0), displayText: "升温 1°C")
         }
 
         return nil
@@ -366,13 +364,17 @@ public struct VoiceCommandParser {
         if text.contains("自动风") || text.contains("风速自动") || text.contains("自动风速") {
             return VoiceParseResult(command: .setWindSpeed("自动"), displayText: "切换至自动风速")
         }
-        if text.contains("大风") || text.contains("风大") || text.contains("强劲") || text.contains("高风") || text.contains("最大风") || text.contains("调大风") || text.contains("风速大") {
+        if text.contains("大风") || text.contains("风大") || text.contains("强劲") || text.contains("高风") ||
+           text.contains("最大风") || text.contains("最大") || text.contains("调大风") || text.contains("风速大") ||
+           text.contains("高速风") || text.contains("开到最大") {
             return VoiceParseResult(command: .setWindSpeed("强劲"), displayText: "切换至强劲风速")
         }
-        if text.contains("小风") || text.contains("风小") || text.contains("微风") || text.contains("低风") || text.contains("静音") || text.contains("柔风") || text.contains("调小风") || text.contains("风速小") {
+        if text.contains("小风") || text.contains("风小") || text.contains("微风") || text.contains("低风") ||
+           text.contains("静音") || text.contains("柔风") || text.contains("最小风") || text.contains("调小风") ||
+           text.contains("风速小") || text.contains("低速风") || text.contains("开到最小") {
             return VoiceParseResult(command: .setWindSpeed("微风"), displayText: "切换至微风模式")
         }
-        if text.contains("中风") || text.contains("适中") || text.contains("风速中") {
+        if text.contains("中风") || text.contains("适中") || text.contains("风速中") || text.contains("中速风") {
             return VoiceParseResult(command: .setWindSpeed("中风"), displayText: "切换至中档风速")
         }
         return nil

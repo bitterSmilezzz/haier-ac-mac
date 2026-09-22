@@ -69,6 +69,9 @@ final class VoiceCommandParserTests: XCTestCase {
 
         let up2 = VoiceCommandParser.parse("升温2度")
         XCTAssertEqual(up2?.command, .adjustTemperature(delta: 2.0))
+
+        let tooColdUp2 = VoiceCommandParser.parse("太冷了调高两度")
+        XCTAssertEqual(tooColdUp2?.command, .adjustTemperature(delta: 2.0))
     }
 
     // MARK: - 模式切换测试
@@ -86,6 +89,9 @@ final class VoiceCommandParserTests: XCTestCase {
         let dry = VoiceCommandParser.parse("除湿")
         XCTAssertEqual(dry?.command, .setMode("除湿"))
 
+        let dry2 = VoiceCommandParser.parse("开启抽湿")
+        XCTAssertEqual(dry2?.command, .setMode("除湿"))
+
         let auto = VoiceCommandParser.parse("智能模式")
         XCTAssertEqual(auto?.command, .setMode("自动"))
     }
@@ -96,8 +102,14 @@ final class VoiceCommandParserTests: XCTestCase {
         let high = VoiceCommandParser.parse("大风一点")
         XCTAssertEqual(high?.command, .setWindSpeed("强劲"))
 
+        let maxWind = VoiceCommandParser.parse("开到最大")
+        XCTAssertEqual(maxWind?.command, .setWindSpeed("强劲"))
+
         let low = VoiceCommandParser.parse("微风")
         XCTAssertEqual(low?.command, .setWindSpeed("微风"))
+
+        let quiet = VoiceCommandParser.parse("静音风")
+        XCTAssertEqual(quiet?.command, .setWindSpeed("微风"))
 
         let auto = VoiceCommandParser.parse("自动风")
         XCTAssertEqual(auto?.command, .setWindSpeed("自动"))
