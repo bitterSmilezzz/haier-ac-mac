@@ -331,6 +331,14 @@ final class AppModel: ObservableObject {
         }
     }
 
+    /// 智能睡眠阶段切换免打扰模式（默认开启，v1.9.13）
+    /// 开启后夜间温阶自动推进时静默下发指令，不发送 macOS 系统横幅与提示音，防止惊醒用户
+    @Published var sleepNotificationDND: Bool = true {
+        didSet {
+            UserDefaults.standard.set(sleepNotificationDND, forKey: "sleepNotificationDND")
+        }
+    }
+
     /// 调度任务列表（持久化到 UserDefaults）
     @Published var scheduledActions: [ScheduledAction] = [] {
         didSet {
@@ -556,7 +564,11 @@ final class AppModel: ObservableObject {
         if !stage.powerOn {
             // 关机
             sendAttribute("onOffStatus", value: .bool(false), deviceId: deviceId)
-            Self.postSleepNotification(title: "🌙 智能睡眠已完成", body: "「\(curveName)」计划已达清晨唤醒时刻，空调已自动关机。")
+            Self.postSleepNotification(
+                title: "🌙 智能睡眠已完成",
+                body: "「\(curveName)」计划已达清晨唤醒时刻，空调已自动关机。",
+                silent: sleepNotificationDND
+            )
         } else {
             // 确保开机
             sendAttribute("onOffStatus", value: .bool(true), deviceId: deviceId)
@@ -569,19 +581,25 @@ final class AppModel: ObservableObject {
                 sendAttribute("windSpeed", value: match.data, deviceId: deviceId)
             }
             let tempDesc = String(format: "%.1f°C", stage.targetTemperature).replacingOccurrences(of: ".0°C", with: "°C")
-            Self.postSleepNotification(
-                title: "🌙 智能睡眠【\(curveName)】",
-                body: "进入【\(stage.name)】阶段，已平滑调节至 \(tempDesc)（\(stage.windSpeed)）"
-            )
+            if !sleepNotificationDND {
+                Self.postSleepNotification(
+                    title: "🌙 智能睡眠【\(curveName)】",
+                    body: "进入【\(stage.name)】阶段，已平滑调节至 \(tempDesc)（\(stage.windSpeed)）"
+                )
+            } else {
+                AppLog.log("智能睡眠阶段推进 (免打扰静默): [\(curveName)] -> \(stage.name) (\(tempDesc))")
+            }
         }
     }
 
-    private static func postSleepNotification(title: String, body: String) {
+    private static func postSleepNotification(title: String, body: String, silent: Bool = false) {
         let center = UNUserNotificationCenter.current()
         let content = UNMutableNotificationContent()
         content.title = title
         content.body = body
-        content.sound = .default
+        if !silent {
+            content.sound = .default
+        }
         let request = UNNotificationRequest(
             identifier: "sleep-curve-\(UUID().uuidString)",
             content: content,
@@ -995,6 +1013,7 @@ final class AppModel: ObservableObject {
             customSleepCurves = saved
         }
         sleepNightDimming = UserDefaults.standard.object(forKey: "sleepNightDimming") as? Bool ?? true
+        sleepNotificationDND = UserDefaults.standard.object(forKey: "sleepNotificationDND") as? Bool ?? true
 
         setupSleepWakeObservers()
     }

@@ -357,6 +357,21 @@ struct SleepCurveSection: View {
             .toggleStyle(.checkbox)
             .padding(.top, 2)
 
+            Toggle(isOn: $model.sleepNotificationDND) {
+                HStack(spacing: 5) {
+                    Image(systemName: "bell.slash")
+                        .font(.system(size: 11))
+                        .foregroundStyle(Theme.inkSubtle)
+                    Text("阶段切换免打扰")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(Theme.ink)
+                    Text("· 夜间调温静默推进，不发通知弹窗打扰睡眠")
+                        .font(.system(size: 10))
+                        .foregroundStyle(Theme.inkSubtle)
+                }
+            }
+            .toggleStyle(.checkbox)
+
             // 启动按钮
             Button {
                 guard !effectiveDeviceId.isEmpty else { return }
