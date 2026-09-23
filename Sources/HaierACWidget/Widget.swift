@@ -18,6 +18,8 @@ struct ACWidgetSnapshot: Codable {
     var sleepTargetTemp: Double?
     var sleepNextStageName: String?
     var sleepNextFireDate: Date?
+    var sleepCompensationOffset: Double?
+    var sleepEffectiveTemp: Double?
 
     static let empty = ACWidgetSnapshot(
         temperature: nil,
@@ -31,7 +33,9 @@ struct ACWidgetSnapshot: Codable {
         sleepStageName: nil,
         sleepTargetTemp: nil,
         sleepNextStageName: nil,
-        sleepNextFireDate: nil
+        sleepNextFireDate: nil,
+        sleepCompensationOffset: nil,
+        sleepEffectiveTemp: nil
     )
 }
 
@@ -324,11 +328,22 @@ struct ACWidgetView: View {
 
             Spacer(minLength: 2)
 
-            if let target = snapshot?.sleepTargetTemp {
-                Text(String(format: "%.0f°", target))
-                    .font(.system(size: 38, weight: .semibold, design: .rounded))
-                    .monospacedDigit()
-                    .foregroundStyle(.white)
+            let targetDisplay = snapshot?.sleepEffectiveTemp ?? snapshot?.sleepTargetTemp
+            if let target = targetDisplay {
+                HStack(alignment: .firstTextBaseline, spacing: 4) {
+                    let tempStr = String(format: "%.1f°", target).replacingOccurrences(of: ".0°", with: "°")
+                    Text(tempStr)
+                        .font(.system(size: 36, weight: .semibold, design: .rounded))
+                        .monospacedDigit()
+                        .foregroundStyle(.white)
+
+                    if let offset = snapshot?.sleepCompensationOffset, offset != 0.0 {
+                        let sign = offset > 0 ? "+" : ""
+                        Text("✨\(sign)\(String(format: "%.1f", offset))°")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundStyle(Color(red: 0.75, green: 0.72, blue: 1.0))
+                    }
+                }
             } else {
                 Text(tempText)
                     .font(.system(size: 38, weight: .semibold, design: .rounded))
@@ -380,11 +395,26 @@ struct ACWidgetView: View {
                         .lineLimit(1)
                 }
 
-                if let target = snapshot?.sleepTargetTemp {
-                    Text(String(format: "%.0f°", target))
-                        .font(.system(size: 34, weight: .semibold, design: .rounded))
-                        .monospacedDigit()
-                        .foregroundStyle(.white)
+                let targetDisplay = snapshot?.sleepEffectiveTemp ?? snapshot?.sleepTargetTemp
+                if let target = targetDisplay {
+                    HStack(alignment: .firstTextBaseline, spacing: 6) {
+                        let tempStr = String(format: "%.1f°", target).replacingOccurrences(of: ".0°", with: "°")
+                        Text(tempStr)
+                            .font(.system(size: 34, weight: .semibold, design: .rounded))
+                            .monospacedDigit()
+                            .foregroundStyle(.white)
+
+                        if let offset = snapshot?.sleepCompensationOffset, offset != 0.0 {
+                            let sign = offset > 0 ? "+" : ""
+                            Text("✨ 自适应 \(sign)\(String(format: "%.1f", offset))°")
+                                .font(.system(size: 10, weight: .semibold))
+                                .foregroundStyle(Color(red: 0.75, green: 0.72, blue: 1.0))
+                                .padding(.horizontal, 5)
+                                .padding(.vertical, 1.5)
+                                .background(Color.white.opacity(0.12))
+                                .clipShape(Capsule())
+                        }
+                    }
                 } else {
                     Text(tempText)
                         .font(.system(size: 34, weight: .semibold, design: .rounded))

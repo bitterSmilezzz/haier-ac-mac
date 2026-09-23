@@ -12,6 +12,7 @@ struct DeviceListView: View {
     /// 批量选择模式（v1.5）
     @State private var batchMode = false
     @State private var selectedDeviceIds: Set<String> = []
+    @State private var showFilterCare = false
 
     /// 可批量操作的设备（云端 + 手动）
     private var batchableDevices: [(id: String, name: String)] {
@@ -35,6 +36,7 @@ struct DeviceListView: View {
                         manualDevicesSection
                         SceneSection()
                         SleepCurveSection()
+                        EcoEnergySection()
                         ScheduleSection()
                         discoverySection
                         // 批量控制面板：批量模式 + 至少选中一台时显示
@@ -59,6 +61,10 @@ struct DeviceListView: View {
         }
         .sheet(item: $renamingDevice) { device in
             renameSheet(device)
+        }
+        .sheet(isPresented: $showFilterCare) {
+            FilterCareSheet()
+                .environmentObject(model)
         }
     }
 
@@ -104,6 +110,19 @@ struct DeviceListView: View {
                 .buttonStyle(Theme.secondaryButtonStyle())
                 .disabled(batchableDevices.count < 2)
             }
+            Button {
+                showFilterCare = true
+            } label: {
+                HStack(spacing: 4) {
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 11))
+                        .foregroundStyle(model.filterCleanlinessPercentage < 20 ? Theme.danger : Theme.accent)
+                    Text("滤网 \(model.filterCleanlinessPercentage)%")
+                        .font(.system(size: 11, weight: .medium))
+                }
+            }
+            .buttonStyle(Theme.secondaryButtonStyle())
+            .help("查看空调滤网健康寿命、清洗保养指南与自清洁")
             ThemePickerMenu()
             Button {
                 model.logout()

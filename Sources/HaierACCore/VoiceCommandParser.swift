@@ -26,6 +26,8 @@ public enum VoiceCommand: Equatable {
     case startSleepCurve(curveName: String?)
     /// 停止智能睡眠温阶
     case stopSleepCurve
+    /// 查询智能睡眠状态或昨晚睡眠报告（v1.9.18）
+    case querySleepReport
 }
 
 /// 语音指令解析结果
@@ -65,7 +67,16 @@ public struct VoiceCommandParser {
             return VoiceParseResult(command: .cancelSchedules, displayText: "取消所有定时与倒计时")
         }
 
-        // 3. 智能睡眠温阶（放在立即开关机与情景模式前）
+        // 3. 睡眠状态与报告查询（v1.9.18，优先于通用睡眠开关）
+        if (cleaned.contains("昨晚") && cleaned.contains("睡")) ||
+           cleaned.contains("睡眠报告") ||
+           cleaned.contains("睡眠情况") ||
+           cleaned.contains("睡眠状态") ||
+           (cleaned.contains("睡眠") && (cleaned.contains("还剩") || cleaned.contains("多久") || cleaned.contains("查") || cleaned.contains("进度"))) {
+            return VoiceParseResult(command: .querySleepReport, displayText: "查询睡眠调温状态与报告")
+        }
+
+        // 4. 智能睡眠温阶启停（放在立即开关机与情景模式前）
         if cleaned.contains("智能睡眠") || cleaned.contains("睡眠曲线") || cleaned.contains("睡眠温阶") ||
            (cleaned.contains("睡眠") && (cleaned.contains("开启") || cleaned.contains("启动") || cleaned.contains("打开") || cleaned.contains("关") || cleaned.contains("停") || cleaned.contains("退"))) {
             if cleaned.contains("关") || cleaned.contains("停") || cleaned.contains("退") {

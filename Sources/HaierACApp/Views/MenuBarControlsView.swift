@@ -616,15 +616,39 @@ struct MenuBarControlsView: View {
                         .font(.system(size: 12))
                         .foregroundStyle(Color.dynamic(light: 0x5E6AD2, dark: 0x9B8BFF))
 
-                    VStack(alignment: .leading, spacing: 1) {
-                        Text("智能睡眠中 · \(session.curveConfig.name)")
-                            .font(.system(size: 11, weight: .semibold))
-                            .foregroundStyle(Theme.ink)
+                    VStack(alignment: .leading, spacing: 2) {
+                        HStack(spacing: 4) {
+                            Text("智能睡眠中 · \(session.curveConfig.name)")
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundStyle(Theme.ink)
+
+                            if session.compensationOffset != 0.0 {
+                                let sign = session.compensationOffset > 0 ? "+" : ""
+                                Text("✨\(sign)\(String(format: "%.1f", session.compensationOffset))°")
+                                    .font(.system(size: 9, weight: .semibold))
+                                    .foregroundStyle(Color.dynamic(light: 0x5E6AD2, dark: 0x9B8BFF))
+                                    .padding(.horizontal, 4)
+                                    .padding(.vertical, 1)
+                                    .background(Color.dynamic(light: 0x5E6AD2, dark: 0x9B8BFF).opacity(0.12))
+                                    .clipShape(Capsule())
+                            }
+                        }
 
                         if let current = session.currentStage {
-                            Text("\(current.name) · \(String(format: "%.0f°C", current.targetTemperature))")
+                            let displayTemp = session.effectiveTargetTemperature ?? current.targetTemperature
+                            let tempStr = String(format: "%.1f°C", displayTemp).replacingOccurrences(of: ".0°C", with: "°C")
+                            let countdownText: String = {
+                                if let fireDate = session.nextFireDate, let next = session.nextStage {
+                                    let mins = max(1, Int(fireDate.timeIntervalSince(Date()) / 60))
+                                    return " · \(mins)分后进入「\(next.name)」"
+                                }
+                                return ""
+                            }()
+
+                            Text("\(current.name) · \(tempStr)\(countdownText)")
                                 .font(.system(size: 10))
                                 .foregroundStyle(Theme.inkSubtle)
+                                .lineLimit(1)
                         }
                     }
 

@@ -310,6 +310,23 @@ public final class VoiceCapsuleWindowController: NSObject, NSWindowDelegate {
             } else {
                 VoiceControlManager.shared.markSuccess("当前未运行睡眠温阶曲线")
             }
+
+        case .querySleepReport:
+            if let session = model.activeSleepSession {
+                let stageName = session.currentStage?.name ?? "进行中"
+                let targetTemp = session.effectiveTargetTemperature ?? session.currentStage?.targetTemperature ?? 26.0
+                let tempStr = String(format: "%.1f°C", targetTemp).replacingOccurrences(of: ".0°C", with: "°C")
+                if let nextFire = session.nextFireDate, let next = session.nextStage {
+                    let mins = max(1, Int(nextFire.timeIntervalSince(Date()) / 60))
+                    VoiceControlManager.shared.markSuccess("睡眠中：处于「\(stageName)」设定 \(tempStr)，\(mins) 分钟后进入「\(next.name)」")
+                } else {
+                    VoiceControlManager.shared.markSuccess("睡眠中：处于「\(stageName)」设定 \(tempStr)")
+                }
+            } else if let last = model.sleepHistory.first {
+                VoiceControlManager.shared.markSuccess("昨晚「\(last.curveName)」共运行 \(last.durationText)，已\(last.endReason.rawValue)")
+            } else {
+                VoiceControlManager.shared.markSuccess("暂无睡眠调温记录")
+            }
         }
 
         scheduleAutoDismiss(delay: 1.5)

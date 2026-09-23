@@ -67,7 +67,7 @@ public struct DeviceInfo: Identifiable, Hashable {
 
     public var id: String { deviceId }
 
-    public init(deviceId: String, deviceName: String, deviceType: String?, productNameT: String?, online: Bool) {
+    public init(deviceId: String, deviceName: String, deviceType: String? = nil, productNameT: String? = nil, online: Bool = true) {
         self.deviceId = deviceId
         self.deviceName = deviceName
         self.deviceType = deviceType
@@ -129,6 +129,10 @@ public struct DeviceAttribute: Identifiable, Hashable {
         case .string(let s): return Double(s)
         default: return nil
         }
+    }
+
+    public var stringValue: String? {
+        value?.stringValue
     }
 
     /// 灯光/屏显相关属性（UI 置顶显示）

@@ -5,11 +5,13 @@ import HaierACCore
 /// 遵循 macOS Bento 设计语言：自适应温阶阶梯预览、夜空感知渐变、动态呼吸动效与一键启停
 struct SleepCurveSection: View {
     @EnvironmentObject var model: AppModel
+    @ObservedObject private var ambientEngine = AmbientSoundEngine.shared
     @State private var selectedConfig: SleepCurveConfig = .standard
     @State private var targetDeviceId: String = ""
     @State private var showCustomEditor = false
     @State private var editingTarget: SleepCurveConfig? = nil
     @State private var templateTarget: SleepCurveConfig? = nil
+    @State private var showHistorySheet = false
 
     private var activeDevice: DeviceInfo? {
         if !targetDeviceId.isEmpty, let d = model.devices.first(where: { $0.id == targetDeviceId }) {
@@ -53,6 +55,27 @@ struct SleepCurveSection: View {
                 }
 
                 Button {
+                    showHistorySheet = true
+                } label: {
+                    HStack(spacing: 3) {
+                        Image(systemName: "clock.arrow.circlepath")
+                            .font(.system(size: 11))
+                        Text("历史")
+                            .font(.system(size: 11, weight: .medium))
+                        if !model.sleepHistory.isEmpty {
+                            Text("\(model.sleepHistory.count)")
+                                .font(.system(size: 9, weight: .bold))
+                                .padding(.horizontal, 4)
+                                .padding(.vertical, 1)
+                                .background(Theme.accent.opacity(0.15))
+                                .clipShape(Capsule())
+                        }
+                    }
+                }
+                .buttonStyle(Theme.secondaryButtonStyle())
+                .help("查看智能睡眠执行历史与温阶轨迹回放")
+
+                Button {
                     editingTarget = nil
                     templateTarget = nil
                     showCustomEditor = true
@@ -91,6 +114,12 @@ struct SleepCurveSection: View {
                     selectedConfig = newCurve
                 }
             )
+            .environmentObject(model)
+        }
+        .sheet(isPresented: $showHistorySheet) {
+            SleepHistorySheet(onSelectCurve: { curve in
+                selectedConfig = curve
+            })
             .environmentObject(model)
         }
         .onChange(of: model.customSleepCurves) { _ in
@@ -138,9 +167,38 @@ struct SleepCurveSection: View {
                     }
 
                     if let current = session.currentStage {
-                        Text("当前：\(current.name) · \(String(format: "%.0f°C", current.targetTemperature))（\(current.windSpeed)）")
-                            .font(.system(size: 12))
-                            .foregroundStyle(Theme.inkMuted)
+                        HStack(spacing: 6) {
+                            let displayTemp = session.effectiveTargetTemperature ?? current.targetTemperature
+                            let tempStr = String(format: "%.1f°C", displayTemp).replacingOccurrences(of: ".0°C", with: "°C")
+                            Text("当前：\(current.name) · \(tempStr)（\(current.windSpeed)）")
+                                .font(.system(size: 12))
+                                .foregroundStyle(Theme.inkMuted)
+
+                            if session.compensationOffset != 0.0 {
+                                let sign = session.compensationOffset > 0 ? "+" : ""
+                                Text("✨ 自适应 \(sign)\(String(format: "%.1f", session.compensationOffset))°")
+                                    .font(.system(size: 10, weight: .semibold))
+                                    .foregroundStyle(Color.dynamic(light: 0x5E6AD2, dark: 0x9B8BFF))
+                                    .padding(.horizontal, 5)
+                                    .padding(.vertical, 1)
+                                    .background(Color.dynamic(light: 0x5E6AD2, dark: 0x9B8BFF).opacity(0.12))
+                                    .clipShape(Capsule())
+                            }
+
+                            if let hum = AppModel.indoorHumidityAttribute(in: model.attributes[session.deviceId] ?? [:])?.doubleValue {
+                                HStack(spacing: 2) {
+                                    Image(systemName: "humidity.fill")
+                                        .font(.system(size: 9))
+                                    Text("\(String(format: "%.0f%%", hum))")
+                                        .font(.system(size: 10, weight: .medium))
+                                }
+                                .foregroundStyle(Color.dynamic(light: 0x5E6AD2, dark: 0x9B8BFF))
+                                .padding(.horizontal, 4)
+                                .padding(.vertical, 1)
+                                .background(Color.dynamic(light: 0x5E6AD2, dark: 0x9B8BFF).opacity(0.1))
+                                .cornerRadius(4)
+                            }
+                        }
                     }
                 }
 
@@ -372,6 +430,159 @@ struct SleepCurveSection: View {
             }
             .toggleStyle(.checkbox)
 
+            Toggle(isOn: $model.sleepAdaptiveCompensation) {
+                HStack(spacing: 5) {
+                    Image(systemName: "thermometer.sun")
+                        .font(.system(size: 11))
+                        .foregroundStyle(Color.dynamic(light: 0x5E6AD2, dark: 0x9B8BFF))
+                    Text("室内温差自适应补偿")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(Theme.ink)
+                    Text("· 实测室温偏离时自动微调 ±1°C，防止过冷受凉或闷热")
+                        .font(.system(size: 10))
+                        .foregroundStyle(Theme.inkSubtle)
+                }
+            }
+            .toggleStyle(.checkbox)
+
+            Toggle(isOn: $model.sleepHumidityGuard) {
+                HStack(spacing: 5) {
+                    Image(systemName: "drop.degreesign.fill")
+                        .font(.system(size: 11))
+                        .foregroundStyle(Color.dynamic(light: 0x5E6AD2, dark: 0x9B8BFF))
+                    Text("温湿度双控健康守护")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(Theme.ink)
+                    Text("· 闷热高湿微调控湿，偏干减轻抽湿呵护呼吸道")
+                        .font(.system(size: 10))
+                        .foregroundStyle(Theme.inkSubtle)
+                }
+            }
+            .toggleStyle(.checkbox)
+
+            // 晨间唤醒平滑过渡
+            HStack(spacing: 8) {
+                HStack(spacing: 5) {
+                    Image(systemName: "sun.haze.fill")
+                        .font(.system(size: 11))
+                        .foregroundStyle(Color.dynamic(light: 0xF05A28, dark: 0xFF6934))
+                    Text("晨间唤醒过渡")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(Theme.ink)
+                    Text("· 清晨醒来自动转为自然风，避免骤热")
+                        .font(.system(size: 10))
+                        .foregroundStyle(Theme.inkSubtle)
+                }
+
+                Spacer()
+
+                Picker("", selection: $model.sleepMorningTransition) {
+                    ForEach(SleepMorningTransitionMode.allCases) { mode in
+                        Text(mode.shortLabel).tag(mode)
+                    }
+                }
+                .labelsHidden()
+                .frame(width: 110)
+            }
+            .padding(.top, 1)
+
+            Toggle(isOn: $model.sleepMorningWakeChime) {
+                HStack(spacing: 5) {
+                    Image(systemName: "bird.fill")
+                        .font(.system(size: 11))
+                        .foregroundStyle(Color.dynamic(light: 0x27AE60, dark: 0x2ECC71))
+                    Text("清晨林鸟唤醒音律")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(Theme.ink)
+                    Text("· 唤醒时刻自动轻柔播放自然林鸟鸣叫，柔和舒展醒神")
+                        .font(.system(size: 10))
+                        .foregroundStyle(Theme.inkSubtle)
+                }
+            }
+            .toggleStyle(.checkbox)
+
+            // 睡眠环境自然白噪音助眠联动 (v1.9.20)
+            VStack(alignment: .leading, spacing: 6) {
+                HStack {
+                    Toggle(isOn: $model.sleepAmbientSoundEnabled) {
+                        HStack(spacing: 5) {
+                            Image(systemName: "waveform")
+                                .font(.system(size: 11))
+                                .foregroundStyle(Color.dynamic(light: 0x5E6AD2, dark: 0x9B8BFF))
+                            Text("自然白噪音助眠联动")
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundStyle(Theme.ink)
+                            Text("· 原生算法合成自然环境音，舒缓宁神")
+                                .font(.system(size: 10))
+                                .foregroundStyle(Theme.inkSubtle)
+                        }
+                    }
+                    .toggleStyle(.checkbox)
+
+                    Spacer()
+
+                    if model.sleepAmbientSoundEnabled {
+                        Button {
+                            if ambientEngine.isPlaying {
+                                ambientEngine.stop(fadeOutDuration: 0.5)
+                            } else {
+                                ambientEngine.play(type: model.sleepAmbientSoundType, fadeInDuration: 0.5)
+                            }
+                        } label: {
+                            HStack(spacing: 3) {
+                                Image(systemName: ambientEngine.isPlaying ? "stop.fill" : "play.fill")
+                                    .font(.system(size: 9))
+                                Text(ambientEngine.isPlaying ? "试听中" : "试听")
+                                    .font(.system(size: 10, weight: .medium))
+                            }
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                        }
+                        .buttonStyle(Theme.secondaryButtonStyle())
+                    }
+                }
+
+                if model.sleepAmbientSoundEnabled {
+                    HStack(spacing: 10) {
+                        Picker("声型", selection: $model.sleepAmbientSoundType) {
+                            ForEach(AmbientSoundType.allCases) { sound in
+                                Label(sound.rawValue, systemImage: sound.icon).tag(sound)
+                            }
+                        }
+                        .pickerStyle(.menu)
+                        .frame(width: 130)
+                        .onChange(of: model.sleepAmbientSoundType) { newType in
+                            if ambientEngine.isPlaying {
+                                ambientEngine.play(type: newType, fadeInDuration: 0.3)
+                            }
+                        }
+
+                        HStack(spacing: 4) {
+                            Image(systemName: "speaker.wave.1.fill")
+                                .font(.system(size: 10))
+                                .foregroundStyle(Theme.inkSubtle)
+                            Slider(value: $model.sleepAmbientSoundVolume, in: 0.05...1.0)
+                                .frame(width: 75)
+                            Image(systemName: "speaker.wave.3.fill")
+                                .font(.system(size: 10))
+                                .foregroundStyle(Theme.inkSubtle)
+                        }
+
+                        Spacer()
+
+                        Toggle("深睡淡出", isOn: $model.sleepAmbientAutoFadeOut)
+                            .toggleStyle(.checkbox)
+                            .font(.system(size: 10))
+                            .help("进入深睡阶段后自动平缓淡出白噪音，安睡整夜")
+                    }
+                    .padding(.leading, 18)
+                    .padding(.vertical, 2)
+                }
+            }
+
+            // 定时就寝与睡前预冷 (v1.9.19)
+            bedtimeScheduleConfigSection
+
             // 启动按钮
             Button {
                 guard !effectiveDeviceId.isEmpty else { return }
@@ -387,6 +598,18 @@ struct SleepCurveSection: View {
             }
             .buttonStyle(Theme.primaryButtonStyle())
             .disabled(effectiveDeviceId.isEmpty)
+
+            // 全局快捷键极速启停提示
+            HStack(spacing: 4) {
+                Image(systemName: "command")
+                    .font(.system(size: 10))
+                    .foregroundStyle(Theme.inkTertiary)
+                Text("macOS 全局快捷键: Control + Option + S 随时一键启停")
+                    .font(.system(size: 10))
+                    .foregroundStyle(Theme.inkTertiary)
+            }
+            .frame(maxWidth: .infinity, alignment: .center)
+            .padding(.top, 1)
         }
         .padding(Theme.spaceMD)
         .background(Theme.cardBackground(Theme.surface1))
@@ -395,5 +618,138 @@ struct SleepCurveSection: View {
             RoundedRectangle(cornerRadius: Theme.radiusMD)
                 .strokeBorder(Theme.hairline, lineWidth: 1)
         )
+    }
+
+    // MARK: - 定时就寝与睡前预冷设置 (v1.9.19)
+
+    private var bedtimeBinding: Binding<Date> {
+        Binding(
+            get: {
+                let cal = Calendar.current
+                return cal.date(bySettingHour: model.bedtimeSchedule.hour, minute: model.bedtimeSchedule.minute, second: 0, of: Date()) ?? Date()
+            },
+            set: { newDate in
+                let cal = Calendar.current
+                model.bedtimeSchedule.hour = cal.component(.hour, from: newDate)
+                model.bedtimeSchedule.minute = cal.component(.minute, from: newDate)
+            }
+        )
+    }
+
+    private var bedtimeScheduleConfigSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Toggle(isOn: $model.bedtimeSchedule.enabled) {
+                HStack(spacing: 5) {
+                    Image(systemName: "bed.double.fill")
+                        .font(.system(size: 11))
+                        .foregroundStyle(Color.dynamic(light: 0x5E6AD2, dark: 0x9B8BFF))
+                    Text("定时就寝与睡前预冷")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(Theme.ink)
+                    if model.bedtimeSchedule.enabled {
+                        Text("· \(model.bedtimeSchedule.timeLabel) (\(model.bedtimeSchedule.repeatLabel))")
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundStyle(Color.dynamic(light: 0x5E6AD2, dark: 0x9B8BFF))
+                    } else {
+                        Text("· 每日/工作日自动启动睡眠温阶，支持提前预冷")
+                            .font(.system(size: 10))
+                            .foregroundStyle(Theme.inkSubtle)
+                    }
+                }
+            }
+            .toggleStyle(.checkbox)
+
+            if model.bedtimeSchedule.enabled {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 12) {
+                        HStack(spacing: 6) {
+                            Text("就寝时间")
+                                .font(.system(size: 11))
+                                .foregroundStyle(Theme.inkSubtle)
+
+                            DatePicker("", selection: bedtimeBinding, displayedComponents: .hourAndMinute)
+                                .labelsHidden()
+                                .frame(width: 80)
+                        }
+
+                        HStack(spacing: 6) {
+                            Text("目标方案")
+                                .font(.system(size: 11))
+                                .foregroundStyle(Theme.inkSubtle)
+
+                            Picker("", selection: $model.bedtimeSchedule.curveName) {
+                                ForEach(model.allSleepCurves) { cfg in
+                                    Text(cfg.name).tag(cfg.name)
+                                }
+                            }
+                            .labelsHidden()
+                            .frame(width: 100)
+                        }
+
+                        Spacer()
+                    }
+
+                    // 重复周期快速切换
+                    HStack(spacing: 8) {
+                        Text("重复周期")
+                            .font(.system(size: 11))
+                            .foregroundStyle(Theme.inkSubtle)
+
+                        HStack(spacing: 4) {
+                            weekdayButton(label: "工作日", isSelected: model.bedtimeSchedule.repeatWeekdays.sorted() == [2, 3, 4, 5, 6]) {
+                                model.bedtimeSchedule.repeatWeekdays = [2, 3, 4, 5, 6]
+                            }
+                            weekdayButton(label: "每天", isSelected: model.bedtimeSchedule.repeatWeekdays.count == 7) {
+                                model.bedtimeSchedule.repeatWeekdays = [1, 2, 3, 4, 5, 6, 7]
+                            }
+                            weekdayButton(label: "周末", isSelected: model.bedtimeSchedule.repeatWeekdays.sorted() == [1, 7]) {
+                                model.bedtimeSchedule.repeatWeekdays = [1, 7]
+                            }
+                        }
+                    }
+
+                    // 睡前预冷开关
+                    HStack(spacing: 8) {
+                        HStack(spacing: 5) {
+                            Image(systemName: "snowflake")
+                                .font(.system(size: 10))
+                                .foregroundStyle(Theme.accent)
+                            Text("睡前 15 分钟预冷")
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundStyle(Theme.ink)
+                            Text("· 提前开启微风降温，营造最佳入眠环境")
+                                .font(.system(size: 10))
+                                .foregroundStyle(Theme.inkSubtle)
+                        }
+
+                        Spacer()
+
+                        Toggle("", isOn: Binding(
+                            get: { model.bedtimeSchedule.preCoolingMinutes > 0 },
+                            set: { model.bedtimeSchedule.preCoolingMinutes = $0 ? 15 : 0 }
+                        ))
+                        .toggleStyle(.switch)
+                        .labelsHidden()
+                        .controlSize(.mini)
+                    }
+                }
+                .padding(10)
+                .background(Theme.surface2)
+                .cornerRadius(Theme.radiusSM)
+            }
+        }
+    }
+
+    private func weekdayButton(label: String, isSelected: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(label)
+                .font(.system(size: 10, weight: isSelected ? .semibold : .regular))
+                .foregroundStyle(isSelected ? Theme.accent : Theme.inkSubtle)
+                .padding(.horizontal, 7)
+                .padding(.vertical, 3)
+                .background(isSelected ? Theme.accent.opacity(0.12) : Theme.surface1)
+                .cornerRadius(4)
+        }
+        .buttonStyle(.plain)
     }
 }

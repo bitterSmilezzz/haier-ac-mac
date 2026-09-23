@@ -4,6 +4,7 @@ import SwiftUI
 import WidgetKit
 import UserNotifications
 import ServiceManagement
+import UniformTypeIdentifiers
 import HaierACCore
 
 /// 手动添加的设备（持久化到 UserDefaults）
@@ -130,12 +131,131 @@ struct SleepCurveConfig: Identifiable, Codable, Hashable {
     static let allPresets: [SleepCurveConfig] = [.standard, .gentle, .coolEco]
 }
 
+/// 智能睡眠温阶执行点
+struct SleepTrajectoryPoint: Codable, Equatable, Identifiable {
+    var id: UUID = UUID()
+    var timestamp: Date
+    var stageIndex: Int
+    var stageName: String
+    var targetTemperature: Double
+    var windSpeed: String
+    var powerOn: Bool
+    var indoorTemperature: Double?
+    var indoorHumidity: Double? = nil
+}
+
+/// 智能睡眠结束原因
+enum SleepEndReason: String, Codable {
+    case completed = "计划完成"
+    case userStopped = "手动停止"
+    case overridden = "新计划覆盖"
+}
+
+/// 智能睡眠晨间唤醒过渡模式（v1.9.18）
+enum SleepMorningTransitionMode: String, CaseIterable, Identifiable, Codable {
+    case off = "直接关机"
+    case gentleFan = "自然微风送风 (30分)"
+    case comfortHold = "舒适恒温26.5°C (30分)"
+
+    var id: String { rawValue }
+
+    var shortLabel: String {
+        switch self {
+        case .off: return "直接关机"
+        case .gentleFan: return "自然送风"
+        case .comfortHold: return "舒适恒温"
+        }
+    }
+}
+
+/// 智能就寝定时与睡前预冷配置（v1.9.19）
+public struct BedtimeSchedule: Codable, Equatable {
+    public var enabled: Bool = false
+    public var hour: Int = 23         // 0..23 (默认 23:00)
+    public var minute: Int = 0        // 0..59
+    public var repeatWeekdays: [Int] = [2, 3, 4, 5, 6] // 默认工作日（周一至周五，1=周日）
+    public var curveName: String = "标准舒适" // 目标曲线名称
+    public var preCoolingMinutes: Int = 15 // 提前预冷分钟数，0 表示不预冷，默认 15 分钟
+
+    public init(
+        enabled: Bool = false,
+        hour: Int = 23,
+        minute: Int = 0,
+        repeatWeekdays: [Int] = [2, 3, 4, 5, 6],
+        curveName: String = "标准舒适",
+        preCoolingMinutes: Int = 15
+    ) {
+        self.enabled = enabled
+        self.hour = hour
+        self.minute = minute
+        self.repeatWeekdays = repeatWeekdays
+        self.curveName = curveName
+        self.preCoolingMinutes = preCoolingMinutes
+    }
+
+    public var timeLabel: String {
+        String(format: "%02d:%02d", hour, minute)
+    }
+
+    public var repeatLabel: String {
+        if repeatWeekdays.count == 7 {
+            return "每天"
+        }
+        let sorted = repeatWeekdays.sorted()
+        if sorted == [2, 3, 4, 5, 6] {
+            return "工作日"
+        }
+        if sorted == [1, 7] {
+            return "周末"
+        }
+        let names = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"]
+        let days = sorted.map { names[max(0, min($0 - 1, 6))] }
+        return "每周 " + days.joined(separator: " ")
+    }
+}
+
+/// 历史睡眠记录
+struct SleepRecord: Codable, Equatable, Identifiable {
+    var id: UUID = UUID()
+    var curveName: String
+    var deviceId: String
+    var deviceName: String
+    var startedAt: Date
+    var endedAt: Date
+    var endReason: SleepEndReason
+    var trajectory: [SleepTrajectoryPoint]
+
+    var durationMinutes: Int {
+        max(1, Int(endedAt.timeIntervalSince(startedAt) / 60))
+    }
+
+    var durationText: String {
+        let mins = durationMinutes
+        if mins < 60 {
+            return "\(mins)分钟"
+        } else {
+            let h = mins / 60
+            let m = mins % 60
+            return m > 0 ? "\(h)小时\(m)分" : "\(h)小时"
+        }
+    }
+}
+
 /// 正在执行的睡眠曲线会话
 struct SleepSession: Codable, Equatable {
     var deviceId: String
     var startedAt: Date
     var curveConfig: SleepCurveConfig
     var currentStageIndex: Int
+    var trajectory: [SleepTrajectoryPoint] = []
+    var compensationOffset: Double = 0.0
+    var lastCompensationCheck: Date? = nil
+
+    /// 结合自适应补偿后的实际有效目标温度
+    var effectiveTargetTemperature: Double? {
+        guard let current = currentStage, current.powerOn else { return nil }
+        return current.targetTemperature + compensationOffset
+    }
 
     var currentStage: SleepStage? {
         guard currentStageIndex >= 0 && currentStageIndex < curveConfig.stages.count else { return nil }
@@ -331,11 +451,130 @@ final class AppModel: ObservableObject {
         }
     }
 
+    // MARK: - 空调滤网健康监测与自清洁保养 (v1.9.20)
+
+    /// 累计开机运行分钟数 (持久化)
+    @Published var filterAccumulatedMinutes: Int = 0 {
+        didSet {
+            UserDefaults.standard.set(filterAccumulatedMinutes, forKey: "filterAccumulatedMinutes")
+        }
+    }
+
+    /// 上次滤网清洗重置日期
+    @Published var lastFilterCleanedDate: Date? {
+        didSet {
+            UserDefaults.standard.set(lastFilterCleanedDate, forKey: "lastFilterCleanedDate")
+        }
+    }
+
+    /// 滤网清洁度百分比 (0 ~ 100%)，基于 250 小时 (15,000 分钟) 建议保养周期
+    var filterCleanlinessPercentage: Int {
+        let maxMinutes = 250 * 60
+        let remaining = max(0, maxMinutes - filterAccumulatedMinutes)
+        return Int(Double(remaining) / Double(maxMinutes) * 100.0)
+    }
+
+    /// 重置滤网保养计时
+    func resetFilterMaintenance() {
+        filterAccumulatedMinutes = 0
+        lastFilterCleanedDate = Date()
+        operationNotice = OperationNotice(text: "🧼 滤网运行计时已重置，洁净度恢复 100%", isError: false)
+    }
+
+    // MARK: - 睡眠自然环境音与晨间音律助眠联动 (v1.9.20)
+
+    /// 是否开启睡眠自然白噪音助眠
+    @Published var sleepAmbientSoundEnabled: Bool = false {
+        didSet {
+            UserDefaults.standard.set(sleepAmbientSoundEnabled, forKey: "sleepAmbientSoundEnabled")
+        }
+    }
+
+    /// 助眠白噪音类型 (春夜细雨/海风浪涌/森林微风/夏夜静谧/清晨林鸟)
+    @Published var sleepAmbientSoundType: AmbientSoundType = .springRain {
+        didSet {
+            UserDefaults.standard.set(sleepAmbientSoundType.rawValue, forKey: "sleepAmbientSoundType")
+        }
+    }
+
+    /// 助眠白噪音音量 (0.0 ~ 1.0)
+    @Published var sleepAmbientSoundVolume: Float = 0.5 {
+        didSet {
+            UserDefaults.standard.set(sleepAmbientSoundVolume, forKey: "sleepAmbientSoundVolume")
+            AmbientSoundEngine.shared.volume = sleepAmbientSoundVolume
+        }
+    }
+
+    /// 进入深睡阶段后自然声音自动淡出 (默认开启)
+    @Published var sleepAmbientAutoFadeOut: Bool = true {
+        didSet {
+            UserDefaults.standard.set(sleepAmbientAutoFadeOut, forKey: "sleepAmbientAutoFadeOut")
+        }
+    }
+
+    /// 清晨唤醒伴随自然林鸟音律 (默认开启)
+    @Published var sleepMorningWakeChime: Bool = true {
+        didSet {
+            UserDefaults.standard.set(sleepMorningWakeChime, forKey: "sleepMorningWakeChime")
+        }
+    }
+
     /// 智能睡眠阶段切换免打扰模式（默认开启，v1.9.13）
     /// 开启后夜间温阶自动推进时静默下发指令，不发送 macOS 系统横幅与提示音，防止惊醒用户
     @Published var sleepNotificationDND: Bool = true {
         didSet {
             UserDefaults.standard.set(sleepNotificationDND, forKey: "sleepNotificationDND")
+        }
+    }
+
+    /// 智能睡眠室内温差自适应补偿（默认开启，v1.9.17）
+    /// 根据实测室温动态微调 ±1°C，防止夜间过冷受凉或闷热
+    @Published var sleepAdaptiveCompensation: Bool = true {
+        didSet {
+            UserDefaults.standard.set(sleepAdaptiveCompensation, forKey: "sleepAdaptiveCompensation")
+        }
+    }
+
+    /// 智能睡眠温湿度健康双控守护（默认开启，v1.9.19）
+    /// 睡眠期间实时监测室内相对湿度，过湿时联动舒适微调控湿，干燥时平缓风速，守护夜间呼吸道
+    @Published var sleepHumidityGuard: Bool = true {
+        didSet {
+            UserDefaults.standard.set(sleepHumidityGuard, forKey: "sleepHumidityGuard")
+        }
+    }
+
+    /// 定时就寝自动入眠与睡前预冷配置（持久化到 UserDefaults，v1.9.19）
+    @Published var bedtimeSchedule: BedtimeSchedule = BedtimeSchedule() {
+        didSet {
+            if let data = try? JSONEncoder().encode(bedtimeSchedule) {
+                UserDefaults.standard.set(data, forKey: "bedtimeSchedule")
+            }
+            wakeScheduler()
+        }
+    }
+
+    private var lastPrecooledDateKey: String? {
+        get { UserDefaults.standard.string(forKey: "bedtime_last_precool_key") }
+        set { UserDefaults.standard.set(newValue, forKey: "bedtime_last_precool_key") }
+    }
+    private var lastBedtimeDateKey: String? {
+        get { UserDefaults.standard.string(forKey: "bedtime_last_bedtime_key") }
+        set { UserDefaults.standard.set(newValue, forKey: "bedtime_last_bedtime_key") }
+    }
+
+    /// 晨间唤醒平滑过渡模式（持久化到 UserDefaults，默认自然送风30分钟，v1.9.18）
+    @Published var sleepMorningTransition: SleepMorningTransitionMode = .gentleFan {
+        didSet {
+            UserDefaults.standard.set(sleepMorningTransition.rawValue, forKey: "sleepMorningTransition")
+        }
+    }
+
+    /// 睡眠温阶历史记录（持久化到 UserDefaults，最多保留50条，v1.9.16）
+    @Published var sleepHistory: [SleepRecord] = [] {
+        didSet {
+            if let data = try? JSONEncoder().encode(sleepHistory) {
+                UserDefaults.standard.set(data, forKey: "sleepHistoryRecords")
+            }
         }
     }
 
@@ -348,9 +587,41 @@ final class AppModel: ObservableObject {
         }
     }
     private var schedulerTask: Task<Void, Never>?
+    private var lastMinuteSampleDate: Date?
+
+    /// 周期性能耗采样积分与滤网运行时长累加 (每分钟一次)
+    private func accumulateMinuteTick() {
+        let now = Date()
+        if let last = lastMinuteSampleDate, now.timeIntervalSince(last) < 50 {
+            return
+        }
+        lastMinuteSampleDate = now
+
+        let deviceId = devices.first?.id ?? manualDevices.first?.deviceId
+        guard let deviceId = deviceId else { return }
+
+        let attrs = attributes[deviceId] ?? [:]
+        let isPowerOn = attrs["onOffStatus"]?.boolValue ?? false
+        let mode = attrs["operationMode"]?.stringValue ?? "0"
+        let targetTemp = attrs["targetTemperature"]?.doubleValue ?? 26.0
+        let indoorTemp = currentIndoorTemperature(for: deviceId)
+        let windSpeed = attrs["windSpeed"]?.stringValue ?? "微风"
+
+        if isPowerOn {
+            filterAccumulatedMinutes += 1
+        }
+
+        EnergyAnalyticsEngine.shared.accumulateMinuteSample(
+            isPowerOn: isPowerOn,
+            modeCode: mode,
+            targetTemp: targetTemp,
+            indoorTemp: indoorTemp,
+            windSpeed: windSpeed
+        )
+    }
 
     /// 启动调度（登录/恢复会话成功后调用；App 退出前持续运行）。
-    /// 优化：按下一任务触发时刻精确休眠，替代固定 15s 轮询（省电、触发更准时）。
+    /// 优化：按下一任务触发时刻精确休眠，并保证每 60 秒定期累积能耗、滤网与定时器。
     func startScheduler() {
         guard schedulerTask == nil else { return }
         if let data = UserDefaults.standard.data(forKey: "scheduledActions"),
@@ -362,7 +633,9 @@ final class AppModel: ObservableObject {
                 guard let self else { break }
                 self.fireDueActions()
                 self.checkSleepCurveSession()
-                // 计算到下一个待触发任务的时间（封顶 5 分钟，保证新增任务也能及时被拾取）
+                self.checkBedtimeSchedule()
+                self.accumulateMinuteTick()
+                // 计算到下一个待触发任务的时间（封顶 60 秒，保证每分钟精确累积能耗与滤网工时）
                 let now = Date()
                 var candidates: [Date] = self.scheduledActions
                     .filter { $0.enabled && $0.fireDate > now }
@@ -370,8 +643,11 @@ final class AppModel: ObservableObject {
                 if let nextSleepFire = self.activeSleepSession?.nextFireDate, nextSleepFire > now {
                     candidates.append(nextSleepFire)
                 }
-                let nextFire = candidates.min() ?? now.addingTimeInterval(300)
-                let delay = min(max(nextFire.timeIntervalSince(now), 1), 300)
+                if let nextBedtimeCandidate = self.nextBedtimeCandidateDate(after: now), nextBedtimeCandidate > now {
+                    candidates.append(nextBedtimeCandidate)
+                }
+                let nextFire = candidates.min() ?? now.addingTimeInterval(60)
+                let delay = min(max(nextFire.timeIntervalSince(now), 1), 60)
                 try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
             }
         }
@@ -471,17 +747,166 @@ final class AppModel: ObservableObject {
         return candidate
     }
 
+    // MARK: - 定时就寝与睡前预冷调度（v1.9.19）
+
+    /// 计算从 after 开始的下一个就寝目标时间
+    func nextBedtimeDate(after date: Date) -> Date? {
+        guard bedtimeSchedule.enabled, !bedtimeSchedule.repeatWeekdays.isEmpty else { return nil }
+        let calendar = Calendar.current
+        for dayOffset in 0...7 {
+            guard let day = calendar.date(byAdding: .day, value: dayOffset, to: date),
+                  let target = calendar.date(bySettingHour: bedtimeSchedule.hour, minute: bedtimeSchedule.minute, second: 0, of: day) else {
+                continue
+            }
+            let weekday = calendar.component(.weekday, from: target)
+            if bedtimeSchedule.repeatWeekdays.contains(weekday) && target > date {
+                return target
+            }
+        }
+        return nil
+    }
+
+    /// 计算下一个调度检查候选时刻（包含就寝时刻与预冷时刻）
+    func nextBedtimeCandidateDate(after date: Date) -> Date? {
+        guard bedtimeSchedule.enabled, !bedtimeSchedule.repeatWeekdays.isEmpty else { return nil }
+        guard let nextBed = nextBedtimeDate(after: date) else { return nil }
+        var dates = [nextBed]
+        if bedtimeSchedule.preCoolingMinutes > 0 {
+            let precool = nextBed.addingTimeInterval(-Double(bedtimeSchedule.preCoolingMinutes * 60))
+            if precool > date {
+                dates.append(precool)
+            }
+        }
+        return dates.min()
+    }
+
+    /// 定时就寝与睡前预冷检查
+    private func checkBedtimeSchedule() {
+        guard bedtimeSchedule.enabled, !bedtimeSchedule.repeatWeekdays.isEmpty else { return }
+        let now = Date()
+        let calendar = Calendar.current
+        let keyFormatter = DateFormatter()
+        keyFormatter.dateFormat = "yyyy-MM-dd"
+
+        // 检查可能命中就寝的目标时间（覆盖今天与跨天明天）
+        for dayOffset in 0...1 {
+            guard let day = calendar.date(byAdding: .day, value: dayOffset, to: now),
+                  let target = calendar.date(bySettingHour: bedtimeSchedule.hour, minute: bedtimeSchedule.minute, second: 0, of: day) else {
+                continue
+            }
+            let weekday = calendar.component(.weekday, from: target)
+            guard bedtimeSchedule.repeatWeekdays.contains(weekday) else { continue }
+
+            let triggerKey = "\(keyFormatter.string(from: target))_\(bedtimeSchedule.hour)_\(bedtimeSchedule.minute)"
+
+            // 1. 睡前预冷检测 (在就寝前 preCoolingMinutes 到就寝时刻之间)
+            let precoolMins = bedtimeSchedule.preCoolingMinutes
+            if precoolMins > 0 {
+                let precoolTime = target.addingTimeInterval(-Double(precoolMins * 60))
+                if now >= precoolTime && now < target {
+                    if lastPrecooledDateKey != triggerKey {
+                        lastPrecooledDateKey = triggerKey
+                        triggerBedtimePrecooling()
+                    }
+                }
+            }
+
+            // 2. 就寝时刻检测 (在就寝时刻到之后 15 分钟内)
+            if now >= target && now < target.addingTimeInterval(900) {
+                if lastBedtimeDateKey != triggerKey {
+                    lastBedtimeDateKey = triggerKey
+                    triggerBedtimeCurve()
+                }
+            }
+        }
+    }
+
+    /// 执行睡前预冷
+    private func triggerBedtimePrecooling() {
+        guard activeSleepSession == nil else { return }
+        guard let deviceId = devices.first?.id ?? manualDevices.first?.deviceId else { return }
+        let curve = allSleepCurves.first(where: { $0.name == bedtimeSchedule.curveName }) ?? allSleepCurves.first ?? .standard
+        let targetTemp = curve.stages.first?.targetTemperature ?? 25.0
+
+        sendAttribute("onOffStatus", value: .bool(true), deviceId: deviceId)
+        sendAttribute("operationMode", value: .string("0"), deviceId: deviceId) // 制冷模式
+        sendAttribute("targetTemperature", value: .double(targetTemp), deviceId: deviceId)
+        sendAttribute("windSpeed", value: .string("微风"), deviceId: deviceId)
+
+        AppLog.log("定时就寝联动: 距离就寝还有 \(bedtimeSchedule.preCoolingMinutes) 分钟，已启动睡前预冷 (\(targetTemp)°C 微风)")
+        Self.postSleepNotification(
+            title: "🌙 睡前预冷已启动",
+            body: "距离就寝还有 \(bedtimeSchedule.preCoolingMinutes) 分钟，已为您开启「\(curve.name)」预冷（\(String(format: "%.0f°C", targetTemp)) 微风），提前营造舒适入睡环境。",
+            silent: false
+        )
+        operationNotice = OperationNotice(text: "已启动睡前预冷（\(String(format: "%.0f°C", targetTemp))）", isError: false)
+    }
+
+    /// 执行定时就寝睡眠温阶
+    private func triggerBedtimeCurve() {
+        guard let deviceId = devices.first?.id ?? manualDevices.first?.deviceId else { return }
+        let curve = allSleepCurves.first(where: { $0.name == bedtimeSchedule.curveName }) ?? allSleepCurves.first ?? .standard
+        startSleepCurve(curve: curve, deviceId: deviceId)
+
+        AppLog.log("定时就寝联动: 到达预设就寝时间 \(bedtimeSchedule.timeLabel)，已自动开启「\(curve.name)」睡眠温阶")
+        Self.postSleepNotification(
+            title: "🌙 定时就寝已自动开启",
+            body: "已达预设就寝时间 \(bedtimeSchedule.timeLabel)，已自动为您开启「\(curve.name)」智能睡眠温阶。",
+            silent: false
+        )
+    }
+
+    /// 一键启停智能睡眠温阶（全局快捷键 ⌃⌥S 或菜单栏/快捷指令调用）
+    func toggleSleepCurve() {
+        if activeSleepSession != nil {
+            stopSleepCurve()
+        } else {
+            guard let deviceId = devices.first?.id ?? manualDevices.first?.deviceId else {
+                operationNotice = OperationNotice(text: "未找到可用空调设备", isError: true)
+                return
+            }
+            let curve = allSleepCurves.first(where: { $0.name == bedtimeSchedule.curveName }) ?? allSleepCurves.first ?? .standard
+            startSleepCurve(curve: curve, deviceId: deviceId)
+        }
+    }
+
     // MARK: - 智能睡眠温阶调度（v1.9.6）
+
+    /// 获取设备当前室内温度
+    func currentIndoorTemperature(for deviceId: String) -> Double? {
+        AppModel.indoorTemperatureAttribute(in: attributes[deviceId] ?? [:])?.doubleValue
+    }
 
     /// 开启智能睡眠温阶
     func startSleepCurve(curve: SleepCurveConfig, deviceId: String) {
+        // 若当前已有进行中的会话，将其归档为新计划覆盖
+        if let existing = activeSleepSession {
+            archiveSleepSession(existing, endReason: .overridden)
+        }
+
         let now = Date()
-        let session = SleepSession(
+        var session = SleepSession(
             deviceId: deviceId,
             startedAt: now,
             curveConfig: curve,
             currentStageIndex: 0
         )
+
+        // 记录初始执行节点
+        if let initialStage = curve.stages.first {
+            let initialPoint = SleepTrajectoryPoint(
+                timestamp: now,
+                stageIndex: 0,
+                stageName: initialStage.name,
+                targetTemperature: initialStage.targetTemperature,
+                windSpeed: initialStage.windSpeed,
+                powerOn: initialStage.powerOn,
+                indoorTemperature: currentIndoorTemperature(for: deviceId),
+                indoorHumidity: AppModel.indoorHumidityAttribute(in: attributes[deviceId] ?? [:])?.doubleValue
+            )
+            session.trajectory.append(initialPoint)
+        }
+
         self.activeSleepSession = session
         AppLog.log("开启智能睡眠: \(curve.name) 设备=\(deviceId)")
 
@@ -493,6 +918,11 @@ final class AppModel: ObservableObject {
         // 联动夜间熄屏与静音
         if sleepNightDimming {
             applyNightQuietMode(deviceId: deviceId)
+        }
+
+        // 联动睡眠自然白噪音助眠
+        if sleepAmbientSoundEnabled {
+            AmbientSoundEngine.shared.play(type: sleepAmbientSoundType, fadeInDuration: 2.5)
         }
 
         requestNotificationPermission()
@@ -523,7 +953,14 @@ final class AppModel: ObservableObject {
     func stopSleepCurve() {
         guard let session = activeSleepSession else { return }
         AppLog.log("停止智能睡眠: \(session.curveConfig.name)")
+        archiveSleepSession(session, endReason: .userStopped)
         self.activeSleepSession = nil
+
+        // 停止自然环境音
+        if AmbientSoundEngine.shared.isPlaying {
+            AmbientSoundEngine.shared.stop(fadeOutDuration: 1.5)
+        }
+
         operationNotice = OperationNotice(text: "已停止智能睡眠温阶", isError: false)
         wakeScheduler()
         writeWidgetSnapshot(force: true)
@@ -544,31 +981,398 @@ final class AppModel: ObservableObject {
         }
 
         if highestStageIndex > session.currentStageIndex {
+            // 若进入深睡阶段 (阶段索引 >= 1) 且开启深睡自动淡出，平滑淡出助眠音
+            if highestStageIndex >= 1 && sleepAmbientAutoFadeOut && AmbientSoundEngine.shared.isPlaying {
+                AmbientSoundEngine.shared.stop(fadeOutDuration: 25.0)
+                AppLog.log("智能睡眠联动: 已进入深睡阶段，自然白噪音柔和淡出完毕")
+            }
+
             // 推进到新阶段
             activeSleepSession?.currentStageIndex = highestStageIndex
+            activeSleepSession?.compensationOffset = 0.0 // 新阶段开始时重置补偿偏移量
+            activeSleepSession?.lastCompensationCheck = nil
             let stage = session.curveConfig.stages[highestStageIndex]
             AppLog.log("智能睡眠推进: [\(session.curveConfig.name)] 阶段 \(highestStageIndex + 1)/\(session.curveConfig.stages.count): \(stage.name)")
             applySleepStage(stage, deviceId: session.deviceId, curveName: session.curveConfig.name)
 
-            // 如果该阶段为关机，则自动结束当前会话
+            // 追加阶段轨迹节点
+            let point = SleepTrajectoryPoint(
+                timestamp: Date(),
+                stageIndex: highestStageIndex,
+                stageName: stage.name,
+                targetTemperature: stage.targetTemperature,
+                windSpeed: stage.windSpeed,
+                powerOn: stage.powerOn,
+                indoorTemperature: currentIndoorTemperature(for: session.deviceId),
+                indoorHumidity: AppModel.indoorHumidityAttribute(in: attributes[session.deviceId] ?? [:])?.doubleValue
+            )
+            activeSleepSession?.trajectory.append(point)
+
+            // 如果该阶段为关机，则自动结束当前会话并进行晨间唤醒过渡处理
             if !stage.powerOn {
-                AppLog.log("智能睡眠完成并关机，结束会话")
+                AppLog.log("智能睡眠温阶计划结束，执行晨间唤醒过渡: \(sleepMorningTransition.rawValue)")
+                handleMorningWakeTransition(deviceId: session.deviceId, curveName: session.curveConfig.name)
+                if let finishedSession = activeSleepSession {
+                    archiveSleepSession(finishedSession, endReason: .completed)
+                }
                 activeSleepSession = nil
+            }
+            writeWidgetSnapshot(force: true)
+        } else if let active = activeSleepSession, (sleepAdaptiveCompensation || sleepHumidityGuard) {
+            // 同一阶段内定期进行室内温湿度双控自适应补偿检测
+            evaluateAdaptiveCompensation(for: active)
+        }
+    }
+
+    // MARK: - 智能睡眠室内温差自适应补偿与温湿度守护（v1.9.17 / v1.9.19）
+
+    /// 智能睡眠室内温差自适应补偿与温湿度守护检测
+    private func evaluateAdaptiveCompensation(for session: SleepSession) {
+        guard let currentStage = session.currentStage, currentStage.powerOn else { return }
+
+        let now = Date()
+        // 检查冷却时间：距上一次自适应评估至少间隔 10 分钟 (600s)
+        if let lastCheck = session.lastCompensationCheck, now.timeIntervalSince(lastCheck) < 600 {
+            return
+        }
+
+        // 阶段刚启动前 10 分钟不进行补偿，留给空调基础调温响应时间
+        let elapsedMinutes = Int(now.timeIntervalSince(session.startedAt) / 60)
+        let stageStartMinutes = currentStage.afterMinutes
+        guard elapsedMinutes - stageStartMinutes >= 10 else {
+            return
+        }
+
+        guard let indoorTemp = currentIndoorTemperature(for: session.deviceId) else {
+            return
+        }
+
+        let baseTemp = currentStage.targetTemperature
+        let delta = indoorTemp - baseTemp // 室内温度与阶段目标温度之差
+        var newOffset = session.compensationOffset
+
+        // 1. 防过冷保护：室温比目标还低 1.5°C 以上（如设 26°C，室温已降到 24.3°C），提高设定温度防止受凉
+        if delta < -1.5 {
+            newOffset = min(session.compensationOffset + 0.5, 1.0)
+        }
+        // 2. 防闷热保护：室温比目标高 2.0°C 以上（如设 26°C，室温依然有 28.2°C），适度下调
+        else if delta > 2.0 {
+            newOffset = max(session.compensationOffset - 0.5, -1.0)
+        }
+        // 3. 舒适区间平稳回归：室温在 ±0.8°C 舒适死区内，且已有补偿偏移，逐步回归基准温度
+        else if abs(delta) <= 0.8 && session.compensationOffset != 0.0 {
+            if session.compensationOffset > 0 {
+                newOffset = max(session.compensationOffset - 0.5, 0.0)
+            } else {
+                newOffset = min(session.compensationOffset + 0.5, 0.0)
+            }
+        }
+
+        // 4. 温湿度双控健康守护联动（v1.9.19）
+        let indoorHum = AppModel.indoorHumidityAttribute(in: attributes[session.deviceId] ?? [:])?.doubleValue
+        var humTag = ""
+
+        if sleepHumidityGuard, let hum = indoorHum {
+            // 湿度过高 (> 70%): 体感黏腻闷热，适度下调 0.5°C 舒爽控湿
+            if hum > 70.0 && newOffset > -1.0 {
+                newOffset = max(newOffset - 0.5, -1.0)
+                humTag = " · 高湿控湿"
+                AppLog.log("智能睡眠温湿度守护: 室内湿度 \(hum)% 偏高，微调降温促进舒爽控湿")
+            }
+            // 湿度过低 (< 40%): 环境干燥，微调上调 0.5°C 减轻空调抽湿，守护呼吸道
+            else if hum < 40.0 && newOffset < 1.0 {
+                newOffset = min(newOffset + 0.5, 1.0)
+                humTag = " · 低湿柔护"
+                AppLog.log("智能睡眠温湿度守护: 室内湿度 \(hum)% 偏干，微调升温减轻干燥")
+            }
+        }
+
+        activeSleepSession?.lastCompensationCheck = now
+
+        if newOffset != session.compensationOffset {
+            activeSleepSession?.compensationOffset = newOffset
+            let effectiveTemp = baseTemp + newOffset
+            // 下发补偿微调温度
+            sendAttribute("targetTemperature", value: .double(effectiveTemp), deviceId: session.deviceId)
+
+            let sign = newOffset > 0 ? "+" : ""
+            let offsetText = "\(sign)\(String(format: "%.1f", newOffset))°C"
+            AppLog.log("智能睡眠温差自适应补偿: [\(session.curveConfig.name)] 阶段「\(currentStage.name)」室温=\(String(format: "%.1f", indoorTemp))°C，基准=\(baseTemp)°C，自适应微调 \(offsetText)\(humTag) -> 有效设定=\(effectiveTemp)°C")
+
+            // 记录补偿轨迹点
+            let point = SleepTrajectoryPoint(
+                timestamp: now,
+                stageIndex: session.currentStageIndex,
+                stageName: "\(currentStage.name) (自适应 \(offsetText)\(humTag))",
+                targetTemperature: effectiveTemp,
+                windSpeed: currentStage.windSpeed,
+                powerOn: true,
+                indoorTemperature: indoorTemp,
+                indoorHumidity: indoorHum
+            )
+            activeSleepSession?.trajectory.append(point)
+
+            if !sleepNotificationDND {
+                let humNotice = (humTag.isEmpty || indoorHum == nil) ? "" : "，室内湿度 \(String(format: "%.0f%%", indoorHum!))\(humTag)"
+                Self.postSleepNotification(
+                    title: "🌙 智能睡眠自适应守护",
+                    body: "监测到室温 \(String(format: "%.1f°C", indoorTemp))\(humNotice)，已自动微调设定温度至 \(String(format: "%.1f°C", effectiveTemp))（\(offsetText)）"
+                )
             }
             writeWidgetSnapshot(force: true)
         }
     }
 
-    /// 下发阶段指令并发送系统通知
-    private func applySleepStage(_ stage: SleepStage, deviceId: String, curveName: String) {
-        if !stage.powerOn {
-            // 关机
+    // MARK: - 智能睡眠历史记录管理（v1.9.16）
+
+    /// 归档一次睡眠会话到历史记录
+    func archiveSleepSession(_ session: SleepSession, endReason: SleepEndReason) {
+        let devName = devices.first(where: { $0.id == session.deviceId })?.deviceName
+            ?? manualDevices.first(where: { $0.deviceId == session.deviceId })?.name
+            ?? "海尔空调"
+        let record = SleepRecord(
+            curveName: session.curveConfig.name,
+            deviceId: session.deviceId,
+            deviceName: devName,
+            startedAt: session.startedAt,
+            endedAt: Date(),
+            endReason: endReason,
+            trajectory: session.trajectory
+        )
+        // 插入最前，保留最近 50 条
+        sleepHistory.insert(record, at: 0)
+        if sleepHistory.count > 50 {
+            sleepHistory = Array(sleepHistory.prefix(50))
+        }
+        AppLog.log("归档睡眠温阶记录: \(record.curveName), 原因: \(endReason.rawValue), 阶段数: \(record.trajectory.count)")
+    }
+
+    /// 删除单条睡眠历史记录
+    func deleteSleepRecord(id: UUID) {
+        sleepHistory.removeAll { $0.id == id }
+        AppLog.log("删除睡眠历史记录: \(id)")
+    }
+
+    /// 清空全部睡眠历史记录
+    func clearAllSleepHistory() {
+        sleepHistory.removeAll()
+        AppLog.log("清空所有睡眠历史记录")
+    }
+
+    // MARK: - 智能睡眠历史数据导出与分享（v1.9.19）
+
+    /// 导出睡眠历史为标准 CSV 字符串（UTF-8 BOM，支持 Excel / Numbers 完美解析）
+    func exportSleepHistoryCSV() -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+
+        var csv = "\u{FEFF}" // UTF-8 BOM
+        csv += "记录ID,方案名称,设备ID,设备名称,开始时间,结束时间,持续时长(分钟),结束原因,阶段序号,阶段名称,设定温度(°C),风速,开关状态,实测室温(°C),实测湿度(%)\n"
+
+        for rec in sleepHistory {
+            let startStr = formatter.string(from: rec.startedAt)
+            let endStr = formatter.string(from: rec.endedAt)
+            let baseFields = [
+                rec.id.uuidString,
+                rec.curveName,
+                rec.deviceId,
+                rec.deviceName,
+                startStr,
+                endStr,
+                "\(rec.durationMinutes)",
+                rec.endReason.rawValue
+            ]
+
+            if rec.trajectory.isEmpty {
+                let row = (baseFields + ["", "", "", "", "", "", ""]).map { "\"\($0.replacingOccurrences(of: "\"", with: "\"\""))\"" }.joined(separator: ",")
+                csv += row + "\n"
+            } else {
+                for pt in rec.trajectory {
+                    let ptFields = [
+                        "\(pt.stageIndex + 1)",
+                        pt.stageName,
+                        String(format: "%.1f", pt.targetTemperature),
+                        pt.windSpeed,
+                        pt.powerOn ? "开机" : "关机",
+                        pt.indoorTemperature != nil ? String(format: "%.1f", pt.indoorTemperature!) : "",
+                        pt.indoorHumidity != nil ? String(format: "%.0f", pt.indoorHumidity!) : ""
+                    ]
+                    let row = (baseFields + ptFields).map { "\"\($0.replacingOccurrences(of: "\"", with: "\"\""))\"" }.joined(separator: ",")
+                    csv += row + "\n"
+                }
+            }
+        }
+        return csv
+    }
+
+    /// 保存睡眠历史 CSV 文件（打开系统原生保存面板）
+    func exportSleepHistoryToCSVFile() {
+        guard !sleepHistory.isEmpty else {
+            operationNotice = OperationNotice(text: "暂无睡眠历史可供导出", isError: true)
+            return
+        }
+        let csvContent = exportSleepHistoryCSV()
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyyMMdd_HHmmss"
+        let filename = "HaierAC_SleepHistory_\(formatter.string(from: Date())).csv"
+
+        let panel = NSSavePanel()
+        panel.title = "导出睡眠历史数据"
+        panel.nameFieldStringValue = filename
+        panel.allowedContentTypes = [.commaSeparatedText]
+        panel.canCreateDirectories = true
+
+        if panel.runModal() == .OK, let url = panel.url {
+            do {
+                try csvContent.write(to: url, atomically: true, encoding: .utf8)
+                operationNotice = OperationNotice(text: "已导出睡眠历史 CSV 文件", isError: false)
+            } catch {
+                operationNotice = OperationNotice(text: "保存失败: \(error.localizedDescription)", isError: true)
+            }
+        }
+    }
+
+    /// 复制睡眠历史 CSV 至剪贴板
+    func copySleepHistoryCSVToClipboard() {
+        guard !sleepHistory.isEmpty else {
+            operationNotice = OperationNotice(text: "暂无睡眠历史可供复制", isError: true)
+            return
+        }
+        let csv = exportSleepHistoryCSV()
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.setString(csv, forType: .string)
+        operationNotice = OperationNotice(text: "已复制 \(sleepHistory.count) 条睡眠历史 CSV 到剪贴板", isError: false)
+    }
+
+    /// 生成精美睡眠总结分享卡片并复制到剪贴板
+    func copySleepSummaryCardToClipboard(record: SleepRecord) {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd HH:mm"
+        let startStr = formatter.string(from: record.startedAt)
+        let endStr = formatter.string(from: record.endedAt)
+
+        var lines: [String] = []
+        lines.append("╭─────────────────────────────────────────╮")
+        lines.append("│ 🌙 海尔空调 · 智能睡眠健康报告            │")
+        lines.append("├─────────────────────────────────────────┤")
+        lines.append("│ 方案名称: \(record.curveName)")
+        lines.append("│ 设备名称: \(record.deviceName)")
+        lines.append("│ 运行状态: \(record.endReason.rawValue)")
+        lines.append("│ 睡眠时长: \(record.durationText)")
+        lines.append("│ 时间周期: \(startStr) ~ \(endStr)")
+        if !record.trajectory.isEmpty {
+            lines.append("├─────────────────────────────────────────┤")
+            lines.append("│ 🌡️ 温阶历程轨迹:")
+            let timeFormatter = DateFormatter()
+            timeFormatter.dateFormat = "HH:mm"
+            for pt in record.trajectory {
+                let tStr = timeFormatter.string(from: pt.timestamp)
+                var ptDesc = "│ • \(tStr) \(pt.stageName)"
+                if pt.powerOn {
+                    ptDesc += " -> \(String(format: "%.1f°C", pt.targetTemperature))"
+                } else {
+                    ptDesc += " -> 关机"
+                }
+                if let indoor = pt.indoorTemperature {
+                    ptDesc += " (室温 \(String(format: "%.1f°C", indoor)))"
+                }
+                if let hum = pt.indoorHumidity {
+                    ptDesc += " (湿度 \(String(format: "%.0f%%", hum)))"
+                }
+                lines.append(ptDesc)
+            }
+        }
+        lines.append("╰─────────────────────────────────────────╯")
+        let cardText = lines.joined(separator: "\n")
+
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.setString(cardText, forType: .string)
+        operationNotice = OperationNotice(text: "已生成并复制「\(record.curveName)」睡眠报告卡片", isError: false)
+    }
+
+    // MARK: - 智能睡眠晨间唤醒平滑过渡（v1.9.18）
+
+    /// 执行晨间唤醒平滑过渡处理
+    private func handleMorningWakeTransition(deviceId: String, curveName: String) {
+        switch sleepMorningTransition {
+        case .off:
+            // 直接关机
             sendAttribute("onOffStatus", value: .bool(false), deviceId: deviceId)
             Self.postSleepNotification(
                 title: "🌙 智能睡眠已完成",
                 body: "「\(curveName)」计划已达清晨唤醒时刻，空调已自动关机。",
                 silent: sleepNotificationDND
             )
+
+        case .gentleFan:
+            // 切换为送风模式 + 微风，并设置 30 分钟后自动关机
+            sendAttribute("onOffStatus", value: .bool(true), deviceId: deviceId)
+            sendAttribute("operationMode", value: .string("2"), deviceId: deviceId) // 送风
+            if let windAttr = attributes[deviceId]?["windSpeed"],
+               case .list(let options) = windAttr.valueRange,
+               let match = options.first(where: { $0.desc.contains("微风") || $0.desc.contains("静音") }) {
+                sendAttribute("windSpeed", value: match.data, deviceId: deviceId)
+            }
+            scheduleMorningAutoOff(deviceId: deviceId, minutes: 30)
+            Self.postSleepNotification(
+                title: "🌅 晨间唤醒平滑过渡",
+                body: "「\(curveName)」已平滑过渡至自然微风送风，30 分钟后将自动关机。",
+                silent: sleepNotificationDND
+            )
+
+        case .comfortHold:
+            // 保持开机，设定 26.5°C 恒温微风，并设置 30 分钟后自动关机
+            sendAttribute("onOffStatus", value: .bool(true), deviceId: deviceId)
+            sendAttribute("targetTemperature", value: .double(26.5), deviceId: deviceId)
+            if let windAttr = attributes[deviceId]?["windSpeed"],
+               case .list(let options) = windAttr.valueRange,
+               let match = options.first(where: { $0.desc.contains("微风") || $0.desc.contains("静音") }) {
+                sendAttribute("windSpeed", value: match.data, deviceId: deviceId)
+            }
+            scheduleMorningAutoOff(deviceId: deviceId, minutes: 30)
+            Self.postSleepNotification(
+                title: "🌅 晨间唤醒舒适恒温",
+                body: "「\(curveName)」已平滑过渡至 26.5°C 舒适微风恒温，30 分钟后将自动关机。",
+                silent: sleepNotificationDND
+            )
+        }
+
+        // 联动清晨林鸟唤醒音律
+        if sleepMorningWakeChime {
+            AmbientSoundEngine.shared.play(type: .morningBirds, fadeInDuration: 12.0)
+            AppLog.log("智能睡眠晨间唤醒联动: 播发清晨自然林鸟音律")
+            Task { @MainActor in
+                try? await Task.sleep(nanoseconds: 300_000_000_000) // 5 分钟后自动淡出停止
+                AmbientSoundEngine.shared.stop(fadeOutDuration: 10.0)
+            }
+        }
+    }
+
+    /// 晨间过渡自动延时关机调度
+    private func scheduleMorningAutoOff(deviceId: String, minutes: Int) {
+        let fireDate = Date().addingTimeInterval(TimeInterval(minutes * 60))
+        guard let valJSON = ScheduledAction.valueJSON(.bool(false)) else { return }
+        let action = ScheduledAction(
+            name: "晨间过渡自动关机 (\(minutes)分钟)",
+            deviceId: deviceId,
+            attrName: "onOffStatus",
+            attrDesc: "开关",
+            attrValueJSON: valJSON,
+            fireDate: fireDate,
+            repeatsDaily: false,
+            repeatWeekdays: [],
+            enabled: true
+        )
+        addScheduledAction(action)
+    }
+
+    /// 下发阶段指令并发送系统通知
+    private func applySleepStage(_ stage: SleepStage, deviceId: String, curveName: String) {
+        if !stage.powerOn {
+            // 关机阶段统一交由 handleMorningWakeTransition 处理
+            return
         } else {
             // 确保开机
             sendAttribute("onOffStatus", value: .bool(true), deviceId: deviceId)
@@ -851,6 +1655,10 @@ final class AppModel: ObservableObject {
                 dict["sleepStageName"] = current.name
                 dict["sleepTargetTemp"] = current.targetTemperature
             }
+            dict["sleepCompensationOffset"] = session.compensationOffset
+            if let eff = session.effectiveTargetTemperature {
+                dict["sleepEffectiveTemp"] = eff
+            }
             if let next = session.nextStage {
                 dict["sleepNextStageName"] = next.name
             }
@@ -1012,8 +1820,37 @@ final class AppModel: ObservableObject {
            let saved = try? JSONDecoder().decode([SleepCurveConfig].self, from: data) {
             customSleepCurves = saved
         }
+        if let data = UserDefaults.standard.data(forKey: "sleepHistoryRecords"),
+           let saved = try? JSONDecoder().decode([SleepRecord].self, from: data) {
+            sleepHistory = saved
+        }
         sleepNightDimming = UserDefaults.standard.object(forKey: "sleepNightDimming") as? Bool ?? true
         sleepNotificationDND = UserDefaults.standard.object(forKey: "sleepNotificationDND") as? Bool ?? true
+        sleepAdaptiveCompensation = UserDefaults.standard.object(forKey: "sleepAdaptiveCompensation") as? Bool ?? true
+        sleepHumidityGuard = UserDefaults.standard.object(forKey: "sleepHumidityGuard") as? Bool ?? true
+        if let raw = UserDefaults.standard.string(forKey: "sleepMorningTransition"),
+           let mode = SleepMorningTransitionMode(rawValue: raw) {
+            sleepMorningTransition = mode
+        }
+        if let data = UserDefaults.standard.data(forKey: "bedtimeSchedule"),
+           let saved = try? JSONDecoder().decode(BedtimeSchedule.self, from: data) {
+            bedtimeSchedule = saved
+        }
+
+        filterAccumulatedMinutes = UserDefaults.standard.integer(forKey: "filterAccumulatedMinutes")
+        lastFilterCleanedDate = UserDefaults.standard.object(forKey: "lastFilterCleanedDate") as? Date
+
+        sleepAmbientSoundEnabled = UserDefaults.standard.bool(forKey: "sleepAmbientSoundEnabled")
+        if let rawSound = UserDefaults.standard.string(forKey: "sleepAmbientSoundType"),
+           let soundType = AmbientSoundType(rawValue: rawSound) {
+            sleepAmbientSoundType = soundType
+        }
+        if let vol = UserDefaults.standard.object(forKey: "sleepAmbientSoundVolume") as? Float {
+            sleepAmbientSoundVolume = vol
+        }
+        sleepAmbientAutoFadeOut = UserDefaults.standard.object(forKey: "sleepAmbientAutoFadeOut") as? Bool ?? true
+        sleepMorningWakeChime = UserDefaults.standard.object(forKey: "sleepMorningWakeChime") as? Bool ?? true
+        AmbientSoundEngine.shared.volume = sleepAmbientSoundVolume
 
         setupSleepWakeObservers()
     }

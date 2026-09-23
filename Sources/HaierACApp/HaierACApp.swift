@@ -18,9 +18,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         controller.setup()
         statusItemController = controller
 
-        // 注册全局语音快捷键（Control + Option + A）
+        // 注册全局快捷键（Control + Option + A: 语音, Control + Option + S: 智能睡眠一键启停）
         GlobalHotKeyManager.shared.onHotKeyPressed = {
             VoiceCapsuleWindowController.shared.toggle()
+        }
+        GlobalHotKeyManager.shared.onSleepHotKeyPressed = {
+            AppModel.shared.toggleSleepCurve()
         }
         GlobalHotKeyManager.shared.registerDefaultHotKey()
 
@@ -52,16 +55,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             model.stopSleepCurve()
         } else if action == "start" || url.path == "/start" {
             guard let deviceId = model.devices.first?.id ?? model.manualDevices.first?.deviceId else { return }
-            let curve = model.allSleepCurves.first ?? .standard
+            let curve = model.allSleepCurves.first(where: { $0.name == model.bedtimeSchedule.curveName }) ?? model.allSleepCurves.first ?? .standard
             model.startSleepCurve(curve: curve, deviceId: deviceId)
         } else if action == "toggle" || url.path == "/toggle" {
-            if model.activeSleepSession != nil {
-                model.stopSleepCurve()
-            } else {
-                guard let deviceId = model.devices.first?.id ?? model.manualDevices.first?.deviceId else { return }
-                let curve = model.allSleepCurves.first ?? .standard
-                model.startSleepCurve(curve: curve, deviceId: deviceId)
-            }
+            model.toggleSleepCurve()
         }
     }
 
