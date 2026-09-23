@@ -178,17 +178,9 @@ public final class VoiceCapsuleWindowController: NSObject, NSWindowDelegate {
                 model.sendAttribute("operationMode", value: match.data, deviceId: deviceId)
                 VoiceControlManager.shared.markSuccess("已切换至「\(match.desc)」模式")
             } else {
-                // 常见模式回退
-                let fallbackValue: String
-                switch modeName {
-                case "制冷": fallbackValue = "0"
-                case "除湿": fallbackValue = "1"
-                case "送风": fallbackValue = "2"
-                case "制热": fallbackValue = "4"
-                case "自动": fallbackValue = "6"
-                default: fallbackValue = "0"
-                }
-                model.sendAttribute("operationMode", value: .string(fallbackValue), deviceId: deviceId)
+                // 常见模式回退（统一采用 ACModeCode 标准码表：0=制冷, 1=制热, 2=送风, 3=除湿, 6=自动）
+                let matched = ACModeCode.match(from: modeName)
+                model.sendAttribute("operationMode", value: .string(matched.rawValue), deviceId: deviceId)
                 VoiceControlManager.shared.markSuccess("已切换至「\(modeName)」模式")
             }
 

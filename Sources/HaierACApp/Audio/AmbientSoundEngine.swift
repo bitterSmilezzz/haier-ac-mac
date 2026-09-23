@@ -46,6 +46,9 @@ public final class AmbientSoundEngine: ObservableObject {
         didSet {
             let clamped = min(max(volume, 0.0), 1.0)
             targetVolume = clamped
+            if isPlaying, let engine = engine, engine.isRunning {
+                smoothGainTransition(to: clamped, duration: 0.2)
+            }
         }
     }
 
@@ -77,6 +80,34 @@ public final class AmbientSoundEngine: ObservableObject {
 
     private init() {}
 
+    /// 平滑过渡 activeGain 至目标增益，杜绝音量骤变/拖拽导致的爆音与破音
+    private func smoothGainTransition(to target: Float, duration: TimeInterval = 0.25) {
+        fadeGeneration &+= 1
+        let currentGen = fadeGeneration
+        fadeTimer?.cancel()
+
+        let startGain = activeGain
+        let diff = target - startGain
+        if abs(diff) < 0.005 || duration <= 0.02 {
+            activeGain = target
+            return
+        }
+
+        let steps = 20
+        let stepTime = max(0.01, duration / Double(steps))
+        let gainStep = diff / Float(steps)
+
+        fadeTimer = Task { @MainActor in
+            for _ in 0..<steps {
+                try? await Task.sleep(nanoseconds: UInt64(stepTime * 1_000_000_000))
+                guard !Task.isCancelled, self.fadeGeneration == currentGen else { return }
+                self.activeGain += gainStep
+            }
+            guard !Task.isCancelled, self.fadeGeneration == currentGen else { return }
+            self.activeGain = target
+        }
+    }
+
     /// 播放指定环境音（支持平滑淡入与平滑声型切换）
     public func play(type: AmbientSoundType? = nil, fadeInDuration: TimeInterval = 2.0) {
         if let type = type {
@@ -86,31 +117,12 @@ public final class AmbientSoundEngine: ObservableObject {
 
         guard let engine = engine else { return }
 
-        fadeGeneration &+= 1
-        let currentGen = fadeGeneration
-        fadeTimer?.cancel()
-
         targetVolume = min(max(volume, 0.0), 1.0)
         isPlaying = true
 
         if engine.isRunning {
-            // 如果已在运行，平滑过渡音量至目标值
-            if activeGain < targetVolume {
-                fadeTimer = Task { @MainActor in
-                    let steps = 25
-                    let stepTime = max(0.01, fadeInDuration / Double(steps))
-                    let gainStep = (self.targetVolume - self.activeGain) / Float(steps)
-                    for _ in 0..<steps {
-                        try? await Task.sleep(nanoseconds: UInt64(stepTime * 1_000_000_000))
-                        guard !Task.isCancelled, self.fadeGeneration == currentGen else { return }
-                        self.activeGain = min(self.targetVolume, self.activeGain + gainStep)
-                    }
-                    guard !Task.isCancelled, self.fadeGeneration == currentGen else { return }
-                    self.activeGain = self.targetVolume
-                }
-            } else {
-                self.activeGain = self.targetVolume
-            }
+            // 如果已在运行，平滑过渡音量至目标值（双向渐变，防范调小音量时的爆音）
+            smoothGainTransition(to: targetVolume, duration: min(1.0, fadeInDuration))
             AppLog.log("助眠音频引擎: 切换音律为「\(currentType.rawValue)」")
             return
         }
@@ -118,20 +130,7 @@ public final class AmbientSoundEngine: ObservableObject {
         do {
             try engine.start()
             activeGain = 0.0
-
-            // 平滑淡入
-            fadeTimer = Task { @MainActor in
-                let steps = 40
-                let stepTime = max(0.01, fadeInDuration / Double(steps))
-                let gainStep = self.targetVolume / Float(steps)
-                for _ in 0..<steps {
-                    try? await Task.sleep(nanoseconds: UInt64(stepTime * 1_000_000_000))
-                    guard !Task.isCancelled, self.fadeGeneration == currentGen else { return }
-                    self.activeGain = min(self.targetVolume, self.activeGain + gainStep)
-                }
-                guard !Task.isCancelled, self.fadeGeneration == currentGen else { return }
-                self.activeGain = self.targetVolume
-            }
+            smoothGainTransition(to: targetVolume, duration: fadeInDuration)
             AppLog.log("助眠音频引擎: 启动播放「\(currentType.rawValue)」")
         } catch {
             AppLog.log("⚠️ 助眠音频引擎启动失败: \(error.localizedDescription)")

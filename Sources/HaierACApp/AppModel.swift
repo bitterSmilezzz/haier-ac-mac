@@ -470,6 +470,9 @@ final class AppModel: ObservableObject {
     /// 是否展示滤网保养与自清洁弹窗 (支持菜单栏/外部直接路由呼出)
     @Published public var showFilterCareSheet: Bool = false
 
+    /// 滤网标准使用寿命与建议保养周期（250 小时，折算 15,000 分钟）
+    public static let filterServiceLifeMinutes: Int = 250 * 60
+
     /// 各设备独立滤网累计开机运行分钟数 [deviceId: minutes]
     @Published var deviceFilterMinutes: [String: Int] = [:] {
         didSet {
@@ -484,6 +487,15 @@ final class AppModel: ObservableObject {
         didSet {
             if let data = try? JSONEncoder().encode(deviceFilterCleanedDates) {
                 UserDefaults.standard.set(data, forKey: "deviceFilterCleanedDates")
+            }
+        }
+    }
+
+    /// 各设备滤网健康告警上次通知时间（落盘持久化，杜绝重启重复弹窗）
+    @Published var deviceFilterAlertDates: [String: Date] = [:] {
+        didSet {
+            if let data = try? JSONEncoder().encode(deviceFilterAlertDates) {
+                UserDefaults.standard.set(data, forKey: "deviceFilterAlertDates")
             }
         }
     }
@@ -512,9 +524,9 @@ final class AppModel: ObservableObject {
         return nil
     }
 
-    /// 指定设备的滤网清洁度百分比 (0 ~ 100%)，基于 250 小时 (15,000 分钟) 建议保养周期
+    /// 指定设备的滤网清洁度百分比 (0 ~ 100%)，基于建议保养周期
     public func filterCleanlinessPercentage(for deviceId: String) -> Int {
-        let maxMinutes = 250 * 60
+        let maxMinutes = Self.filterServiceLifeMinutes
         let minutes = filterAccumulatedMinutes(for: deviceId)
         let remaining = max(0, maxMinutes - minutes)
         return Int(Double(remaining) / Double(maxMinutes) * 100.0)
@@ -524,7 +536,7 @@ final class AppModel: ObservableObject {
     var filterCleanlinessPercentage: Int {
         let allIds = devices.map(\.id) + manualDevices.map(\.deviceId)
         guard !allIds.isEmpty else {
-            let maxMinutes = 250 * 60
+            let maxMinutes = Self.filterServiceLifeMinutes
             let remaining = max(0, maxMinutes - filterAccumulatedMinutes)
             return Int(Double(remaining) / Double(maxMinutes) * 100.0)
         }
@@ -539,6 +551,7 @@ final class AppModel: ObservableObject {
         if !targetId.isEmpty {
             deviceFilterMinutes[targetId] = 0
             deviceFilterCleanedDates[targetId] = Date()
+            deviceFilterAlertDates[targetId] = nil
         }
         if targetId == primaryId || targetId.isEmpty {
             filterAccumulatedMinutes = 0
@@ -574,22 +587,23 @@ final class AppModel: ObservableObject {
             windFactor = 1.00 // 自动风速默认基准
         }
 
-        // 2. 冷凝结露与环境潮湿附着因子（制冷/除湿蒸发器凝露使滤网更易吸附粉尘并滋生微生物）
+        // 2. 冷凝结露与环境潮湿附着因子（采用 ACModeCode 标准码表，修复送风/除湿反向倒挂）
         let modeFactor: Double
-        let m = mode.lowercased()
-        if m == "0" || m.contains("制冷") || m.contains("cool") {
+        let modeCode = ACModeCode.match(from: mode)
+        switch modeCode {
+        case .cooling:
             if let indoor = indoorTemp, indoor > targetTemp {
                 modeFactor = 1.35
             } else {
                 modeFactor = 1.20
             }
-        } else if m == "2" || m.contains("除湿") || m.contains("dehum") {
+        case .dehumidify:
             modeFactor = 1.30
-        } else if m == "4" || m.contains("制热") || m.contains("heat") {
+        case .heating:
             modeFactor = 1.05
-        } else if m == "6" || m.contains("送风") || m.contains("fan") {
+        case .fan:
             modeFactor = 0.85
-        } else {
+        case .auto:
             modeFactor = 1.00
         }
 
@@ -609,18 +623,15 @@ final class AppModel: ObservableObject {
         checkFilterHealthAlert(deviceId: deviceId, minutes: updated)
     }
 
-    private var lastFilterAlertDates: [String: Date] = [:]
-
     private func checkFilterHealthAlert(deviceId: String, minutes: Int) {
-        let maxMinutes = 250 * 60
-        let percentage = Int(Double(max(0, maxMinutes - minutes)) / Double(maxMinutes) * 100.0)
+        let percentage = filterCleanlinessPercentage(for: deviceId)
         guard percentage <= 20 else { return }
 
-        let lastAlert = lastFilterAlertDates[deviceId]
+        let lastAlert = deviceFilterAlertDates[deviceId]
         if let last = lastAlert, Date().timeIntervalSince(last) < 7 * 86400 {
             return
         }
-        lastFilterAlertDates[deviceId] = Date()
+        deviceFilterAlertDates[deviceId] = Date()
 
         let devName = devices.first(where: { $0.id == deviceId })?.deviceName ??
                       manualDevices.first(where: { $0.deviceId == deviceId })?.name ?? "海尔空调"
@@ -634,7 +645,12 @@ final class AppModel: ObservableObject {
             trigger: nil
         )
         Task {
-            try? await UNUserNotificationCenter.current().add(req)
+            do {
+                try await UNUserNotificationCenter.current().add(req)
+                AppLog.log("已下发滤网低洁净度保养通知: \(devName) 洁净度 \(percentage)%")
+            } catch {
+                AppLog.log("⚠️ 下发滤网低洁净度通知失败: \(error.localizedDescription)")
+            }
         }
     }
 
@@ -1086,7 +1102,7 @@ final class AppModel: ObservableObject {
         let targetTemp = curve.stages.first?.targetTemperature ?? 25.0
 
         sendAttribute("onOffStatus", value: .bool(true), deviceId: deviceId)
-        sendAttribute("operationMode", value: .string("0"), deviceId: deviceId) // 制冷模式
+        sendAttribute("operationMode", value: .string(ACModeCode.cooling.rawValue), deviceId: deviceId) // 制冷模式
         sendAttribute("targetTemperature", value: .double(targetTemp), deviceId: deviceId)
         sendAttribute("windSpeed", value: .string("微风"), deviceId: deviceId)
 
@@ -1566,7 +1582,7 @@ final class AppModel: ObservableObject {
         case .gentleFan:
             // 切换为送风模式 + 微风，并设置 30 分钟后自动关机
             sendAttribute("onOffStatus", value: .bool(true), deviceId: deviceId)
-            sendAttribute("operationMode", value: .string("2"), deviceId: deviceId) // 送风
+            sendAttribute("operationMode", value: .string(ACModeCode.fan.rawValue), deviceId: deviceId) // 送风
             if let windAttr = attributes[deviceId]?["windSpeed"],
                case .list(let options) = windAttr.valueRange,
                let match = options.first(where: { $0.desc.contains("微风") || $0.desc.contains("静音") }) {
@@ -2104,6 +2120,10 @@ final class AppModel: ObservableObject {
         if let data = UserDefaults.standard.data(forKey: "deviceFilterCleanedDates"),
            let saved = try? JSONDecoder().decode([String: Date].self, from: data) {
             deviceFilterCleanedDates = saved
+        }
+        if let data = UserDefaults.standard.data(forKey: "deviceFilterAlertDates"),
+           let saved = try? JSONDecoder().decode([String: Date].self, from: data) {
+            deviceFilterAlertDates = saved
         }
 
         sleepAmbientSoundEnabled = UserDefaults.standard.bool(forKey: "sleepAmbientSoundEnabled")

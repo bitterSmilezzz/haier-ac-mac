@@ -167,7 +167,7 @@ struct FilterCareSheet: View {
                         .clipShape(Capsule())
                     }
 
-                    Text("空气动力学等效工时: \(String(format: "%.1f", runningHours)) / 250 小时（含风量与凝露加权）")
+                    Text("空气动力学等效工时: \(String(format: "%.1f", runningHours)) / \(AppModel.filterServiceLifeMinutes / 60) 小时（含风量与凝露加权）")
                         .font(.system(size: 12))
                         .foregroundStyle(Theme.inkSubtle)
 
@@ -183,8 +183,11 @@ struct FilterCareSheet: View {
                         }
 
                         if cleanlinessPercentage > 0 {
-                            let estDays = max(1, Int(Double(250 * 60 - model.filterAccumulatedMinutes(for: currentDeviceId)) / (6.0 * 60.0)))
-                            Text("• 预计还可使用约 \(estDays) 天")
+                            let standardDailyHours: Double = 6.0
+                            let remainingMinutes = Double(max(0, AppModel.filterServiceLifeMinutes - model.filterAccumulatedMinutes(for: currentDeviceId)))
+                            let effectiveDailyMinutes = standardDailyHours * 60.0 * max(0.5, currentWearFactor)
+                            let estDays = max(1, Int(ceil(remainingMinutes / effectiveDailyMinutes)))
+                            Text("• 按日均 6h 及当前工况估算约可用 \(estDays) 天")
                                 .font(.system(size: 11))
                                 .foregroundStyle(Theme.inkTertiary)
                         }

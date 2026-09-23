@@ -16,11 +16,24 @@ struct EcoEnergySection: View {
     }
 
     private var ecoScore: Int {
-        let firstDevId = model.devices.first?.id ?? model.manualDevices.first?.deviceId ?? ""
-        let targetTemp = model.attribute("targetTemperature", deviceId: firstDevId)?.doubleValue
+        // 全屋多设备运行加权能效评分 (v1.9.23)
+        let runningDevices = model.devices.filter {
+            model.attribute("onOffStatus", deviceId: $0.id)?.boolValue == true
+        }
+        let targetTemps = runningDevices.compactMap {
+            model.attribute("targetTemperature", deviceId: $0.id)?.doubleValue
+        }
+        let avgTarget: Double? = {
+            if !targetTemps.isEmpty {
+                return targetTemps.reduce(0.0, +) / Double(targetTemps.count)
+            }
+            let fallbackId = model.menuBarDeviceId ?? model.devices.first?.id ?? model.manualDevices.first?.deviceId ?? ""
+            return model.attribute("targetTemperature", deviceId: fallbackId)?.doubleValue
+        }()
+
         return energyEngine.calculateEcoScore(
             activeSleepSession: model.activeSleepSession != nil,
-            targetTemp: targetTemp
+            targetTemp: avgTarget
         )
     }
 

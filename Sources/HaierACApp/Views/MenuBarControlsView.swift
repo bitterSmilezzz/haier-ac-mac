@@ -26,7 +26,8 @@ struct MenuBarControlsView: View {
     }
 
     private var currentDevice: DeviceInfo? {
-        if let selectedDeviceId, let device = activeDevices.first(where: { $0.id == selectedDeviceId }) {
+        let targetId = selectedDeviceId ?? model.menuBarDeviceId
+        if let targetId, let device = activeDevices.first(where: { $0.id == targetId }) {
             return device
         }
         return activeDevices.first
@@ -96,6 +97,15 @@ struct MenuBarControlsView: View {
         .overlay(alignment: .top) {
             OperationToast()
                 .padding(.top, 4)
+        }
+        .animation(Theme.springSmooth, value: currentDevice?.id)
+        .onAppear {
+            if selectedDeviceId == nil {
+                selectedDeviceId = model.menuBarDeviceId ?? activeDevices.first?.id
+            }
+            if selectedSleepCurveId == nil {
+                selectedSleepCurveId = model.allSleepCurves.first?.id
+            }
         }
     }
 

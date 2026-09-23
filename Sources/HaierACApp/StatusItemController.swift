@@ -57,13 +57,17 @@ final class StatusItemController: NSObject {
     private func refreshTemperature() {
         guard let button = statusItem?.button else { return }
 
-        // 状态栏图标与标题动态感知 (v1.9.22)
+        // 状态栏图标与标题动态感知 (v1.9.23)
         if model.isSelfCleaningActive {
             let m = model.selfCleaningRemainingSeconds / 60
             let s = model.selfCleaningRemainingSeconds % 60
             button.image = NSImage(systemSymbolName: "sparkles", accessibilityDescription: "蒸发器自清洁")
             button.image?.isTemplate = true
-            button.title = " 56°C (\(String(format: "%02d:%02d", m, s)))"
+            if model.menuBarShowTemperature {
+                button.title = " 56°C (\(String(format: "%02d:%02d", m, s)))"
+            } else {
+                button.title = " (\(String(format: "%02d:%02d", m, s)))"
+            }
         } else if model.activeSleepSession != nil {
             button.image = NSImage(systemSymbolName: "moon.fill", accessibilityDescription: "睡眠曲线运行中")
             button.image?.isTemplate = true
@@ -84,33 +88,61 @@ final class StatusItemController: NSObject {
         button.imagePosition = .imageLeft
         statusItem?.length = NSStatusItem.variableLength
 
-        // 动态构建悬浮 Tooltip 状态概览 (v1.9.21)
+        // 动态构建悬浮 Tooltip 状态概览 (v1.9.23 增强多设备与整屋瞬时用电展示)
         var tooltipParts: [String] = ["海尔空调控制"]
-        let deviceId = model.menuBarDeviceId ?? model.devices.first?.id ?? model.manualDevices.first?.deviceId
-        if let deviceId = deviceId {
-            let devName = model.devices.first(where: { $0.id == deviceId })?.deviceName ??
-                          model.manualDevices.first(where: { $0.deviceId == deviceId })?.name ?? "空调"
-            let attrs = model.attributes[deviceId] ?? [:]
-            let isPowerOn = attrs["onOffStatus"]?.boolValue ?? false
-            let mode = attrs["operationMode"]?.value?.stringValue ?? "制冷"
-            let targetTemp = attrs["targetTemperature"]?.doubleValue ?? 26.0
-            let indoorTemp = model.currentIndoorTemperature(for: deviceId)
+        let allDevices = model.devices
+        if !allDevices.isEmpty {
+            for dev in allDevices {
+                let devId = dev.id
+                let devName = dev.deviceName
+                let attrs = model.attributes[devId] ?? [:]
+                let isPowerOn = attrs["onOffStatus"]?.boolValue ?? false
+                let rawMode = attrs["operationMode"]?.value?.stringValue
+                let modeCode = ACModeCode.match(from: rawMode)
+                let targetTemp = attrs["targetTemperature"]?.doubleValue ?? 26.0
+                let indoorTemp = model.currentIndoorTemperature(for: devId)
+                let isCurrentTarget = (devId == (model.menuBarDeviceId ?? allDevices.first?.id))
 
-            if isPowerOn {
-                var line = "📍 \(devName): 开机中 | 模式: \(mode) | 设定: \(String(format: "%.0f°C", targetTemp))"
-                if let indoor = indoorTemp {
-                    line += " | 室内: \(String(format: "%.1f°C", indoor))"
+                let starPrefix = isCurrentTarget ? "★" : " "
+                if isPowerOn {
+                    let modeGlyph: String
+                    switch modeCode {
+                    case .cooling: modeGlyph = "❄️ 制冷"
+                    case .heating: modeGlyph = "🔥 制热"
+                    case .fan: modeGlyph = "🍃 送风"
+                    case .dehumidify: modeGlyph = "💧 除湿"
+                    case .auto: modeGlyph = "🔄 自动"
+                    }
+                    var line = "\(starPrefix) \(devName): \(modeGlyph) \(String(format: "%.0f°C", targetTemp))"
+                    if let indoor = indoorTemp {
+                        line += " (室内 \(String(format: "%.1f°C", indoor)))"
+                    }
+                    tooltipParts.append(line)
+                } else {
+                    tooltipParts.append("\(starPrefix) \(devName): 关机待机")
                 }
-                tooltipParts.append(line)
+            }
+        } else if let devId = model.menuBarDeviceId ?? model.manualDevices.first?.deviceId {
+            let devName = model.manualDevices.first(where: { $0.deviceId == devId })?.name ?? "空调"
+            let attrs = model.attributes[devId] ?? [:]
+            let isPowerOn = attrs["onOffStatus"]?.boolValue ?? false
+            if isPowerOn {
+                tooltipParts.append("📍 \(devName): 开机中")
             } else {
                 tooltipParts.append("📍 \(devName): 关机待机中")
             }
         }
 
+        // 瞬时总功率 (v1.9.23)
+        let instantPower = EnergyAnalyticsEngine.shared.currentInstantaneousPower
+        if instantPower > 10.0 {
+            tooltipParts.append("⚡️ 全屋空调瞬时功率: \(Int(round(instantPower))) W")
+        }
+
         if model.isSelfCleaningActive {
             let m = model.selfCleaningRemainingSeconds / 60
             let s = model.selfCleaningRemainingSeconds % 60
-            tooltipParts.append("🔥 56°C 高温除菌自清洁进行中 (剩余 \(String(format: "%02d:%02d", m, s)))")
+            tooltipParts.append("✨ 56°C 高温除菌自清洁进行中 (剩余 \(String(format: "%02d:%02d", m, s)))")
         }
 
         if let session = model.activeSleepSession {
@@ -121,7 +153,12 @@ final class StatusItemController: NSObject {
             tooltipParts.append("🎵 助眠白噪音播放中 (\(model.sleepAmbientSoundType.displayName))")
         }
 
-        tooltipParts.append("💡 左键点击呼出快捷控制面板，右键点击展开系统菜单")
+        let filterClean = model.filterCleanlinessPercentage
+        if filterClean <= 30 {
+            tooltipParts.append("⚠️ 滤网洁净度较低 (\(filterClean)%)，建议拆洗保养")
+        }
+
+        tooltipParts.append("💡 左键呼出快捷控制面板，右键展开系统菜单")
         button.toolTip = tooltipParts.joined(separator: "\n")
     }
 
@@ -144,26 +181,33 @@ final class StatusItemController: NSObject {
         }
     }
 
+    private var lastAppliedColorScheme: ColorScheme?
+
     private func showPanel(relativeTo button: NSButton) {
+        let currentScheme = model.themeMode.colorScheme
         let popover: NSPopover
         if let existing = self.popover {
             popover = existing
-            if let host = popover.contentViewController as? NSHostingController<AnyView> {
+            // 只有当主题方案发生变化时才更新 rootView，避免不必要地销毁重建视图树丢失状态
+            if lastAppliedColorScheme != currentScheme,
+               let host = popover.contentViewController as? NSHostingController<AnyView> {
+                lastAppliedColorScheme = currentScheme
                 host.rootView = AnyView(
                     MenuBarControlsView()
                         .environmentObject(model)
-                        .preferredColorScheme(model.themeMode.colorScheme)
+                        .preferredColorScheme(currentScheme)
                 )
             }
         } else {
             popover = NSPopover()
             popover.behavior = .transient  // 点击外部自动关闭；关闭时销毁，无幽灵窗口
             popover.animates = true
+            lastAppliedColorScheme = currentScheme
             let host = NSHostingController(
                 rootView: AnyView(
                     MenuBarControlsView()
                         .environmentObject(model)
-                        .preferredColorScheme(model.themeMode.colorScheme)
+                        .preferredColorScheme(currentScheme)
                 )
             )
             popover.contentViewController = host

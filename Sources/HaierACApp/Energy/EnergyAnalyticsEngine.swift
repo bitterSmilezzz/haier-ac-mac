@@ -1,4 +1,5 @@
 import Foundation
+import HaierACCore
 
 /// 每日用电能耗历史记录
 ///
@@ -126,7 +127,6 @@ public final class EnergyAnalyticsEngine: ObservableObject {
             return 1.5 // 待机微功耗 1.5W
         }
 
-        let mode = modeCode ?? "0"
         let windOffset: Double = {
             guard let wind = windSpeed?.lowercased() else { return 40.0 }
             if wind.contains("微") || wind.contains("静") { return 15.0 }
@@ -138,31 +138,44 @@ public final class EnergyAnalyticsEngine: ObservableObject {
         }()
 
         var power: Double = 400.0
+        let mode = ACModeCode.match(from: modeCode)
 
         switch mode {
-        case "2":
+        case .fan:
             // 送风模式：仅室内风机运转，极其省电
             power = 15.0 + windOffset * 0.4
             return min(max(power, 15.0), 65.0)
 
-        case "3":
+        case .dehumidify:
             // 除湿模式：低频恒定除湿
             power = 420.0 + windOffset * 0.5
             return min(max(power, 300.0), 600.0)
 
-        case "1":
+        case .heating:
             // 制热模式：基准功率较高
             let delta = max(0.0, (targetTemp ?? 20.0) - (indoorTemp ?? 18.0))
             power = 550.0 + (delta * 110.0) + windOffset
             return min(max(power, 220.0), 1650.0)
 
-        case "0":
-            fallthrough
-        default:
+        case .cooling:
             // 制冷模式：温差驱动变频功率
             let delta = max(0.0, (indoorTemp ?? 26.0) - (targetTemp ?? 25.0))
             power = 380.0 + (delta * 95.0) + windOffset
             return min(max(power, 180.0), 1450.0)
+
+        case .auto:
+            // 自动模式：根据室内与设定温差智能判别制冷或制热动力曲线
+            let indoor = indoorTemp ?? 25.0
+            let target = targetTemp ?? 24.0
+            if indoor >= target {
+                let delta = indoor - target
+                power = 380.0 + (delta * 95.0) + windOffset
+                return min(max(power, 180.0), 1450.0)
+            } else {
+                let delta = target - indoor
+                power = 550.0 + (delta * 110.0) + windOffset
+                return min(max(power, 220.0), 1650.0)
+            }
         }
     }
 
@@ -230,12 +243,18 @@ public final class EnergyAnalyticsEngine: ObservableObject {
                 let devKWh = (power * deltaHours) / 1000.0
                 totalIncrementalKWh += devKWh
 
-                switch sample.modeCode ?? "0" {
-                case "0": runningCooling += 1
-                case "1": runningHeating += 1
-                case "2": runningFan += 1
-                case "3": runningDehum += 1
-                default: break
+                let sampleMode = ACModeCode.match(from: sample.modeCode)
+                switch sampleMode {
+                case .cooling: runningCooling += 1
+                case .heating: runningHeating += 1
+                case .fan: runningFan += 1
+                case .dehumidify: runningDehum += 1
+                case .auto:
+                    if (sample.indoorTemp ?? 25.0) >= (sample.targetTemp ?? 24.0) {
+                        runningCooling += 1
+                    } else {
+                        runningHeating += 1
+                    }
                 }
             }
         }

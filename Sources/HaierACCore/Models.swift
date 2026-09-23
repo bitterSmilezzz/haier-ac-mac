@@ -58,6 +58,46 @@ public struct TokenInfo: Codable {
     }
 }
 
+/// 海尔空调标准运行模式码与语义枚举 (v1.9.23 规范化)
+public enum ACModeCode: String, CaseIterable, Codable {
+    case cooling = "0"       // 制冷
+    case heating = "1"       // 制热
+    case fan = "2"           // 送风
+    case dehumidify = "3"    // 除湿
+    case auto = "6"          // 自动 (部分机型使用 4 或 6)
+
+    public var desc: String {
+        switch self {
+        case .cooling: return "制冷"
+        case .heating: return "制热"
+        case .fan: return "送风"
+        case .dehumidify: return "除湿"
+        case .auto: return "自动"
+        }
+    }
+
+    /// 从任意数字字符串或文本描述匹配模式（消除多套码表冲突与数字语义漂移）
+    public static func match(from raw: String?) -> ACModeCode {
+        guard let raw = raw?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased(), !raw.isEmpty else {
+            return .cooling
+        }
+        if let exact = ACModeCode(rawValue: raw) {
+            return exact
+        }
+        if raw == "4" {
+            // 兼容性分支：部分老机型以 4 表示制热，归一化到制热
+            return .heating
+        }
+        if raw.contains("冷") || raw.contains("cool") { return .cooling }
+        if raw.contains("热") || raw.contains("暖") || raw.contains("heat") { return .heating }
+        if raw.contains("风") || raw.contains("fan") { return .fan }
+        if raw.contains("湿") || raw.contains("dry") || raw.contains("dehum") { return .dehumidify }
+        if raw.contains("自") || raw.contains("auto") { return .auto }
+        return .cooling
+    }
+}
+
+
 public struct DeviceInfo: Identifiable, Hashable {
     public let deviceId: String
     public let deviceName: String
