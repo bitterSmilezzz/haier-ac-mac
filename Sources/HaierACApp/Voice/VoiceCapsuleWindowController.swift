@@ -179,7 +179,7 @@ public final class VoiceCapsuleWindowController: NSObject, NSWindowDelegate {
                 VoiceControlManager.shared.markSuccess("已切换至「\(match.desc)」模式")
             } else {
                 // 常见模式回退（统一采用 ACModeCode 标准码表：0=制冷, 1=制热, 2=送风, 3=除湿, 6=自动）
-                let matched = ACModeCode.match(from: modeName)
+                let matched = ACModeCode.match(from: modeName, default: .cooling)
                 model.sendAttribute("operationMode", value: .string(matched.rawValue), deviceId: deviceId)
                 VoiceControlManager.shared.markSuccess("已切换至「\(modeName)」模式")
             }

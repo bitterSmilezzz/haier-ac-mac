@@ -1,6 +1,7 @@
 import Foundation
 import AVFoundation
 import HaierACCore
+import os
 
 /// 助眠自然白噪音与晨间音律类型
 public enum AmbientSoundType: String, CaseIterable, Identifiable, Codable {
@@ -34,6 +35,33 @@ public enum AmbientSoundType: String, CaseIterable, Identifiable, Codable {
     }
 }
 
+/// 实时音频渲染线程安全参数容器（采用 os_unfair_lock 纳秒级轻量锁保护原子快照，消除主线程写入与音频回调读取的 TSAN 数据竞争）
+private final class AudioRenderParameters: @unchecked Sendable {
+    private var lock = os_unfair_lock_s()
+    private var _gain: Float = 0.0
+    private var _type: AmbientSoundType = .springRain
+
+    func setGain(_ gain: Float) {
+        os_unfair_lock_lock(&lock)
+        _gain = gain
+        os_unfair_lock_unlock(&lock)
+    }
+
+    func setType(_ type: AmbientSoundType) {
+        os_unfair_lock_lock(&lock)
+        _type = type
+        os_unfair_lock_unlock(&lock)
+    }
+
+    func snapshot() -> (gain: Float, type: AmbientSoundType) {
+        os_unfair_lock_lock(&lock)
+        let g = _gain
+        let t = _type
+        os_unfair_lock_unlock(&lock)
+        return (g, t)
+    }
+}
+
 /// 纯算法程序化自然助眠音引擎（零外部音频资产依赖，极度轻量低功耗）
 /// 基于 AVAudioEngine 与 AVAudioSourceNode 实时合成春雨、浪涌、微风、夜虫与晨鸟
 @MainActor
@@ -41,7 +69,11 @@ public final class AmbientSoundEngine: ObservableObject {
     public static let shared = AmbientSoundEngine()
 
     @Published public private(set) var isPlaying: Bool = false
-    @Published public var currentType: AmbientSoundType = .springRain
+    @Published public var currentType: AmbientSoundType = .springRain {
+        didSet {
+            renderParams.setType(currentType)
+        }
+    }
     @Published public var volume: Float = 0.5 {
         didSet {
             let clamped = min(max(volume, 0.0), 1.0)
@@ -55,10 +87,15 @@ public final class AmbientSoundEngine: ObservableObject {
     private var engine: AVAudioEngine?
     private var sourceNode: AVAudioSourceNode?
 
-    // 内部实时合成参数
+    // 内部实时合成参数与线程安全同步器 (TSAN 加固)
+    private let renderParams = AudioRenderParameters()
     private var sampleRate: Double = 44100.0
     private var targetVolume: Float = 0.5
-    private var activeGain: Float = 0.0
+    private var activeGain: Float = 0.0 {
+        didSet {
+            renderParams.setGain(activeGain)
+        }
+    }
 
     // 合成器状态
     private struct SynthesisState {
@@ -78,7 +115,10 @@ public final class AmbientSoundEngine: ObservableObject {
     private var fadeTimer: Task<Void, Never>?
     private var fadeGeneration: Int = 0
 
-    private init() {}
+    private init() {
+        renderParams.setGain(0.0)
+        renderParams.setType(.springRain)
+    }
 
     /// 平滑过渡 activeGain 至目标增益，杜绝音量骤变/拖拽导致的爆音与破音
     private func smoothGainTransition(to target: Float, duration: TimeInterval = 0.25) {
@@ -195,18 +235,12 @@ public final class AmbientSoundEngine: ObservableObject {
         let nodeFormat = AVAudioFormat(standardFormatWithSampleRate: sampleRate, channels: 2) ?? outputFormat
 
         var localState = synthState
-        let currentTypeProvider = { [weak self] () -> AmbientSoundType in
-            self?.currentType ?? .springRain
-        }
-        let gainProvider = { [weak self] () -> Float in
-            self?.activeGain ?? 0.0
-        }
+        let params = self.renderParams
         let currentSampleRate = sampleRate
 
         let node = AVAudioSourceNode { _, _, frameCount, audioBufferList -> OSStatus in
             let ablPointer = UnsafeMutableAudioBufferListPointer(audioBufferList)
-            let type = currentTypeProvider()
-            let masterVol = gainProvider()
+            let (masterVol, type) = params.snapshot()
             let sr = currentSampleRate > 0 ? currentSampleRate : 44100.0
             let invSr = 1.0 / sr
 

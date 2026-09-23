@@ -138,7 +138,7 @@ public final class EnergyAnalyticsEngine: ObservableObject {
         }()
 
         var power: Double = 400.0
-        let mode = ACModeCode.match(from: modeCode)
+        let mode = ACModeCode.match(from: modeCode, default: .cooling)
 
         switch mode {
         case .fan:
@@ -243,7 +243,7 @@ public final class EnergyAnalyticsEngine: ObservableObject {
                 let devKWh = (power * deltaHours) / 1000.0
                 totalIncrementalKWh += devKWh
 
-                let sampleMode = ACModeCode.match(from: sample.modeCode)
+                let sampleMode = ACModeCode.match(from: sample.modeCode, default: .cooling)
                 switch sampleMode {
                 case .cooling: runningCooling += 1
                 case .heating: runningHeating += 1

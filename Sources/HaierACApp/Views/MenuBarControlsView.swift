@@ -155,10 +155,30 @@ struct MenuBarControlsView: View {
                     }
 
                     HStack(spacing: 5) {
+                        let isOnline = device.online
+                        let dotColor: Color = {
+                            if !model.gatewayConnected {
+                                return Theme.warning
+                            }
+                            if !isOnline {
+                                return Color.gray.opacity(0.6)
+                            }
+                            return isPowerOn ? Theme.success : Theme.inkTertiary
+                        }()
+                        let statusText: String = {
+                            if !model.gatewayConnected {
+                                return "重连中..."
+                            }
+                            if !isOnline {
+                                return "设备离线"
+                            }
+                            return isPowerOn ? "\(modeCat.label)中" : "已关机"
+                        }()
+
                         Circle()
-                            .fill(model.gatewayConnected ? (isPowerOn ? Theme.success : Theme.inkTertiary) : Theme.warning)
+                            .fill(dotColor)
                             .frame(width: 6, height: 6)
-                        Text(model.gatewayConnected ? (isPowerOn ? "\(modeCat.label)中" : "已关机") : "重连中...")
+                        Text(statusText)
                             .font(.system(size: 11, weight: .medium))
                             .foregroundStyle(Theme.inkSubtle)
                         if !model.gatewayConnected {
@@ -171,6 +191,10 @@ struct MenuBarControlsView: View {
                                     .underline()
                             }
                             .buttonStyle(.plain)
+                        } else if !isOnline {
+                            Text("（未连网）")
+                                .font(.system(size: 10))
+                                .foregroundStyle(Theme.inkTertiary)
                         }
                     }
                 }

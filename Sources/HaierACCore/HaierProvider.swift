@@ -93,4 +93,8 @@ public final class HaierGatewayHandle: GatewayHandle {
     public func updateSubscription(deviceIds: [String]) {
         gateway.updateSubscription(deviceIds: deviceIds)
     }
+
+    public func reconnectImmediately() {
+        gateway.reconnectImmediately()
+    }
 }

@@ -33,6 +33,7 @@ public final class NetworkPresenceGuard: ObservableObject {
     private let monitorQueue = DispatchQueue(label: "local.haierac.networkpresence")
     private var lastDisconnectionCheck: Date?
     private var pendingAlertTask: Task<Void, Never>?
+    private var previousNetworkAvailable: Bool = true
 
     private init() {
         self.isGuardEnabled = UserDefaults.standard.object(forKey: "homePresenceGuardEnabled") as? Bool ?? true
@@ -78,6 +79,15 @@ public final class NetworkPresenceGuard: ObservableObject {
 
         let detectedSSID = detectCurrentWiFiSSID()
 
+        // 连通性恢复极速秒级自愈机制 (v1.9.24)
+        if !previousNetworkAvailable && isConnected {
+            AppLog.log("网络守护: 检测到网络已恢复畅通，触发网关秒级即时自愈")
+            Task { @MainActor in
+                AppModel.shared.retryConnection()
+            }
+        }
+        previousNetworkAvailable = isConnected
+
         if !isConnected {
             currentNetworkStatusDesc = "网络已断开"
             onNetworkStateChanged(inHome: false)
@@ -109,6 +119,11 @@ public final class NetworkPresenceGuard: ObservableObject {
         } else if !previous && inHome {
             pendingAlertTask?.cancel()
             AppLog.log("网络守护: 检测到已返回家庭网络「\(homeNetworkName)」")
+            if !AppModel.shared.gatewayConnected {
+                Task { @MainActor in
+                    AppModel.shared.retryConnection()
+                }
+            }
         }
     }
 

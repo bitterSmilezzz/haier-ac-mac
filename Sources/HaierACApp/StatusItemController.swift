@@ -104,14 +104,22 @@ final class StatusItemController: NSObject {
                 let isCurrentTarget = (devId == (model.menuBarDeviceId ?? allDevices.first?.id))
 
                 let starPrefix = isCurrentTarget ? "★" : " "
-                if isPowerOn {
+                if !dev.online {
+                    tooltipParts.append("\(starPrefix) \(devName): ⚡️ 设备离线 (未连网)")
+                } else if isPowerOn {
                     let modeGlyph: String
-                    switch modeCode {
-                    case .cooling: modeGlyph = "❄️ 制冷"
-                    case .heating: modeGlyph = "🔥 制热"
-                    case .fan: modeGlyph = "🍃 送风"
-                    case .dehumidify: modeGlyph = "💧 除湿"
-                    case .auto: modeGlyph = "🔄 自动"
+                    if let modeCode = modeCode {
+                        switch modeCode {
+                        case .cooling: modeGlyph = "❄️ 制冷"
+                        case .heating: modeGlyph = "🔥 制热"
+                        case .fan: modeGlyph = "🍃 送风"
+                        case .dehumidify: modeGlyph = "💧 除湿"
+                        case .auto: modeGlyph = "🔄 自动"
+                        }
+                    } else if let raw = rawMode, !raw.isEmpty {
+                        modeGlyph = "⚙️ \(raw)"
+                    } else {
+                        modeGlyph = "⚙️ 运行中"
                     }
                     var line = "\(starPrefix) \(devName): \(modeGlyph) \(String(format: "%.0f°C", targetTemp))"
                     if let indoor = indoorTemp {

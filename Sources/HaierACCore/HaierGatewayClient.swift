@@ -261,6 +261,17 @@ public final class HaierGatewayClient: NSObject, URLSessionWebSocketDelegate {
         }
     }
 
+    /// 立即重置退避并触发快速重连（用于网络恢复、休眠唤醒或用户主动重试场景）
+    public func reconnectImmediately() {
+        guard !stopped else { return }
+        guard !isConnected else { return }
+        AppLog.log("WS 请求立即重连（重置退避计数并立即尝试连接）")
+        reconnectAttempt = 0
+        reconnectTask?.cancel()
+        reconnectTask = nil
+        connect()
+    }
+
     public static func randomString(_ length: Int) -> String {
         let chars = "abcdef1234567890"
         return String((0..<length).map { _ in chars.randomElement()! })

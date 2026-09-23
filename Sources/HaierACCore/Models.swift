@@ -76,10 +76,10 @@ public enum ACModeCode: String, CaseIterable, Codable {
         }
     }
 
-    /// 从任意数字字符串或文本描述匹配模式（消除多套码表冲突与数字语义漂移）
-    public static func match(from raw: String?) -> ACModeCode {
+    /// 从任意数字字符串或文本描述匹配模式（无法识别时返回 nil，消除将未知工况强行兜底为制冷的缺陷）
+    public static func match(from raw: String?) -> ACModeCode? {
         guard let raw = raw?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased(), !raw.isEmpty else {
-            return .cooling
+            return nil
         }
         if let exact = ACModeCode(rawValue: raw) {
             return exact
@@ -93,7 +93,12 @@ public enum ACModeCode: String, CaseIterable, Codable {
         if raw.contains("风") || raw.contains("fan") { return .fan }
         if raw.contains("湿") || raw.contains("dry") || raw.contains("dehum") { return .dehumidify }
         if raw.contains("自") || raw.contains("auto") { return .auto }
-        return .cooling
+        return nil
+    }
+
+    /// 便捷匹配（带显式兜底语义）
+    public static func match(from raw: String?, default fallback: ACModeCode) -> ACModeCode {
+        return match(from: raw) ?? fallback
     }
 }
 

@@ -54,6 +54,14 @@ public protocol GatewayHandle: AnyObject {
     func sendControl(deviceId: String, attributes: [String: Any], completion: ((Bool) -> Void)?)
     /// 更新订阅设备列表（手动添加设备后调用）
     func updateSubscription(deviceIds: [String])
+    /// 立即重置退避并触发快速重连（用于网络恢复、休眠唤醒等极速自愈场景）
+    func reconnectImmediately()
+}
+
+public extension GatewayHandle {
+    func reconnectImmediately() {
+        start()
+    }
 }
 
 /// 设备提供商协议：所有品牌（海尔/华为/米家…）接入的抽象接口。

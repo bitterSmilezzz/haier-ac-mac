@@ -587,24 +587,27 @@ final class AppModel: ObservableObject {
             windFactor = 1.00 // 自动风速默认基准
         }
 
-        // 2. 冷凝结露与环境潮湿附着因子（采用 ACModeCode 标准码表，修复送风/除湿反向倒挂）
+        // 2. 冷凝结露与环境潮湿附着因子（采用 ACModeCode 标准码表，未识别模式回归中性基准 1.00，消除虚标高估）
         let modeFactor: Double
-        let modeCode = ACModeCode.match(from: mode)
-        switch modeCode {
-        case .cooling:
-            if let indoor = indoorTemp, indoor > targetTemp {
-                modeFactor = 1.35
-            } else {
-                modeFactor = 1.20
+        if let modeCode = ACModeCode.match(from: mode) {
+            switch modeCode {
+            case .cooling:
+                if let indoor = indoorTemp, indoor > targetTemp {
+                    modeFactor = 1.35
+                } else {
+                    modeFactor = 1.20
+                }
+            case .dehumidify:
+                modeFactor = 1.30
+            case .heating:
+                modeFactor = 1.05
+            case .fan:
+                modeFactor = 0.85
+            case .auto:
+                modeFactor = 1.00
             }
-        case .dehumidify:
-            modeFactor = 1.30
-        case .heating:
-            modeFactor = 1.05
-        case .fan:
-            modeFactor = 0.85
-        case .auto:
-            modeFactor = 1.00
+        } else {
+            modeFactor = 1.00 // 无法识别模式时回归中性基准 1.00，消除虚标高估
         }
 
         return max(0.5, min(3.0, windFactor * modeFactor))
@@ -2165,7 +2168,11 @@ final class AppModel: ObservableObject {
                     if self.provider != nil && self.context != nil {
                         await self.refreshTokenIfNeeded()
                         if !self.gatewayConnected {
-                            await self.connectAndLoad()
+                            if let handle = self.gatewayHandle {
+                                handle.reconnectImmediately()
+                            } else {
+                                await self.connectAndLoad()
+                            }
                         }
                     }
                 }
@@ -2175,10 +2182,15 @@ final class AppModel: ObservableObject {
 
     // MARK: - 生命周期
 
-    /// 错误页「重试」：会话仍有效时直接重连（无需重新登录）
+    /// 错误页「重试」/ 网络恢复自愈：会话仍有效时直接重连
     func retryConnection() {
         guard provider != nil, context != nil else {
             phase = .loggedOut
+            return
+        }
+        if let handle = gatewayHandle, !gatewayConnected {
+            AppLog.log("触发网关即时自愈重连")
+            handle.reconnectImmediately()
             return
         }
         phase = .connecting

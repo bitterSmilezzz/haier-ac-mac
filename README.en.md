@@ -6,6 +6,11 @@ A native SwiftUI app to control Haier / Leader (统帅) smart air conditioners o
 
 ## Features
 
+- 🏷 **Safe Mode Decoding & Lockless Audio Realtime Engine (v1.9.24)**:
+  - 🛡 **CR Mode Semantic Safety & Wear Model Alignment**: Fixed raw mode fallback bug where unrecognized modes defaulted to cooling; non-recognized states now safely use neutral base wear factor (1.00), preventing 20%~35% filter wear overestimation.
+  - 🔒 **Lockless CoreAudio Realtime Engine**: Replaced closure captures and main-actor variable reads inside `AVAudioSourceNode` render loop with `os_unfair_lock`-backed atomic parameter snapshotting, completely eliminating TSAN data-race hazards.
+  - ⚡️ **Sub-Second Gateway Healing**: Auto-resets backoff attempts upon `NWPathMonitor` reconnection or system wake-up, cutting reconnection latency from up to 120s down to milliseconds.
+  - 💡 **Deep Physical Offline Status Awareness**: Header pod clearly distinguishes device offline status from normal power-off state with helpful tooltips.
 - 🎨 **Brand New Design System & Control Center Style (v1.9.0)**:
   - 🧊 **Native Vibrant Material**: NSStatusItem NSPopover adopts native translucent materials with subtle glass borders and glow.
   - 🍱 **Modular Bento Grid**: Structured Bento card layout across menu bar and main window for crisp visual hierarchy.
