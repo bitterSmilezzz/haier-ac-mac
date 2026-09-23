@@ -44,7 +44,8 @@ struct FilterCareSheet: View {
             targetTemp: targetTemp,
             indoorTemp: indoorTemp,
             indoorHumidity: indoorHum,
-            windSpeed: windSpeed
+            windSpeed: windSpeed,
+            deviceId: currentDeviceId
         )
     }
 
@@ -167,6 +168,21 @@ struct FilterCareSheet: View {
                         .padding(.vertical, 2)
                         .background(Theme.surface2)
                         .clipShape(Capsule())
+
+                        // 蒸发器自清洁 7 天除菌保护徽章 (v1.9.27)
+                        if model.isSelfCleaningProtectionActive(for: currentDeviceId) {
+                            HStack(spacing: 3) {
+                                Image(systemName: "sparkles")
+                                    .font(.system(size: 9))
+                                Text("56°C除菌保护 (-10%)")
+                                    .font(.system(size: 10, weight: .medium))
+                            }
+                            .foregroundStyle(Theme.success)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Theme.success.opacity(0.12))
+                            .clipShape(Capsule())
+                        }
                     }
 
                     Text("空气动力学等效工时: \(String(format: "%.1f", runningHours)) / \(AppModel.filterServiceLifeMinutes / 60) 小时（含风量、凝露与湿度加权）")
@@ -270,6 +286,23 @@ struct FilterCareSheet: View {
                 .foregroundStyle(Theme.inkSubtle)
                 .lineSpacing(2)
 
+            if let lastDate = model.lastSelfCleaningDate(for: currentDeviceId) {
+                HStack(spacing: 6) {
+                    Text("上次自清洁: \(formattedDate(lastDate))")
+                        .font(.system(size: 11))
+                        .foregroundStyle(Theme.inkTertiary)
+                    if model.isSelfCleaningProtectionActive(for: currentDeviceId) {
+                        Text("• ✨ 7天翅片洁净保护生效中（负荷衰减减免 10%）")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(Theme.success)
+                    }
+                }
+            } else {
+                Text("暂无近期蒸发器高温自清洁记录，建议定期深度清洁除菌")
+                    .font(.system(size: 11))
+                    .foregroundStyle(Theme.inkTertiary)
+            }
+
             HStack {
                 HStack(spacing: 12) {
                     processBadge(step: "1", title: "急速凝霜")
@@ -281,6 +314,7 @@ struct FilterCareSheet: View {
 
                 Spacer()
 
+                let isControllable = model.reachability(for: currentDeviceId).isControllable
                 if isCleaningCurrentDevice {
                     Button("中止自清洁") {
                         model.stopSelfCleaning()
@@ -298,6 +332,8 @@ struct FilterCareSheet: View {
                         }
                     }
                     .buttonStyle(Theme.secondaryButtonStyle())
+                    .disabled(!isControllable)
+                    .opacity(isControllable ? 1.0 : 0.6)
                 } else {
                     Button {
                         model.startSelfCleaning(deviceId: currentDeviceId)
@@ -310,6 +346,8 @@ struct FilterCareSheet: View {
                         }
                     }
                     .buttonStyle(Theme.primaryButtonStyle())
+                    .disabled(!isControllable)
+                    .opacity(isControllable ? 1.0 : 0.6)
                 }
             }
         }

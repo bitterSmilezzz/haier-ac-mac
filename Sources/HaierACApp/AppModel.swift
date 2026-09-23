@@ -335,15 +335,15 @@ final class AppModel: ObservableObject {
         return .available
     }
 
-    /// 根据设备 ID 获取可达状态
+    /// 根据设备 ID 获取可达状态（未知设备按离线 fail-closed 处理，杜绝虚报可用）
     public func reachability(for deviceId: String) -> DeviceReachability {
-        if let dev = devices.first(where: { $0.id == deviceId }) {
-            return reachability(for: dev)
-        }
         if !gatewayConnected {
             return .gatewayReconnecting
         }
-        return .available
+        guard let dev = devices.first(where: { $0.id == deviceId }) else {
+            return .deviceOffline
+        }
+        return reachability(for: dev)
     }
 
     /// 重连操作代际计数器，防止并发/连续重连时前序定时器竞态覆盖当前状态
@@ -536,6 +536,15 @@ final class AppModel: ObservableObject {
         }
     }
 
+    /// 各设备上次完成 56°C 蒸发器高温自清洁日期 [deviceId: Date] (v1.9.27)
+    @Published public var deviceSelfCleaningDates: [String: Date] = [:] {
+        didSet {
+            if let data = try? JSONEncoder().encode(deviceSelfCleaningDates) {
+                UserDefaults.standard.set(data, forKey: "deviceSelfCleaningDates")
+            }
+        }
+    }
+
     /// 获取指定设备的滤网累计运行分钟数（基于空气动力学等效工时）
     public func filterAccumulatedMinutes(for deviceId: String) -> Int {
         if let minutes = deviceFilterMinutes[deviceId] {
@@ -558,6 +567,17 @@ final class AppModel: ObservableObject {
             return lastFilterCleanedDate
         }
         return nil
+    }
+
+    /// 获取指定设备上次完成蒸发器 56°C 高温自清洁的日期 (v1.9.27)
+    public func lastSelfCleaningDate(for deviceId: String) -> Date? {
+        deviceSelfCleaningDates[deviceId]
+    }
+
+    /// 判断指定设备是否处于蒸发器自清洁健康保护期（完成自清洁 7 天内，翅片无积尘霉变，风阻低，衰减减缓）
+    public func isSelfCleaningProtectionActive(for deviceId: String) -> Bool {
+        guard let lastDate = deviceSelfCleaningDates[deviceId] else { return false }
+        return Date().timeIntervalSince(lastDate) < 7 * 86400
     }
 
     /// 指定设备的滤网清洁度百分比 (0 ~ 100%)，基于建议保养周期
@@ -599,13 +619,14 @@ final class AppModel: ObservableObject {
         operationNotice = OperationNotice(text: "🧼 \(devName) 滤网运行计时已重置，洁净度恢复 100%", isError: false)
     }
 
-    /// 计算空气动力学、冷凝结露与环境湿度多维滤网负荷衰减系数 (v1.9.26)
+    /// 计算空气动力学、冷凝结露、环境湿度与蒸发器自清洁多维滤网负荷衰减系数 (v1.9.27)
     public func calculateFilterWearFactor(
         mode: String,
         targetTemp: Double,
         indoorTemp: Double?,
         indoorHumidity: Double? = nil,
-        windSpeed: String
+        windSpeed: String,
+        deviceId: String? = nil
     ) -> Double {
         // 1. 风量通量因子（高速风量通过滤网单位时间截留更多浮尘颗粒）
         let windFactor: Double
@@ -663,7 +684,15 @@ final class AppModel: ObservableObject {
             humidityFactor = 1.00
         }
 
-        return max(0.5, min(3.0, windFactor * modeFactor * humidityFactor))
+        // 4. 蒸发器自清洁除菌防护因子（完成 56°C 高温自清洁后 7 天内，翅片无污垢杂菌、风道通畅阻力小，积尘截留速率减缓 10%）
+        let selfCleaningBonus: Double
+        if let devId = deviceId, isSelfCleaningProtectionActive(for: devId) {
+            selfCleaningBonus = 0.90
+        } else {
+            selfCleaningBonus = 1.00
+        }
+
+        return max(0.4, min(3.0, windFactor * modeFactor * humidityFactor * selfCleaningBonus))
     }
 
     /// 累加特定设备的滤网运行时间（结合空气动力学负荷系数折算等效工时）
@@ -719,6 +748,14 @@ final class AppModel: ObservableObject {
 
     /// 启动 56°C 高温除菌自清洁托管程序
     public func startSelfCleaning(deviceId: String) {
+        let reach = reachability(for: deviceId)
+        guard reach.isControllable else {
+            let msg = reach == .gatewayReconnecting ? "网关重连中，暂无法启动自清洁" : "空调设备已离线，无法启动自清洁"
+            operationNotice = OperationNotice(text: "⚠️ \(msg)", isError: true)
+            AppLog.warning("无法启动蒸发器自清洁：\(msg) (deviceId: \(deviceId))")
+            return
+        }
+
         if isSelfCleaningActive {
             stopSelfCleaning()
         }
@@ -748,7 +785,8 @@ final class AppModel: ObservableObject {
             guard let self = self, self.isSelfCleaningActive else { return }
             self.isSelfCleaningActive = false
             self.selfCleaningRemainingSeconds = 0
-            self.operationNotice = OperationNotice(text: "🧼 \(devName) 蒸发器 56°C 高温除菌自清洁已完成", isError: false)
+            self.deviceSelfCleaningDates[deviceId] = Date()
+            self.operationNotice = OperationNotice(text: "🧼 \(devName) 蒸发器 56°C 高温除菌自清洁已完成，已开启 7 天翅片健康保护", isError: false)
 
             let content = UNMutableNotificationContent()
             content.title = "✅ 蒸发器自清洁完成"
@@ -928,7 +966,8 @@ final class AppModel: ObservableObject {
                     targetTemp: targetTemp,
                     indoorTemp: indoorTemp,
                     indoorHumidity: indoorHum,
-                    windSpeed: windSpeed
+                    windSpeed: windSpeed,
+                    deviceId: dev.id
                 )
                 accumulateFilterMinutes(for: dev.id, minutes: elapsedMinutes, wearFactor: wearFactor)
             }
@@ -1210,6 +1249,14 @@ final class AppModel: ObservableObject {
 
     /// 开启智能睡眠温阶
     func startSleepCurve(curve: SleepCurveConfig, deviceId: String) {
+        let reach = reachability(for: deviceId)
+        guard reach.isControllable else {
+            let msg = reach == .gatewayReconnecting ? "网关重连中，暂无法启动智能睡眠" : "空调设备已离线，无法启动智能睡眠"
+            operationNotice = OperationNotice(text: "⚠️ \(msg)", isError: true)
+            AppLog.warning("无法启动智能睡眠：\(msg) (deviceId: \(deviceId))")
+            return
+        }
+
         // 若当前已有进行中的会话，将其归档为新计划覆盖
         if let existing = activeSleepSession {
             archiveSleepSession(existing, endReason: .overridden)
@@ -2183,6 +2230,10 @@ final class AppModel: ObservableObject {
            let saved = try? JSONDecoder().decode([String: Date].self, from: data) {
             deviceFilterAlertDates = saved
         }
+        if let data = UserDefaults.standard.data(forKey: "deviceSelfCleaningDates"),
+           let saved = try? JSONDecoder().decode([String: Date].self, from: data) {
+            deviceSelfCleaningDates = saved
+        }
 
         sleepAmbientSoundEnabled = UserDefaults.standard.bool(forKey: "sleepAmbientSoundEnabled")
         if let rawSound = UserDefaults.standard.string(forKey: "sleepAmbientSoundType"),
@@ -2538,19 +2589,23 @@ final class AppModel: ObservableObject {
     /// 批量下发同一指令到多台设备（v1.5）；返回值：成功下发的设备数
     @discardableResult
     func sendAttributeToDevices(_ name: String, value: AttrValue, deviceIds: [String]) -> Int {
-        guard !deviceIds.isEmpty else {
+        // 先对入参进行有序去重，杜绝重复 ID 传入导致的计数虚高
+        var seen = Set<String>()
+        let uniqueDeviceIds = deviceIds.filter { seen.insert($0).inserted }
+
+        guard !uniqueDeviceIds.isEmpty else {
             operationNotice = OperationNotice(text: "⚠️ 请先选择需要控制的设备", isError: true)
             return 0
         }
 
-        // 过滤物理在线的设备
-        let targetIds = deviceIds.filter { id in
-            devices.first(where: { $0.id == id })?.online ?? true
+        // 统一过滤物理在线的设备（未知设备默认离线 fail-closed）
+        let targetIds = uniqueDeviceIds.filter { id in
+            devices.first(where: { $0.id == id })?.online ?? false
         }
-        let offlineCount = deviceIds.count - targetIds.count
+        let offlineCount = uniqueDeviceIds.count - targetIds.count
 
         guard !targetIds.isEmpty else {
-            operationNotice = OperationNotice(text: "⚠️ 选中的 \(deviceIds.count) 台设备均处于离线状态", isError: true)
+            operationNotice = OperationNotice(text: "⚠️ 选中的 \(uniqueDeviceIds.count) 台设备均处于离线状态", isError: true)
             return 0
         }
 

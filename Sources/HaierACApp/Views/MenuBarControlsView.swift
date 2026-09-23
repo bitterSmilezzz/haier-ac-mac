@@ -95,6 +95,8 @@ struct MenuBarControlsView: View {
 
                 // 2.1 智能睡眠快速启停模块 (运行中显示进度与停止，空闲时支持选择方案与一键启动)
                 sleepControlPod(device: device)
+                    .disabled(!reachability.isControllable)
+                    .opacity(reachability.isControllable ? 1.0 : 0.6)
 
                 // 2.2 蒸发器自清洁状态指示 (若处于清洁中)
                 if model.isSelfCleaningActive {
@@ -204,24 +206,26 @@ struct MenuBarControlsView: View {
                     }
 
                     HStack(spacing: 5) {
-                        let isOnline = device.online
+                        let reachability = model.reachability(for: device)
                         let dotColor: Color = {
-                            if !model.gatewayConnected {
+                            switch reachability {
+                            case .gatewayReconnecting:
                                 return Theme.warning
-                            }
-                            if !isOnline {
+                            case .deviceOffline:
                                 return Theme.offline
+                            case .available:
+                                return isPowerOn ? Theme.success : Theme.inkTertiary
                             }
-                            return isPowerOn ? Theme.success : Theme.inkTertiary
                         }()
                         let statusText: String = {
-                            if !model.gatewayConnected {
+                            switch reachability {
+                            case .gatewayReconnecting:
                                 return "重连中..."
-                            }
-                            if !isOnline {
+                            case .deviceOffline:
                                 return "设备离线"
+                            case .available:
+                                return isPowerOn ? "\(modeCat.label)中" : "已关机"
                             }
-                            return isPowerOn ? "\(modeCat.label)中" : "已关机"
                         }()
 
                         Circle()
@@ -230,7 +234,7 @@ struct MenuBarControlsView: View {
                         Text(statusText)
                             .font(.system(size: 11, weight: .medium))
                             .foregroundStyle(Theme.inkSubtle)
-                        if !model.gatewayConnected {
+                        if reachability == .gatewayReconnecting {
                             Button {
                                 model.retryConnection()
                             } label: {
@@ -240,7 +244,7 @@ struct MenuBarControlsView: View {
                                     .underline()
                             }
                             .buttonStyle(.plain)
-                        } else if !isOnline {
+                        } else if reachability == .deviceOffline {
                             Text("（未连网）")
                                 .font(.system(size: 10))
                                 .foregroundStyle(Theme.inkTertiary)

@@ -20,6 +20,18 @@ public enum AppLog {
         }
     }
 
+    public static func info(_ message: String) {
+        log("[INFO] \(message)")
+    }
+
+    public static func warning(_ message: String) {
+        log("[WARN] \(message)")
+    }
+
+    public static func error(_ message: String) {
+        log("[ERROR] \(message)")
+    }
+
     private static func write(_ line: String) {
         do {
             let dir = logURL.deletingLastPathComponent()

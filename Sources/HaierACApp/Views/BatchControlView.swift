@@ -10,9 +10,11 @@ struct BatchControlPanel: View {
 
     var body: some View {
         let onlineCount = deviceIds.filter { id in
-            model.devices.first(where: { $0.id == id })?.online ?? true
+            model.devices.first(where: { $0.id == id })?.online ?? false
         }.count
-        let isBatchAvailable = model.gatewayConnected && onlineCount > 0
+        let isBatchAvailable = deviceIds.contains { id in
+            model.reachability(for: id).isControllable
+        }
 
         VStack(alignment: .leading, spacing: Theme.spaceSM) {
             HStack {

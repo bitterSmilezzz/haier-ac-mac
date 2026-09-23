@@ -1,6 +1,15 @@
 import Foundation
 import HaierACCore
 
+/// 容错解码包装器：解码失败时不抛出异常而是置为 nil，防止列表局部损毁导致整组数据静默丢失
+private struct FailableDecodable<T: Decodable>: Decodable {
+    let value: T?
+    init(from decoder: Decoder) throws {
+        let container = try? decoder.singleValueContainer()
+        self.value = try? container?.decode(T.self)
+    }
+}
+
 /// 每日用电能耗历史记录
 ///
 /// 统计口径说明：
@@ -50,15 +59,15 @@ public struct EnergyDayRecord: Codable, Equatable, Identifiable {
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        date = try container.decode(String.self, forKey: .date)
-        totalMinutes = try container.decode(Int.self, forKey: .totalMinutes)
-        coolingMinutes = try container.decode(Int.self, forKey: .coolingMinutes)
-        heatingMinutes = try container.decode(Int.self, forKey: .heatingMinutes)
-        fanMinutes = try container.decode(Int.self, forKey: .fanMinutes)
-        dehumMinutes = try container.decode(Int.self, forKey: .dehumMinutes)
+        date = try container.decodeIfPresent(String.self, forKey: .date) ?? ""
+        totalMinutes = try container.decodeIfPresent(Int.self, forKey: .totalMinutes) ?? 0
+        coolingMinutes = try container.decodeIfPresent(Int.self, forKey: .coolingMinutes) ?? 0
+        heatingMinutes = try container.decodeIfPresent(Int.self, forKey: .heatingMinutes) ?? 0
+        fanMinutes = try container.decodeIfPresent(Int.self, forKey: .fanMinutes) ?? 0
+        dehumMinutes = try container.decodeIfPresent(Int.self, forKey: .dehumMinutes) ?? 0
         unknownMinutes = try container.decodeIfPresent(Int.self, forKey: .unknownMinutes) ?? 0
-        totalKWh = try container.decode(Double.self, forKey: .totalKWh)
-        totalCost = try container.decode(Double.self, forKey: .totalCost)
+        totalKWh = try container.decodeIfPresent(Double.self, forKey: .totalKWh) ?? 0.0
+        totalCost = try container.decodeIfPresent(Double.self, forKey: .totalCost) ?? 0.0
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -139,9 +148,18 @@ public final class EnergyAnalyticsEngine: ObservableObject {
             self.pricingConfig = ElectricityPricingConfig()
         }
 
-        if let data = UserDefaults.standard.data(forKey: "energyHistoryRecords"),
-           let saved = try? JSONDecoder().decode([EnergyDayRecord].self, from: data) {
-            self.historyRecords = saved
+        if let data = UserDefaults.standard.data(forKey: "energyHistoryRecords") {
+            // 采用逐条元素容错解码（Safe List Decoder），确保损坏或格式不兼容的历史单项记录不会导致整组 60 天数据静默丢失
+            if let failableList = try? JSONDecoder().decode([FailableDecodable<EnergyDayRecord>].self, from: data) {
+                let validRecords = failableList.compactMap { $0.value }.filter { !$0.date.isEmpty }
+                if validRecords.count < failableList.count {
+                    let corrupted = failableList.count - validRecords.count
+                    AppLog.warning("能耗历史加载：已安全隔离并过滤 \(corrupted) 条损毁/无效记录，成功保留 \(validRecords.count) 天历史数据")
+                }
+                self.historyRecords = validRecords
+            } else {
+                AppLog.warning("能耗历史数据反序列化异常，未能解析有效 JSON 列表")
+            }
         }
     }
 
@@ -170,14 +188,16 @@ public final class EnergyAnalyticsEngine: ObservableObject {
             return 40.0
         }()
 
-        // 未识别模式采用中性功率估算策略：
-        // 1. 若室内温度与设定温度均有效，采用中性温差自适应负荷测算，避免固定偏向制冷或制热；
-        // 2. 若温度字段缺失（室内或设定温度为 nil），则采用 1.5 匹直流变频压缩机典型低频维持中性基准功率 (350W + windOffset)，避免盲目套用大温差制热/制冷曲线导致功率偏离。
+        // 未识别模式采用物理中性功率估算策略（冷热综合无偏估计）：
+        // 1. 若室内温度与设定温度均有效，采用制冷动力曲线（380W + 95W/°C）与制热动力曲线（550W + 110W/°C）在温差绝对值 |ΔT| 下的均值基准：
+        //    P = ((380 + 550) / 2) + (|indoor - target| * ((95 + 110) / 2)) + windOffset = 465.0 + |ΔT| * 102.5 + windOffset
+        //    clamp 限制在 [200.0, 1550.0] W 区间，实现对称且客观的中性功率估算，避免系统性偏向制冷低估或制热高估；
+        // 2. 若温度字段缺失（室内或设定温度为 nil），则采用 1.5 匹直流变频压缩机典型低频维持中性基准功率 (350W + windOffset，clamp [180.0, 600.0] W)，避免盲目套用大温差曲线导致功率虚标。
         guard let mode = ACModeCode.match(from: modeCode) else {
             if let indoor = indoorTemp, let target = targetTemp {
                 let delta = abs(indoor - target)
-                let neutralPower = 380.0 + (delta * 95.0) + windOffset
-                return min(max(neutralPower, 180.0), 1200.0)
+                let neutralPower = 465.0 + (delta * 102.5) + windOffset
+                return min(max(neutralPower, 200.0), 1550.0)
             } else {
                 let neutralPower = 350.0 + windOffset
                 return min(max(neutralPower, 180.0), 600.0)

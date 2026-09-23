@@ -112,31 +112,37 @@ final class StatusItemController: NSObject {
                 let indoorTemp = model.currentIndoorTemperature(for: devId)
                 let isCurrentTarget = (devId == (model.menuBarDeviceId ?? allDevices.first?.id))
 
+                let reach = model.reachability(for: dev)
                 let starPrefix = isCurrentTarget ? "★" : " "
-                if !dev.online {
+                switch reach {
+                case .gatewayReconnecting:
+                    tooltipParts.append("\(starPrefix) \(devName): ⏳ 网关重连中...")
+                case .deviceOffline:
                     tooltipParts.append("\(starPrefix) \(devName): ⚡️ 设备离线 (未连网)")
-                } else if isPowerOn {
-                    let modeGlyph: String
-                    if let modeCode = modeCode {
-                        switch modeCode {
-                        case .cooling: modeGlyph = "❄️ 制冷"
-                        case .heating: modeGlyph = "🔥 制热"
-                        case .fan: modeGlyph = "🍃 送风"
-                        case .dehumidify: modeGlyph = "💧 除湿"
-                        case .auto: modeGlyph = "🔄 自动"
+                case .available:
+                    if isPowerOn {
+                        let modeGlyph: String
+                        if let modeCode = modeCode {
+                            switch modeCode {
+                            case .cooling: modeGlyph = "❄️ 制冷"
+                            case .heating: modeGlyph = "🔥 制热"
+                            case .fan: modeGlyph = "🍃 送风"
+                            case .dehumidify: modeGlyph = "💧 除湿"
+                            case .auto: modeGlyph = "🔄 自动"
+                            }
+                        } else if let raw = rawMode, !raw.isEmpty {
+                            modeGlyph = "⚙️ \(raw)"
+                        } else {
+                            modeGlyph = "⚙️ 运行中"
                         }
-                    } else if let raw = rawMode, !raw.isEmpty {
-                        modeGlyph = "⚙️ \(raw)"
+                        var line = "\(starPrefix) \(devName): \(modeGlyph) \(String(format: "%.0f°C", targetTemp))"
+                        if let indoor = indoorTemp {
+                            line += " (室内 \(String(format: "%.1f°C", indoor)))"
+                        }
+                        tooltipParts.append(line)
                     } else {
-                        modeGlyph = "⚙️ 运行中"
+                        tooltipParts.append("\(starPrefix) \(devName): 关机待机")
                     }
-                    var line = "\(starPrefix) \(devName): \(modeGlyph) \(String(format: "%.0f°C", targetTemp))"
-                    if let indoor = indoorTemp {
-                        line += " (室内 \(String(format: "%.1f°C", indoor)))"
-                    }
-                    tooltipParts.append(line)
-                } else {
-                    tooltipParts.append("\(starPrefix) \(devName): 关机待机")
                 }
             }
         } else if let devId = model.menuBarDeviceId ?? model.manualDevices.first?.deviceId {
@@ -244,9 +250,80 @@ final class StatusItemController: NSObject {
         voiceItem.target = self
         menu.addItem(voiceItem)
 
-        // 主空调一键电源快速启停 (v1.9.25: 原生右键快速电源操作)
-        let targetDev = model.devices.first(where: { $0.id == (model.menuBarDeviceId ?? model.devices.first?.id) })
-        if let dev = targetDev {
+        let allDevices = model.devices
+        let onDevices = allDevices.filter { dev in
+            model.attribute("onOffStatus", deviceId: dev.id)?.boolValue == true
+        }
+
+        if allDevices.count > 1 {
+            // 多设备场景：若有空调处于开机状态，提供全屋一键快速关机 (v1.9.27)
+            if !onDevices.isEmpty {
+                let turnOffAllItem = NSMenuItem(title: "⏻ 关闭全屋空调 (\(onDevices.count) 台运行中)", action: #selector(turnOffAllDevices), keyEquivalent: "")
+                turnOffAllItem.target = self
+                turnOffAllItem.isEnabled = model.gatewayConnected
+                menu.addItem(turnOffAllItem)
+            }
+
+            // 多设备级联控制子菜单 (v1.9.27)
+            let devicesMenu = NSMenu()
+            for dev in allDevices {
+                let devId = dev.id
+                let isPowerOn = model.attribute("onOffStatus", deviceId: devId)?.boolValue ?? false
+                let reach = model.reachability(for: dev)
+                let isControllable = reach.isControllable
+
+                let devSubmenu = NSMenu()
+
+                // 开关机切换
+                let togglePowerItem = NSMenuItem(
+                    title: isPowerOn ? "关机" : "开机",
+                    action: #selector(toggleDevicePower(_:)),
+                    keyEquivalent: ""
+                )
+                togglePowerItem.target = self
+                togglePowerItem.representedObject = devId
+                togglePowerItem.isEnabled = isControllable
+                devSubmenu.addItem(togglePowerItem)
+
+                // 一键制冷 26°C
+                let coolItem = NSMenuItem(
+                    title: "一键制冷 26°C",
+                    action: #selector(setQuickCooling(_:)),
+                    keyEquivalent: ""
+                )
+                coolItem.target = self
+                coolItem.representedObject = devId
+                coolItem.isEnabled = isControllable
+                devSubmenu.addItem(coolItem)
+
+                // 一键制热 20°C
+                let heatItem = NSMenuItem(
+                    title: "一键制热 20°C",
+                    action: #selector(setQuickHeating(_:)),
+                    keyEquivalent: ""
+                )
+                heatItem.target = self
+                heatItem.representedObject = devId
+                heatItem.isEnabled = isControllable
+                devSubmenu.addItem(heatItem)
+
+                let statusBadge: String
+                switch reach {
+                case .gatewayReconnecting: statusBadge = "⏳ 重连中"
+                case .deviceOffline: statusBadge = "⚡️ 离线"
+                case .available: statusBadge = isPowerOn ? "🟢 开机" : "⚪️ 待机"
+                }
+
+                let devItem = NSMenuItem(title: "\(dev.deviceName) (\(statusBadge))", action: nil, keyEquivalent: "")
+                devicesMenu.setSubmenu(devSubmenu, for: devItem)
+                devicesMenu.addItem(devItem)
+            }
+
+            let devicesParentItem = NSMenuItem(title: "空调设备控制矩阵...", action: nil, keyEquivalent: "")
+            menu.setSubmenu(devicesMenu, for: devicesParentItem)
+            menu.addItem(devicesParentItem)
+        } else if let dev = allDevices.first {
+            // 单设备场景：保留快速电源开关
             let isPowerOn = model.attribute("onOffStatus", deviceId: dev.id)?.boolValue ?? false
             let powerTitle = isPowerOn ? "关机「\(dev.deviceName)」" : "开机「\(dev.deviceName)」"
             let powerItem = NSMenuItem(title: powerTitle, action: #selector(togglePrimaryPower), keyEquivalent: "")
@@ -336,6 +413,31 @@ final class StatusItemController: NSObject {
         guard let targetId = model.menuBarDeviceId ?? model.devices.first?.id else { return }
         let currentPower = model.attribute("onOffStatus", deviceId: targetId)?.boolValue ?? false
         model.sendAttribute("onOffStatus", value: .bool(!currentPower), deviceId: targetId)
+    }
+
+    @objc private func turnOffAllDevices() {
+        let allIds = model.devices.map(\.id)
+        model.sendAttributeToDevices("onOffStatus", value: .bool(false), deviceIds: allIds)
+    }
+
+    @objc private func toggleDevicePower(_ sender: NSMenuItem) {
+        guard let devId = sender.representedObject as? String else { return }
+        let currentPower = model.attribute("onOffStatus", deviceId: devId)?.boolValue ?? false
+        model.sendAttribute("onOffStatus", value: .bool(!currentPower), deviceId: devId)
+    }
+
+    @objc private func setQuickCooling(_ sender: NSMenuItem) {
+        guard let devId = sender.representedObject as? String else { return }
+        model.sendAttribute("onOffStatus", value: .bool(true), deviceId: devId)
+        model.sendAttribute("operationMode", value: .string(ACModeCode.cooling.rawValue), deviceId: devId)
+        model.sendAttribute("targetTemperature", value: .double(26.0), deviceId: devId)
+    }
+
+    @objc private func setQuickHeating(_ sender: NSMenuItem) {
+        guard let devId = sender.representedObject as? String else { return }
+        model.sendAttribute("onOffStatus", value: .bool(true), deviceId: devId)
+        model.sendAttribute("operationMode", value: .string(ACModeCode.heating.rawValue), deviceId: devId)
+        model.sendAttribute("targetTemperature", value: .double(20.0), deviceId: devId)
     }
 
     @objc private func openFilterCare() {
