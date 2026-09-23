@@ -1,0 +1,16 @@
+{
+  "display_name": "Haier AC 每小时自动巡检优化发版",
+  "description": "每小时整点定时巡检 haier-ac-mac 项目，检查并修复 docs/code-review 下外部 Agent 的审查意见，自主发现优化点、执行构建校验与修复、递增版本发版推送 GitHub Release 并更新文档。",
+  "builtin": "schedule",
+  "args": [
+    "0 * * * *",
+    "agentapi",
+    "new-conversation",
+    "【Haier AC 自动化整点巡检优化与发版任务】\n工作区：/Users/fangshoufanji/workspace/ai-test/haier-ac-mac\n\n【用户最高优先级全权授权】\n用户已全权授权无需通过弹窗让用户选择方案，所有优化决策、方案选择与 Proceed 确认均由 Agent 自主决定并全自动执行，严禁打断等待用户回答！\n\n【任务要求与流水线执行规范】\n1. 审查协同与代码巡检：\n   - 【外部 Agent Code Review 审查机制】：本项目由另一个其他软件的 Agent 审查最近的代码更新并执行 Code Review，审查结果文档存放在 docs/code-review/ 目录下。\n   - 巡检启动时必须首先检查 docs/code-review/ 下最新的审查报告；如果 Code Review 发现了代码问题、安全隐患、性能瓶颈、逻辑缺陷或设计坏味道，必须优先进行修复闭环，确保所有审查问题解决完毕。\n   - 在解决审查问题的基础上，深入分析 haier-ac-mac 项目源码与架构，自主寻找 1~2 个高价值优化点（如：UI 动效丝滑度、能耗动力学算法、离线降级容错、滤网深度算法、macOS 原生状态栏细节等），直接完成代码编写与重构。\n2. 本地编译与校验：\n   - 使用 SDKROOT=/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk swift build 构建验证；\n   - 如构建或测试未通过，必须自主分析错误、修复代码，直至 100% 编译成功；\n   - 验证无误后运行 ./build_app.sh 打包产物。\n3. 自动化发版与远程同步：\n   - 获取最新 Git Tag，自动递增小版本号（例如当前为 v1.9.20，新版本为 v1.9.21）；\n   - 执行 git add、git commit 并安全推送到 remote main 分支；\n   - 创建对应版本 Git Tag 并推送到远程；\n   - 使用 gh release create 发布 GitHub Release，附带构建产物压缩包与更新日志。\n4. 项目文档同步：\n   - 更新 README.md 与 walkthrough.md，清晰记载本次更新的优化内容、Code Review 问题的修复情况、验证过程与发版信息。\n5. 安全敏感数据脱敏底线：\n   - 严禁提交或上传任何个人手机号、真实密码、第三方 Secret Token 等敏感隐私数据。"
+  ],
+  "restart_policy": "always",
+  "disabled": false,
+  "env": {
+    "ANTIGRAVITY_PROJECT_ID": "20a02443-a136-49d7-bfda-b9842c61e0ac"
+  }
+}
