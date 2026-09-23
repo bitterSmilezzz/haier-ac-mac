@@ -2188,12 +2188,20 @@ final class AppModel: ObservableObject {
             phase = .loggedOut
             return
         }
+        phase = .connecting
         if let handle = gatewayHandle, !gatewayConnected {
-            AppLog.log("触发网关即时自愈重连")
-            handle.reconnectImmediately()
+            AppLog.log("触发网关即时自愈重连（含 Token 校验与状态反馈）")
+            Task {
+                await refreshTokenIfNeeded()
+                handle.reconnectImmediately(force: true)
+                // 1.5s 后若仍未收到 didOpen，但已有本地缓存设备，平滑恢复 ready，避免停留在转圈中
+                try? await Task.sleep(nanoseconds: 1_500_000_000)
+                if case .connecting = self.phase, !self.devices.isEmpty {
+                    self.phase = .ready
+                }
+            }
             return
         }
-        phase = .connecting
         Task {
             await refreshTokenIfNeeded()
             await connectAndLoad()
@@ -2435,6 +2443,12 @@ final class AppModel: ObservableObject {
     func sendAttribute(_ name: String, value: AttrValue, deviceId: String) {
         AppLog.log("sendAttribute: \(name)=\(value.stringValue) device=\(deviceId)")
 
+        // 防御性校验：设备物理离线拦截（未连网无法执行控制，避免产生虚假的乐观更新）
+        if let dev = devices.first(where: { $0.id == deviceId }), !dev.online {
+            operationNotice = OperationNotice(text: "⚠️ 设备离线：\(dev.deviceName) 未连网，无法执行控制", isError: true)
+            return
+        }
+
         // 失效预案：网关未连接时明确提示，不静默失败
         guard gatewayConnected, let handle = gatewayHandle else {
             operationNotice = OperationNotice(text: "⚠️ 连接中断，指令未发送（自动重连中）", isError: true)
@@ -2465,12 +2479,21 @@ final class AppModel: ObservableObject {
     /// 批量下发同一指令到多台设备（v1.5）；返回值：成功下发的设备数
     @discardableResult
     func sendAttributeToDevices(_ name: String, value: AttrValue, deviceIds: [String]) -> Int {
+        // 过滤物理在线的设备
+        let targetIds = deviceIds.filter { id in
+            devices.first(where: { $0.id == id })?.online ?? true
+        }
+        guard !targetIds.isEmpty else {
+            operationNotice = OperationNotice(text: "⚠️ 选中的设备均处于离线状态", isError: true)
+            return 0
+        }
+
         guard gatewayConnected, let handle = gatewayHandle else {
             operationNotice = OperationNotice(text: "⚠️ 连接中断，指令未发送（自动重连中）", isError: true)
             return 0
         }
         var sent = 0
-        for deviceId in deviceIds {
+        for deviceId in targetIds {
             handle.sendControl(deviceId: deviceId, attributes: [name: value.jsonValue]) { [weak self] ok in
                 if !ok {
                     Task { @MainActor in
@@ -2484,8 +2507,8 @@ final class AppModel: ObservableObject {
             }
             sent += 1
         }
-        let desc = attributes[deviceIds.first ?? ""]?[name]?.desc ?? name
-        AppLog.log("批量下发: \(name)=\(value.stringValue) → \(deviceIds.count) 台设备")
+        let desc = attributes[targetIds.first ?? ""]?[name]?.desc ?? name
+        AppLog.log("批量下发: \(name)=\(value.stringValue) → \(targetIds.count) 台设备")
         operationNotice = OperationNotice(text: "已发送：\(desc) → \(sent) 台设备", isError: false)
         return sent
     }

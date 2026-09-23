@@ -45,8 +45,27 @@ struct MenuBarControlsView: View {
                 // 1. 顶部状态与设备 Bento
                 headerPod(device: device, attrs: attrs, isPowerOn: isPowerOn, modeCat: modeCat, tint: tint)
 
+                // 物理离线防护横幅
+                if !device.online {
+                    HStack(spacing: 6) {
+                        Image(systemName: "wifi.slash")
+                            .font(.system(size: 11))
+                            .foregroundStyle(Theme.offline)
+                        Text("当前空调未连入网络，控制指令暂不可用")
+                            .font(.system(size: 11))
+                            .foregroundStyle(Theme.inkSubtle)
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Theme.surface2)
+                    .clipShape(RoundedRectangle(cornerRadius: Theme.radiusSM, style: .continuous))
+                }
+
                 // 2. 快捷操作 Bento 矩阵（电源、情景灯光、屏显）
                 quickActionsPod(device: device, attrs: attrs, isPowerOn: isPowerOn, tint: tint)
+                    .disabled(!device.online)
+                    .opacity(device.online ? 1.0 : 0.6)
 
                 // 2.1 智能睡眠快速启停模块 (运行中显示进度与停止，空闲时支持选择方案与一键启动)
                 sleepControlPod(device: device)
@@ -161,7 +180,7 @@ struct MenuBarControlsView: View {
                                 return Theme.warning
                             }
                             if !isOnline {
-                                return Color.gray.opacity(0.6)
+                                return Theme.offline
                             }
                             return isPowerOn ? Theme.success : Theme.inkTertiary
                         }()

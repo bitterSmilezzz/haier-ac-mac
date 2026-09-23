@@ -35,7 +35,7 @@ final class StatusItemController: NSObject {
         statusItem = item
         refreshTemperature()
 
-        // 温度/开关/自清洁/睡眠/白噪音/设备选择/温度显示等状态变化时刷新菜单栏标题与悬浮提示 Tooltip
+        // 温度/开关/自清洁/睡眠/白噪音/设备选择/温度显示/网关连接等状态变化时刷新菜单栏标题与悬浮提示 Tooltip
         Publishers.MergeMany(
             model.$attributes.map { _ in () }.eraseToAnyPublisher(),
             model.$devices.map { _ in () }.eraseToAnyPublisher(),
@@ -44,6 +44,7 @@ final class StatusItemController: NSObject {
             model.$isSelfCleaningActive.map { _ in () }.eraseToAnyPublisher(),
             model.$selfCleaningRemainingSeconds.map { _ in () }.eraseToAnyPublisher(),
             model.$activeSleepSession.map { _ in () }.eraseToAnyPublisher(),
+            model.$gatewayConnected.map { _ in () }.eraseToAnyPublisher(),
             AmbientSoundEngine.shared.$isPlaying.map { _ in () }.eraseToAnyPublisher()
         )
         .receive(on: DispatchQueue.main)
@@ -57,7 +58,7 @@ final class StatusItemController: NSObject {
     private func refreshTemperature() {
         guard let button = statusItem?.button else { return }
 
-        // 状态栏图标与标题动态感知 (v1.9.23)
+        // 状态栏图标与标题动态感知 (v1.9.25: 开机运行态实心展示)
         if model.isSelfCleaningActive {
             let m = model.selfCleaningRemainingSeconds / 60
             let s = model.selfCleaningRemainingSeconds % 60
@@ -77,7 +78,13 @@ final class StatusItemController: NSObject {
                 button.title = ""
             }
         } else {
-            button.image = NSImage(systemSymbolName: "air.conditioner.horizontal", accessibilityDescription: "海尔空调")
+            let targetId = model.menuBarDeviceId ?? model.devices.first?.id
+            let isPowerOn: Bool = {
+                guard let targetId else { return false }
+                return model.attribute("onOffStatus", deviceId: targetId)?.boolValue ?? false
+            }()
+            let symbolName = isPowerOn ? "air.conditioner.horizontal.fill" : "air.conditioner.horizontal"
+            button.image = NSImage(systemSymbolName: symbolName, accessibilityDescription: isPowerOn ? "海尔空调 (运行中)" : "海尔空调 (待机)")
             button.image?.isTemplate = true
             if let text = model.menuBarTemperatureText {
                 button.title = " \(text)"
@@ -88,8 +95,10 @@ final class StatusItemController: NSObject {
         button.imagePosition = .imageLeft
         statusItem?.length = NSStatusItem.variableLength
 
-        // 动态构建悬浮 Tooltip 状态概览 (v1.9.23 增强多设备与整屋瞬时用电展示)
-        var tooltipParts: [String] = ["海尔空调控制"]
+        // 动态构建悬浮 Tooltip 状态概览 (v1.9.25 增强网关连通性与多设备三态感知)
+        var tooltipParts: [String] = [
+            model.gatewayConnected ? "海尔空调控制 (网关在线)" : "⚠️ 海尔云端网关重连中..."
+        ]
         let allDevices = model.devices
         if !allDevices.isEmpty {
             for dev in allDevices {
@@ -235,6 +244,17 @@ final class StatusItemController: NSObject {
         voiceItem.target = self
         menu.addItem(voiceItem)
 
+        // 主空调一键电源快速启停 (v1.9.25: 原生右键快速电源操作)
+        let targetDev = model.devices.first(where: { $0.id == (model.menuBarDeviceId ?? model.devices.first?.id) })
+        if let dev = targetDev {
+            let isPowerOn = model.attribute("onOffStatus", deviceId: dev.id)?.boolValue ?? false
+            let powerTitle = isPowerOn ? "关机「\(dev.deviceName)」" : "开机「\(dev.deviceName)」"
+            let powerItem = NSMenuItem(title: powerTitle, action: #selector(togglePrimaryPower), keyEquivalent: "")
+            powerItem.target = self
+            powerItem.isEnabled = dev.online && model.gatewayConnected
+            menu.addItem(powerItem)
+        }
+
         let openItem = NSMenuItem(title: "打开主窗口", action: #selector(openMainWindow), keyEquivalent: "")
         openItem.target = self
         menu.addItem(openItem)
@@ -310,6 +330,12 @@ final class StatusItemController: NSObject {
             AmbientSoundEngine.shared.play(type: model.sleepAmbientSoundType)
         }
         refreshTemperature()
+    }
+
+    @objc private func togglePrimaryPower() {
+        guard let targetId = model.menuBarDeviceId ?? model.devices.first?.id else { return }
+        let currentPower = model.attribute("onOffStatus", deviceId: targetId)?.boolValue ?? false
+        model.sendAttribute("onOffStatus", value: .bool(!currentPower), deviceId: targetId)
     }
 
     @objc private func openFilterCare() {

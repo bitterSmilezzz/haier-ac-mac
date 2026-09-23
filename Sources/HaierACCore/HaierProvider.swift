@@ -94,7 +94,7 @@ public final class HaierGatewayHandle: GatewayHandle {
         gateway.updateSubscription(deviceIds: deviceIds)
     }
 
-    public func reconnectImmediately() {
-        gateway.reconnectImmediately()
+    public func reconnectImmediately(force: Bool = false) {
+        gateway.reconnectImmediately(force: force)
     }
 }

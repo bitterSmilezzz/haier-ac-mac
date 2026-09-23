@@ -106,6 +106,8 @@ enum Theme {
     static let warning = Color.dynamic(light: 0xA67C00, dark: 0xC9A227)
     /// 语义：错误
     static let danger = Color.dynamic(light: 0xC93A3A, dark: 0xD64545)
+    /// 语义：设备离线/断网 (未连网)
+    static let offline = Color.dynamic(light: 0x9CA0A6, dark: 0x62666D)
 
     // MARK: - 语义感知模式色彩（Mode Tint）
 

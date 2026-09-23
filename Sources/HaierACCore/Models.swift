@@ -76,6 +76,8 @@ public enum ACModeCode: String, CaseIterable, Codable {
         }
     }
 
+    public var localizedName: String { desc }
+
     /// 从任意数字字符串或文本描述匹配模式（无法识别时返回 nil，消除将未知工况强行兜底为制冷的缺陷）
     public static func match(from raw: String?) -> ACModeCode? {
         guard let raw = raw?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased(), !raw.isEmpty else {

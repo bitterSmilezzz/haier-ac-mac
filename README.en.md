@@ -6,9 +6,14 @@ A native SwiftUI app to control Haier / Leader (统帅) smart air conditioners o
 
 ## Features
 
-- 🏷 **Safe Mode Decoding & Lockless Audio Realtime Engine (v1.9.24)**:
+- 🏷 **In-Flight Connection Guard & Dynamic Dual-State Status Bar (v1.9.25)**:
+  - 🛡️ **WebSocket In-Flight Guard & Task Generation Validation**: Closed CR P1 defect by adding strict `guard self.task == nil else { return }` in `connect()`, completely preventing orphan duplicate connections under rapid reentrancy; `reconnectImmediately(force: true)` cancels and clears existing tasks before re-handshaking; `receiveLoop` enforces `task === self.task` validation across all async phases.
+  - ⚡️ **Neutral Power Baseline & Precise Mode Matching**: Closed CR P2-1 by updating instantaneous power model to fallback to `.auto` instead of forced cooling; sampling engine excludes unrecognized modes from `runningCooling` hours; voice control returns descriptive failure when mode is unrecognized instead of forced cooling.
+  - 🍱 **Dynamic Menu Bar Dual-State Icon & Context Menu Toggle**: Status bar icon dynamically renders solid `air.conditioner.horizontal.fill` when any AC is active and running, and outline `air.conditioner.horizontal` when standby; right-click context menu now provides one-click power toggle for the primary AC.
+  - 🛡️ **Full-Stack Physical Offline Defense & Semantic Design Token**: Added offline checks before sending commands in `AppModel` to block ghost optimistic UI; standardized `Theme.offline` token across menu bar and main window status capsules.
+- 🏷 **Safe Mode Decoding & Lightweight Audio Snapshot Engine (v1.9.24)**:
   - 🛡 **CR Mode Semantic Safety & Wear Model Alignment**: Fixed raw mode fallback bug where unrecognized modes defaulted to cooling; non-recognized states now safely use neutral base wear factor (1.00), preventing 20%~35% filter wear overestimation.
-  - 🔒 **Lockless CoreAudio Realtime Engine**: Replaced closure captures and main-actor variable reads inside `AVAudioSourceNode` render loop with `os_unfair_lock`-backed atomic parameter snapshotting, completely eliminating TSAN data-race hazards.
+  - 🔒 **CoreAudio Realtime Thread Lightweight Parameter Snapshotting**: Replaced closure captures and main-actor variable reads inside `AVAudioSourceNode` render loop with `os_unfair_lock`-backed parameter snapshotting, completely eliminating TSAN data-race hazards.
   - ⚡️ **Sub-Second Gateway Healing**: Auto-resets backoff attempts upon `NWPathMonitor` reconnection or system wake-up, cutting reconnection latency from up to 120s down to milliseconds.
   - 💡 **Deep Physical Offline Status Awareness**: Header pod clearly distinguishes device offline status from normal power-off state with helpful tooltips.
 - 🎨 **Brand New Design System & Control Center Style (v1.9.0)**:

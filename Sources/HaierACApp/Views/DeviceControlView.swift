@@ -70,10 +70,20 @@ struct DeviceControlView: View {
             // 设备型号与连接状态
             HStack(spacing: Theme.spaceSM) {
                 HStack(spacing: 6) {
+                    let dotColor: Color = {
+                        if !model.gatewayConnected { return Theme.warning }
+                        if !device.online { return Theme.offline }
+                        return isPowerOn ? Theme.success : Theme.inkTertiary
+                    }()
+                    let statusLabel: String = {
+                        if !model.gatewayConnected { return "网关重连中..." }
+                        if !device.online { return "设备离线 (未连网)" }
+                        return isPowerOn ? "实时网关连接建立" : "空调已关机"
+                    }()
                     Circle()
-                        .fill(model.gatewayConnected ? (isPowerOn ? Theme.success : Theme.inkTertiary) : Theme.warning)
+                        .fill(dotColor)
                         .frame(width: 8, height: 8)
-                    Text(model.gatewayConnected ? (isPowerOn ? "实时网关连接建立" : "空调已关机") : "网关重连中...")
+                    Text(statusLabel)
                         .font(.system(size: 12, weight: .medium))
                         .foregroundStyle(model.gatewayConnected ? Theme.inkMuted : Theme.warning)
                 }

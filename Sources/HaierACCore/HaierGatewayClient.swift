@@ -67,6 +67,11 @@ public final class HaierGatewayClient: NSObject, URLSessionWebSocketDelegate {
 
     private func connect() {
         guard let session, let gatewayURL, !stopped else { return }
+        // 防在途重复连接：已有在途握手或已连接 task 时直接跳过，避免生成孤儿连接
+        guard self.task == nil else {
+            AppLog.log("WS connect 跳过：当前已有在途或活跃 WebSocket 任务")
+            return
+        }
         // 参考实现: '{server}/userag?token=..&agClientId=..'，必须保留 /userag 路径
         let urlString = gatewayURL.absoluteString + "/userag?token=\(token)&agClientId=\(token)"
         guard let url = URL(string: urlString) else { return }
@@ -170,10 +175,10 @@ public final class HaierGatewayClient: NSObject, URLSessionWebSocketDelegate {
     private func receiveLoop(_ task: URLSessionWebSocketTask) {
         task.receive { [weak self] result in
             guard let self else { return }
+            // 严格代际校验：若已停止或当前任务已被替代/取消，直接断开循环
+            guard !self.stopped, task === self.task else { return }
             switch result {
             case .success(let message):
-                // 连接代际已切换（重连/停止）：不再处理旧连接的消息
-                guard task === self.task else { return }
                 switch message {
                 case .string(let text):
                     self.handle(text)
@@ -184,6 +189,7 @@ public final class HaierGatewayClient: NSObject, URLSessionWebSocketDelegate {
                 @unknown default:
                     break
                 }
+                guard !self.stopped, task === self.task else { return }
                 self.receiveLoop(task)
             case .failure(let error):
                 guard task === self.task else { return }
@@ -262,13 +268,20 @@ public final class HaierGatewayClient: NSObject, URLSessionWebSocketDelegate {
     }
 
     /// 立即重置退避并触发快速重连（用于网络恢复、休眠唤醒或用户主动重试场景）
-    public func reconnectImmediately() {
+    /// - Parameter force: 是否强制中断现有在途握手或连接重新建立
+    public func reconnectImmediately(force: Bool = false) {
         guard !stopped else { return }
-        guard !isConnected else { return }
-        AppLog.log("WS 请求立即重连（重置退避计数并立即尝试连接）")
+        if isConnected && !force { return }
+        AppLog.log("WS 请求立即重连（清理旧在途连接并重置退避）")
         reconnectAttempt = 0
         reconnectTask?.cancel()
         reconnectTask = nil
+        // 取消并清理已有任务，确保 connect() 的 self.task == nil 防护通过且无孤儿连接挂起
+        if let existing = self.task {
+            self.task = nil
+            existing.cancel()
+        }
+        isConnected = false
         connect()
     }
 

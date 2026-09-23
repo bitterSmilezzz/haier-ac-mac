@@ -55,11 +55,11 @@ public protocol GatewayHandle: AnyObject {
     /// 更新订阅设备列表（手动添加设备后调用）
     func updateSubscription(deviceIds: [String])
     /// 立即重置退避并触发快速重连（用于网络恢复、休眠唤醒等极速自愈场景）
-    func reconnectImmediately()
+    func reconnectImmediately(force: Bool)
 }
 
 public extension GatewayHandle {
-    func reconnectImmediately() {
+    func reconnectImmediately(force: Bool = false) {
         start()
     }
 }

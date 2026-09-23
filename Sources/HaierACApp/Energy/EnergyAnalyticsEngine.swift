@@ -138,7 +138,8 @@ public final class EnergyAnalyticsEngine: ObservableObject {
         }()
 
         var power: Double = 400.0
-        let mode = ACModeCode.match(from: modeCode, default: .cooling)
+        // 未识别模式采用 .auto 中性智能自适应基准，按温差动态测算，避免偏高虚标
+        let mode = ACModeCode.match(from: modeCode, default: .auto)
 
         switch mode {
         case .fan:
@@ -243,17 +244,18 @@ public final class EnergyAnalyticsEngine: ObservableObject {
                 let devKWh = (power * deltaHours) / 1000.0
                 totalIncrementalKWh += devKWh
 
-                let sampleMode = ACModeCode.match(from: sample.modeCode, default: .cooling)
-                switch sampleMode {
-                case .cooling: runningCooling += 1
-                case .heating: runningHeating += 1
-                case .fan: runningFan += 1
-                case .dehumidify: runningDehum += 1
-                case .auto:
-                    if (sample.indoorTemp ?? 25.0) >= (sample.targetTemp ?? 24.0) {
-                        runningCooling += 1
-                    } else {
-                        runningHeating += 1
+                if let sampleMode = ACModeCode.match(from: sample.modeCode) {
+                    switch sampleMode {
+                    case .cooling: runningCooling += 1
+                    case .heating: runningHeating += 1
+                    case .fan: runningFan += 1
+                    case .dehumidify: runningDehum += 1
+                    case .auto:
+                        if (sample.indoorTemp ?? 25.0) >= (sample.targetTemp ?? 24.0) {
+                            runningCooling += 1
+                        } else {
+                            runningHeating += 1
+                        }
                     }
                 }
             }
