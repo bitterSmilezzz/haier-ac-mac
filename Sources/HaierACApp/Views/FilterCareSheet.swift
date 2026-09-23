@@ -30,6 +30,22 @@ struct FilterCareSheet: View {
         Double(model.filterAccumulatedMinutes(for: currentDeviceId)) / 60.0
     }
 
+    private var currentWearFactor: Double {
+        let attrs = model.attributes[currentDeviceId] ?? [:]
+        let isPowerOn = attrs["onOffStatus"]?.boolValue ?? false
+        if !isPowerOn { return 1.0 }
+        let mode = attrs["operationMode"]?.stringValue ?? "0"
+        let targetTemp = attrs["targetTemperature"]?.doubleValue ?? 26.0
+        let indoorTemp = model.currentIndoorTemperature(for: currentDeviceId)
+        let windSpeed = attrs["windSpeed"]?.stringValue ?? "微风"
+        return model.calculateFilterWearFactor(
+            mode: mode,
+            targetTemp: targetTemp,
+            indoorTemp: indoorTemp,
+            windSpeed: windSpeed
+        )
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             // 顶栏
@@ -136,20 +152,42 @@ struct FilterCareSheet: View {
                             .padding(.vertical, 2)
                             .background(statusColor.opacity(0.12))
                             .clipShape(Capsule())
+
+                        // 动力学负载倍率徽章 (v1.9.22)
+                        HStack(spacing: 3) {
+                            Image(systemName: "wind")
+                                .font(.system(size: 9))
+                            Text("动力负荷 \(String(format: "%.1f", currentWearFactor))x")
+                                .font(.system(size: 10, weight: .medium))
+                        }
+                        .foregroundStyle(currentWearFactor > 1.2 ? Theme.accent : Theme.inkTertiary)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(Theme.surface2)
+                        .clipShape(Capsule())
                     }
 
-                    Text("当前累计运行: \(String(format: "%.1f", runningHours)) 小时（建议每 250 小时清洗一次）")
+                    Text("空气动力学等效工时: \(String(format: "%.1f", runningHours)) / 250 小时（含风量与凝露加权）")
                         .font(.system(size: 12))
                         .foregroundStyle(Theme.inkSubtle)
 
-                    if let lastClean = model.lastFilterCleanedDate {
-                        Text("上次清洗时间: \(formattedDate(lastClean))")
-                            .font(.system(size: 11))
-                            .foregroundStyle(Theme.inkTertiary)
-                    } else {
-                        Text("近期尚未记录水洗保养")
-                            .font(.system(size: 11))
-                            .foregroundStyle(Theme.inkTertiary)
+                    HStack(spacing: 12) {
+                        if let lastClean = model.lastFilterCleanedDate(for: currentDeviceId) {
+                            Text("上次清洗时间: \(formattedDate(lastClean))")
+                                .font(.system(size: 11))
+                                .foregroundStyle(Theme.inkTertiary)
+                        } else {
+                            Text("近期未记录拆洗")
+                                .font(.system(size: 11))
+                                .foregroundStyle(Theme.inkTertiary)
+                        }
+
+                        if cleanlinessPercentage > 0 {
+                            let estDays = max(1, Int(Double(250 * 60 - model.filterAccumulatedMinutes(for: currentDeviceId)) / (6.0 * 60.0)))
+                            Text("• 预计还可使用约 \(estDays) 天")
+                                .font(.system(size: 11))
+                                .foregroundStyle(Theme.inkTertiary)
+                        }
                     }
                 }
 
@@ -243,6 +281,18 @@ struct FilterCareSheet: View {
                         model.stopSelfCleaning()
                     }
                     .buttonStyle(Theme.secondaryButtonStyle())
+                } else if model.isSelfCleaningActive {
+                    Button {
+                        model.startSelfCleaning(deviceId: currentDeviceId)
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "arrow.triangle.2.circlepath")
+                                .font(.system(size: 10))
+                            Text("切换至此设备清洁")
+                                .font(.system(size: 12, weight: .medium))
+                        }
+                    }
+                    .buttonStyle(Theme.secondaryButtonStyle())
                 } else {
                     Button {
                         model.startSelfCleaning(deviceId: currentDeviceId)
@@ -255,7 +305,6 @@ struct FilterCareSheet: View {
                         }
                     }
                     .buttonStyle(Theme.primaryButtonStyle())
-                    .disabled(model.isSelfCleaningActive)
                 }
             }
         }

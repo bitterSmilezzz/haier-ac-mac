@@ -80,7 +80,7 @@ struct EcoEnergySection: View {
                         title: "今日累计耗电",
                         value: String(format: "%.2f", today.totalKWh),
                         unit: "kWh",
-                        subtitle: "约 \(today.totalMinutes) 分钟运行",
+                        subtitle: "全屋墙钟约 \(today.totalMinutes) 分钟",
                         color: Color.dynamic(light: 0x0071E3, dark: 0x2997FF)
                     )
 

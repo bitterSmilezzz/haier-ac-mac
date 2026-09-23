@@ -6,6 +6,7 @@ import HaierACCore
 /// 遵循 macOS 控制中心规范：毛玻璃材质底衬、Bento 网格模块、状态感知动态强调色与微触感弹簧动效
 struct MenuBarControlsView: View {
     @EnvironmentObject var model: AppModel
+    @ObservedObject private var ambient = AmbientSoundEngine.shared
 
     /// 当前选中的设备（多设备切换）
     @State private var selectedDeviceId: String?
@@ -55,7 +56,7 @@ struct MenuBarControlsView: View {
                 }
 
                 // 2.3 睡眠助眠白噪音快捷播控 (若正在播放或配置开启)
-                if AmbientSoundEngine.shared.isPlaying || model.sleepAmbientSoundEnabled {
+                if ambient.isPlaying || model.sleepAmbientSoundEnabled {
                     ambientSoundPod
                 }
 
@@ -816,7 +817,7 @@ struct MenuBarControlsView: View {
 
     private var ambientSoundPod: some View {
         HStack(spacing: 8) {
-            Image(systemName: AmbientSoundEngine.shared.isPlaying ? "waveform" : "speaker.slash")
+            Image(systemName: ambient.isPlaying ? "waveform" : "speaker.slash")
                 .font(.system(size: 11))
                 .foregroundStyle(Theme.accent)
 
@@ -827,13 +828,13 @@ struct MenuBarControlsView: View {
             Spacer()
 
             Button {
-                if AmbientSoundEngine.shared.isPlaying {
-                    AmbientSoundEngine.shared.stop()
+                if ambient.isPlaying {
+                    ambient.stop()
                 } else {
-                    AmbientSoundEngine.shared.play(type: model.sleepAmbientSoundType)
+                    ambient.play(type: model.sleepAmbientSoundType)
                 }
             } label: {
-                Image(systemName: AmbientSoundEngine.shared.isPlaying ? "pause.fill" : "play.fill")
+                Image(systemName: ambient.isPlaying ? "pause.fill" : "play.fill")
                     .font(.system(size: 10))
             }
             .buttonStyle(.plain)

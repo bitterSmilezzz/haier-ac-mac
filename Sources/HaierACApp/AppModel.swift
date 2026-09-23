@@ -467,6 +467,9 @@ final class AppModel: ObservableObject {
         }
     }
 
+    /// 是否展示滤网保养与自清洁弹窗 (支持菜单栏/外部直接路由呼出)
+    @Published public var showFilterCareSheet: Bool = false
+
     /// 各设备独立滤网累计开机运行分钟数 [deviceId: minutes]
     @Published var deviceFilterMinutes: [String: Int] = [:] {
         didSet {
@@ -485,12 +488,16 @@ final class AppModel: ObservableObject {
         }
     }
 
-    /// 获取指定设备的滤网累计运行分钟数
+    /// 获取指定设备的滤网累计运行分钟数（基于空气动力学等效工时）
     public func filterAccumulatedMinutes(for deviceId: String) -> Int {
         if let minutes = deviceFilterMinutes[deviceId] {
             return minutes
         }
-        return filterAccumulatedMinutes
+        let primaryId = devices.first?.id ?? manualDevices.first?.deviceId
+        if primaryId == deviceId {
+            return filterAccumulatedMinutes
+        }
+        return 0
     }
 
     /// 获取指定设备的上次滤网清洗日期
@@ -498,7 +505,11 @@ final class AppModel: ObservableObject {
         if let date = deviceFilterCleanedDates[deviceId] {
             return date
         }
-        return lastFilterCleanedDate
+        let primaryId = devices.first?.id ?? manualDevices.first?.deviceId
+        if primaryId == deviceId {
+            return lastFilterCleanedDate
+        }
+        return nil
     }
 
     /// 指定设备的滤网清洁度百分比 (0 ~ 100%)，基于 250 小时 (15,000 分钟) 建议保养周期
@@ -523,26 +534,107 @@ final class AppModel: ObservableObject {
 
     /// 重置滤网保养计时 (支持指定设备，默认主设备)
     func resetFilterMaintenance(for deviceId: String? = nil) {
-        let targetId = deviceId ?? devices.first?.id ?? manualDevices.first?.deviceId ?? ""
+        let primaryId = devices.first?.id ?? manualDevices.first?.deviceId ?? ""
+        let targetId = deviceId ?? primaryId
         if !targetId.isEmpty {
             deviceFilterMinutes[targetId] = 0
             deviceFilterCleanedDates[targetId] = Date()
         }
-        filterAccumulatedMinutes = 0
-        lastFilterCleanedDate = Date()
+        if targetId == primaryId || targetId.isEmpty {
+            filterAccumulatedMinutes = 0
+            lastFilterCleanedDate = Date()
+        }
 
         let devName = devices.first(where: { $0.id == targetId })?.deviceName ??
                       manualDevices.first(where: { $0.deviceId == targetId })?.name ?? "海尔空调"
         operationNotice = OperationNotice(text: "🧼 \(devName) 滤网运行计时已重置，洁净度恢复 100%", isError: false)
     }
 
-    /// 累加特定设备的滤网运行时间
-    func accumulateFilterMinutes(for deviceId: String, minutes: Int) {
-        let current = deviceFilterMinutes[deviceId] ?? filterAccumulatedMinutes
-        let updated = current + minutes
+    /// 计算空气动力学与冷凝水湿度多维滤网负荷衰减系数
+    public func calculateFilterWearFactor(
+        mode: String,
+        targetTemp: Double,
+        indoorTemp: Double?,
+        windSpeed: String
+    ) -> Double {
+        // 1. 风量通量因子（高速风量通过滤网单位时间截留更多浮尘颗粒）
+        let windFactor: Double
+        let speed = windSpeed.lowercased()
+        if speed.contains("强力") || speed.contains("turbo") || speed.contains("超强") {
+            windFactor = 1.70
+        } else if speed.contains("高") || speed.contains("high") {
+            windFactor = 1.35
+        } else if speed.contains("中") || speed.contains("medium") || speed.contains("mid") {
+            windFactor = 1.00
+        } else if speed.contains("低") || speed.contains("low") {
+            windFactor = 0.80
+        } else if speed.contains("微") || speed.contains("静") || speed.contains("quiet") || speed.contains("mute") {
+            windFactor = 0.60
+        } else {
+            windFactor = 1.00 // 自动风速默认基准
+        }
+
+        // 2. 冷凝结露与环境潮湿附着因子（制冷/除湿蒸发器凝露使滤网更易吸附粉尘并滋生微生物）
+        let modeFactor: Double
+        let m = mode.lowercased()
+        if m == "0" || m.contains("制冷") || m.contains("cool") {
+            if let indoor = indoorTemp, indoor > targetTemp {
+                modeFactor = 1.35
+            } else {
+                modeFactor = 1.20
+            }
+        } else if m == "2" || m.contains("除湿") || m.contains("dehum") {
+            modeFactor = 1.30
+        } else if m == "4" || m.contains("制热") || m.contains("heat") {
+            modeFactor = 1.05
+        } else if m == "6" || m.contains("送风") || m.contains("fan") {
+            modeFactor = 0.85
+        } else {
+            modeFactor = 1.00
+        }
+
+        return max(0.5, min(3.0, windFactor * modeFactor))
+    }
+
+    /// 累加特定设备的滤网运行时间（结合空气动力学负荷系数折算等效工时）
+    func accumulateFilterMinutes(for deviceId: String, minutes: Int, wearFactor: Double = 1.0) {
+        let current = filterAccumulatedMinutes(for: deviceId)
+        let effectiveMinutes = max(1, Int(round(Double(minutes) * wearFactor)))
+        let updated = current + effectiveMinutes
         deviceFilterMinutes[deviceId] = updated
-        if deviceId == (devices.first?.id ?? manualDevices.first?.deviceId) {
+        let primaryId = devices.first?.id ?? manualDevices.first?.deviceId
+        if deviceId == primaryId {
             filterAccumulatedMinutes = updated
+        }
+        checkFilterHealthAlert(deviceId: deviceId, minutes: updated)
+    }
+
+    private var lastFilterAlertDates: [String: Date] = [:]
+
+    private func checkFilterHealthAlert(deviceId: String, minutes: Int) {
+        let maxMinutes = 250 * 60
+        let percentage = Int(Double(max(0, maxMinutes - minutes)) / Double(maxMinutes) * 100.0)
+        guard percentage <= 20 else { return }
+
+        let lastAlert = lastFilterAlertDates[deviceId]
+        if let last = lastAlert, Date().timeIntervalSince(last) < 7 * 86400 {
+            return
+        }
+        lastFilterAlertDates[deviceId] = Date()
+
+        let devName = devices.first(where: { $0.id == deviceId })?.deviceName ??
+                      manualDevices.first(where: { $0.deviceId == deviceId })?.name ?? "海尔空调"
+        let content = UNMutableNotificationContent()
+        content.title = "⚠️ 滤网建议清洗保养"
+        content.body = "「\(devName)」滤网综合洁净度已降至 \(percentage)%，积尘可能会导致风阻增大并增加用电负荷，建议拆下水洗并晾干。"
+        content.sound = .default
+        let req = UNNotificationRequest(
+            identifier: "filter-health-alert-\(deviceId)",
+            content: content,
+            trigger: nil
+        )
+        Task {
+            try? await UNUserNotificationCenter.current().add(req)
         }
     }
 
@@ -555,6 +647,10 @@ final class AppModel: ObservableObject {
 
     /// 启动 56°C 高温除菌自清洁托管程序
     public func startSelfCleaning(deviceId: String) {
+        if isSelfCleaningActive {
+            stopSelfCleaning()
+        }
+
         let devName = devices.first(where: { $0.id == deviceId })?.deviceName ??
                       manualDevices.first(where: { $0.deviceId == deviceId })?.name ?? "海尔空调"
 
@@ -754,7 +850,13 @@ final class AppModel: ObservableObject {
             let windSpeed = attrs["windSpeed"]?.stringValue ?? "微风"
 
             if isPowerOn {
-                accumulateFilterMinutes(for: dev.id, minutes: elapsedMinutes)
+                let wearFactor = calculateFilterWearFactor(
+                    mode: mode,
+                    targetTemp: targetTemp,
+                    indoorTemp: indoorTemp,
+                    windSpeed: windSpeed
+                )
+                accumulateFilterMinutes(for: dev.id, minutes: elapsedMinutes, wearFactor: wearFactor)
             }
 
             samples.append(

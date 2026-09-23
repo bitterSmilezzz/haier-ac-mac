@@ -12,7 +12,6 @@ struct DeviceListView: View {
     /// 批量选择模式（v1.5）
     @State private var batchMode = false
     @State private var selectedDeviceIds: Set<String> = []
-    @State private var showFilterCare = false
 
     /// 可批量操作的设备（云端 + 手动）
     private var batchableDevices: [(id: String, name: String)] {
@@ -62,7 +61,7 @@ struct DeviceListView: View {
         .sheet(item: $renamingDevice) { device in
             renameSheet(device)
         }
-        .sheet(isPresented: $showFilterCare) {
+        .sheet(isPresented: $model.showFilterCareSheet) {
             FilterCareSheet()
                 .environmentObject(model)
         }
@@ -111,7 +110,7 @@ struct DeviceListView: View {
                 .disabled(batchableDevices.count < 2)
             }
             Button {
-                showFilterCare = true
+                model.showFilterCareSheet = true
             } label: {
                 HStack(spacing: 4) {
                     Image(systemName: "sparkles")

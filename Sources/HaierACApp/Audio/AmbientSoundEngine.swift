@@ -73,6 +73,7 @@ public final class AmbientSoundEngine: ObservableObject {
 
     private var synthState = SynthesisState()
     private var fadeTimer: Task<Void, Never>?
+    private var fadeGeneration: Int = 0
 
     private init() {}
 
@@ -85,12 +86,15 @@ public final class AmbientSoundEngine: ObservableObject {
 
         guard let engine = engine else { return }
 
+        fadeGeneration &+= 1
+        let currentGen = fadeGeneration
+        fadeTimer?.cancel()
+
         targetVolume = min(max(volume, 0.0), 1.0)
         isPlaying = true
 
         if engine.isRunning {
             // 如果已在运行，平滑过渡音量至目标值
-            fadeTimer?.cancel()
             if activeGain < targetVolume {
                 fadeTimer = Task { @MainActor in
                     let steps = 25
@@ -98,11 +102,14 @@ public final class AmbientSoundEngine: ObservableObject {
                     let gainStep = (self.targetVolume - self.activeGain) / Float(steps)
                     for _ in 0..<steps {
                         try? await Task.sleep(nanoseconds: UInt64(stepTime * 1_000_000_000))
-                        if Task.isCancelled { break }
+                        guard !Task.isCancelled, self.fadeGeneration == currentGen else { return }
                         self.activeGain = min(self.targetVolume, self.activeGain + gainStep)
                     }
+                    guard !Task.isCancelled, self.fadeGeneration == currentGen else { return }
                     self.activeGain = self.targetVolume
                 }
+            } else {
+                self.activeGain = self.targetVolume
             }
             AppLog.log("助眠音频引擎: 切换音律为「\(currentType.rawValue)」")
             return
@@ -113,16 +120,16 @@ public final class AmbientSoundEngine: ObservableObject {
             activeGain = 0.0
 
             // 平滑淡入
-            fadeTimer?.cancel()
             fadeTimer = Task { @MainActor in
                 let steps = 40
                 let stepTime = max(0.01, fadeInDuration / Double(steps))
                 let gainStep = self.targetVolume / Float(steps)
                 for _ in 0..<steps {
                     try? await Task.sleep(nanoseconds: UInt64(stepTime * 1_000_000_000))
-                    if Task.isCancelled { break }
+                    guard !Task.isCancelled, self.fadeGeneration == currentGen else { return }
                     self.activeGain = min(self.targetVolume, self.activeGain + gainStep)
                 }
+                guard !Task.isCancelled, self.fadeGeneration == currentGen else { return }
                 self.activeGain = self.targetVolume
             }
             AppLog.log("助眠音频引擎: 启动播放「\(currentType.rawValue)」")
@@ -134,13 +141,18 @@ public final class AmbientSoundEngine: ObservableObject {
 
     /// 停止播放（支持平滑淡出）
     public func stop(fadeOutDuration: TimeInterval = 1.5) {
-        guard isPlaying else { return }
+        guard isPlaying || (engine?.isRunning == true) else { return }
 
+        // 立即置 false，保证 UI 语义与按钮响应即时一致
+        isPlaying = false
+
+        fadeGeneration &+= 1
+        let currentGen = fadeGeneration
         fadeTimer?.cancel()
+
         if fadeOutDuration <= 0.1 {
             self.activeGain = 0.0
             self.engine?.stop()
-            self.isPlaying = false
             return
         }
 
@@ -152,12 +164,12 @@ public final class AmbientSoundEngine: ObservableObject {
 
             for _ in 0..<steps {
                 try? await Task.sleep(nanoseconds: UInt64(stepTime * 1_000_000_000))
-                if Task.isCancelled { break }
+                guard !Task.isCancelled, self.fadeGeneration == currentGen else { return }
                 self.activeGain = max(0.0, self.activeGain - gainStep)
             }
+            guard !Task.isCancelled, self.fadeGeneration == currentGen else { return }
             self.activeGain = 0.0
             self.engine?.stop()
-            self.isPlaying = false
             AppLog.log("助眠音频引擎: 已平滑淡出停止")
         }
     }

@@ -35,12 +35,16 @@ final class StatusItemController: NSObject {
         statusItem = item
         refreshTemperature()
 
-        // 温度/开关/自清洁/睡眠等状态变化时刷新菜单栏标题与悬浮提示 Tooltip
-        Publishers.Merge4(
+        // 温度/开关/自清洁/睡眠/白噪音/设备选择/温度显示等状态变化时刷新菜单栏标题与悬浮提示 Tooltip
+        Publishers.MergeMany(
             model.$attributes.map { _ in () }.eraseToAnyPublisher(),
             model.$devices.map { _ in () }.eraseToAnyPublisher(),
+            model.$menuBarDeviceId.map { _ in () }.eraseToAnyPublisher(),
+            model.$menuBarShowTemperature.map { _ in () }.eraseToAnyPublisher(),
             model.$isSelfCleaningActive.map { _ in () }.eraseToAnyPublisher(),
-            model.$activeSleepSession.map { _ in () }.eraseToAnyPublisher()
+            model.$selfCleaningRemainingSeconds.map { _ in () }.eraseToAnyPublisher(),
+            model.$activeSleepSession.map { _ in () }.eraseToAnyPublisher(),
+            AmbientSoundEngine.shared.$isPlaying.map { _ in () }.eraseToAnyPublisher()
         )
         .receive(on: DispatchQueue.main)
         .sink { [weak self] _ in
@@ -52,12 +56,32 @@ final class StatusItemController: NSObject {
     /// 菜单栏图标旁显示当前温度（如 26°）与动态多维状态悬浮 Tooltip
     private func refreshTemperature() {
         guard let button = statusItem?.button else { return }
-        if let text = model.menuBarTemperatureText {
-            button.title = " \(text)"
-            button.imagePosition = .imageLeft
+
+        // 状态栏图标与标题动态感知 (v1.9.22)
+        if model.isSelfCleaningActive {
+            let m = model.selfCleaningRemainingSeconds / 60
+            let s = model.selfCleaningRemainingSeconds % 60
+            button.image = NSImage(systemSymbolName: "sparkles", accessibilityDescription: "蒸发器自清洁")
+            button.image?.isTemplate = true
+            button.title = " 56°C (\(String(format: "%02d:%02d", m, s)))"
+        } else if model.activeSleepSession != nil {
+            button.image = NSImage(systemSymbolName: "moon.fill", accessibilityDescription: "睡眠曲线运行中")
+            button.image?.isTemplate = true
+            if let text = model.menuBarTemperatureText {
+                button.title = " \(text)"
+            } else {
+                button.title = ""
+            }
         } else {
-            button.title = ""
+            button.image = NSImage(systemSymbolName: "air.conditioner.horizontal", accessibilityDescription: "海尔空调")
+            button.image?.isTemplate = true
+            if let text = model.menuBarTemperatureText {
+                button.title = " \(text)"
+            } else {
+                button.title = ""
+            }
         }
+        button.imagePosition = .imageLeft
         statusItem?.length = NSStatusItem.variableLength
 
         // 动态构建悬浮 Tooltip 状态概览 (v1.9.21)
@@ -124,14 +148,23 @@ final class StatusItemController: NSObject {
         let popover: NSPopover
         if let existing = self.popover {
             popover = existing
+            if let host = popover.contentViewController as? NSHostingController<AnyView> {
+                host.rootView = AnyView(
+                    MenuBarControlsView()
+                        .environmentObject(model)
+                        .preferredColorScheme(model.themeMode.colorScheme)
+                )
+            }
         } else {
             popover = NSPopover()
             popover.behavior = .transient  // 点击外部自动关闭；关闭时销毁，无幽灵窗口
             popover.animates = true
             let host = NSHostingController(
-                rootView: MenuBarControlsView()
-                    .environmentObject(model)
-                    .preferredColorScheme(model.themeMode.colorScheme)
+                rootView: AnyView(
+                    MenuBarControlsView()
+                        .environmentObject(model)
+                        .preferredColorScheme(model.themeMode.colorScheme)
+                )
             )
             popover.contentViewController = host
             self.popover = popover
@@ -229,6 +262,7 @@ final class StatusItemController: NSObject {
 
     @objc private func openFilterCare() {
         openMainWindow()
+        model.showFilterCareSheet = true
     }
 
     @objc private func toggleLaunchAtLogin() {

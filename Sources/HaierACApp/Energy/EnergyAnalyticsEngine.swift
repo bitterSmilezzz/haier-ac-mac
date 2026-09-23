@@ -1,6 +1,14 @@
 import Foundation
 
 /// 每日用电能耗历史记录
+///
+/// 统计口径说明：
+/// - `totalMinutes`: 全屋空调开机墙钟运行总时长（分钟）。若任意一台或多台空调在同一分钟处于开机运行状态，
+///   该分钟仅累计一次（墙钟时间），反映家庭空调环境处于启用的自然时长。
+/// - `coolingMinutes` / `heatingMinutes` / `fanMinutes` / `dehumMinutes`: 各模式对应的全屋累计墙钟运行分钟数。
+/// - `totalKWh`: 全屋所有设备累计消耗电量（度/kWh）。采用多台空调物理叠加口径，结合各设备当前运行模式、
+///   风速档位、设定温度与室内温差动力学模型动态逐分钟积分累加。
+/// - `totalCost`: 全屋累计预估电费金额（元），支持单一电价与峰谷分时时段自动折算。
 public struct EnergyDayRecord: Codable, Equatable, Identifiable {
     public var id: String { date }
     public var date: String // "yyyy-MM-dd"
