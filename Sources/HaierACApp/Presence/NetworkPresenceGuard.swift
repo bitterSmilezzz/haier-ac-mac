@@ -124,24 +124,32 @@ public final class NetworkPresenceGuard: ObservableObject {
         }
     }
 
-    /// 触发离家空调防空转提醒
+    /// 触发离家空调防空转提醒 (遍历全屋所有运行设备)
     private func triggerLeaveHomeAlertIfNeeded() {
         let model = AppModel.shared
-        let deviceId = model.devices.first?.id ?? model.manualDevices.first?.deviceId
-        guard let deviceId = deviceId else { return }
-        let deviceName = model.devices.first?.deviceName ?? model.manualDevices.first?.name ?? "海尔空调"
-        let isPowerOn = model.attribute("onOffStatus", deviceId: deviceId)?.boolValue ?? false
+        var runningDevices: [(name: String, tempText: String)] = []
 
-        guard isPowerOn else { return }
+        let allDevices = model.devices.map { (id: $0.id, name: $0.deviceName) } +
+            model.manualDevices.map { (id: $0.deviceId, name: $0.name) }
 
-        let targetTemp = model.attribute("targetTemperature", deviceId: deviceId)?.doubleValue ?? 26.0
-        let tempText = String(format: "%.0f°C", targetTemp)
+        for dev in allDevices {
+            let isPowerOn = model.attribute("onOffStatus", deviceId: dev.id)?.boolValue ?? false
+            if isPowerOn {
+                let targetTemp = model.attribute("targetTemperature", deviceId: dev.id)?.doubleValue ?? 26.0
+                runningDevices.append((name: dev.name, tempText: String(format: "%.0f°C", targetTemp)))
+            }
+        }
 
-        AppLog.log("⚠️ 离家防空转守护触发: 检测到已离开家庭网络，空调仍在开机运行 (\(tempText))")
+        guard !runningDevices.isEmpty else { return }
+
+        let names = runningDevices.map(\.name).joined(separator: "、")
+        let detail = runningDevices.map { "\($0.name)(\($0.tempText))" }.joined(separator: "，")
+
+        AppLog.log("⚠️ 离家防空转守护触发: 检测到已离开家庭网络，以下空调仍在开机运行: \(detail)")
 
         let content = UNMutableNotificationContent()
         content.title = "⚠️ 离家防空转提醒"
-        content.body = "检测到您已离开家庭网络，\(deviceName) 仍在运行中（设定 \(tempText)）。如已出门请及时关机以防浪费电量。"
+        content.body = "检测到您已离开家庭网络，\(names) 仍在运行中（\(detail)）。如已出门请及时关机以防浪费电量。"
         content.sound = .default
 
         let request = UNNotificationRequest(

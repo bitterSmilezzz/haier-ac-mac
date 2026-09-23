@@ -451,34 +451,168 @@ final class AppModel: ObservableObject {
         }
     }
 
-    // MARK: - 空调滤网健康监测与自清洁保养 (v1.9.20)
+    // MARK: - 空调滤网健康监测与自清洁保养 (v1.9.21)
 
-    /// 累计开机运行分钟数 (持久化)
+    /// 累计开机运行分钟数 (持久化，向下兼容)
     @Published var filterAccumulatedMinutes: Int = 0 {
         didSet {
             UserDefaults.standard.set(filterAccumulatedMinutes, forKey: "filterAccumulatedMinutes")
         }
     }
 
-    /// 上次滤网清洗重置日期
+    /// 上次滤网清洗重置日期 (向下兼容)
     @Published var lastFilterCleanedDate: Date? {
         didSet {
             UserDefaults.standard.set(lastFilterCleanedDate, forKey: "lastFilterCleanedDate")
         }
     }
 
-    /// 滤网清洁度百分比 (0 ~ 100%)，基于 250 小时 (15,000 分钟) 建议保养周期
-    var filterCleanlinessPercentage: Int {
+    /// 各设备独立滤网累计开机运行分钟数 [deviceId: minutes]
+    @Published var deviceFilterMinutes: [String: Int] = [:] {
+        didSet {
+            if let data = try? JSONEncoder().encode(deviceFilterMinutes) {
+                UserDefaults.standard.set(data, forKey: "deviceFilterMinutes")
+            }
+        }
+    }
+
+    /// 各设备上次清洗滤网日期 [deviceId: Date]
+    @Published var deviceFilterCleanedDates: [String: Date] = [:] {
+        didSet {
+            if let data = try? JSONEncoder().encode(deviceFilterCleanedDates) {
+                UserDefaults.standard.set(data, forKey: "deviceFilterCleanedDates")
+            }
+        }
+    }
+
+    /// 获取指定设备的滤网累计运行分钟数
+    public func filterAccumulatedMinutes(for deviceId: String) -> Int {
+        if let minutes = deviceFilterMinutes[deviceId] {
+            return minutes
+        }
+        return filterAccumulatedMinutes
+    }
+
+    /// 获取指定设备的上次滤网清洗日期
+    public func lastFilterCleanedDate(for deviceId: String) -> Date? {
+        if let date = deviceFilterCleanedDates[deviceId] {
+            return date
+        }
+        return lastFilterCleanedDate
+    }
+
+    /// 指定设备的滤网清洁度百分比 (0 ~ 100%)，基于 250 小时 (15,000 分钟) 建议保养周期
+    public func filterCleanlinessPercentage(for deviceId: String) -> Int {
         let maxMinutes = 250 * 60
-        let remaining = max(0, maxMinutes - filterAccumulatedMinutes)
+        let minutes = filterAccumulatedMinutes(for: deviceId)
+        let remaining = max(0, maxMinutes - minutes)
         return Int(Double(remaining) / Double(maxMinutes) * 100.0)
     }
 
-    /// 重置滤网保养计时
-    func resetFilterMaintenance() {
+    /// 全局综合最低滤网清洁度百分比 (0 ~ 100%)
+    var filterCleanlinessPercentage: Int {
+        let allIds = devices.map(\.id) + manualDevices.map(\.deviceId)
+        guard !allIds.isEmpty else {
+            let maxMinutes = 250 * 60
+            let remaining = max(0, maxMinutes - filterAccumulatedMinutes)
+            return Int(Double(remaining) / Double(maxMinutes) * 100.0)
+        }
+        let percentages = allIds.map { filterCleanlinessPercentage(for: $0) }
+        return percentages.min() ?? 100
+    }
+
+    /// 重置滤网保养计时 (支持指定设备，默认主设备)
+    func resetFilterMaintenance(for deviceId: String? = nil) {
+        let targetId = deviceId ?? devices.first?.id ?? manualDevices.first?.deviceId ?? ""
+        if !targetId.isEmpty {
+            deviceFilterMinutes[targetId] = 0
+            deviceFilterCleanedDates[targetId] = Date()
+        }
         filterAccumulatedMinutes = 0
         lastFilterCleanedDate = Date()
-        operationNotice = OperationNotice(text: "🧼 滤网运行计时已重置，洁净度恢复 100%", isError: false)
+
+        let devName = devices.first(where: { $0.id == targetId })?.deviceName ??
+                      manualDevices.first(where: { $0.deviceId == targetId })?.name ?? "海尔空调"
+        operationNotice = OperationNotice(text: "🧼 \(devName) 滤网运行计时已重置，洁净度恢复 100%", isError: false)
+    }
+
+    /// 累加特定设备的滤网运行时间
+    func accumulateFilterMinutes(for deviceId: String, minutes: Int) {
+        let current = deviceFilterMinutes[deviceId] ?? filterAccumulatedMinutes
+        let updated = current + minutes
+        deviceFilterMinutes[deviceId] = updated
+        if deviceId == (devices.first?.id ?? manualDevices.first?.deviceId) {
+            filterAccumulatedMinutes = updated
+        }
+    }
+
+    // MARK: - 蒸发器 56°C 高温自清洁生命周期全局管理 (v1.9.21)
+
+    @Published public var isSelfCleaningActive: Bool = false
+    @Published public var selfCleaningRemainingSeconds: Int = 0
+    @Published public var selfCleaningDeviceId: String? = nil
+    private var selfCleaningTask: Task<Void, Never>?
+
+    /// 启动 56°C 高温除菌自清洁托管程序
+    public func startSelfCleaning(deviceId: String) {
+        let devName = devices.first(where: { $0.id == deviceId })?.deviceName ??
+                      manualDevices.first(where: { $0.deviceId == deviceId })?.name ?? "海尔空调"
+
+        // 尝试下发海尔标准自清洁控制指令
+        let attrs = attributes[deviceId] ?? [:]
+        for key in ["selfCleaningStatus", "cleanStatus", "pm25CleanStatus", "sterilizationStatus"] {
+            if let attr = attrs[key], attr.writable {
+                sendAttribute(key, value: .bool(true), deviceId: deviceId)
+            }
+        }
+
+        selfCleaningDeviceId = deviceId
+        isSelfCleaningActive = true
+        selfCleaningRemainingSeconds = 1200 // 20分钟
+
+        selfCleaningTask?.cancel()
+        selfCleaningTask = Task { @MainActor [weak self] in
+            while let self = self, self.isSelfCleaningActive && self.selfCleaningRemainingSeconds > 0 {
+                try? await Task.sleep(nanoseconds: 1_000_000_000)
+                if Task.isCancelled { break }
+                self.selfCleaningRemainingSeconds -= 1
+            }
+            guard let self = self, self.isSelfCleaningActive else { return }
+            self.isSelfCleaningActive = false
+            self.selfCleaningRemainingSeconds = 0
+            self.operationNotice = OperationNotice(text: "🧼 \(devName) 蒸发器 56°C 高温除菌自清洁已完成", isError: false)
+
+            let content = UNMutableNotificationContent()
+            content.title = "✅ 蒸发器自清洁完成"
+            content.body = "\(devName) 56°C 高温自清洁程序已圆满完成，蒸发器翅片已烘干除菌，空气洁净清新。"
+            content.sound = .default
+            let req = UNNotificationRequest(
+                identifier: "self-cleaning-finished-\(UUID().uuidString)",
+                content: content,
+                trigger: nil
+            )
+            try? await UNUserNotificationCenter.current().add(req)
+        }
+
+        operationNotice = OperationNotice(text: "已启动「\(devName)」56°C 高温自清洁（约20分钟）", isError: false)
+    }
+
+    /// 中止自清洁托管程序
+    public func stopSelfCleaning() {
+        guard isSelfCleaningActive else { return }
+        if let devId = selfCleaningDeviceId {
+            let attrs = attributes[devId] ?? [:]
+            for key in ["selfCleaningStatus", "cleanStatus", "pm25CleanStatus", "sterilizationStatus"] {
+                if let attr = attrs[key], attr.writable {
+                    sendAttribute(key, value: .bool(false), deviceId: devId)
+                }
+            }
+        }
+        isSelfCleaningActive = false
+        selfCleaningRemainingSeconds = 0
+        selfCleaningTask?.cancel()
+        selfCleaningTask = nil
+        operationNotice = OperationNotice(text: "已退出自清洁模式", isError: false)
     }
 
     // MARK: - 睡眠自然环境音与晨间音律助眠联动 (v1.9.20)
@@ -589,34 +723,55 @@ final class AppModel: ObservableObject {
     private var schedulerTask: Task<Void, Never>?
     private var lastMinuteSampleDate: Date?
 
-    /// 周期性能耗采样积分与滤网运行时长累加 (每分钟一次)
+    /// 周期性能耗采样积分与滤网运行时长累加 (全屋多设备并发动力学积分，v1.9.21)
     private func accumulateMinuteTick() {
         let now = Date()
-        if let last = lastMinuteSampleDate, now.timeIntervalSince(last) < 50 {
+        guard let last = lastMinuteSampleDate else {
+            lastMinuteSampleDate = now
+            return
+        }
+        let elapsed = now.timeIntervalSince(last)
+        // 采样防抖：未满 45 秒暂不结算，避免快速调度抖动
+        if elapsed < 45 {
             return
         }
         lastMinuteSampleDate = now
 
-        let deviceId = devices.first?.id ?? manualDevices.first?.deviceId
-        guard let deviceId = deviceId else { return }
+        // 限制单次流逝时间最大 300 秒，兼顾短时睡眠唤醒能量补偿与异常超长休眠截断
+        let effectiveElapsed = min(elapsed, 300.0)
+        let elapsedMinutes = max(1, Int(round(effectiveElapsed / 60.0)))
 
-        let attrs = attributes[deviceId] ?? [:]
-        let isPowerOn = attrs["onOffStatus"]?.boolValue ?? false
-        let mode = attrs["operationMode"]?.stringValue ?? "0"
-        let targetTemp = attrs["targetTemperature"]?.doubleValue ?? 26.0
-        let indoorTemp = currentIndoorTemperature(for: deviceId)
-        let windSpeed = attrs["windSpeed"]?.stringValue ?? "微风"
+        var samples: [EnergyAnalyticsEngine.DeviceEnergySample] = []
+        let allDevices = devices.map { (id: $0.id, name: $0.deviceName) } +
+            manualDevices.map { (id: $0.deviceId, name: $0.name) }
 
-        if isPowerOn {
-            filterAccumulatedMinutes += 1
+        for dev in allDevices {
+            let attrs = attributes[dev.id] ?? [:]
+            let isPowerOn = attrs["onOffStatus"]?.boolValue ?? false
+            let mode = attrs["operationMode"]?.stringValue ?? "0"
+            let targetTemp = attrs["targetTemperature"]?.doubleValue ?? 26.0
+            let indoorTemp = currentIndoorTemperature(for: dev.id)
+            let windSpeed = attrs["windSpeed"]?.stringValue ?? "微风"
+
+            if isPowerOn {
+                accumulateFilterMinutes(for: dev.id, minutes: elapsedMinutes)
+            }
+
+            samples.append(
+                EnergyAnalyticsEngine.DeviceEnergySample(
+                    deviceId: dev.id,
+                    isPowerOn: isPowerOn,
+                    modeCode: mode,
+                    targetTemp: targetTemp,
+                    indoorTemp: indoorTemp,
+                    windSpeed: windSpeed
+                )
+            )
         }
 
-        EnergyAnalyticsEngine.shared.accumulateMinuteSample(
-            isPowerOn: isPowerOn,
-            modeCode: mode,
-            targetTemp: targetTemp,
-            indoorTemp: indoorTemp,
-            windSpeed: windSpeed
+        EnergyAnalyticsEngine.shared.accumulateSample(
+            deviceSamples: samples,
+            elapsedSeconds: effectiveElapsed
         )
     }
 
@@ -1839,6 +1994,15 @@ final class AppModel: ObservableObject {
 
         filterAccumulatedMinutes = UserDefaults.standard.integer(forKey: "filterAccumulatedMinutes")
         lastFilterCleanedDate = UserDefaults.standard.object(forKey: "lastFilterCleanedDate") as? Date
+
+        if let data = UserDefaults.standard.data(forKey: "deviceFilterMinutes"),
+           let saved = try? JSONDecoder().decode([String: Int].self, from: data) {
+            deviceFilterMinutes = saved
+        }
+        if let data = UserDefaults.standard.data(forKey: "deviceFilterCleanedDates"),
+           let saved = try? JSONDecoder().decode([String: Date].self, from: data) {
+            deviceFilterCleanedDates = saved
+        }
 
         sleepAmbientSoundEnabled = UserDefaults.standard.bool(forKey: "sleepAmbientSoundEnabled")
         if let rawSound = UserDefaults.standard.string(forKey: "sleepAmbientSoundType"),

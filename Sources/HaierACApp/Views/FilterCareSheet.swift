@@ -7,20 +7,27 @@ struct FilterCareSheet: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var showResetConfirm = false
-    @State private var isSelfCleaningInProgress = false
-    @State private var selfCleaningCountdown = 1200 // 20分钟
-    @State private var timerTask: Task<Void, Never>? = nil
+    @State private var selectedDeviceId: String? = nil
+
+    private var allDeviceList: [(id: String, name: String)] {
+        model.devices.map { ($0.id, $0.deviceName) } +
+        model.manualDevices.map { ($0.deviceId, $0.name) }
+    }
+
+    private var currentDeviceId: String {
+        selectedDeviceId ?? allDeviceList.first?.id ?? ""
+    }
 
     private var targetDeviceName: String {
-        model.devices.first?.deviceName ?? model.manualDevices.first?.name ?? "海尔空调"
+        allDeviceList.first(where: { $0.id == currentDeviceId })?.name ?? "海尔空调"
     }
 
     private var cleanlinessPercentage: Int {
-        model.filterCleanlinessPercentage
+        model.filterCleanlinessPercentage(for: currentDeviceId)
     }
 
     private var runningHours: Double {
-        Double(model.filterAccumulatedMinutes) / 60.0
+        Double(model.filterAccumulatedMinutes(for: currentDeviceId)) / 60.0
     }
 
     var body: some View {
@@ -32,6 +39,11 @@ struct FilterCareSheet: View {
 
             ScrollView {
                 VStack(spacing: Theme.spaceLG) {
+                    // 设备切换器（如果有多台设备）
+                    if allDeviceList.count > 1 {
+                        devicePickerPod
+                    }
+
                     // 1. 滤网健康度核心环形指示器
                     healthMetricCard
 
@@ -49,10 +61,10 @@ struct FilterCareSheet: View {
         .alert("重置滤网清洗计时", isPresented: $showResetConfirm) {
             Button("取消", role: .cancel) { }
             Button("确认已清洗重置", role: .destructive) {
-                model.resetFilterMaintenance()
+                model.resetFilterMaintenance(for: currentDeviceId)
             }
         } message: {
-            Text("确认您已经完成了滤网的水洗与晾干装回吗？重置后累计运行时间将归零，洁净度恢复为 100%。")
+            Text("确认您已经完成了「\(targetDeviceName)」滤网的水洗与晾干装回吗？重置后该空调累计运行时间将归零，洁净度恢复为 100%。")
         }
     }
 
@@ -169,10 +181,33 @@ struct FilterCareSheet: View {
         )
     }
 
+    // MARK: - 设备切换器
+
+    private var devicePickerPod: some View {
+        HStack(spacing: 8) {
+            Text("当前维护设备:")
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(Theme.inkSubtle)
+
+            Picker("设备", selection: Binding(
+                get: { currentDeviceId },
+                set: { selectedDeviceId = $0 }
+            )) {
+                ForEach(allDeviceList, id: \.id) { dev in
+                    Text(dev.name).tag(dev.id)
+                }
+            }
+            .pickerStyle(.segmented)
+        }
+        .padding(.horizontal, 4)
+    }
+
     // MARK: - 2. 深度自清洁卡
 
     private var selfCleaningCard: some View {
-        VStack(alignment: .leading, spacing: Theme.spaceMD) {
+        let isCleaningCurrentDevice = model.isSelfCleaningActive && (model.selfCleaningDeviceId == nil || model.selfCleaningDeviceId == currentDeviceId)
+
+        return VStack(alignment: .leading, spacing: Theme.spaceMD) {
             HStack {
                 Label("56°C 高温除菌自清洁", systemImage: "flame.fill")
                     .font(.system(size: 13, weight: .semibold))
@@ -180,8 +215,8 @@ struct FilterCareSheet: View {
 
                 Spacer()
 
-                if isSelfCleaningInProgress {
-                    Text("清洁中 \(formatCountdown(selfCleaningCountdown))")
+                if isCleaningCurrentDevice {
+                    Text("清洁中 \(formatCountdown(model.selfCleaningRemainingSeconds))")
                         .font(.system(size: 11, weight: .medium, design: .rounded))
                         .foregroundStyle(Theme.accent)
                 }
@@ -203,14 +238,14 @@ struct FilterCareSheet: View {
 
                 Spacer()
 
-                if isSelfCleaningInProgress {
+                if isCleaningCurrentDevice {
                     Button("中止自清洁") {
-                        stopSelfCleaning()
+                        model.stopSelfCleaning()
                     }
                     .buttonStyle(Theme.secondaryButtonStyle())
                 } else {
                     Button {
-                        startSelfCleaning()
+                        model.startSelfCleaning(deviceId: currentDeviceId)
                     } label: {
                         HStack(spacing: 4) {
                             Image(systemName: "play.fill")
@@ -220,6 +255,7 @@ struct FilterCareSheet: View {
                         }
                     }
                     .buttonStyle(Theme.primaryButtonStyle())
+                    .disabled(model.isSelfCleaningActive)
                 }
             }
         }
@@ -341,39 +377,5 @@ struct FilterCareSheet: View {
         let m = seconds / 60
         let s = seconds % 60
         return String(format: "%02d:%02d", m, s)
-    }
-
-    private func startSelfCleaning() {
-        guard let deviceId = model.devices.first?.id ?? model.manualDevices.first?.deviceId else { return }
-
-        // 尝试下发自清洁专用属性（海尔标准自清洁属性）
-        let attrs = model.attributes[deviceId] ?? [:]
-        for key in ["selfCleaningStatus", "cleanStatus", "pm25CleanStatus", "sterilizationStatus"] {
-            if let attr = attrs[key], attr.writable {
-                model.sendAttribute(key, value: .bool(true), deviceId: deviceId)
-            }
-        }
-
-        isSelfCleaningInProgress = true
-        selfCleaningCountdown = 1200
-        timerTask?.cancel()
-        timerTask = Task { @MainActor in
-            while isSelfCleaningInProgress && selfCleaningCountdown > 0 {
-                try? await Task.sleep(nanoseconds: 1_000_000_000)
-                if Task.isCancelled { break }
-                selfCleaningCountdown -= 1
-            }
-            if selfCleaningCountdown <= 0 {
-                isSelfCleaningInProgress = false
-                model.operationNotice = AppModel.OperationNotice(text: "蒸发器 56°C 高温自清洁已完成", isError: false)
-            }
-        }
-        model.operationNotice = AppModel.OperationNotice(text: "已启动 56°C 高温除菌自清洁（约20分钟）", isError: false)
-    }
-
-    private func stopSelfCleaning() {
-        isSelfCleaningInProgress = false
-        timerTask?.cancel()
-        model.operationNotice = AppModel.OperationNotice(text: "已退出自清洁模式", isError: false)
     }
 }

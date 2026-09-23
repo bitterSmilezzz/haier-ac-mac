@@ -11,6 +11,7 @@ public enum AmbientSoundType: String, CaseIterable, Identifiable, Codable {
     case morningBirds = "清晨林鸟"
 
     public var id: String { rawValue }
+    public var displayName: String { rawValue }
 
     public var icon: String {
         switch self {
@@ -58,14 +59,10 @@ public final class AmbientSoundEngine: ObservableObject {
 
     // 合成器状态
     private struct SynthesisState {
-        var b0: Float = 0.0
-        var b1: Float = 0.0
-        var b2: Float = 0.0
-        var b3: Float = 0.0
-        var b4: Float = 0.0
-        var b5: Float = 0.0
-        var b6: Float = 0.0
-        var brown: Float = 0.0
+        // 独立左右声道粉红噪声双极点滤波器状态 (Decorrelated Stereo Pink Noise)
+        var b0L: Float = 0.0, b1L: Float = 0.0, b2L: Float = 0.0, b3L: Float = 0.0, b4L: Float = 0.0, b5L: Float = 0.0, b6L: Float = 0.0
+        var b0R: Float = 0.0, b1R: Float = 0.0, b2R: Float = 0.0, b3R: Float = 0.0, b4R: Float = 0.0, b5R: Float = 0.0, b6R: Float = 0.0
+        var brownL: Float = 0.0, brownR: Float = 0.0
 
         var phase: Double = 0.0
         var wavePhase: Double = 0.0
@@ -79,26 +76,41 @@ public final class AmbientSoundEngine: ObservableObject {
 
     private init() {}
 
-    /// 播放指定环境音（支持平滑淡入）
+    /// 播放指定环境音（支持平滑淡入与平滑声型切换）
     public func play(type: AmbientSoundType? = nil, fadeInDuration: TimeInterval = 2.0) {
         if let type = type {
             self.currentType = type
         }
         setupEngineIfNeeded()
 
-        guard let engine = engine, !engine.isRunning else {
-            // 如果已在运行，平滑过渡目标类型
+        guard let engine = engine else { return }
+
+        targetVolume = min(max(volume, 0.0), 1.0)
+        isPlaying = true
+
+        if engine.isRunning {
+            // 如果已在运行，平滑过渡音量至目标值
             fadeTimer?.cancel()
-            targetVolume = min(max(volume, 0.0), 1.0)
-            isPlaying = true
+            if activeGain < targetVolume {
+                fadeTimer = Task { @MainActor in
+                    let steps = 25
+                    let stepTime = max(0.01, fadeInDuration / Double(steps))
+                    let gainStep = (self.targetVolume - self.activeGain) / Float(steps)
+                    for _ in 0..<steps {
+                        try? await Task.sleep(nanoseconds: UInt64(stepTime * 1_000_000_000))
+                        if Task.isCancelled { break }
+                        self.activeGain = min(self.targetVolume, self.activeGain + gainStep)
+                    }
+                    self.activeGain = self.targetVolume
+                }
+            }
+            AppLog.log("助眠音频引擎: 切换音律为「\(currentType.rawValue)」")
             return
         }
 
         do {
             try engine.start()
-            isPlaying = true
             activeGain = 0.0
-            targetVolume = min(max(volume, 0.0), 1.0)
 
             // 平滑淡入
             fadeTimer?.cancel()
@@ -178,101 +190,127 @@ public final class AmbientSoundEngine: ObservableObject {
         let gainProvider = { [weak self] () -> Float in
             self?.activeGain ?? 0.0
         }
+        let currentSampleRate = sampleRate
 
         let node = AVAudioSourceNode { _, _, frameCount, audioBufferList -> OSStatus in
             let ablPointer = UnsafeMutableAudioBufferListPointer(audioBufferList)
             let type = currentTypeProvider()
             let masterVol = gainProvider()
+            let sr = currentSampleRate > 0 ? currentSampleRate : 44100.0
+            let invSr = 1.0 / sr
+
+            let numBuffers = ablPointer.count
+            let isDeinterleaved = numBuffers >= 2
+            let bufL = ablPointer[0].mData?.assumingMemoryBound(to: Float.self)
+            let bufR = isDeinterleaved ? ablPointer[1].mData?.assumingMemoryBound(to: Float.self) : nil
+            let isInterleavedStereo = (!isDeinterleaved && ablPointer[0].mNumberChannels == 2)
 
             for frame in 0..<Int(frameCount) {
-                // 生成基础高斯/粉红噪声 (Kellet's algorithm)
-                let white = Float.random(in: -1.0...1.0)
-                localState.b0 = 0.99886 * localState.b0 + white * 0.0555179
-                localState.b1 = 0.99332 * localState.b1 + white * 0.0750759
-                localState.b2 = 0.96900 * localState.b2 + white * 0.1538520
-                localState.b3 = 0.86650 * localState.b3 + white * 0.3104856
-                localState.b4 = 0.55000 * localState.b4 + white * 0.5329522
-                localState.b5 = -0.7616 * localState.b5 - white * 0.0168980
-                let pink = (localState.b0 + localState.b1 + localState.b2 + localState.b3 + localState.b4 + localState.b5 + localState.b6 + white * 0.5362) * 0.11
-                localState.b6 = white * 0.115926
-                localState.brown = (localState.brown + (0.02 * white)) / 1.02
+                // 1. 生成独立的左右声道随机白噪声 (Binaural Decorrelated Seed)
+                let whiteL = Float.random(in: -1.0...1.0)
+                let whiteR = Float.random(in: -1.0...1.0)
+
+                // 2. 左声道粉红+棕色噪声滤波器更新 (Kellet's Algorithm)
+                localState.b0L = 0.99886 * localState.b0L + whiteL * 0.0555179
+                localState.b1L = 0.99332 * localState.b1L + whiteL * 0.0750759
+                localState.b2L = 0.96900 * localState.b2L + whiteL * 0.1538520
+                localState.b3L = 0.86650 * localState.b3L + whiteL * 0.3104856
+                localState.b4L = 0.55000 * localState.b4L + whiteL * 0.5329522
+                localState.b5L = -0.7616 * localState.b5L - whiteL * 0.0168980
+                let pinkL = (localState.b0L + localState.b1L + localState.b2L + localState.b3L + localState.b4L + localState.b5L + localState.b6L + whiteL * 0.5362) * 0.11
+                localState.b6L = whiteL * 0.115926
+                localState.brownL = (localState.brownL + (0.02 * whiteL)) / 1.02
+
+                // 3. 右声道粉红+棕色噪声滤波器更新
+                localState.b0R = 0.99886 * localState.b0R + whiteR * 0.0555179
+                localState.b1R = 0.99332 * localState.b1R + whiteR * 0.0750759
+                localState.b2R = 0.96900 * localState.b2R + whiteR * 0.1538520
+                localState.b3R = 0.86650 * localState.b3R + whiteR * 0.3104856
+                localState.b4R = 0.55000 * localState.b4R + whiteR * 0.5329522
+                localState.b5R = -0.7616 * localState.b5R - whiteR * 0.0168980
+                let pinkR = (localState.b0R + localState.b1R + localState.b2R + localState.b3R + localState.b4R + localState.b5R + localState.b6R + whiteR * 0.5362) * 0.11
+                localState.b6R = whiteR * 0.115926
+                localState.brownR = (localState.brownR + (0.02 * whiteR)) / 1.02
 
                 var sampleL: Float = 0.0
                 var sampleR: Float = 0.0
 
                 switch type {
                 case .springRain:
-                    // 粉红雨声底噪 + 随机柔和雨滴微瞬态
-                    sampleL = pink * 0.65
-                    sampleR = (pink + white * 0.05) * 0.65
-                    if Float.random(in: 0...1) < 0.0008 {
-                        let drop = Float.random(in: 0.1...0.3)
-                        sampleL += drop
-                        sampleR += drop * 0.8
+                    // 真实双声道空间粉红细雨底噪 + 随机立体声雨滴下落
+                    sampleL = pinkL * 0.65
+                    sampleR = pinkR * 0.65
+                    if Float.random(in: 0...1) < 0.0009 {
+                        let pan = Float.random(in: 0.1...0.9)
+                        let drop = Float.random(in: 0.08...0.25)
+                        sampleL += drop * (1.0 - pan)
+                        sampleR += drop * pan
                     }
 
                 case .oceanWaves:
-                    // 慢周期潮汐起伏
-                    localState.wavePhase += (2.0 * .pi * 0.09) / 44100.0
-                    let envelope = Float(0.35 + 0.35 * sin(localState.wavePhase) + 0.15 * sin(localState.wavePhase * 0.43))
-                    let waveNoise = (pink * 0.4 + localState.brown * 0.6) * envelope
-                    sampleL = waveNoise
-                    sampleR = waveNoise * 0.95
+                    // 基于硬件真实采样率的缓慢潮汐流动，立体声相位差营造波浪由左向右席卷感
+                    localState.wavePhase += (2.0 * .pi * 0.085) * invSr
+                    let envL = Float(0.35 + 0.35 * sin(localState.wavePhase) + 0.12 * sin(localState.wavePhase * 0.43))
+                    let envR = Float(0.35 + 0.35 * sin(localState.wavePhase - 0.28) + 0.12 * sin(localState.wavePhase * 0.43 - 0.12))
+                    sampleL = (pinkL * 0.4 + localState.brownL * 0.6) * envL
+                    sampleR = (pinkR * 0.4 + localState.brownR * 0.6) * envR
 
                 case .forestBreeze:
-                    // 温暖低频微风与轻微晃动
-                    localState.wavePhase += (2.0 * .pi * 0.15) / 44100.0
-                    let breeze = Float(0.5 + 0.3 * sin(localState.wavePhase))
-                    sampleL = localState.brown * 1.2 * breeze
-                    sampleR = localState.brown * 1.2 * (1.0 - breeze * 0.2)
+                    // 温暖低频立体声森林微风，左右微弱差速起伏
+                    localState.wavePhase += (2.0 * .pi * 0.14) * invSr
+                    let breezeL = Float(0.5 + 0.32 * sin(localState.wavePhase))
+                    let breezeR = Float(0.5 + 0.32 * sin(localState.wavePhase + 0.35))
+                    sampleL = localState.brownL * 1.15 * breezeL
+                    sampleR = localState.brownR * 1.15 * breezeR
 
                 case .summerNight:
-                    // 极柔底噪 + 稀疏蟋蟀高频鸣叫
-                    localState.chirpTimer += 1.0 / 44100.0
+                    // 柔和微夜风 + 随机左右声相蟋蟀鸣叫
+                    localState.chirpTimer += invSr
                     var chirp: Float = 0.0
                     if localState.chirpTimer > 2.2 {
                         if localState.chirpTimer < 2.35 {
-                            localState.phase += (2.0 * .pi * 4200.0) / 44100.0
+                            localState.phase += (2.0 * .pi * 4200.0) * invSr
                             let env = Float(sin((localState.chirpTimer - 2.2) / 0.15 * .pi))
-                            chirp = Float(sin(localState.phase)) * env * 0.15
+                            chirp = Float(sin(localState.phase)) * env * 0.16
                         } else {
-                            localState.chirpTimer = Double.random(in: 0.0...0.8)
+                            localState.chirpTimer = Double.random(in: 0.0...0.75)
                         }
                     }
-                    sampleL = pink * 0.35 + chirp
-                    sampleR = pink * 0.35 + chirp * 0.7
+                    sampleL = pinkL * 0.35 + chirp * 0.85
+                    sampleR = pinkR * 0.35 + chirp * 0.55
 
                 case .morningBirds:
-                    // 柔和清晨双音鸟鸣
-                    localState.birdTimer += 1.0 / 44100.0
+                    // 柔和清晨双音鸟鸣（精准适配硬件采样率，声学频移与自然空间混响）
+                    localState.birdTimer += invSr
                     var birdTone: Float = 0.0
-                    if localState.birdTimer > 2.8 {
-                        if localState.birdTimer < 3.2 {
-                            let prog = (localState.birdTimer - 2.8) / 0.4
+                    if localState.birdTimer > 2.7 {
+                        if localState.birdTimer < 3.15 {
+                            let prog = (localState.birdTimer - 2.7) / 0.45
                             let freq = 2600.0 + sin(prog * .pi * 3) * 600.0
-                            localState.phase += (2.0 * .pi * freq) / 44100.0
+                            localState.phase += (2.0 * .pi * freq) * invSr
                             let env = Float(sin(prog * .pi))
                             birdTone = Float(sin(localState.phase)) * env * 0.22
                         } else {
-                            localState.birdTimer = Double.random(in: 0.0...0.7)
+                            localState.birdTimer = Double.random(in: 0.0...0.65)
                         }
                     }
-                    sampleL = pink * 0.15 + birdTone
-                    sampleR = pink * 0.15 + birdTone * 0.85
+                    sampleL = pinkL * 0.15 + birdTone * 0.95
+                    sampleR = pinkR * 0.15 + birdTone * 0.70
                 }
 
                 // 应用主音量增益
                 let outL = sampleL * masterVol
                 let outR = sampleR * masterVol
 
-                for buffer in ablPointer {
-                    guard let bufPtr = buffer.mData?.assumingMemoryBound(to: Float.self) else { continue }
-                    if buffer.mNumberChannels == 2 {
-                        bufPtr[frame * 2] = outL
-                        bufPtr[frame * 2 + 1] = outR
-                    } else {
-                        bufPtr[frame] = (outL + outR) * 0.5
-                    }
+                // 准确写入 CoreAudio 音频通道 (支持 macOS 标准非交错双声道与交错双声道)
+                if isDeinterleaved {
+                    bufL?[frame] = outL
+                    bufR?[frame] = outR
+                } else if isInterleavedStereo, let buf = bufL {
+                    buf[frame * 2] = outL
+                    buf[frame * 2 + 1] = outR
+                } else if let buf = bufL {
+                    buf[frame] = (outL + outR) * 0.5
                 }
             }
             return noErr

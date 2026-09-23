@@ -35,16 +35,21 @@ final class StatusItemController: NSObject {
         statusItem = item
         refreshTemperature()
 
-        // 温度/开关变化时刷新菜单栏标题
-        model.$attributes
-            .combineLatest(model.$menuBarDeviceId, model.$menuBarShowTemperature, model.$devices)
-            .sink { [weak self] _ in
-                Task { @MainActor in self?.refreshTemperature() }
-            }
-            .store(in: &cancellables)
+        // 温度/开关/自清洁/睡眠等状态变化时刷新菜单栏标题与悬浮提示 Tooltip
+        Publishers.Merge4(
+            model.$attributes.map { _ in () }.eraseToAnyPublisher(),
+            model.$devices.map { _ in () }.eraseToAnyPublisher(),
+            model.$isSelfCleaningActive.map { _ in () }.eraseToAnyPublisher(),
+            model.$activeSleepSession.map { _ in () }.eraseToAnyPublisher()
+        )
+        .receive(on: DispatchQueue.main)
+        .sink { [weak self] _ in
+            self?.refreshTemperature()
+        }
+        .store(in: &cancellables)
     }
 
-    /// 菜单栏图标旁显示当前温度（如 26°）
+    /// 菜单栏图标旁显示当前温度（如 26°）与动态多维状态悬浮 Tooltip
     private func refreshTemperature() {
         guard let button = statusItem?.button else { return }
         if let text = model.menuBarTemperatureText {
@@ -54,6 +59,46 @@ final class StatusItemController: NSObject {
             button.title = ""
         }
         statusItem?.length = NSStatusItem.variableLength
+
+        // 动态构建悬浮 Tooltip 状态概览 (v1.9.21)
+        var tooltipParts: [String] = ["海尔空调控制"]
+        let deviceId = model.menuBarDeviceId ?? model.devices.first?.id ?? model.manualDevices.first?.deviceId
+        if let deviceId = deviceId {
+            let devName = model.devices.first(where: { $0.id == deviceId })?.deviceName ??
+                          model.manualDevices.first(where: { $0.deviceId == deviceId })?.name ?? "空调"
+            let attrs = model.attributes[deviceId] ?? [:]
+            let isPowerOn = attrs["onOffStatus"]?.boolValue ?? false
+            let mode = attrs["operationMode"]?.value?.stringValue ?? "制冷"
+            let targetTemp = attrs["targetTemperature"]?.doubleValue ?? 26.0
+            let indoorTemp = model.currentIndoorTemperature(for: deviceId)
+
+            if isPowerOn {
+                var line = "📍 \(devName): 开机中 | 模式: \(mode) | 设定: \(String(format: "%.0f°C", targetTemp))"
+                if let indoor = indoorTemp {
+                    line += " | 室内: \(String(format: "%.1f°C", indoor))"
+                }
+                tooltipParts.append(line)
+            } else {
+                tooltipParts.append("📍 \(devName): 关机待机中")
+            }
+        }
+
+        if model.isSelfCleaningActive {
+            let m = model.selfCleaningRemainingSeconds / 60
+            let s = model.selfCleaningRemainingSeconds % 60
+            tooltipParts.append("🔥 56°C 高温除菌自清洁进行中 (剩余 \(String(format: "%02d:%02d", m, s)))")
+        }
+
+        if let session = model.activeSleepSession {
+            tooltipParts.append("🌙 智能睡眠曲线运行中 (\(session.curveConfig.name))")
+        }
+
+        if AmbientSoundEngine.shared.isPlaying {
+            tooltipParts.append("🎵 助眠白噪音播放中 (\(model.sleepAmbientSoundType.displayName))")
+        }
+
+        tooltipParts.append("💡 左键点击呼出快捷控制面板，右键点击展开系统菜单")
+        button.toolTip = tooltipParts.joined(separator: "\n")
     }
 
     @objc private func togglePopover(_ sender: Any?) {
@@ -98,7 +143,7 @@ final class StatusItemController: NSObject {
         }
     }
 
-    /// 右键：上下文菜单（打开主窗口 / 开机自启 / 主题 / 退出）
+    /// 右键：上下文菜单（打开主窗口 / 助眠白噪音 / 滤网自清洁 / 开机自启 / 主题 / 退出）
     private func showContextMenu() {
         let menu = NSMenu()
         let voiceItem = NSMenuItem(title: "语音控制... (⌃⌥A)", action: #selector(openVoiceControl), keyEquivalent: "")
@@ -108,6 +153,24 @@ final class StatusItemController: NSObject {
         let openItem = NSMenuItem(title: "打开主窗口", action: #selector(openMainWindow), keyEquivalent: "")
         openItem.target = self
         menu.addItem(openItem)
+
+        menu.addItem(.separator())
+
+        // 助眠白噪音快捷开关 (v1.9.21)
+        let ambientTitle = AmbientSoundEngine.shared.isPlaying ?
+            "助眠白噪音：\(model.sleepAmbientSoundType.displayName) (点击暂停)" :
+            "助眠白噪音：已暂停 (点击播放)"
+        let ambientItem = NSMenuItem(title: ambientTitle, action: #selector(toggleAmbientSound), keyEquivalent: "")
+        ambientItem.target = self
+        menu.addItem(ambientItem)
+
+        // 滤网健康与自清洁快速入口 (v1.9.21)
+        let filterTitle = model.isSelfCleaningActive ?
+            "56°C 自清洁进行中 (\(model.selfCleaningRemainingSeconds / 60)m\(model.selfCleaningRemainingSeconds % 60)s)..." :
+            "滤网保养与自清洁 (洁净度 \(model.filterCleanlinessPercentage)%)..."
+        let filterItem = NSMenuItem(title: filterTitle, action: #selector(openFilterCare), keyEquivalent: "")
+        filterItem.target = self
+        menu.addItem(filterItem)
 
         menu.addItem(.separator())
 
@@ -153,6 +216,19 @@ final class StatusItemController: NSObject {
             // 窗口已销毁时通过 openWindow 场景重建（由 App 侧处理）
             NotificationCenter.default.post(name: .haierOpenMainWindow, object: nil)
         }
+    }
+
+    @objc private func toggleAmbientSound() {
+        if AmbientSoundEngine.shared.isPlaying {
+            AmbientSoundEngine.shared.stop()
+        } else {
+            AmbientSoundEngine.shared.play(type: model.sleepAmbientSoundType)
+        }
+        refreshTemperature()
+    }
+
+    @objc private func openFilterCare() {
+        openMainWindow()
     }
 
     @objc private func toggleLaunchAtLogin() {

@@ -49,6 +49,16 @@ struct MenuBarControlsView: View {
                 // 2.1 智能睡眠快速启停模块 (运行中显示进度与停止，空闲时支持选择方案与一键启动)
                 sleepControlPod(device: device)
 
+                // 2.2 蒸发器自清洁状态指示 (若处于清洁中)
+                if model.isSelfCleaningActive {
+                    selfCleaningPod(device: device)
+                }
+
+                // 2.3 睡眠助眠白噪音快捷播控 (若正在播放或配置开启)
+                if AmbientSoundEngine.shared.isPlaying || model.sleepAmbientSoundEnabled {
+                    ambientSoundPod
+                }
+
                 // 3. 核心温控 Bento 卡片
                 temperatureBentoPod(device: device, attrs: attrs, isPowerOn: isPowerOn, tint: tint)
 
@@ -762,6 +772,82 @@ struct MenuBarControlsView: View {
                 )
             }
         }
+    }
+
+    // MARK: - 蒸发器自清洁状态卡 (v1.9.21)
+
+    private func selfCleaningPod(device: DeviceInfo) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: "flame.fill")
+                .font(.system(size: 12))
+                .foregroundStyle(Color.dynamic(light: 0xF05A28, dark: 0xFF6934))
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text("56°C 高温自清洁中")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(Theme.ink)
+                let m = model.selfCleaningRemainingSeconds / 60
+                let s = model.selfCleaningRemainingSeconds % 60
+                Text("剩余 \(String(format: "%02d:%02d", m, s)) • 翅片凝霜烘干")
+                    .font(.system(size: 10))
+                    .foregroundStyle(Theme.inkMuted)
+            }
+
+            Spacer()
+
+            Button("中止") {
+                model.stopSelfCleaning()
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.mini)
+        }
+        .padding(8)
+        .background(
+            RoundedRectangle(cornerRadius: Theme.radiusMD, style: .continuous)
+                .fill(Color.dynamic(light: 0xFFF3ED, dark: 0x331C12))
+                .overlay(
+                    RoundedRectangle(cornerRadius: Theme.radiusMD, style: .continuous)
+                        .strokeBorder(Color.dynamic(light: 0xFFA07A, dark: 0x8B4513).opacity(0.3), lineWidth: 1)
+                )
+        )
+    }
+
+    // MARK: - 睡眠助眠白噪音迷你播控 (v1.9.21)
+
+    private var ambientSoundPod: some View {
+        HStack(spacing: 8) {
+            Image(systemName: AmbientSoundEngine.shared.isPlaying ? "waveform" : "speaker.slash")
+                .font(.system(size: 11))
+                .foregroundStyle(Theme.accent)
+
+            Text(model.sleepAmbientSoundType.displayName)
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(Theme.ink)
+
+            Spacer()
+
+            Button {
+                if AmbientSoundEngine.shared.isPlaying {
+                    AmbientSoundEngine.shared.stop()
+                } else {
+                    AmbientSoundEngine.shared.play(type: model.sleepAmbientSoundType)
+                }
+            } label: {
+                Image(systemName: AmbientSoundEngine.shared.isPlaying ? "pause.fill" : "play.fill")
+                    .font(.system(size: 10))
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(Theme.inkMuted)
+        }
+        .padding(8)
+        .background(
+            RoundedRectangle(cornerRadius: Theme.radiusMD, style: .continuous)
+                .fill(Theme.surface1)
+                .overlay(
+                    RoundedRectangle(cornerRadius: Theme.radiusMD, style: .continuous)
+                        .strokeBorder(Theme.hairline, lineWidth: 1)
+                )
+        )
     }
 }
 

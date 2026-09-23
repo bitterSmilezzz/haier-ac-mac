@@ -158,9 +158,116 @@ public final class EnergyAnalyticsEngine: ObservableObject {
         }
     }
 
-    // MARK: - 周期用电积分累计
+    // MARK: - 多设备能耗动力学模型与周期积分累计
 
-    /// 记录 1 分钟空调运行采样并积分计入当日电量
+    /// 单台空调设备的运行采样状态
+    public struct DeviceEnergySample {
+        public let deviceId: String
+        public let isPowerOn: Bool
+        public let modeCode: String?
+        public let targetTemp: Double?
+        public let indoorTemp: Double?
+        public let windSpeed: String?
+
+        public init(
+            deviceId: String,
+            isPowerOn: Bool,
+            modeCode: String?,
+            targetTemp: Double?,
+            indoorTemp: Double?,
+            windSpeed: String?
+        ) {
+            self.deviceId = deviceId
+            self.isPowerOn = isPowerOn
+            self.modeCode = modeCode
+            self.targetTemp = targetTemp
+            self.indoorTemp = indoorTemp
+            self.windSpeed = windSpeed
+        }
+    }
+
+    /// 多设备全场景瞬时功率聚合与运行采样积分 (v1.9.21)
+    /// - Parameters:
+    ///   - deviceSamples: 所有已绑定空调的运行状态样本列表
+    ///   - elapsedSeconds: 距离上次采样的流逝秒数（支持动态微补偿与休眠唤醒精确积分）
+    public func accumulateSample(
+        deviceSamples: [DeviceEnergySample],
+        elapsedSeconds: Double = 60.0
+    ) {
+        let now = Date()
+        let rate = pricingConfig.rate(for: now)
+        let dateKey = DateFormatter.dayDateFormatter.string(from: now)
+        let deltaHours = max(0.0, elapsedSeconds) / 3600.0
+
+        var totalInstantaneousPower: Double = 0.0
+        var totalIncrementalKWh: Double = 0.0
+        var runningCooling = 0
+        var runningHeating = 0
+        var runningFan = 0
+        var runningDehum = 0
+        var hasAnyRunningDevice = false
+
+        for sample in deviceSamples {
+            let power = estimateInstantaneousPower(
+                isPowerOn: sample.isPowerOn,
+                modeCode: sample.modeCode,
+                targetTemp: sample.targetTemp,
+                indoorTemp: sample.indoorTemp,
+                windSpeed: sample.windSpeed
+            )
+            totalInstantaneousPower += power
+
+            if sample.isPowerOn {
+                hasAnyRunningDevice = true
+                let devKWh = (power * deltaHours) / 1000.0
+                totalIncrementalKWh += devKWh
+
+                switch sample.modeCode ?? "0" {
+                case "0": runningCooling += 1
+                case "1": runningHeating += 1
+                case "2": runningFan += 1
+                case "3": runningDehum += 1
+                default: break
+                }
+            }
+        }
+
+        self.currentInstantaneousPower = totalInstantaneousPower
+
+        // 若全屋所有空调均处于关机待机状态，仅刷新待机总功率，不计入运行分钟与账单
+        guard hasAnyRunningDevice, totalIncrementalKWh > 0.0 else { return }
+
+        let totalCostDelta = totalIncrementalKWh * rate
+        let incrementalMinutes = max(1, Int(round(elapsedSeconds / 60.0)))
+
+        if let idx = historyRecords.firstIndex(where: { $0.date == dateKey }) {
+            historyRecords[idx].totalMinutes += incrementalMinutes
+            historyRecords[idx].totalKWh += totalIncrementalKWh
+            historyRecords[idx].totalCost += totalCostDelta
+
+            if runningCooling > 0 { historyRecords[idx].coolingMinutes += incrementalMinutes }
+            if runningHeating > 0 { historyRecords[idx].heatingMinutes += incrementalMinutes }
+            if runningFan > 0 { historyRecords[idx].fanMinutes += incrementalMinutes }
+            if runningDehum > 0 { historyRecords[idx].dehumMinutes += incrementalMinutes }
+        } else {
+            var newRecord = EnergyDayRecord(date: dateKey)
+            newRecord.totalMinutes = incrementalMinutes
+            newRecord.totalKWh = totalIncrementalKWh
+            newRecord.totalCost = totalCostDelta
+
+            if runningCooling > 0 { newRecord.coolingMinutes = incrementalMinutes }
+            if runningHeating > 0 { newRecord.heatingMinutes = incrementalMinutes }
+            if runningFan > 0 { newRecord.fanMinutes = incrementalMinutes }
+            if runningDehum > 0 { newRecord.dehumMinutes = incrementalMinutes }
+
+            historyRecords.insert(newRecord, at: 0)
+            if historyRecords.count > 60 {
+                historyRecords = Array(historyRecords.prefix(60))
+            }
+        }
+    }
+
+    /// 记录单台空调 1 分钟运行采样并积分计入当日电量 (向下兼容接口)
     public func accumulateMinuteSample(
         isPowerOn: Bool,
         modeCode: String?,
@@ -168,57 +275,15 @@ public final class EnergyAnalyticsEngine: ObservableObject {
         indoorTemp: Double?,
         windSpeed: String?
     ) {
-        let now = Date()
-        let powerW = estimateInstantaneousPower(
+        let sample = DeviceEnergySample(
+            deviceId: "legacy_single_device",
             isPowerOn: isPowerOn,
             modeCode: modeCode,
             targetTemp: targetTemp,
             indoorTemp: indoorTemp,
             windSpeed: windSpeed
         )
-        self.currentInstantaneousPower = powerW
-
-        // 关机时仅更新瞬时功率，不大量累计能耗账单
-        guard isPowerOn else { return }
-
-        let dateKey = DateFormatter.dayDateFormatter.string(from: now)
-        let rate = pricingConfig.rate(for: now)
-
-        // 1 分钟耗电量 (kWh) = P(W) * (1/60 h) / 1000
-        let deltaKWh = (powerW / 60.0) / 1000.0
-        let deltaCost = deltaKWh * rate
-
-        let mode = modeCode ?? "0"
-
-        if let idx = historyRecords.firstIndex(where: { $0.date == dateKey }) {
-            historyRecords[idx].totalMinutes += 1
-            historyRecords[idx].totalKWh += deltaKWh
-            historyRecords[idx].totalCost += deltaCost
-
-            switch mode {
-            case "0": historyRecords[idx].coolingMinutes += 1
-            case "1": historyRecords[idx].heatingMinutes += 1
-            case "2": historyRecords[idx].fanMinutes += 1
-            case "3": historyRecords[idx].dehumMinutes += 1
-            default: break
-            }
-        } else {
-            var newRecord = EnergyDayRecord(date: dateKey)
-            newRecord.totalMinutes = 1
-            newRecord.totalKWh = deltaKWh
-            newRecord.totalCost = deltaCost
-            switch mode {
-            case "0": newRecord.coolingMinutes = 1
-            case "1": newRecord.heatingMinutes = 1
-            case "2": newRecord.fanMinutes = 1
-            case "3": newRecord.dehumMinutes = 1
-            default: break
-            }
-            historyRecords.insert(newRecord, at: 0)
-            if historyRecords.count > 60 {
-                historyRecords = Array(historyRecords.prefix(60))
-            }
-        }
+        accumulateSample(deviceSamples: [sample], elapsedSeconds: 60.0)
     }
 
     // MARK: - 统计计算属性
