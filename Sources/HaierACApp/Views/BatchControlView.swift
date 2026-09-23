@@ -9,12 +9,54 @@ struct BatchControlPanel: View {
     let deviceIds: [String]
 
     var body: some View {
+        let onlineCount = deviceIds.filter { id in
+            model.devices.first(where: { $0.id == id })?.online ?? true
+        }.count
+        let isBatchAvailable = model.gatewayConnected && onlineCount > 0
+
         VStack(alignment: .leading, spacing: Theme.spaceSM) {
             HStack {
-                Label("批量控制（\(deviceIds.count) 台）", systemImage: "square.stack.3d.up.fill")
+                Label("批量控制（\(deviceIds.count) 台设备，\(onlineCount) 台在线）", systemImage: "square.stack.3d.up.fill")
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(Theme.ink)
                 Spacer()
+                if !model.gatewayConnected {
+                    Text("网关重连中")
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(Theme.warning)
+                } else if onlineCount == 0 {
+                    Text("所选设备均离线")
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(Theme.offline)
+                }
+            }
+
+            if !model.gatewayConnected {
+                HStack(spacing: 6) {
+                    Image(systemName: "network.slash")
+                        .font(.system(size: 11))
+                        .foregroundStyle(Theme.warning)
+                    Text("网关连接断开，批量下发已暂停")
+                        .font(.system(size: 11))
+                        .foregroundStyle(Theme.inkSubtle)
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(Theme.surface2)
+                .clipShape(RoundedRectangle(cornerRadius: Theme.radiusSM, style: .continuous))
+            } else if onlineCount < deviceIds.count && onlineCount > 0 {
+                HStack(spacing: 6) {
+                    Image(systemName: "info.circle")
+                        .font(.system(size: 11))
+                        .foregroundStyle(Theme.inkSubtle)
+                    Text("部分设备离线（\(deviceIds.count - onlineCount) 台），指令将自动跳过并仅发给在线设备")
+                        .font(.system(size: 11))
+                        .foregroundStyle(Theme.inkSubtle)
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(Theme.surface2)
+                .clipShape(RoundedRectangle(cornerRadius: Theme.radiusSM, style: .continuous))
             }
 
             // 汇总第一台设备的可写属性作为控制项（同品牌设备属性一致）
@@ -40,6 +82,8 @@ struct BatchControlPanel: View {
             .padding(.horizontal, Theme.spaceMD)
             .padding(.vertical, 6)
             .background(Theme.cardBackground(Theme.surface1))
+            .disabled(!isBatchAvailable)
+            .opacity(isBatchAvailable ? 1.0 : 0.6)
         }
     }
 

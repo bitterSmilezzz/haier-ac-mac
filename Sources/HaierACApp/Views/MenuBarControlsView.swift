@@ -45,8 +45,34 @@ struct MenuBarControlsView: View {
                 // 1. 顶部状态与设备 Bento
                 headerPod(device: device, attrs: attrs, isPowerOn: isPowerOn, modeCat: modeCat, tint: tint)
 
-                // 物理离线防护横幅
-                if !device.online {
+                let reachability = model.reachability(for: device)
+
+                // 物理离线与网关断网三态防护横幅
+                switch reachability {
+                case .available:
+                    EmptyView()
+                case .gatewayReconnecting:
+                    HStack(spacing: 6) {
+                        Image(systemName: "network.slash")
+                            .font(.system(size: 11))
+                            .foregroundStyle(Theme.warning)
+                        Text("网关重连中，控制指令暂不可用")
+                            .font(.system(size: 11))
+                            .foregroundStyle(Theme.inkSubtle)
+                        Spacer()
+                        Button("重试") {
+                            model.retryConnection()
+                        }
+                        .font(.system(size: 10, weight: .medium))
+                        .buttonStyle(.borderless)
+                        .foregroundStyle(Theme.accent)
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Theme.surface2)
+                    .clipShape(RoundedRectangle(cornerRadius: Theme.radiusSM, style: .continuous))
+                case .deviceOffline:
                     HStack(spacing: 6) {
                         Image(systemName: "wifi.slash")
                             .font(.system(size: 11))
@@ -64,8 +90,8 @@ struct MenuBarControlsView: View {
 
                 // 2. 快捷操作 Bento 矩阵（电源、情景灯光、屏显）
                 quickActionsPod(device: device, attrs: attrs, isPowerOn: isPowerOn, tint: tint)
-                    .disabled(!device.online)
-                    .opacity(device.online ? 1.0 : 0.6)
+                    .disabled(!reachability.isControllable)
+                    .opacity(reachability.isControllable ? 1.0 : 0.6)
 
                 // 2.1 智能睡眠快速启停模块 (运行中显示进度与停止，空闲时支持选择方案与一键启动)
                 sleepControlPod(device: device)
@@ -82,10 +108,14 @@ struct MenuBarControlsView: View {
 
                 // 3. 核心温控 Bento 卡片
                 temperatureBentoPod(device: device, attrs: attrs, isPowerOn: isPowerOn, tint: tint)
+                    .disabled(!reachability.isControllable)
+                    .opacity(reachability.isControllable ? 1.0 : 0.6)
 
                 // 4. 模式与风速分段矩阵
                 if isPowerOn {
                     modeAndFanPod(device: device, attrs: attrs, tint: tint)
+                        .disabled(!reachability.isControllable)
+                        .opacity(reachability.isControllable ? 1.0 : 0.6)
                 }
 
                 // 5. 24小时走势 Sparkline

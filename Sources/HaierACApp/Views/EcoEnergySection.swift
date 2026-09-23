@@ -114,6 +114,11 @@ struct EcoEnergySection: View {
                     )
                 }
 
+                // 今日各工况运行时长分布 (v1.9.26 自洽分析)
+                if today.totalMinutes > 0 {
+                    todayModeBreakdownView(today: today)
+                }
+
                 // 7 日用电柱状图
                 durationBarChart
 
@@ -217,6 +222,47 @@ struct EcoEnergySection: View {
         let parts = str.split(separator: "-")
         guard parts.count == 3 else { return str }
         return "\(parts[1])/\(parts[2])"
+    }
+
+    // MARK: - 今日各工况运行时长分布 (v1.9.26)
+
+    private func todayModeBreakdownView(today: EnergyDayRecord) -> some View {
+        HStack(spacing: 8) {
+            Text("工况分布:")
+                .font(.system(size: 10, weight: .medium))
+                .foregroundStyle(Theme.inkSubtle)
+
+            if today.coolingMinutes > 0 {
+                modeTimeTag(label: "制冷", minutes: today.coolingMinutes, color: Color.blue)
+            }
+            if today.heatingMinutes > 0 {
+                modeTimeTag(label: "制热", minutes: today.heatingMinutes, color: Color.orange)
+            }
+            if today.dehumMinutes > 0 {
+                modeTimeTag(label: "除湿", minutes: today.dehumMinutes, color: Color.teal)
+            }
+            if today.fanMinutes > 0 {
+                modeTimeTag(label: "送风", minutes: today.fanMinutes, color: Color.gray)
+            }
+            if today.unknownMinutes > 0 {
+                modeTimeTag(label: "其他", minutes: today.unknownMinutes, color: Color.purple)
+            }
+
+            Spacer()
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background(Theme.surface2)
+        .clipShape(RoundedRectangle(cornerRadius: Theme.radiusSM, style: .continuous))
+    }
+
+    private func modeTimeTag(label: String, minutes: Int, color: Color) -> some View {
+        HStack(spacing: 3) {
+            Circle().fill(color).frame(width: 5, height: 5)
+            Text("\(label) \(minutes)m")
+                .font(.system(size: 10, weight: .medium, design: .rounded))
+                .foregroundStyle(Theme.ink)
+        }
     }
 
     // MARK: - 电价设置 Sheet

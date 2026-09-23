@@ -313,6 +313,42 @@ final class AppModel: ObservableObject {
         case error(String)
     }
 
+    /// 设备可达性与控制可用状态（三态模型：正常可用、网关重连中、设备硬件离线）
+    public enum DeviceReachability: Equatable {
+        case available
+        case gatewayReconnecting
+        case deviceOffline
+
+        public var isControllable: Bool {
+            self == .available
+        }
+    }
+
+    /// 获取指定设备的可达状态（三态判定：网关是否连通、设备是否连网）
+    public func reachability(for device: DeviceInfo) -> DeviceReachability {
+        if !gatewayConnected {
+            return .gatewayReconnecting
+        }
+        if !device.online {
+            return .deviceOffline
+        }
+        return .available
+    }
+
+    /// 根据设备 ID 获取可达状态
+    public func reachability(for deviceId: String) -> DeviceReachability {
+        if let dev = devices.first(where: { $0.id == deviceId }) {
+            return reachability(for: dev)
+        }
+        if !gatewayConnected {
+            return .gatewayReconnecting
+        }
+        return .available
+    }
+
+    /// 重连操作代际计数器，防止并发/连续重连时前序定时器竞态覆盖当前状态
+    private var reconnectGeneration: Int = 0
+
     @Published var phase: Phase = .loggedOut
     @Published var phone: String = ""
     @Published var password: String = ""
@@ -563,11 +599,12 @@ final class AppModel: ObservableObject {
         operationNotice = OperationNotice(text: "🧼 \(devName) 滤网运行计时已重置，洁净度恢复 100%", isError: false)
     }
 
-    /// 计算空气动力学与冷凝水湿度多维滤网负荷衰减系数
+    /// 计算空气动力学、冷凝结露与环境湿度多维滤网负荷衰减系数 (v1.9.26)
     public func calculateFilterWearFactor(
         mode: String,
         targetTemp: Double,
         indoorTemp: Double?,
+        indoorHumidity: Double? = nil,
         windSpeed: String
     ) -> Double {
         // 1. 风量通量因子（高速风量通过滤网单位时间截留更多浮尘颗粒）
@@ -587,7 +624,7 @@ final class AppModel: ObservableObject {
             windFactor = 1.00 // 自动风速默认基准
         }
 
-        // 2. 冷凝结露与环境潮湿附着因子（采用 ACModeCode 标准码表，未识别模式回归中性基准 1.00，消除虚标高估）
+        // 2. 冷凝结露与工况因子（采用 ACModeCode 标准码表，未识别模式回归中性基准 1.00，消除虚标高估）
         let modeFactor: Double
         if let modeCode = ACModeCode.match(from: mode) {
             switch modeCode {
@@ -610,7 +647,23 @@ final class AppModel: ObservableObject {
             modeFactor = 1.00 // 无法识别模式时回归中性基准 1.00，消除虚标高估
         }
 
-        return max(0.5, min(3.0, windFactor * modeFactor))
+        // 3. 室内湿度附着因子（高湿环境下颗粒物吸水膨胀并易附着在翅片与滤网网孔表面）
+        let humidityFactor: Double
+        if let hum = indoorHumidity {
+            if hum >= 75.0 {
+                humidityFactor = 1.25
+            } else if hum >= 65.0 {
+                humidityFactor = 1.12
+            } else if hum <= 35.0 {
+                humidityFactor = 0.95
+            } else {
+                humidityFactor = 1.00
+            }
+        } else {
+            humidityFactor = 1.00
+        }
+
+        return max(0.5, min(3.0, windFactor * modeFactor * humidityFactor))
     }
 
     /// 累加特定设备的滤网运行时间（结合空气动力学负荷系数折算等效工时）
@@ -866,6 +919,7 @@ final class AppModel: ObservableObject {
             let mode = attrs["operationMode"]?.stringValue ?? "0"
             let targetTemp = attrs["targetTemperature"]?.doubleValue ?? 26.0
             let indoorTemp = currentIndoorTemperature(for: dev.id)
+            let indoorHum = Self.indoorHumidityAttribute(in: attrs)?.doubleValue
             let windSpeed = attrs["windSpeed"]?.stringValue ?? "微风"
 
             if isPowerOn {
@@ -873,6 +927,7 @@ final class AppModel: ObservableObject {
                     mode: mode,
                     targetTemp: targetTemp,
                     indoorTemp: indoorTemp,
+                    indoorHumidity: indoorHum,
                     windSpeed: windSpeed
                 )
                 accumulateFilterMinutes(for: dev.id, minutes: elapsedMinutes, wearFactor: wearFactor)
@@ -2188,14 +2243,17 @@ final class AppModel: ObservableObject {
             phase = .loggedOut
             return
         }
+        reconnectGeneration += 1
+        let currentGen = reconnectGeneration
         phase = .connecting
         if let handle = gatewayHandle, !gatewayConnected {
-            AppLog.log("触发网关即时自愈重连（含 Token 校验与状态反馈）")
+            AppLog.log("触发网关即时自愈重连（含 Token 校验与状态反馈，代际: \(currentGen)）")
             Task {
                 await refreshTokenIfNeeded()
                 handle.reconnectImmediately(force: true)
                 // 1.5s 后若仍未收到 didOpen，但已有本地缓存设备，平滑恢复 ready，避免停留在转圈中
                 try? await Task.sleep(nanoseconds: 1_500_000_000)
+                guard self.reconnectGeneration == currentGen else { return }
                 if case .connecting = self.phase, !self.devices.isEmpty {
                     self.phase = .ready
                 }
@@ -2204,6 +2262,7 @@ final class AppModel: ObservableObject {
         }
         Task {
             await refreshTokenIfNeeded()
+            guard self.reconnectGeneration == currentGen else { return }
             await connectAndLoad()
         }
     }
@@ -2479,17 +2538,24 @@ final class AppModel: ObservableObject {
     /// 批量下发同一指令到多台设备（v1.5）；返回值：成功下发的设备数
     @discardableResult
     func sendAttributeToDevices(_ name: String, value: AttrValue, deviceIds: [String]) -> Int {
+        guard !deviceIds.isEmpty else {
+            operationNotice = OperationNotice(text: "⚠️ 请先选择需要控制的设备", isError: true)
+            return 0
+        }
+
         // 过滤物理在线的设备
         let targetIds = deviceIds.filter { id in
             devices.first(where: { $0.id == id })?.online ?? true
         }
+        let offlineCount = deviceIds.count - targetIds.count
+
         guard !targetIds.isEmpty else {
-            operationNotice = OperationNotice(text: "⚠️ 选中的设备均处于离线状态", isError: true)
+            operationNotice = OperationNotice(text: "⚠️ 选中的 \(deviceIds.count) 台设备均处于离线状态", isError: true)
             return 0
         }
 
         guard gatewayConnected, let handle = gatewayHandle else {
-            operationNotice = OperationNotice(text: "⚠️ 连接中断，指令未发送（自动重连中）", isError: true)
+            operationNotice = OperationNotice(text: "⚠️ 网关连接中断，指令未发送（自动重连中）", isError: true)
             return 0
         }
         var sent = 0
@@ -2508,8 +2574,12 @@ final class AppModel: ObservableObject {
             sent += 1
         }
         let desc = attributes[targetIds.first ?? ""]?[name]?.desc ?? name
-        AppLog.log("批量下发: \(name)=\(value.stringValue) → \(targetIds.count) 台设备")
-        operationNotice = OperationNotice(text: "已发送：\(desc) → \(sent) 台设备", isError: false)
+        AppLog.log("批量下发: \(name)=\(value.stringValue) → \(targetIds.count) 台设备（跳过离线 \(offlineCount) 台）")
+        if offlineCount > 0 {
+            operationNotice = OperationNotice(text: "已发送：\(desc) → \(sent) 台设备（\(offlineCount) 台离线已跳过）", isError: false)
+        } else {
+            operationNotice = OperationNotice(text: "已发送：\(desc) → \(sent) 台设备", isError: false)
+        }
         return sent
     }
 

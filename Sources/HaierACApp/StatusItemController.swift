@@ -251,7 +251,7 @@ final class StatusItemController: NSObject {
             let powerTitle = isPowerOn ? "关机「\(dev.deviceName)」" : "开机「\(dev.deviceName)」"
             let powerItem = NSMenuItem(title: powerTitle, action: #selector(togglePrimaryPower), keyEquivalent: "")
             powerItem.target = self
-            powerItem.isEnabled = dev.online && model.gatewayConnected
+            powerItem.isEnabled = model.reachability(for: dev).isControllable
             menu.addItem(powerItem)
         }
 

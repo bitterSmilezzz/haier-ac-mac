@@ -37,11 +37,13 @@ struct FilterCareSheet: View {
         let mode = attrs["operationMode"]?.stringValue ?? "0"
         let targetTemp = attrs["targetTemperature"]?.doubleValue ?? 26.0
         let indoorTemp = model.currentIndoorTemperature(for: currentDeviceId)
+        let indoorHum = AppModel.indoorHumidityAttribute(in: attrs)?.doubleValue
         let windSpeed = attrs["windSpeed"]?.stringValue ?? "微风"
         return model.calculateFilterWearFactor(
             mode: mode,
             targetTemp: targetTemp,
             indoorTemp: indoorTemp,
+            indoorHumidity: indoorHum,
             windSpeed: windSpeed
         )
     }
@@ -167,7 +169,7 @@ struct FilterCareSheet: View {
                         .clipShape(Capsule())
                     }
 
-                    Text("空气动力学等效工时: \(String(format: "%.1f", runningHours)) / \(AppModel.filterServiceLifeMinutes / 60) 小时（含风量与凝露加权）")
+                    Text("空气动力学等效工时: \(String(format: "%.1f", runningHours)) / \(AppModel.filterServiceLifeMinutes / 60) 小时（含风量、凝露与湿度加权）")
                         .font(.system(size: 12))
                         .foregroundStyle(Theme.inkSubtle)
 

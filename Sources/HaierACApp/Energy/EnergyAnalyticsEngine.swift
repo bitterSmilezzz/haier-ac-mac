@@ -18,6 +18,7 @@ public struct EnergyDayRecord: Codable, Equatable, Identifiable {
     public var heatingMinutes: Int
     public var fanMinutes: Int
     public var dehumMinutes: Int
+    public var unknownMinutes: Int // 未识别模式分钟数 (v1.9.26)
     public var totalKWh: Double
     public var totalCost: Double
 
@@ -28,6 +29,7 @@ public struct EnergyDayRecord: Codable, Equatable, Identifiable {
         heatingMinutes: Int = 0,
         fanMinutes: Int = 0,
         dehumMinutes: Int = 0,
+        unknownMinutes: Int = 0,
         totalKWh: Double = 0.0,
         totalCost: Double = 0.0
     ) {
@@ -37,8 +39,39 @@ public struct EnergyDayRecord: Codable, Equatable, Identifiable {
         self.heatingMinutes = heatingMinutes
         self.fanMinutes = fanMinutes
         self.dehumMinutes = dehumMinutes
+        self.unknownMinutes = unknownMinutes
         self.totalKWh = totalKWh
         self.totalCost = totalCost
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case date, totalMinutes, coolingMinutes, heatingMinutes, fanMinutes, dehumMinutes, unknownMinutes, totalKWh, totalCost
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        date = try container.decode(String.self, forKey: .date)
+        totalMinutes = try container.decode(Int.self, forKey: .totalMinutes)
+        coolingMinutes = try container.decode(Int.self, forKey: .coolingMinutes)
+        heatingMinutes = try container.decode(Int.self, forKey: .heatingMinutes)
+        fanMinutes = try container.decode(Int.self, forKey: .fanMinutes)
+        dehumMinutes = try container.decode(Int.self, forKey: .dehumMinutes)
+        unknownMinutes = try container.decodeIfPresent(Int.self, forKey: .unknownMinutes) ?? 0
+        totalKWh = try container.decode(Double.self, forKey: .totalKWh)
+        totalCost = try container.decode(Double.self, forKey: .totalCost)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(date, forKey: .date)
+        try container.encode(totalMinutes, forKey: .totalMinutes)
+        try container.encode(coolingMinutes, forKey: .coolingMinutes)
+        try container.encode(heatingMinutes, forKey: .heatingMinutes)
+        try container.encode(fanMinutes, forKey: .fanMinutes)
+        try container.encode(dehumMinutes, forKey: .dehumMinutes)
+        try container.encode(unknownMinutes, forKey: .unknownMinutes)
+        try container.encode(totalKWh, forKey: .totalKWh)
+        try container.encode(totalCost, forKey: .totalCost)
     }
 }
 
@@ -137,44 +170,55 @@ public final class EnergyAnalyticsEngine: ObservableObject {
             return 40.0
         }()
 
-        var power: Double = 400.0
-        // 未识别模式采用 .auto 中性智能自适应基准，按温差动态测算，避免偏高虚标
-        let mode = ACModeCode.match(from: modeCode, default: .auto)
+        // 未识别模式采用中性功率估算策略：
+        // 1. 若室内温度与设定温度均有效，采用中性温差自适应负荷测算，避免固定偏向制冷或制热；
+        // 2. 若温度字段缺失（室内或设定温度为 nil），则采用 1.5 匹直流变频压缩机典型低频维持中性基准功率 (350W + windOffset)，避免盲目套用大温差制热/制冷曲线导致功率偏离。
+        guard let mode = ACModeCode.match(from: modeCode) else {
+            if let indoor = indoorTemp, let target = targetTemp {
+                let delta = abs(indoor - target)
+                let neutralPower = 380.0 + (delta * 95.0) + windOffset
+                return min(max(neutralPower, 180.0), 1200.0)
+            } else {
+                let neutralPower = 350.0 + windOffset
+                return min(max(neutralPower, 180.0), 600.0)
+            }
+        }
 
         switch mode {
         case .fan:
             // 送风模式：仅室内风机运转，极其省电
-            power = 15.0 + windOffset * 0.4
+            let power = 15.0 + windOffset * 0.4
             return min(max(power, 15.0), 65.0)
 
         case .dehumidify:
             // 除湿模式：低频恒定除湿
-            power = 420.0 + windOffset * 0.5
+            let power = 420.0 + windOffset * 0.5
             return min(max(power, 300.0), 600.0)
 
         case .heating:
             // 制热模式：基准功率较高
             let delta = max(0.0, (targetTemp ?? 20.0) - (indoorTemp ?? 18.0))
-            power = 550.0 + (delta * 110.0) + windOffset
+            let power = 550.0 + (delta * 110.0) + windOffset
             return min(max(power, 220.0), 1650.0)
 
         case .cooling:
             // 制冷模式：温差驱动变频功率
             let delta = max(0.0, (indoorTemp ?? 26.0) - (targetTemp ?? 25.0))
-            power = 380.0 + (delta * 95.0) + windOffset
+            let power = 380.0 + (delta * 95.0) + windOffset
             return min(max(power, 180.0), 1450.0)
 
         case .auto:
             // 自动模式：根据室内与设定温差智能判别制冷或制热动力曲线
+            // 注：若双温度均缺失，默认室内 25°C、设定 24°C，温差为 1°C 的轻载中性工况
             let indoor = indoorTemp ?? 25.0
             let target = targetTemp ?? 24.0
             if indoor >= target {
                 let delta = indoor - target
-                power = 380.0 + (delta * 95.0) + windOffset
+                let power = 380.0 + (delta * 95.0) + windOffset
                 return min(max(power, 180.0), 1450.0)
             } else {
                 let delta = target - indoor
-                power = 550.0 + (delta * 110.0) + windOffset
+                let power = 550.0 + (delta * 110.0) + windOffset
                 return min(max(power, 220.0), 1650.0)
             }
         }
@@ -227,6 +271,7 @@ public final class EnergyAnalyticsEngine: ObservableObject {
         var runningHeating = 0
         var runningFan = 0
         var runningDehum = 0
+        var runningUnknown = 0
         var hasAnyRunningDevice = false
 
         for sample in deviceSamples {
@@ -257,6 +302,8 @@ public final class EnergyAnalyticsEngine: ObservableObject {
                             runningHeating += 1
                         }
                     }
+                } else {
+                    runningUnknown += 1
                 }
             }
         }
@@ -278,6 +325,7 @@ public final class EnergyAnalyticsEngine: ObservableObject {
             if runningHeating > 0 { historyRecords[idx].heatingMinutes += incrementalMinutes }
             if runningFan > 0 { historyRecords[idx].fanMinutes += incrementalMinutes }
             if runningDehum > 0 { historyRecords[idx].dehumMinutes += incrementalMinutes }
+            if runningUnknown > 0 { historyRecords[idx].unknownMinutes += incrementalMinutes }
         } else {
             var newRecord = EnergyDayRecord(date: dateKey)
             newRecord.totalMinutes = incrementalMinutes
@@ -288,6 +336,7 @@ public final class EnergyAnalyticsEngine: ObservableObject {
             if runningHeating > 0 { newRecord.heatingMinutes = incrementalMinutes }
             if runningFan > 0 { newRecord.fanMinutes = incrementalMinutes }
             if runningDehum > 0 { newRecord.dehumMinutes = incrementalMinutes }
+            if runningUnknown > 0 { newRecord.unknownMinutes = incrementalMinutes }
 
             historyRecords.insert(newRecord, at: 0)
             if historyRecords.count > 60 {

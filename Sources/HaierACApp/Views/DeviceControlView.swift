@@ -33,28 +33,74 @@ struct DeviceControlView: View {
                 let modeDesc = model.attribute("operationMode", deviceId: device.id)?.value?.stringValue
                 let tint = Theme.modeTint(modeDesc: modeDesc, isOn: isPowerOn)
                 let modeCat = Theme.modeCategory(modeDesc: modeDesc, isOn: isPowerOn)
+                let reachability = model.reachability(for: device)
 
                 ScrollView {
                     VStack(alignment: .leading, spacing: Theme.spaceLG) {
                         // 1. 顶部连接与环境遥测胶囊
                         headerAndStatusCapsules(isPowerOn: isPowerOn, modeCat: modeCat, tint: tint)
 
+                        // 离线与重连横幅
+                        switch reachability {
+                        case .available:
+                            EmptyView()
+                        case .gatewayReconnecting:
+                            HStack(spacing: 8) {
+                                Image(systemName: "network.slash")
+                                    .font(.system(size: 13))
+                                    .foregroundStyle(Theme.warning)
+                                Text("海尔云端网关连接中断，正在自动重连...")
+                                    .font(.system(size: 12, weight: .medium))
+                                    .foregroundStyle(Theme.inkMuted)
+                                Spacer()
+                                Button("立即重试") {
+                                    model.retryConnection()
+                                }
+                                .buttonStyle(Theme.secondaryButtonStyle())
+                            }
+                            .padding(.horizontal, Theme.spaceMD)
+                            .padding(.vertical, Theme.spaceSM)
+                            .background(Theme.surface2)
+                            .clipShape(RoundedRectangle(cornerRadius: Theme.radiusMD, style: .continuous))
+                        case .deviceOffline:
+                            HStack(spacing: 8) {
+                                Image(systemName: "wifi.slash")
+                                    .font(.system(size: 13))
+                                    .foregroundStyle(Theme.offline)
+                                Text("当前空调未连入网络，控制指令暂不可用")
+                                    .font(.system(size: 12, weight: .medium))
+                                    .foregroundStyle(Theme.inkMuted)
+                            }
+                            .padding(.horizontal, Theme.spaceMD)
+                            .padding(.vertical, Theme.spaceSM)
+                            .background(Theme.surface2)
+                            .clipShape(RoundedRectangle(cornerRadius: Theme.radiusMD, style: .continuous))
+                        }
+
                         // 2. 核心 Temperature Pod
                         temperatureHeroPod(isPowerOn: isPowerOn, modeCat: modeCat, tint: tint)
+                            .disabled(!reachability.isControllable)
+                            .opacity(reachability.isControllable ? 1.0 : 0.6)
 
                         // 3. 运行模式与风速选择矩阵
                         if isPowerOn {
                             modeAndFanSection(tint: tint)
+                                .disabled(!reachability.isControllable)
+                                .opacity(reachability.isControllable ? 1.0 : 0.6)
                         }
 
                         // 4. 灯光与快控 Bento 行
                         quickControlsSection(isPowerOn: isPowerOn, tint: tint)
+                            .disabled(!reachability.isControllable)
+                            .opacity(reachability.isControllable ? 1.0 : 0.6)
 
                         // 5. 24 小时温度趋势 Area Trend
                         temperatureTrendSection(tint: tint)
 
                         // 6. 全部扩展可写属性
                         allWritableSection
+                            .disabled(!reachability.isControllable)
+                            .opacity(reachability.isControllable ? 1.0 : 0.6)
                     }
                     .padding(Theme.spaceLG)
                 }
