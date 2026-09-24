@@ -6,6 +6,21 @@ A native SwiftUI app to control Haier / Leader (统帅) smart air conditioners o
 
 ## Features
 
+- 🏷 **Whole-House Temperature Power Linking & Fan Speed Coordination, Boundary Feedback Hardening, All-Weather Auto Extreme Dynamics & Menu Bar Visual Polish (v1.9.41)**:
+  - 🎙️ **Whole-House Temperature Standby Wakeup Linking & Power Guarding (`VoiceCommandParser` / `VoiceCapsuleWindowController` / `VoiceCommandParserTests`)**:
+    - Completely resolved the interactive flaw where spoken whole-house temperature commands prefixed with "开" (e.g. "全屋开26度", "所有空调开25", "全屋开24") merely adjusted target temperature while leaving standby units off; seamlessly linked standby power-on (`onOffStatus = true`) in `VoiceCapsuleWindowController` with explicit feedback "（并开启 N 台待机空调）";
+    - Hardened `isAllPowerOn` by excluding 16.0°C ~ 30.0°C valid temperature values and fan speed keywords, preventing whole-house setpoints from being misclassified as generic power commands.
+  - 🍃 **Whole-House Fan Speed Coordination & Batch Dispatch (`VoiceCommandParser` / `VoiceCapsuleWindowController` / `AppModel` / `VoiceCommandParserTests`)**:
+    - Addressed the limitation where whole-house fan speed commands (e.g. "全屋开大风", "所有空调开微风", "全屋自动风", "把所有空调都调到中速风") previously fell back to single-unit control; added `VoiceCommand.setWindSpeedAll(String)` command;
+    - Excluded fan speed keywords in `parseAllPreset` and routed whole-house fan speed requests cleanly; implemented `setWindSpeed(deviceIds:speedName:autoPowerOn:)` and `setWindSpeedAll` in `AppModel` with automatic standby awakening.
+  - 🌡️ **Accurate Relative Temperature Boundary Feedback (`VoiceCapsuleWindowController`)**:
+    - Fixed misleading error reporting where adjusting temperature when all operating units had reached limits (30°C or 16°C) falsely reported "当前无任何开机运行中的在线空调"; established two-tier validation returning clear neutral boundary messages ("全屋运行中的空调均已达到最高温度上限 30°C / 最低温度下限 16°C");
+    - Aligned single-unit and multi-device relative adjustment boundaries with clean limit notifications, eliminating redundant hardware writes and false success messages.
+  - ⚡️ **All-Season Extreme Climate & Dual-Direction Humidity Inverter Dynamics in Auto Mode (`EnergyAnalyticsEngine`)**:
+    - Fully incorporated extreme heatwave condenser degradation overload dynamics (`heatBoost` 100~280W, 1750W peak at $\ge 30^\circ\text{C}$) and severe winter low-temp PTC auxiliary heating dynamics (`coldBoost` 120~320W, 1950W peak at $\le 15^\circ\text{C}$) into `.auto` mode in `estimateInstantaneousPower`, establishing 100% thermodynamic symmetry with cooling and heating modes alongside dual-direction humidity adjustments.
+  - 🍱 **macOS Menu Bar Matrix Visual Symmetry & Tooltip Health Confirmation (`StatusItemController`)**:
+    - Added matching visual mode emojis (❄️, 🔥, 💧, 🍃, 🔄) across all room submenus in the right-click "空调设备控制矩阵...", unifying visual presentation with top-level menus;
+    - Added positive filter health feedback in the hover tooltip ("✨ 全屋空调滤网状态良好") when all units operate with healthy filter cleanliness.
 - 🏷 **Structured Spoken Negation Guard, Whole-House Scheduling Dispatch, 5-in-1 Menu Bar Symmetry & Heatwave Cooling Dynamics (v1.9.40)**:
   - 🛡️ **Structured Natural Language Negation Defense & Phrase Insertion Bypass Elimination (`VoiceCommandParser` / `VoiceCommandParserTests`)**:
     - Completely resolved the bypass vulnerability where colloquial words, adverbs, or nouns inserted between negation words and action verbs (e.g., "别给我关了", "千万别现在关", "不用帮我关", "别太快关", "别乱调") failed to match whitelist character classes; upgraded to structural non-punctuation greedy matching `(?:别|不要|不用|先别|千万别|切勿|请勿|暂不)[^，。！？\s]{0,6}?(?:关|停|开|启动|运转|打开|关闭|调|设|升|降)` to robustly intercept conversational speech and prevent accidental whole-house or unit shutdowns;

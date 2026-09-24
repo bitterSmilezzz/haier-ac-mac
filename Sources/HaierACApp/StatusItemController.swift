@@ -215,6 +215,8 @@ final class StatusItemController: NSObject {
                 let summary = lowCleanDevices.map { "「\($0.name)」\($0.pct)%" }.joined(separator: "、")
                 tooltipParts.append("⚠️ 全屋 \(lowCleanDevices.count) 台空调滤网洁净度较低（\(summary)），建议拆洗保养")
             }
+        } else if !allDevices.isEmpty {
+            tooltipParts.append("✨ 全屋空调滤网状态良好")
         }
 
         tooltipParts.append("💡 左键呼出快捷控制面板，右键展开系统菜单")
@@ -402,7 +404,7 @@ final class StatusItemController: NSObject {
 
                 // 一键制冷 26°C
                 let coolItem = NSMenuItem(
-                    title: "一键制冷 26°C",
+                    title: "❄️ 一键制冷 26°C",
                     action: #selector(setQuickCooling(_:)),
                     keyEquivalent: ""
                 )
@@ -413,7 +415,7 @@ final class StatusItemController: NSObject {
 
                 // 一键制热 20°C
                 let heatItem = NSMenuItem(
-                    title: "一键制热 20°C",
+                    title: "🔥 一键制热 20°C",
                     action: #selector(setQuickHeating(_:)),
                     keyEquivalent: ""
                 )
@@ -424,7 +426,7 @@ final class StatusItemController: NSObject {
 
                 // 一键除湿 (v1.9.36)
                 let dehumItem = NSMenuItem(
-                    title: "一键除湿",
+                    title: "💧 一键除湿",
                     action: #selector(setQuickDehumidify(_:)),
                     keyEquivalent: ""
                 )
@@ -435,7 +437,7 @@ final class StatusItemController: NSObject {
 
                 // 一键送风 (v1.9.36)
                 let fanItem = NSMenuItem(
-                    title: "一键送风",
+                    title: "🍃 一键送风",
                     action: #selector(setQuickFan(_:)),
                     keyEquivalent: ""
                 )
@@ -446,7 +448,7 @@ final class StatusItemController: NSObject {
 
                 // 一键智能自动 24°C (v1.9.40)
                 let autoItem = NSMenuItem(
-                    title: "一键智能自动 24°C",
+                    title: "🔄 一键智能自动 24°C",
                     action: #selector(setQuickAuto(_:)),
                     keyEquivalent: ""
                 )

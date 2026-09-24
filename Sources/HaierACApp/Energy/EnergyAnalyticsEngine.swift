@@ -360,7 +360,7 @@ public final class EnergyAnalyticsEngine: ObservableObject {
             return min(max(power, 180.0), 1750.0)
 
         case .auto:
-            // 自动模式：根据室内与设定温差智能判别制冷或制热动力曲线，融合环境湿度微调补偿 (v1.9.36 统一阻尼, v1.9.38 湿度双控动力微调)
+            // 自动模式：根据室内与设定温差智能判别制冷或制热动力曲线，融合环境湿度微调与全气候极端温差超频动力学 (v1.9.36, v1.9.38, v1.9.41 全季节对称)
             let indoor = indoorTemp ?? 25.0
             let target = targetTemp ?? 24.0
             let humOffset: Double = {
@@ -382,20 +382,45 @@ public final class EnergyAnalyticsEngine: ObservableObject {
                 } else if delta < 1.0 {
                     power = 220.0 + (delta * 160.0) + (windOffset * 0.8) + (humOffset * 0.8)
                 } else {
-                    power = 380.0 + ((delta - 1.0) * 95.0) + windOffset + humOffset
+                    // 酷暑极端高温与冷凝器恶化超频动力学补偿
+                    let heatBoost: Double = {
+                        if indoor >= 30.0 && delta >= 5.0 {
+                            let excessIndoor = min(8.0, indoor - 30.0)
+                            let excessDelta = min(8.0, delta - 5.0)
+                            return 100.0 + (excessIndoor * 12.0) + (excessDelta * 10.0)
+                        }
+                        return 0.0
+                    }()
+                    power = 380.0 + ((delta - 1.0) * 95.0) + windOffset + humOffset + heatBoost
                 }
-                return min(max(power, 180.0), 1450.0)
+                return min(max(power, 180.0), 1750.0)
             } else {
                 let delta = target - indoor
                 let power: Double
+                let heatHumOffset: Double = {
+                    guard let hum = indoorHumidity else { return 0.0 }
+                    if hum <= 40.0 {
+                        return min(30.0, (40.0 - hum) * 1.0)
+                    }
+                    return 0.0
+                }()
                 if delta <= 0.0 {
                     power = 300.0 + (windOffset * 0.6)
                 } else if delta < 1.0 {
-                    power = 300.0 + (delta * 250.0) + (windOffset * 0.8)
+                    power = 300.0 + (delta * 250.0) + (windOffset * 0.8) + (heatHumOffset * 0.5)
                 } else {
-                    power = 550.0 + ((delta - 1.0) * 110.0) + windOffset
+                    // 严寒低温大温差 PTC 电辅热与大压比高频超载运转补偿
+                    let coldBoost: Double = {
+                        if indoor <= 15.0 && delta >= 5.0 {
+                            let deficit = min(10.0, 15.0 - indoor)
+                            let excess = min(8.0, delta - 5.0)
+                            return 120.0 + (deficit * 10.0) + (excess * 12.0)
+                        }
+                        return 0.0
+                    }()
+                    power = 550.0 + ((delta - 1.0) * 110.0) + windOffset + heatHumOffset + coldBoost
                 }
-                return min(max(power, 220.0), 1650.0)
+                return min(max(power, 220.0), 1950.0)
             }
         }
     }

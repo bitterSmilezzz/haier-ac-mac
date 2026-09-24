@@ -2963,6 +2963,55 @@ final class AppModel: ObservableObject {
         return setTemperature(deviceIds: nil, temperature: temperature)
     }
 
+    /// 批量/全屋风速调节：将目标设备集（若为 nil 则默认全屋）中所有可控空调设置为指定风速 (v1.9.41)
+    @discardableResult
+    public func setWindSpeed(deviceIds: [String]? = nil, speedName: String, autoPowerOn: Bool = false) -> Int {
+        let targets = deviceIds ?? allUnifiedDevices.map(\.id)
+        let allIds = Set(allUnifiedDevices.map(\.id))
+        let isAll = (deviceIds == nil) || (!allIds.isEmpty && Set(targets).isSuperset(of: allIds))
+        let controllableIds = targets.filter { reachability(for: $0).isControllable }
+        guard !controllableIds.isEmpty else {
+            let desc = isAll ? "⚠️ 当前无任何可控的在线空调设备" : "⚠️ 所选设备当前均不可控或离线"
+            operationNotice = OperationNotice(text: desc, isError: true)
+            return 0
+        }
+
+        if autoPowerOn {
+            let standbyIds = controllableIds.filter { attribute("onOffStatus", deviceId: $0)?.boolValue != true }
+            if !standbyIds.isEmpty {
+                sendAttributeToDevices("onOffStatus", value: .bool(true), deviceIds: standbyIds)
+            }
+        }
+
+        for devId in controllableIds {
+            if let windAttr = attributes[devId]?["windSpeed"],
+               case .list(let options) = windAttr.valueRange,
+               let match = options.first(where: { $0.desc.contains(speedName) || speedName.contains($0.desc) }) {
+                sendAttribute("windSpeed", value: match.data, deviceId: devId)
+            } else {
+                let val: String = {
+                    if speedName.contains("微") || speedName.contains("低") || speedName.contains("静") { return "1" }
+                    if speedName.contains("中") { return "2" }
+                    if speedName.contains("强") || speedName.contains("高") || speedName.contains("大") { return "3" }
+                    return "0"
+                }()
+                sendAttribute("windSpeed", value: .string(val), deviceId: devId)
+            }
+        }
+
+        let desc = isAll
+            ? "✅ 已将全屋 \(controllableIds.count) 台空调风速统一设为「\(speedName)」"
+            : "✅ 已将所选 \(controllableIds.count) 台空调风速统一设为「\(speedName)」"
+        operationNotice = OperationNotice(text: desc, isError: false)
+        return controllableIds.count
+    }
+
+    /// 全屋一键风速设定 (v1.9.41)
+    @discardableResult
+    public func setWindSpeedAll(speedName: String, autoPowerOn: Bool = false) -> Int {
+        return setWindSpeed(deviceIds: nil, speedName: speedName, autoPowerOn: autoPowerOn)
+    }
+
     /// 网关推送属性时调用：确认待生效操作
     private func confirmPendingIfNeeded(deviceId: String, attrs: [String: DeviceAttribute]) {
         guard let pending = pendingConfirm,

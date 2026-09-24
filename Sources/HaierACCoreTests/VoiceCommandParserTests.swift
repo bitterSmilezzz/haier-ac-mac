@@ -207,6 +207,21 @@ final class VoiceCommandParserTests: XCTestCase {
 
         let w2 = VoiceCommandParser.parse("开微风")
         XCTAssertEqual(w2?.command, .setWindSpeed("微风"))
+
+        // 全屋风速协同测试 (v1.9.41)
+        let wall1 = VoiceCommandParser.parse("全屋开大风")
+        XCTAssertEqual(wall1?.command, .setWindSpeedAll("强劲"))
+        XCTAssertEqual(wall1?.displayText, "全屋切换至强劲风速")
+
+        let wall2 = VoiceCommandParser.parse("所有空调开微风")
+        XCTAssertEqual(wall2?.command, .setWindSpeedAll("微风"))
+        XCTAssertEqual(wall2?.displayText, "全屋切换至微风模式")
+
+        let wall3 = VoiceCommandParser.parse("全屋自动风")
+        XCTAssertEqual(wall3?.command, .setWindSpeedAll("自动"))
+
+        let wall4 = VoiceCommandParser.parse("把所有空调都调到中速风")
+        XCTAssertEqual(wall4?.command, .setWindSpeedAll("中风"))
     }
 
     // MARK: - 状态查询测试 (v1.9.38 扩展全屋/单机汇总)
@@ -493,6 +508,16 @@ final class VoiceCommandParserTests: XCTestCase {
 
         let temp3 = VoiceCommandParser.parse("把所有的空调都调到26度")
         XCTAssertEqual(temp3?.command, .setTemperatureAll(26.0))
+
+        // 全屋开字前缀与省略“度”字调温（闭环 v1.9.41）
+        let temp4 = VoiceCommandParser.parse("全屋开26度")
+        XCTAssertEqual(temp4?.command, .setTemperatureAll(26.0))
+
+        let temp5 = VoiceCommandParser.parse("所有空调开25")
+        XCTAssertEqual(temp5?.command, .setTemperatureAll(25.0))
+
+        let temp6 = VoiceCommandParser.parse("全屋开24")
+        XCTAssertEqual(temp6?.command, .setTemperatureAll(24.0))
 
         // 全屋相对调温 (v1.9.35)
         let rel1 = VoiceCommandParser.parse("全屋调高两度")

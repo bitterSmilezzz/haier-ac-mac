@@ -44,6 +44,8 @@ public enum VoiceCommand: Equatable {
     case adjustTemperatureAll(delta: Double)
     /// 设定运行模式与目标温度 (mode: 模式名称如"制冷"/"制热", temperature: 可选温度) (v1.9.39)
     case setModeAndTemperature(mode: String, temperature: Double?)
+    /// 全屋/所有设备统一设置风速 (speed: 如"微风"/"中风"/"强劲"/"自动") (v1.9.41)
+    case setWindSpeedAll(String)
     /// 启动 56°C 蒸发器高温自清洁 (v1.9.30)
     case startSelfCleaning
     /// 停止蒸发器自清洁 (v1.9.30)
@@ -157,6 +159,9 @@ public struct VoiceCommandParser {
         }
         if let allRelativeTemp = parseAllRelativeTemperature(cleaned) {
             return allRelativeTemp
+        }
+        if isAllDeviceScope(cleaned), let allWind = parseWindSpeed(cleaned) {
+            return allWind
         }
         if isAllPowerOn(cleaned) {
             return VoiceParseResult(command: .turnOnAll, displayText: "开启全屋所有空调")
@@ -451,13 +456,18 @@ public struct VoiceCommandParser {
         guard !containsNegativeAction(text) else { return nil }
         guard isAllDeviceScope(text) else { return nil }
 
+        // 排除风速调节命令（如“全屋自动风”、“全屋开大风”、“所有空调微风”） (v1.9.41)
+        if text.contains("自动风") || text.contains("风速") || text.contains("微风") || text.contains("大风") || text.contains("强劲") {
+            return nil
+        }
+
         // 识别模式
         let detectedMode: String? = {
             if text.contains("制冷") || text.contains("冷气") || text.contains("冷风") { return "制冷" }
             if text.contains("制热") || text.contains("暖气") || text.contains("暖风") || text.contains("加热") { return "制热" }
             if text.contains("送风") || text.contains("吹风") || text.contains("通风") { return "送风" }
             if text.contains("除湿") || text.contains("抽湿") || text.contains("干燥") { return "除湿" }
-            if text.contains("自动") || text.contains("智能") { return "自动" }
+            if (text.contains("自动") || text.contains("智能")) && !text.contains("自动风") && !text.contains("风速") { return "自动" }
             return nil
         }()
 
@@ -542,9 +552,20 @@ public struct VoiceCommandParser {
         if text.contains("后") || text.contains("倒计时") || text.contains("定时") || text.contains("预约") {
             return false
         }
+        // 排除带有具体有效温度（16~30°C）的口令（如“全屋开26度”、“全屋开26”、“所有空调开25”） (v1.9.41 完善全屋开机防线)
+        if let temp = extractTemperatureValue(from: text), temp >= 16.0 && temp <= 30.0 {
+            return false
+        }
         // 排除模式与温控命令（如“全屋开暖气”、“全屋开冷气”、“全屋开制热”、“全屋开到26度”），防止冷暖倒置 (v1.9.33)
         if text.contains("冷气") || text.contains("暖气") || text.contains("制冷") || text.contains("制热") ||
            text.contains("冷风") || text.contains("暖风") || text.contains("度") {
+            return false
+        }
+        // 排除风速调节命令（如“全屋开大风”、“所有空调开微风”、“全屋自动风”） (v1.9.41)
+        let windKeywords = [
+            "自动风", "风速", "大风", "风大", "强劲", "高风", "微风", "小风", "风小", "静音", "柔风", "低风", "中风"
+        ]
+        if windKeywords.contains(where: { text.contains($0) }) {
             return false
         }
         let allOnKeywords = [
@@ -758,23 +779,40 @@ public struct VoiceCommandParser {
         if text.contains("不要") || text.contains("别") || text.contains("不用") || text.contains("暂不") {
             return nil
         }
-        if text.contains("自动风") || text.contains("风速自动") || text.contains("自动风速") {
-            return VoiceParseResult(command: .setWindSpeed("自动"), displayText: "切换至自动风速")
+        let isAll = isAllDeviceScope(text)
+        let matched: (speed: String, desc: String)? = {
+            if text.contains("自动风") || text.contains("风速自动") || text.contains("自动风速") {
+                return ("自动", "自动风速")
+            }
+            if text.contains("大风") || text.contains("风大") || text.contains("强劲") || text.contains("高风") ||
+               text.contains("最大风") || text.contains("最大") || text.contains("调大风") || text.contains("风速大") ||
+               text.contains("高速风") || text.contains("开到最大") {
+                return ("强劲", "强劲风速")
+            }
+            if text.contains("小风") || text.contains("风小") || text.contains("微风") || text.contains("低风") ||
+               text.contains("静音") || text.contains("柔风") || text.contains("最小风") || text.contains("调小风") ||
+               text.contains("风速小") || text.contains("低速风") || text.contains("开到最小") {
+                return ("微风", "微风模式")
+            }
+            if text.contains("中风") || text.contains("适中") || text.contains("风速中") || text.contains("中速风") {
+                return ("中风", "中档风速")
+            }
+            return nil
+        }()
+
+        guard let match = matched else { return nil }
+
+        if isAll {
+            return VoiceParseResult(
+                command: .setWindSpeedAll(match.speed),
+                displayText: "全屋切换至\(match.desc)"
+            )
+        } else {
+            return VoiceParseResult(
+                command: .setWindSpeed(match.speed),
+                displayText: "切换至\(match.desc)"
+            )
         }
-        if text.contains("大风") || text.contains("风大") || text.contains("强劲") || text.contains("高风") ||
-           text.contains("最大风") || text.contains("最大") || text.contains("调大风") || text.contains("风速大") ||
-           text.contains("高速风") || text.contains("开到最大") {
-            return VoiceParseResult(command: .setWindSpeed("强劲"), displayText: "切换至强劲风速")
-        }
-        if text.contains("小风") || text.contains("风小") || text.contains("微风") || text.contains("低风") ||
-           text.contains("静音") || text.contains("柔风") || text.contains("最小风") || text.contains("调小风") ||
-           text.contains("风速小") || text.contains("低速风") || text.contains("开到最小") {
-            return VoiceParseResult(command: .setWindSpeed("微风"), displayText: "切换至微风模式")
-        }
-        if text.contains("中风") || text.contains("适中") || text.contains("风速中") || text.contains("中速风") {
-            return VoiceParseResult(command: .setWindSpeed("中风"), displayText: "切换至中档风速")
-        }
-        return nil
     }
 
     private static func parseScene(_ text: String) -> VoiceParseResult? {
