@@ -2895,22 +2895,22 @@ final class AppModel: ObservableObject {
         return target
     }
 
-    /// 批量/全屋相对调温：为目标设备集（若为 nil 则默认全屋）中所有可控且开机运行的空调按 delta 步进调温 (v1.9.35, v1.9.36 极值边界防护)
+    /// 批量/全屋相对调温：为目标设备集（若为 nil 则默认全屋）中所有可控空调按 delta 步进调温 (v1.9.35, v1.9.36 极值边界防护, v1.9.43 增强对待机状态调温支持)
     @discardableResult
-    public func adjustTemperature(deviceIds: [String]? = nil, delta: Double) -> Int {
+    public func adjustTemperature(deviceIds: [String]? = nil, delta: Double, includeStandby: Bool = false) -> Int {
         let targets = deviceIds ?? allUnifiedDevices.map(\.id)
         let allIds = Set(allUnifiedDevices.map(\.id))
         let isAll = (deviceIds == nil) || (!allIds.isEmpty && Set(targets).isSuperset(of: allIds))
-        let controllableOnIds = targets.filter {
-            reachability(for: $0).isControllable && attribute("onOffStatus", deviceId: $0)?.boolValue == true
+        let eligibleIds = targets.filter {
+            reachability(for: $0).isControllable && (includeStandby || attribute("onOffStatus", deviceId: $0)?.boolValue == true)
         }
-        guard !controllableOnIds.isEmpty else {
-            let desc = isAll ? "当前无任何开机运行中的在线空调" : "所选设备中无开机运行中的在线空调"
+        guard !eligibleIds.isEmpty else {
+            let desc = isAll ? "当前无任何开机运行中的在线空调" : "所选设备中无可调节的在线空调"
             operationNotice = OperationNotice(text: desc, isError: false)
             return 0
         }
         var changedCount = 0
-        for id in controllableOnIds {
+        for id in eligibleIds {
             let current = attribute("targetTemperature", deviceId: id)?.doubleValue ?? 26.0
             let target = min(30.0, max(16.0, current + delta))
             if target != current {
@@ -2920,7 +2920,7 @@ final class AppModel: ObservableObject {
         }
         if changedCount == 0 {
             let limitDesc = delta > 0 ? "已达到最高温度上限 30°C" : "已达到最低温度下限 16°C"
-            let desc = isAll ? "全屋运行中的空调均\(limitDesc)" : "所选运行中的空调均\(limitDesc)"
+            let desc = isAll ? "全屋空调均\(limitDesc)" : "所选空调均\(limitDesc)"
             operationNotice = OperationNotice(text: desc, isError: false)
             return 0
         }
@@ -2928,8 +2928,8 @@ final class AppModel: ObservableObject {
         let deltaDesc = deltaAbs.truncatingRemainder(dividingBy: 1.0) == 0 ? "\(Int(deltaAbs))" : String(format: "%.1f", deltaAbs)
         let dirDesc = delta > 0 ? "升温 \(deltaDesc)°C" : "降温 \(deltaDesc)°C"
         let desc = isAll
-            ? "✅ 已将全屋 \(changedCount) 台运行中的空调统一\(dirDesc)"
-            : "✅ 已将所选 \(changedCount) 台运行中的空调统一\(dirDesc)"
+            ? "✅ 已将全屋 \(changedCount) 台空调统一\(dirDesc)"
+            : "✅ 已将所选 \(changedCount) 台空调统一\(dirDesc)"
         operationNotice = OperationNotice(text: desc, isError: false)
         return changedCount
     }
@@ -3041,7 +3041,7 @@ final class AppModel: ObservableObject {
         guard let url = URL(string: "https://api.github.com/repos/bitterSmilezzz/haier-ac-mac/releases/latest") else { return }
         var request = URLRequest(url: url)
         request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
-        let appVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.2.0"
+        let appVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.9.43"
         request.setValue("HaierAC-Mac/\(appVersion)", forHTTPHeaderField: "User-Agent")
         guard let (data, _) = try? await URLSession.shared.data(for: request),
               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],

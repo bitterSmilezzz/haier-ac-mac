@@ -8,8 +8,6 @@ struct MenuBarControlsView: View {
     @EnvironmentObject var model: AppModel
     @ObservedObject private var ambient = AmbientSoundEngine.shared
 
-    /// 当前选中的设备（多设备切换）
-    @State private var selectedDeviceId: String?
     /// 菜单栏选中的睡眠曲线方案
     @State private var selectedSleepCurveId: UUID?
 
@@ -25,7 +23,7 @@ struct MenuBarControlsView: View {
     }
 
     private var currentDevice: DeviceInfo? {
-        let targetId = selectedDeviceId ?? model.menuBarDeviceId
+        let targetId = model.primaryDeviceId
         if let targetId, let device = activeDevices.first(where: { $0.id == targetId }) {
             return device
         }
@@ -148,9 +146,6 @@ struct MenuBarControlsView: View {
         }
         .animation(Theme.springSmooth, value: currentDevice?.id)
         .onAppear {
-            if selectedDeviceId == nil {
-                selectedDeviceId = model.menuBarDeviceId ?? activeDevices.first?.id
-            }
             if selectedSleepCurveId == nil {
                 selectedSleepCurveId = model.allSleepCurves.first?.id
             }
@@ -183,7 +178,6 @@ struct MenuBarControlsView: View {
                         Picker("", selection: Binding(
                             get: { currentDevice?.id ?? activeDevices.first?.id ?? "" },
                             set: { id in
-                                selectedDeviceId = id
                                 model.menuBarDeviceId = id
                             }
                         )) {

@@ -106,6 +106,59 @@ struct BatchControlPanel: View {
                         .clipShape(RoundedRectangle(cornerRadius: Theme.radiusSM, style: .continuous))
                     }
                     .buttonStyle(.plain)
+
+                    Button {
+                        model.applyPreset(deviceIds: deviceIds, mode: .auto, temperature: 24.0)
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "arrow.triangle.2.circlepath")
+                                .font(.system(size: 11))
+                            Text("智能 24°C")
+                                .font(.system(size: 11, weight: .medium))
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 6)
+                        .background(Theme.surface2)
+                        .foregroundStyle(Color.green)
+                        .clipShape(RoundedRectangle(cornerRadius: Theme.radiusSM, style: .continuous))
+                    }
+                    .buttonStyle(.plain)
+                }
+
+                HStack(spacing: 8) {
+                    Button {
+                        model.applyPreset(deviceIds: deviceIds, mode: .dehumidify, temperature: 24.0)
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "drop.fill")
+                                .font(.system(size: 11))
+                            Text("舒爽除湿")
+                                .font(.system(size: 11, weight: .medium))
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 5)
+                        .background(Theme.surface2)
+                        .foregroundStyle(Color.teal)
+                        .clipShape(RoundedRectangle(cornerRadius: Theme.radiusSM, style: .continuous))
+                    }
+                    .buttonStyle(.plain)
+
+                    Button {
+                        model.applyPreset(deviceIds: deviceIds, mode: .fan, temperature: 26.0)
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "wind")
+                                .font(.system(size: 11))
+                            Text("清新送风")
+                                .font(.system(size: 11, weight: .medium))
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 5)
+                        .background(Theme.surface2)
+                        .foregroundStyle(Color.gray)
+                        .clipShape(RoundedRectangle(cornerRadius: Theme.radiusSM, style: .continuous))
+                    }
+                    .buttonStyle(.plain)
                 }
 
                 HStack(spacing: 8) {
@@ -214,9 +267,7 @@ struct BatchControlPanel: View {
             Spacer()
             HStack(spacing: 10) {
                 Button {
-                    let current = attr.doubleValue ?? min
-                    let new = Swift.max(min, current - step)
-                    model.sendAttributeToDevices(attr.name, value: .double((new / step).rounded() * step), deviceIds: deviceIds)
+                    model.adjustTemperature(deviceIds: deviceIds, delta: -step, includeStandby: true)
                 } label: {
                     Image(systemName: "minus")
                         .font(.system(size: 10, weight: .semibold))
@@ -231,9 +282,7 @@ struct BatchControlPanel: View {
                     .frame(width: 44)
 
                 Button {
-                    let current = attr.doubleValue ?? min
-                    let new = Swift.min(max, current + step)
-                    model.sendAttributeToDevices(attr.name, value: .double((new / step).rounded() * step), deviceIds: deviceIds)
+                    model.adjustTemperature(deviceIds: deviceIds, delta: step, includeStandby: true)
                 } label: {
                     Image(systemName: "plus")
                         .font(.system(size: 10, weight: .semibold))

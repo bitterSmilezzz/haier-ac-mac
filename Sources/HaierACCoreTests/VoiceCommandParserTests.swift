@@ -325,6 +325,19 @@ final class VoiceCommandParserTests: XCTestCase {
 
         let c21 = VoiceCommandParser.parse("全屋四十五分钟后开机")
         XCTAssertEqual(c21?.command, .countdownPower(minutes: 45, power: true))
+
+        // 复合半小时倒计时折算测试 (v1.9.43: 彻底消除两个半小时被缩水解析为30分钟缺陷)
+        let c22 = VoiceCommandParser.parse("两个半小时后关空调")
+        XCTAssertEqual(c22?.command, .countdownPower(minutes: 150, power: false))
+
+        let c23 = VoiceCommandParser.parse("2个半小时后关机")
+        XCTAssertEqual(c23?.command, .countdownPower(minutes: 150, power: false))
+
+        let c24 = VoiceCommandParser.parse("三个半小时后关机")
+        XCTAssertEqual(c24?.command, .countdownPower(minutes: 210, power: false))
+
+        let c25 = VoiceCommandParser.parse("两小时半后关机")
+        XCTAssertEqual(c25?.command, .countdownPower(minutes: 150, power: false))
     }
 
     func testScheduleTime() {
@@ -350,6 +363,19 @@ final class VoiceCommandParserTests: XCTestCase {
 
         let s7 = VoiceCommandParser.parse("所有空调明早7点开机")
         XCTAssertEqual(s7?.command, .schedulePower(hour: 7, minute: 0, power: true))
+
+        // 中午 PM 钟点识别测试 (v1.9.43: 解决“中午1点”被误判为凌晨1点缺陷)
+        let s8 = VoiceCommandParser.parse("中午1点关机")
+        XCTAssertEqual(s8?.command, .schedulePower(hour: 13, minute: 0, power: false))
+
+        let s9 = VoiceCommandParser.parse("中午一点半关机")
+        XCTAssertEqual(s9?.command, .schedulePower(hour: 13, minute: 30, power: false))
+
+        let s10 = VoiceCommandParser.parse("中午2点开机")
+        XCTAssertEqual(s10?.command, .schedulePower(hour: 14, minute: 0, power: true))
+
+        let s11 = VoiceCommandParser.parse("中午12点关机")
+        XCTAssertEqual(s11?.command, .schedulePower(hour: 12, minute: 0, power: false))
     }
 
     func testCancelSchedules() {
@@ -505,6 +531,26 @@ final class VoiceCommandParserTests: XCTestCase {
 
         let multiOn2 = VoiceCommandParser.parse("把客厅和主卧都打开")
         XCTAssertEqual(multiOn2?.command, .setPower(true))
+
+        // 多房间定向协同带“全部/全都”字口语（v1.9.43: 严防误判为全屋一锅端关机）
+        let multiOff4 = VoiceCommandParser.parse("把客厅和主卧全部关了")
+        XCTAssertEqual(multiOff4?.command, .setPower(false))
+
+        let multiOff5 = VoiceCommandParser.parse("客厅和主卧全都关了")
+        XCTAssertEqual(multiOff5?.command, .setPower(false))
+
+        let multiOff6 = VoiceCommandParser.parse("客厅和主卧全部关掉")
+        XCTAssertEqual(multiOff6?.command, .setPower(false))
+
+        let multiCancel1 = VoiceCommandParser.parse("取消客厅和主卧全部定时")
+        XCTAssertEqual(multiCancel1?.command, .cancelSchedules)
+
+        // 真实全屋命令对照验证
+        let allOffCtrl = VoiceCommandParser.parse("全屋空调包括客厅全部关了")
+        XCTAssertEqual(allOffCtrl?.command, .turnOffAll)
+
+        let allCancelCtrl = VoiceCommandParser.parse("取消全屋所有定时")
+        XCTAssertEqual(allCancelCtrl?.command, .cancelSchedulesAll)
     }
 
     // MARK: - 全屋模式与温控协同测试 (v1.9.33)

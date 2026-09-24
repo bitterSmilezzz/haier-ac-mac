@@ -6,6 +6,19 @@ A native SwiftUI app to control Haier / Leader (统帅) smart air conditioners o
 
 ## Features
 
+- 🏷 **Natural Language Half-Hour Compound Conversion, Multi-Room Scope Hardening, Scene Preset Route Convergence & Menu Bar Control Center Alignment (v1.9.43)**:
+  - ⏱️ **Natural Language Compound Half-Hour Countdown & Noon PM Timer Defect Remediation (`VoiceCommandParser` / `VoiceCommandParserTests`)**:
+    - Completely resolved the major parsing bug where `convertChineseNumbers` previously replaced "半小时" unconditionally with "30分钟", causing colloquial phrases like "两个半小时后关机" (turn off after 2.5 hours) to become "两个30分钟", which collapsed into `30 minutes` (a severe 120-minute truncation); introduced structural regex matching (`([一二两三四五六七八九]|\d+)(?:个半小时|个钟头半|小时半|个小时半)`) to accurately translate "两个半小时" / "2个半小时" / "两小时半" to 2.5 hours (150 minutes) and "三个半小时" to 3.5 hours (210 minutes);
+    - Resolved the noon timing defect where expressions like "中午1点关机" or "中午一点半关机" were misclassified as 01:00 / 01:30 AM (middle of the night) by adding "中午" and "午后" to the PM classifier, properly mapping them to 13:00 / 13:30 / 14:00 (while preserving 12:00 for noon).
+  - 🛡️ **Targeted Multi-Room Commands Containing "全部/全都" Scope Defense (`VoiceCommandParser` / `VoiceCommandParserTests`)**:
+    - Hardened `isAllDeviceScope` to differentiate between house-wide scope and multi-room targeted commands; phrases such as "把客厅和主卧全部关了" (turn off both living room and master bedroom completely) or "取消客厅和主卧全部定时" explicitly specify target rooms (`hasTargetRoomKeyword`), so adverbs like "全部/全都" apply strictly to the designated rooms rather than triggering `.turnOffAll` or `.cancelSchedulesAll`; whole-house triggers are strictly reserved for genuine global subjects like "全屋", "全家", "所有空调", or "全部空调".
+  - 🌟 **Scene Preset Route Convergence & Multi-Room/Whole-House/Shortcuts Dispatch (`VoiceCapsuleWindowController` / `AppIntents`)**:
+    - Fixed the routing bug where voice commands like "主卧睡眠情景" called `model.applyScene(scene)` without passing `targetDeviceId`, mistakenly defaulting to the primary device (e.g. living room);
+    - Added whole-house scene scheduling (e.g. "全屋应用睡眠情景" dispatches with `allDevices: true`) and multi-room scene dispatch in `executeMultiDeviceCommand`;
+    - Enhanced `ApplyACSceneIntent` in AppIntents with optional `deviceName` and `allDevices` parameters.
+  - 🍱 **Menu Bar Control Center Single Source of Truth & Batch Control Panel Relative Stepping (`MenuBarControlsView` / `BatchControlView` / `AppModel`)**:
+    - Eliminated stale state desynchronization in `MenuBarControlsView` by removing local `@State selectedDeviceId` and converging directly on `model.primaryDeviceId` as the single source of truth across the popover view, right-click menu, and global status item;
+    - Upgraded batch temperature stepping in `BatchControlView` to utilize `adjustTemperature(includeStandby: true)`, preserving relative temperature offsets between different rooms and respecting the 16~30°C range bounds; expanded batch presets with Auto 24°C, Dehumidify, and Fan modes.
 - 🏷 **Chinese Compound Numeral Overflow Remediation, Multi-Room Targeted Power Scope Defense, Unified Primary Device Routing & Menu Bar Active Unit Counter (v1.9.42)**:
   - 🔢 **Compound Chinese Numeral Overflow & Timer/Countdown Defect Remediation (`VoiceCommandParser` / `VoiceCommandParserTests`)**:
     - Completely resolved the overflow flaw where `convertChineseNumbers` previously mapped only up to 30 while omitting decades 31~99; commands like "四十分钟后关机" (turn off after 40 minutes) had "十" replaced with 10 and "四" with 4, corrupting into `410 minutes` (nearly 7 hours); similarly "四十五分钟" produced `415 minutes`, "五十分钟" produced `510 minutes`, and "三十五分钟" produced `305 minutes`;

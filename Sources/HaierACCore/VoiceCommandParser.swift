@@ -338,7 +338,8 @@ public struct VoiceCommandParser {
 
         var isPM = false
         if normalized.contains("下午") || normalized.contains("晚上") || normalized.contains("今晚") ||
-           normalized.contains("明晚") || normalized.contains("夜里") || normalized.contains("傍晚") {
+           normalized.contains("明晚") || normalized.contains("夜里") || normalized.contains("傍晚") ||
+           normalized.contains("中午") || normalized.contains("午后") {
             isPM = true
         }
 
@@ -462,7 +463,13 @@ public struct VoiceCommandParser {
     }
 
     public static func isAllDeviceScope(_ text: String) -> Bool {
-        text.contains("所有") || text.contains("全部") || text.contains("全屋") || text.contains("全都") || text.contains("全家") || text.contains("整套")
+        if hasTargetRoomKeyword(text) {
+            // 当明确包含具体房间词（如“客厅”、“主卧”）时，仅当明确包含全局性主语（如“全屋”、“全家”、“整套”、“所有空调”、“全部空调”）时才属于全屋范围；
+            // 彻底杜绝“把客厅和主卧全部关了/全都关了”中的副词“全部/全都”越权泛化为全屋关机 (v1.9.43)
+            return text.contains("全屋") || text.contains("全家") || text.contains("整套") ||
+                   text.contains("所有空调") || text.contains("全部空调")
+        }
+        return text.contains("所有") || text.contains("全部") || text.contains("全屋") || text.contains("全都") || text.contains("全家") || text.contains("整套")
     }
 
     private static func parseAllPreset(_ text: String) -> VoiceParseResult? {
@@ -882,22 +889,40 @@ public struct VoiceCommandParser {
         return nil
     }
 
-    /// 将常见的中文数字表达替换为阿拉伯数字 (v1.9.42 升级为 1~99 结构化复合数字解析，彻底根除四十五/四十分钟溢出缺陷)
+    /// 将常见的中文数字表达替换为阿拉伯数字 (v1.9.42 升级为 1~99 结构化复合数字解析，v1.9.43 解决“两个半小时/三个半小时/两小时半”缩水缺陷)
     private static func convertChineseNumbers(in input: String) -> String {
         var str = input
-        // 先处理时间特定的固定搭配
-        str = str.replacingOccurrences(of: "一个半小时", with: "90分钟")
-        str = str.replacingOccurrences(of: "1个半小时", with: "90分钟")
-        str = str.replacingOccurrences(of: "半小时", with: "30分钟")
-        str = str.replacingOccurrences(of: "点半", with: "点30分")
-        str = str.replacingOccurrences(of: "时半", with: "点30分")
-        str = str.replacingOccurrences(of: "一百", with: "100")
-        str = str.replacingOccurrences(of: "点五", with: ".5")
 
         let digitMap: [Character: Int] = [
             "零": 0, "一": 1, "二": 2, "两": 2, "三": 3,
             "四": 4, "五": 5, "六": 6, "七": 7, "八": 8, "九": 9
         ]
+
+        // 复合半小时结构（如：两个半小时 -> 2.5小时，三个半小时 -> 3.5小时，两小时半 -> 2.5小时，一个半小时 -> 1.5小时）
+        // 彻底根除“两个半小时后关机”被“半小时”粗暴替换为“30分钟”导致严重缩水120分钟的重大缺陷 (v1.9.43)
+        let halfHourPattern = #"([一二两三四五六七八九]|\d+)(?:个半小时|个钟头半|小时半|个小时半)"#
+        if let regex = try? NSRegularExpression(pattern: halfHourPattern) {
+            let ns = str as NSString
+            let matches = regex.matches(in: str, range: NSRange(location: 0, length: ns.length)).reversed()
+            for m in matches {
+                let digitStr = ns.substring(with: m.range(at: 1))
+                let digitVal: Int = {
+                    if let d = Int(digitStr) { return d }
+                    return digitMap[digitStr.first ?? " "] ?? 1
+                }()
+                let range = Range(m.range, in: str)!
+                str.replaceSubrange(range, with: "\(digitVal).5小时")
+            }
+        }
+
+        // 单独的固定搭配
+        str = str.replacingOccurrences(of: "一个半小时", with: "1.5小时")
+        str = str.replacingOccurrences(of: "1个半小时", with: "1.5小时")
+        str = str.replacingOccurrences(of: "半小时", with: "30分钟")
+        str = str.replacingOccurrences(of: "点半", with: "点30分")
+        str = str.replacingOccurrences(of: "时半", with: "点30分")
+        str = str.replacingOccurrences(of: "一百", with: "100")
+        str = str.replacingOccurrences(of: "点五", with: ".5")
 
         // 匹配 [一二两三四五六七八九]?十[一二三四五六七八九]? 复合中文数字（如：四十五 -> 45，四十 -> 40，十五 -> 15，十 -> 10）
         let compoundPattern = #"([一二两三四五六七八九])?十([一二三四五六七八九])?"#

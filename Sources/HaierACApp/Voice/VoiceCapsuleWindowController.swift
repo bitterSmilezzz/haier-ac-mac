@@ -496,6 +496,21 @@ public final class VoiceCapsuleWindowController: NSObject, NSWindowDelegate {
                 scheduleAutoDismiss(delay: 1.8)
                 return
 
+            case .applyScene(let sceneName):
+                guard model.gatewayConnected else {
+                    VoiceControlManager.shared.markFailed("网关重连中，无法执行全屋控制")
+                    scheduleAutoDismiss(delay: 2.5)
+                    return
+                }
+                if let scene = model.scenes.first(where: { $0.name.contains(sceneName) }) {
+                    model.applyScene(scene, allDevices: true)
+                    VoiceControlManager.shared.markSuccess("已为全屋空调应用「\(scene.name)」情景")
+                } else {
+                    VoiceControlManager.shared.markFailed("未找到「\(sceneName)」情景")
+                }
+                scheduleAutoDismiss(delay: 1.8)
+                return
+
             default:
                 break
             }
@@ -635,8 +650,8 @@ public final class VoiceCapsuleWindowController: NSObject, NSWindowDelegate {
         case .applyScene(let sceneName):
             guard ensureControllable() else { return }
             if let scene = model.scenes.first(where: { $0.name.contains(sceneName) }) {
-                model.applyScene(scene)
-                VoiceControlManager.shared.markSuccess("已应用「\(scene.name)」情景")
+                model.applyScene(scene, targetDeviceId: deviceId)
+                VoiceControlManager.shared.markSuccess("已为\(prefix)应用「\(scene.name)」情景")
             } else {
                 VoiceControlManager.shared.markFailed("未找到「\(sceneName)」情景")
             }
@@ -842,6 +857,16 @@ public final class VoiceCapsuleWindowController: NSObject, NSWindowDelegate {
                 VoiceControlManager.shared.markSuccess("已取消\(prefix)定时任务（共 \(totalRemoved) 个）")
             } else {
                 VoiceControlManager.shared.markSuccess("\(prefix)当前没有正在运行的定时任务")
+            }
+
+        case .applyScene(let sceneName):
+            if let scene = model.scenes.first(where: { $0.name.contains(sceneName) }) {
+                for dev in controllable {
+                    model.applyScene(scene, targetDeviceId: dev.id)
+                }
+                VoiceControlManager.shared.markSuccess("已为\(prefix)应用「\(scene.name)」情景")
+            } else {
+                VoiceControlManager.shared.markFailed("未找到「\(sceneName)」情景")
             }
 
         case .setMode(let modeName):

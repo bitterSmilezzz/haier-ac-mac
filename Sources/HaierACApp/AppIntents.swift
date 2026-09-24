@@ -140,6 +140,12 @@ struct ApplyACSceneIntent: AppIntent {
     @Parameter(title: "情景名称", description: "如：睡眠、离家")
     var sceneName: String
 
+    @Parameter(title: "设备名称", description: "可选；留空使用默认设备")
+    var deviceName: String?
+
+    @Parameter(title: "全屋应用", default: false)
+    var allDevices: Bool
+
     @MainActor
     func perform() async throws -> some IntentResult & ProvidesDialog {
         guard AppModel.shared.gatewayConnected else {
@@ -148,8 +154,15 @@ struct ApplyACSceneIntent: AppIntent {
         guard let scene = AppModel.shared.scenes.first(where: { $0.name.contains(sceneName) }) else {
             throw ACIntentError.message("未找到情景「\(sceneName)」，请先在应用内创建")
         }
-        AppModel.shared.applyScene(scene)
-        return .result(dialog: "已应用情景「\(scene.name)」")
+        let targetId = resolveDeviceId(named: deviceName)
+        AppModel.shared.applyScene(scene, targetDeviceId: targetId, allDevices: allDevices)
+        if allDevices {
+            return .result(dialog: "已为全屋空调应用情景「\(scene.name)」")
+        } else if let targetId, let name = AppModel.shared.allUnifiedDevices.first(where: { $0.id == targetId })?.name {
+            return .result(dialog: "已为\(name)应用情景「\(scene.name)」")
+        } else {
+            return .result(dialog: "已应用情景「\(scene.name)」")
+        }
     }
 }
 
