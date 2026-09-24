@@ -6,6 +6,21 @@ A native SwiftUI app to control Haier / Leader (统帅) smart air conditioners o
 
 ## Features
 
+- 🏷 **Natural Language "Turn On" Mode/Temp Interception Fix, Menu Bar Primary Device Routing, Multi-Device Aggregated Status Query & Auto Mode Humidity Dynamics (v1.9.38)**:
+  - 🎙️ **Root Fix for "Turn On" Mode & Temperature Preemption (`VoiceCommandParser` / `VoiceCommandParserTests`)**:
+    - Completely resolved the defect where conversational phrases prefixed with "开/打开/开启" (e.g. "开除湿", "开制冷", "开制热", "开送风", "开26度", "开到26度", "开大风") were greedily preempted by `isPowerOn` and misclassified as simple power toggles; added explicit keyword exclusions for mode names, temperature values with "度", fan speeds, and scenes to ensure direct routing to mode switching and temperature adjustments;
+    - Fixed fan speed downward adjustments ("关小风", "风速关小一点", "关小一点") being mistakenly caught by power-off rules;
+    - Introduced `.queryStatusAll` command model to cleanly distinguish house-wide status queries ("全屋空调多少度", "全屋空调状态") from single-device inquiries.
+  - 🛡️ **Self-Cleaning Control Flow & Multi-Device Aggregated Query Closure (`VoiceCapsuleWindowController`)**:
+    - Added missing `scheduleAutoDismiss(delay: 1.8)` and `return` in `.stopSelfCleaning` branch, eliminating unintended fallthrough leaks;
+    - Promoted `.stopSleepCurve` and `.queryStatusAll` to top-level priority dispatch, preventing premature "operation does not support multi-device batch execution" fallback warnings;
+    - Implemented `case .queryStatus` in `executeMultiDeviceCommand` to format and aggregate room-by-room status telemetry (e.g. "「客厅」运行中，室温 24.5°C，制冷 26.0°C；「主卧」待机，室温 25.0°C");
+    - Introduced smart standby interlock: when changing mode or setting temperature with "开", idle standby units automatically power on (`onOffStatus = true`).
+  - 🍱 **Menu Bar Primary Device Routing Alignment & Live Online Count (`StatusItemController`)**:
+    - Fixed routing drift in context menu step-up/step-down (`stepUpPrimaryTemperature` / `stepDownPrimaryTemperature`) and quick mode presets (Cooling/Heating/Dehumidify/Fan) which hardcoded `allUnifiedDevices.first?.id`, cleanly standardizing them onto the active user-selected primary device `primaryDeviceId` (`model.menuBarDeviceId ?? model.allUnifiedDevices.first?.id`);
+    - Context menu whole-house quick preset items dynamically display controllable online unit counts (e.g. `❄️ Whole-House Cool 26°C (2 Online)`).
+  - 💧 **Auto Mode Thermodynamic Humidity Dynamics Modeling (`EnergyAnalyticsEngine`)**:
+    - Integrated indoor relative humidity (`indoorHumidity`) into `.auto` mode power estimation: humid conditions ($\text{RH} \ge 65\%$) dynamically factor in latent cooling loads, while dry conditions ($\text{RH} \le 45\%$) smoothly throttle micro-load power, ensuring realistic inverter thermodynamic responses.
 - 🏷 **Full-Chain Natural Language Negation Protection, Atomic Scheduler Decoupling, Humidity-Adaptive Dehumidification & Dynamic Filter Lifespan Prediction (v1.9.37)**:
   - 🛡️ **Full-Chain Negation Guard across Modes, Scenes, Self-Cleaning & Sleep Curves (`VoiceCommandParser` / `VoiceCommandParserTests`)**:
     - Broadened negation pattern screening across all-house presets (`parseAllPreset`), modes (`parseMode`), scenes (`parseScene`), and global temperature adjustments (`parseAllTemperature` / `parseAllRelativeTemperature`), preventing expressions like "全屋空调别开冷气", "千万别开除湿", "不要开暖气", or "别开离家模式" from mistakenly activating units or switching modes;

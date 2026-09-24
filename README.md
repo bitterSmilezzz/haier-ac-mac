@@ -8,6 +8,21 @@
 
 ## 功能
 
+- 🏷 **闭环自然语言开字模式/调温拦截缺陷、状态栏首选设备路由对齐、多设备状态聚合查询与自动模式湿度动力学 (v1.9.38)**：
+  - 🎙️ **自然语言开字前缀与调温拦截缺陷根治 (`VoiceCommandParser` / `VoiceCommandParserTests`)**：
+    - 修复此前口语中以“开/打开/开启”为前缀的复合指令（如“开除湿”、“开制冷”、“开制热”、“开送风”、“开26度”、“开到26度”、“开大风”等）被 `isPowerOn` 贪婪前置拦截误判为单纯开机的严重缺陷；增加模式名、带“度”温度值、风速和情景关键词的显式排除，使其准确映射为对应的模式切换与温度调整；
+    - 修复“关小风”、“风速关小一点”、“关小一点”等风量下调口语被误判为整机断电关机的问题；
+    - 新增 `.queryStatusAll` 全屋状态查询指令模型，区分全屋状态查询（“全屋空调多少度”、“全屋空调状态”）与单机状态查询。
+  - 🛡️ **自清洁控制流与多设备批量状态聚合闭环 (`VoiceCapsuleWindowController`)**：
+    - 修复 `.stopSelfCleaning` 分支中遗漏的 `scheduleAutoDismiss(delay: 1.8)` 与 `return`，消除控制流泄漏至兜底逻辑的隐患；
+    - 将 `.stopSleepCurve` 与 `.queryStatusAll` 提升至顶层多设备/单设备前置分发，避免误报“该操作暂不支持多设备批量执行”；
+    - 在 `executeMultiDeviceCommand` 中补齐 `case .queryStatus` 状态聚合查询，按房间格式化汇总运行态与室内温度（如“「客厅」运行中，室温 24.5°C，制冷 26.0°C；「主卧」待机，室温 25.0°C”）；
+    - 引入智能待机联动：当用户发出带“开”字的调温或模式切换时，自动为待机设备联锁唤醒开机（`onOffStatus = true`）。
+  - 🍱 **macOS 状态栏首选设备路由对齐与动态设备计数 (`StatusItemController`)**：
+    - 修复状态栏右键菜单中的单机温度步进（`stepUpPrimaryTemperature` / `stepDownPrimaryTemperature`）与快捷模式预设（制冷/制热/除湿/送风）硬编码抓取 `allUnifiedDevices.first?.id` 导致的路由漂移缺陷，全面收敛对齐至用户当前选定的首选主控设备 `primaryDeviceId` (`model.menuBarDeviceId ?? model.allUnifiedDevices.first?.id`)；
+    - 状态栏右键全屋快捷预设菜单项（全屋制冷/全屋制热/全屋除湿/全屋送风）动态显示当前在线可控设备数量（如 `❄️ 全屋清爽制冷 26°C (2台在线)`），反馈更加透明精准。
+  - 💧 **自动模式温湿度协同动力学建模 (`EnergyAnalyticsEngine`)**：
+    - 在自动模式（`.auto`）瞬时功率估算中引入室内相对湿度（`indoorHumidity`）动力学补偿：高湿工况 ($\text{RH} \ge 65\%$) 自动叠加除湿蒸发负荷补偿，干爽工况 ($\text{RH} \le 45\%$) 相应平滑缩减微载功率，使自动工况功率响应更贴合变频空调的舒适平衡热力学。
 - 🏷 **自然语言全链路否定安全防线、调度器解耦重置、除湿变频环境湿度动力学与多设备滤网自适应预测 (v1.9.37)**：
   - 🛡️ **自然语言全链路模式/情景/自清洁/睡眠温阶否定防护与防高温误烘烤 (`VoiceCommandParser` / `VoiceCommandParserTests`)**：
     - 深度扩展否定语义保护网至全屋预设 (`parseAllPreset`)、运行模式 (`parseMode`)、情景模式 (`parseScene`) 以及全屋绝对/相对调温 (`parseAllTemperature` / `parseAllRelativeTemperature`)，杜绝如“全屋空调别开冷气”、“千万别开除湿”、“不要开暖气”、“别开离家模式”等口语被盲目映射为开机和模式切换；

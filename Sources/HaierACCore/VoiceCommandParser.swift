@@ -14,6 +14,8 @@ public enum VoiceCommand: Equatable {
     case setWindSpeed(String)
     /// 查询状态与室内温度
     case queryStatus
+    /// 查询全屋所有空调状态与汇总 (v1.9.38)
+    case queryStatusAll
     /// 应用情景模式
     case applyScene(String)
     /// 倒计时开关机（minutes: 倒计时分钟数，power: true=开机, false=关机）
@@ -72,10 +74,15 @@ public struct VoiceCommandParser {
 
         guard !cleaned.isEmpty else { return nil }
 
-        // 1. 查询类
+        // 1. 查询类（支持全屋空调状态汇总与室内温度查询） (v1.9.38)
         if cleaned.contains("多少度") || cleaned.contains("当前温度") || cleaned.contains("室内温度") ||
-           cleaned.contains("现在温度") || cleaned.contains("查温度") || cleaned.contains("室温") {
-            return VoiceParseResult(command: .queryStatus, displayText: "查询室内温度")
+           cleaned.contains("现在温度") || cleaned.contains("查温度") || cleaned.contains("室温") ||
+           cleaned.contains("查状态") || cleaned.contains("空调状态") || cleaned.contains("运行状态") {
+            if isAllDeviceScope(cleaned) {
+                return VoiceParseResult(command: .queryStatusAll, displayText: "查询全屋空调状态")
+            } else {
+                return VoiceParseResult(command: .queryStatus, displayText: "查询室内温度")
+            }
         }
 
         // 2. 定时与倒计时取消 (v1.9.36 闭环 CR P1-2: 区分全屋取消与定向设备取消)
@@ -536,6 +543,13 @@ public struct VoiceCommandParser {
 
     private static func isPowerOff(_ text: String) -> Bool {
         guard !containsNegativeAction(text) else { return false }
+        // 排除风速调节（如“关小风”、“风速关小一点”）与相对调温（如“关小一点”） (v1.9.38)
+        if (text.contains("小") || text.contains("微") || text.contains("低")) && (text.contains("风") || text.contains("速")) {
+            return false
+        }
+        if text.contains("小一点") || text.contains("慢一点") || text.contains("轻一点") {
+            return false
+        }
         let offKeywords = [
             "关空调", "关闭空调", "关掉空调", "关机", "别吹了", "停机", "关闭", "关掉",
             "关了", "关上", "关一下", "关停", "关掉它", "断电"
@@ -553,8 +567,27 @@ public struct VoiceCommandParser {
 
     private static func isPowerOn(_ text: String) -> Bool {
         guard !containsNegativeAction(text) else { return false }
-        // 排除模式切换命令（如“开冷气”、“开暖气”、“吹冷风”）
-        if text.contains("冷气") || text.contains("暖气") || text.contains("冷风") || text.contains("暖风") {
+        // 排除温度设定命令（如“开26度”、“开到26度”、“打开26度”、“开启26度”）(v1.9.38 彻底解决开字前缀温度被拦截缺陷)
+        if extractTemperatureValue(from: text) != nil && (text.contains("度") || text.contains("°")) {
+            return false
+        }
+        // 排除模式切换命令（如“开制冷”、“开冷气”、“开制热”、“开暖气”、“开除湿”、“开抽湿”、“开送风”、“开吹风”、“开自动”、“打开除湿”、“开启送风”等）(v1.9.38)
+        let modeKeywords = [
+            "制冷", "冷气", "冷风", "开冷", "制热", "暖气", "暖风", "开暖", "加热",
+            "送风", "吹风", "通风", "自然风", "除湿", "抽湿", "干燥", "自动", "智能"
+        ]
+        if modeKeywords.contains(where: { text.contains($0) }) {
+            return false
+        }
+        // 排除风速调节命令（如“开大风”、“开微风”、“开小风”、“开强劲风”、“开静音”、“自动风”）(v1.9.38)
+        let windKeywords = [
+            "自动风", "风速", "大风", "风大", "强劲", "高风", "微风", "小风", "风小", "静音", "柔风", "低风", "中风"
+        ]
+        if windKeywords.contains(where: { text.contains($0) }) {
+            return false
+        }
+        // 排除情景模式命令（如“开睡眠情景”、“开离家模式”）
+        if text.contains("情景") || (text.contains("模式") && (text.contains("睡眠") || text.contains("离家") || text.contains("回家"))) {
             return false
         }
         let onKeywords = [

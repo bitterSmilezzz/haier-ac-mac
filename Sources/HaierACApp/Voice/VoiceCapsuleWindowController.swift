@@ -296,6 +296,58 @@ public final class VoiceCapsuleWindowController: NSObject, NSWindowDelegate {
             } else {
                 VoiceControlManager.shared.markSuccess("当前未在执行自清洁")
             }
+            scheduleAutoDismiss(delay: 1.8)
+            return
+
+        case .stopSleepCurve:
+            if model.activeSleepSession != nil {
+                let name = model.activeSleepSession?.curveConfig.name ?? "智能睡眠"
+                model.stopSleepCurve()
+                VoiceControlManager.shared.markSuccess("已退出「\(name)」睡眠曲线")
+            } else {
+                VoiceControlManager.shared.markSuccess("当前未运行睡眠温阶曲线")
+            }
+            scheduleAutoDismiss(delay: 1.8)
+            return
+
+        case .queryStatusAll:
+            let all = model.allUnifiedDevices
+            guard !all.isEmpty else {
+                VoiceControlManager.shared.markFailed("未检测到已绑定的空调设备")
+                scheduleAutoDismiss(delay: 2.0)
+                return
+            }
+            let controllable = all.filter { model.reachability(for: $0.id).isControllable }
+            let onList = controllable.filter { model.attribute("onOffStatus", deviceId: $0.id)?.boolValue == true }
+            let offList = controllable.filter { model.attribute("onOffStatus", deviceId: $0.id)?.boolValue != true }
+
+            var temps: [Double] = []
+            for dev in all {
+                if let t = model.currentIndoorTemperature(for: dev.id) {
+                    temps.append(t)
+                }
+            }
+
+            let tempSummary: String
+            if !temps.isEmpty {
+                let avg = temps.reduce(0.0, +) / Double(temps.count)
+                tempSummary = String(format: "，平均室温 %.1f°C", avg)
+            } else {
+                tempSummary = ""
+            }
+
+            let statusText: String
+            if onList.isEmpty {
+                statusText = "全屋 \(all.count) 台空调均处于待机状态\(tempSummary)"
+            } else if onList.count == all.count {
+                statusText = "全屋 \(all.count) 台空调均在运行中\(tempSummary)"
+            } else {
+                statusText = "全屋 \(all.count) 台空调中 \(onList.count) 台运行、\(offList.count) 台待机\(tempSummary)"
+            }
+            VoiceControlManager.shared.markSuccess(statusText)
+            scheduleAutoDismiss(delay: 2.5)
+            return
+
         case .cancelSchedulesAll:
             let count = model.cancelAllSchedules()
             if count > 0 {
@@ -319,7 +371,7 @@ public final class VoiceCapsuleWindowController: NSObject, NSWindowDelegate {
         }
 
         if targetDevices.count > 1 {
-            executeMultiDeviceCommand(command, targetDevices: targetDevices, model: model)
+            executeMultiDeviceCommand(command, targetDevices: targetDevices, model: model, spokenText: spokenText)
             return
         }
 
@@ -352,6 +404,10 @@ public final class VoiceCapsuleWindowController: NSObject, NSWindowDelegate {
 
         case .setTemperature(let temp):
             guard ensureControllable() else { return }
+            // 联动开机：若口令含“开”（如“开26度”）且当前待机，自动唤醒电源 (v1.9.38)
+            if spokenText.contains("开") && model.attribute("onOffStatus", deviceId: deviceId)?.boolValue != true {
+                model.sendAttribute("onOffStatus", value: .bool(true), deviceId: deviceId)
+            }
             model.sendAttribute("targetTemperature", value: .double(temp), deviceId: deviceId)
             let formatted = temp.truncatingRemainder(dividingBy: 1.0) == 0 ? "\(Int(temp))" : String(format: "%.1f", temp)
             VoiceControlManager.shared.markSuccess("已将\(prefix)温度调至 \(formatted)°C")
@@ -367,6 +423,10 @@ public final class VoiceCapsuleWindowController: NSObject, NSWindowDelegate {
 
         case .setMode(let modeName):
             guard ensureControllable() else { return }
+            // 联动开机：切换模式时若空调处于关机待机状态，自动唤醒电源 (v1.9.38)
+            if model.attribute("onOffStatus", deviceId: deviceId)?.boolValue != true {
+                model.sendAttribute("onOffStatus", value: .bool(true), deviceId: deviceId)
+            }
             // 在数字模型中匹配模式
             if let modeAttr = model.attributes[deviceId]?["operationMode"],
                case .list(let options) = modeAttr.valueRange,
@@ -501,15 +561,6 @@ public final class VoiceCapsuleWindowController: NSObject, NSWindowDelegate {
             model.startSleepCurve(curve: curve, deviceId: deviceId)
             VoiceControlManager.shared.markSuccess("已为\(prefix)启动「\(curve.name)」睡眠温阶曲线")
 
-        case .stopSleepCurve:
-            // 睡眠曲线退出与白噪音停止属于本地状态控制，即便网络临时颠簸也应允许停止 (v1.9.34)
-            if model.activeSleepSession != nil {
-                model.stopSleepCurve()
-                VoiceControlManager.shared.markSuccess("已停止\(prefix)智能睡眠温阶")
-            } else {
-                VoiceControlManager.shared.markSuccess("当前未运行睡眠温阶曲线")
-            }
-
         case .querySleepReport:
             // 本地会话报告查询，无需硬件在线校验 (v1.9.34)
             if let session = model.activeSleepSession {
@@ -538,7 +589,7 @@ public final class VoiceCapsuleWindowController: NSObject, NSWindowDelegate {
                 VoiceControlManager.shared.markSuccess("已为\(prefix)启动 56°C 蒸发器高温自清洁")
             }
 
-        case .turnOffAll, .turnOnAll, .stopSelfCleaning, .presetAll, .setTemperatureAll, .adjustTemperatureAll, .cancelSchedulesAll:
+        case .turnOffAll, .turnOnAll, .stopSelfCleaning, .stopSleepCurve, .presetAll, .setTemperatureAll, .adjustTemperatureAll, .cancelSchedulesAll, .queryStatusAll:
             break // 已在指令前置流程中由全局调度完成分发
         }
 
@@ -546,7 +597,7 @@ public final class VoiceCapsuleWindowController: NSObject, NSWindowDelegate {
     }
 
     /// 多设备定向协同控制执行 (v1.9.33)
-    private func executeMultiDeviceCommand(_ command: VoiceCommand, targetDevices: [AppModel.UnifiedDevice], model: AppModel) {
+    private func executeMultiDeviceCommand(_ command: VoiceCommand, targetDevices: [AppModel.UnifiedDevice], model: AppModel, spokenText: String = "") {
         let controllable = targetDevices.filter { model.reachability(for: $0.id).isControllable }
         guard !controllable.isEmpty else {
             let names = targetDevices.map(\.name).joined(separator: "、")
@@ -568,7 +619,34 @@ public final class VoiceCapsuleWindowController: NSObject, NSWindowDelegate {
                 VoiceControlManager.shared.markSuccess("已关闭\(prefix)电源")
             }
 
+        case .queryStatus:
+            var summaries: [String] = []
+            for dev in targetDevices {
+                let devId = dev.id
+                let reach = model.reachability(for: devId)
+                if !reach.isControllable {
+                    summaries.append("「\(dev.name)」离线")
+                    continue
+                }
+                let isPower = model.attribute("onOffStatus", deviceId: devId)?.boolValue ?? false
+                let powerDesc = isPower ? "运行中" : "待机"
+                let targetTemp = model.attribute("targetTemperature", deviceId: devId)?.doubleValue ?? 26.0
+                if let indoor = model.currentIndoorTemperature(for: devId) {
+                    let tempStr = isPower ? "，设定 \(Int(targetTemp))°C" : ""
+                    summaries.append("「\(dev.name)」\(powerDesc)，室温 \(String(format: "%.1f°C", indoor))\(tempStr)")
+                } else {
+                    summaries.append("「\(dev.name)」\(powerDesc)，设定 \(Int(targetTemp))°C")
+                }
+            }
+            VoiceControlManager.shared.markSuccess(summaries.joined(separator: "；"))
+
         case .setTemperature(let temp):
+            if spokenText.contains("开") {
+                let standbyIds = ids.filter { model.attribute("onOffStatus", deviceId: $0)?.boolValue != true }
+                if !standbyIds.isEmpty {
+                    model.sendAttributeToDevices("onOffStatus", value: .bool(true), deviceIds: standbyIds)
+                }
+            }
             model.sendAttributeToDevices("targetTemperature", value: .double(temp), deviceIds: ids)
             let formatted = temp.truncatingRemainder(dividingBy: 1.0) == 0 ? "\(Int(temp))" : String(format: "%.1f", temp)
             VoiceControlManager.shared.markSuccess("已将\(prefix)温度调至 \(formatted)°C")
@@ -590,6 +668,10 @@ public final class VoiceCapsuleWindowController: NSObject, NSWindowDelegate {
 
         case .setMode(let modeName):
             if let matched = ACModeCode.match(from: modeName) {
+                let standbyIds = ids.filter { model.attribute("onOffStatus", deviceId: $0)?.boolValue != true }
+                if !standbyIds.isEmpty {
+                    model.sendAttributeToDevices("onOffStatus", value: .bool(true), deviceIds: standbyIds)
+                }
                 model.sendAttributeToDevices("operationMode", value: .string(matched.rawValue), deviceIds: ids)
                 VoiceControlManager.shared.markSuccess("已将\(prefix)切换至「\(matched.desc)」模式")
             } else {

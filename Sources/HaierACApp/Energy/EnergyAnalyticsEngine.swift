@@ -339,18 +339,29 @@ public final class EnergyAnalyticsEngine: ObservableObject {
             return min(max(power, 180.0), 1450.0)
 
         case .auto:
-            // 自动模式：根据室内与设定温差智能判别制冷或制热动力曲线 (v1.9.36 统一阻尼模型)
+            // 自动模式：根据室内与设定温差智能判别制冷或制热动力曲线，融合环境湿度微调补偿 (v1.9.36 统一阻尼, v1.9.38 湿度双控动力微调)
             let indoor = indoorTemp ?? 25.0
             let target = targetTemp ?? 24.0
+            let humOffset: Double = {
+                guard let hum = indoorHumidity else { return 0.0 }
+                if hum >= 65.0 {
+                    // 高湿环境：增加潜热冷凝除湿负荷 (0 ~ 45W)
+                    return min(45.0, (hum - 65.0) * 1.5)
+                } else if hum <= 45.0 {
+                    // 干燥环境：体感温度稍低，降低部分维持负荷 (-25W ~ 0W)
+                    return max(-25.0, (hum - 45.0) * 1.0)
+                }
+                return 0.0
+            }()
             if indoor >= target {
                 let delta = indoor - target
                 let power: Double
                 if delta <= 0.0 {
-                    power = 220.0 + (windOffset * 0.6)
+                    power = 220.0 + (windOffset * 0.6) + (humOffset * 0.5)
                 } else if delta < 1.0 {
-                    power = 220.0 + (delta * 160.0) + (windOffset * 0.8)
+                    power = 220.0 + (delta * 160.0) + (windOffset * 0.8) + (humOffset * 0.8)
                 } else {
-                    power = 380.0 + ((delta - 1.0) * 95.0) + windOffset
+                    power = 380.0 + ((delta - 1.0) * 95.0) + windOffset + humOffset
                 }
                 return min(max(power, 180.0), 1450.0)
             } else {

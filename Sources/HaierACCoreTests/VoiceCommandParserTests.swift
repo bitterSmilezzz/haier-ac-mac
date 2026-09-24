@@ -50,6 +50,19 @@ final class VoiceCommandParserTests: XCTestCase {
 
         let t5 = VoiceCommandParser.parse("调到二十七度")
         XCTAssertEqual(t5?.command, .setTemperature(27.0))
+
+        // “开”字前缀绝对调温（口语高频指令，闭环 v1.9.38 误判为单纯开机缺陷）
+        let t6 = VoiceCommandParser.parse("开26度")
+        XCTAssertEqual(t6?.command, .setTemperature(26.0))
+
+        let t7 = VoiceCommandParser.parse("开到26度")
+        XCTAssertEqual(t7?.command, .setTemperature(26.0))
+
+        let t8 = VoiceCommandParser.parse("打开26度")
+        XCTAssertEqual(t8?.command, .setTemperature(26.0))
+
+        let t9 = VoiceCommandParser.parse("空调开26度")
+        XCTAssertEqual(t9?.command, .setTemperature(26.0))
     }
 
     // MARK: - 相对温度微调测试
@@ -92,6 +105,25 @@ final class VoiceCommandParserTests: XCTestCase {
         let dry2 = VoiceCommandParser.parse("开启抽湿")
         XCTAssertEqual(dry2?.command, .setMode("除湿"))
 
+        // “开”字前缀模式切换（口语高频指令，闭环 v1.9.38 误判为单纯开机缺陷）
+        let dry3 = VoiceCommandParser.parse("开除湿")
+        XCTAssertEqual(dry3?.command, .setMode("除湿"))
+
+        let dry4 = VoiceCommandParser.parse("打开除湿")
+        XCTAssertEqual(dry4?.command, .setMode("除湿"))
+
+        let cool2 = VoiceCommandParser.parse("开制冷")
+        XCTAssertEqual(cool2?.command, .setMode("制冷"))
+
+        let heat2 = VoiceCommandParser.parse("开制热")
+        XCTAssertEqual(heat2?.command, .setMode("制热"))
+
+        let fan2 = VoiceCommandParser.parse("开送风")
+        XCTAssertEqual(fan2?.command, .setMode("送风"))
+
+        let auto2 = VoiceCommandParser.parse("开自动模式")
+        XCTAssertEqual(auto2?.command, .setMode("自动"))
+
         let auto = VoiceCommandParser.parse("智能模式")
         XCTAssertEqual(auto?.command, .setMode("自动"))
     }
@@ -113,9 +145,16 @@ final class VoiceCommandParserTests: XCTestCase {
 
         let auto = VoiceCommandParser.parse("自动风")
         XCTAssertEqual(auto?.command, .setWindSpeed("自动"))
+
+        // 开字前缀风速（v1.9.38）
+        let w1 = VoiceCommandParser.parse("开大风")
+        XCTAssertEqual(w1?.command, .setWindSpeed("强劲"))
+
+        let w2 = VoiceCommandParser.parse("开微风")
+        XCTAssertEqual(w2?.command, .setWindSpeed("微风"))
     }
 
-    // MARK: - 状态查询测试
+    // MARK: - 状态查询测试 (v1.9.38 扩展全屋/单机汇总)
 
     func testQueryStatus() {
         let q1 = VoiceCommandParser.parse("现在多少度")
@@ -126,6 +165,15 @@ final class VoiceCommandParserTests: XCTestCase {
 
         let q3 = VoiceCommandParser.parse("当前温度")
         XCTAssertEqual(q3?.command, .queryStatus)
+
+        let qa1 = VoiceCommandParser.parse("全屋空调多少度")
+        XCTAssertEqual(qa1?.command, .queryStatusAll)
+
+        let qa2 = VoiceCommandParser.parse("所有空调运行状态")
+        XCTAssertEqual(qa2?.command, .queryStatusAll)
+
+        let qa3 = VoiceCommandParser.parse("全屋空调状态")
+        XCTAssertEqual(qa3?.command, .queryStatusAll)
     }
 
     // MARK: - 情景模式测试
