@@ -59,8 +59,70 @@ struct BatchControlPanel: View {
                 .clipShape(RoundedRectangle(cornerRadius: Theme.radiusSM, style: .continuous))
             }
 
-            // 汇总第一台设备的可写属性作为控制项（同品牌设备属性一致）
-            let attrs = model.attributes[deviceIds.first ?? ""] ?? [:]
+            // 汇总首个具备有效属性的设备作为控制模板（杜绝首台设备离线导致属性字典为空白）
+            let attrs: [String: DeviceAttribute] = {
+                for id in deviceIds {
+                    let map = model.attributes[id] ?? [:]
+                    if !map.isEmpty { return map }
+                }
+                return model.attributes[deviceIds.first ?? ""] ?? [:]
+            }()
+
+            // 全屋快捷一键预设 (v1.9.30)
+            HStack(spacing: 8) {
+                Button {
+                    model.applyPresetToAllDevices(mode: .cooling, temperature: 26.0)
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "snowflake")
+                            .font(.system(size: 11))
+                        Text("清爽 26°C")
+                            .font(.system(size: 11, weight: .medium))
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 6)
+                    .background(Theme.surface2)
+                    .foregroundStyle(Theme.accent)
+                    .clipShape(RoundedRectangle(cornerRadius: Theme.radiusSM, style: .continuous))
+                }
+                .buttonStyle(.plain)
+
+                Button {
+                    model.applyPresetToAllDevices(mode: .heating, temperature: 20.0)
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "flame.fill")
+                            .font(.system(size: 11))
+                        Text("暖房 20°C")
+                            .font(.system(size: 11, weight: .medium))
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 6)
+                    .background(Theme.surface2)
+                    .foregroundStyle(Theme.warning)
+                    .clipShape(RoundedRectangle(cornerRadius: Theme.radiusSM, style: .continuous))
+                }
+                .buttonStyle(.plain)
+
+                Button {
+                    model.turnOffAllDevices()
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "power")
+                            .font(.system(size: 11))
+                        Text("全屋关机")
+                            .font(.system(size: 11, weight: .medium))
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 6)
+                    .background(Theme.surface2)
+                    .foregroundStyle(Theme.inkMuted)
+                    .clipShape(RoundedRectangle(cornerRadius: Theme.radiusSM, style: .continuous))
+                }
+                .buttonStyle(.plain)
+            }
+            .disabled(!isBatchAvailable)
+            .opacity(isBatchAvailable ? 1.0 : 0.6)
 
             VStack(spacing: 0) {
                 if let onOff = attrs["onOffStatus"], onOff.writable {

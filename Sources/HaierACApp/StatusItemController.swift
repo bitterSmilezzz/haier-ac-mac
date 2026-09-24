@@ -46,6 +46,8 @@ final class StatusItemController: NSObject {
             model.$selfCleaningRemainingSeconds.map { _ in () }.eraseToAnyPublisher(),
             model.$activeSleepSession.map { _ in () }.eraseToAnyPublisher(),
             model.$gatewayConnected.map { _ in () }.eraseToAnyPublisher(),
+            model.$filterAccumulatedMinutes.map { _ in () }.eraseToAnyPublisher(),
+            EnergyAnalyticsEngine.shared.$currentInstantaneousPower.map { _ in () }.eraseToAnyPublisher(),
             AmbientSoundEngine.shared.$isPlaying.map { _ in () }.eraseToAnyPublisher()
         )
         .receive(on: DispatchQueue.main)
@@ -255,7 +257,12 @@ final class StatusItemController: NSObject {
         }
 
         if allDevices.count > 1 {
-            // 多设备场景：若有空调处于开机状态，提供全屋一键快速关机 (v1.9.28)
+            // 多设备场景：提供全屋快捷协同操作 (v1.9.30)
+            let coolAllItem = NSMenuItem(title: "❄️ 全屋清爽制冷 26°C", action: #selector(applyQuickCoolingAll), keyEquivalent: "")
+            coolAllItem.target = self
+            coolAllItem.isEnabled = model.gatewayConnected
+            menu.addItem(coolAllItem)
+
             if !onDevices.isEmpty {
                 let turnOffAllItem = NSMenuItem(title: "⏻ 关闭全屋空调 (\(onDevices.count) 台运行中)", action: #selector(turnOffAllDevices), keyEquivalent: "")
                 turnOffAllItem.target = self
@@ -418,11 +425,11 @@ final class StatusItemController: NSObject {
     }
 
     @objc private func turnOffAllDevices() {
-        let controllableOnIds = model.allUnifiedDevices
-            .filter { model.reachability(for: $0.id).isControllable && model.attribute("onOffStatus", deviceId: $0.id)?.boolValue == true }
-            .map(\.id)
-        guard !controllableOnIds.isEmpty else { return }
-        model.sendAttributeToDevices("onOffStatus", value: .bool(false), deviceIds: controllableOnIds)
+        model.turnOffAllDevices()
+    }
+
+    @objc private func applyQuickCoolingAll() {
+        model.applyPresetToAllDevices(mode: .cooling, temperature: 26.0)
     }
 
     @objc private func toggleDevicePower(_ sender: NSMenuItem) {

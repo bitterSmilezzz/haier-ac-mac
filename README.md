@@ -8,7 +8,13 @@
 
 ## 功能
 
-- 🏷 **全屋设备全链路平权与离线虚假能耗阻断 (v1.9.30)**：
+- 🏷 **全屋智能协同控制、自然语言自清洁与状态栏实时功率感知 (v1.9.31)**：
+  - 🏠 **全屋设备一键协同控制 (`turnOffAllDevices` / `applyPresetToAllDevices`)**：在 `AppModel` 中原生集成全屋一键关机与全屋快捷清爽预设，自动识别过滤在线可达且处于运行中的空调目标集，支持批量并发下发；在多设备批量控制面板 `BatchControlView` 中新增全屋「清爽 26°C」、「暖房 20°C」与「全屋关机」Bento 预设卡片，属性控制项引入首个有效属性设备动态探测，彻底解决首台设备离线导致控制面板空白的问题。
+  - 🎙️ **自然语言语音控制升级全屋协同与自清洁托管 (`VoiceCapsuleWindowController`)**：语音指令体系全面扩充：新增全屋关机（“全屋关机”、“关闭所有空调”、“把所有的空调都关了”）、全屋开机（“开启所有空调”、“全屋开机”）以及蒸发器自清洁调度（“启动自清洁”、“蒸发器高温自清洁”、“停止自清洁”）；语音胶囊执行流程重构，全屋与停止指令优先分发，不受单一主控设备离线误拦，实现高容错调度。
+  - 📱 **Siri 与系统快捷指令生态全面打通 (`AppIntents`)**：新增 `TurnOffAllACIntent`（关闭全屋空调）与 `StartSelfCleaningIntent`（启动自清洁），通过 `AppShortcutsProvider` 自动注册至 macOS 系统快捷指令与 Siri；修复温度调整 dialog 中的浮点截断 Bug，原生支持 0.5°C 精度细腻微调回显。
+  - ⚡️ **macOS 状态栏瞬时总功率与滤网耗损实时感知 (`StatusItemController`)**：将 `EnergyAnalyticsEngine.shared.$currentInstantaneousPower` 与 `model.$filterAccumulatedMinutes` 全面接入 Combine 响应式监听流水线，悬浮 Tooltip 瞬时功率看板与滤网保养预警实时计算响应；原生右键菜单新增「❄️ 全屋清爽制冷 26°C」一键直达，关机动作直接联动全屋可达模型。
+  - 🧪 **离线设备回风温度物理剥离**：在分钟级能耗动力学采样积分中，为离线断电设备严格隔离室内温度读取（`indoorTemp: isOnline ? indoorTemp : nil`），消除断网陈旧温度数据对动态热力学模型的干扰。
+- 🏷 **全屋设备全链路平权与离线虚假能耗阻断 (v1.9.29)**：
   - 🏠 **全屋设备全链路 100% 平权对齐**：彻底消除项目中分散的 `model.devices.map + model.manualDevices.map` 拼接，全面收敛使用统一去重视图 `allUnifiedDevices`。菜单栏控制面板 `activeDevices` 接入 `effectiveDevices`，使局域网手动直连空调与云端空调在菜单栏弹窗中享有完全平等的设备切换、控制与状态感知能力；情景模式（`SceneViews`）、自动化定时调度（`ScheduleViews`）、主设备列表（`DeviceListView`）及 URL Scheme 启停全链路无死角对齐。
   - ⚡️ **动态可达性感知模型 (`effectiveDevices`)**：重构 `effectiveDevices` 计算属性，动态对齐底层 `reachability(for: u.id) == .available` 真实状态，杜绝云端初始抓取时的陈旧静态在线标记误导视图层。
   - 🛡️ **离线幽灵能耗与虚假滤网磨损彻底拦截**：在能耗动力学后台积分 `accumulatePeriodicWork` 中引入设备物理在线校验 `let isOnline = (reachability(for: dev.id) == .available)`。当空调硬件离线断电断网时，自动将其从高负荷压缩机运行工况切断，不再持续积分数百瓦虚假运行功率，不再为离线空调无故虚耗空气动力学滤网等效使用寿命。

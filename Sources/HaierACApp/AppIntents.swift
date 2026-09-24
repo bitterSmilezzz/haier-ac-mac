@@ -99,7 +99,8 @@ struct SetACTemperatureIntent: AppIntent {
     func perform() async throws -> some IntentResult & ProvidesDialog {
         let deviceId = try requireGatewayAndDevice(deviceName)
         AppModel.shared.sendAttribute("targetTemperature", value: .double(temperature), deviceId: deviceId)
-        return .result(dialog: "已将温度设置为 \(Int(temperature)) 度")
+        let tempStr = temperature.truncatingRemainder(dividingBy: 1.0) == 0 ? "\(Int(temperature))" : String(format: "%.1f", temperature)
+        return .result(dialog: "已将温度设置为 \(tempStr) 度")
     }
 }
 
@@ -232,6 +233,48 @@ struct StopSleepCurveIntent: AppIntent {
     }
 }
 
+// MARK: - 关闭全屋空调 (v1.9.30)
+
+struct TurnOffAllACIntent: AppIntent {
+    static var title: LocalizedStringResource = "关闭全屋空调"
+    static var description = IntentDescription("一键关闭全屋所有正在运行的海尔空调", categoryName: "空调控制")
+
+    @MainActor
+    func perform() async throws -> some IntentResult & ProvidesDialog {
+        guard AppModel.shared.gatewayConnected else {
+            throw ACIntentError.message("空调连接中断，请稍后重试")
+        }
+        let closedCount = AppModel.shared.turnOffAllDevices()
+        if closedCount > 0 {
+            return .result(dialog: "已关闭全屋 \(closedCount) 台运行中的空调")
+        } else {
+            return .result(dialog: "全屋空调当前均已处于关机或待机状态")
+        }
+    }
+}
+
+// MARK: - 启动蒸发器自清洁 (v1.9.30)
+
+struct StartSelfCleaningIntent: AppIntent {
+    static var title: LocalizedStringResource = "启动自清洁"
+    static var description = IntentDescription("启动 56°C 蒸发器高温除菌自清洁程序", categoryName: "空调控制")
+
+    @Parameter(title: "设备名称", description: "可选；留空使用第一台设备")
+    var deviceName: String?
+
+    @MainActor
+    func perform() async throws -> some IntentResult & ProvidesDialog {
+        let deviceId = try requireGatewayAndDevice(deviceName)
+        let model = AppModel.shared
+        if model.isSelfCleaningActive {
+            return .result(dialog: "56°C 蒸发器自清洁已在运行中")
+        }
+        model.startSelfCleaning(deviceId: deviceId)
+        let name = model.allUnifiedDevices.first(where: { $0.id == deviceId })?.name ?? "海尔空调"
+        return .result(dialog: "已为\(name)启动 56°C 蒸发器高温自清洁")
+    }
+}
+
 // MARK: - 快捷指令库入口
 
 struct ACAppShortcuts: AppShortcutsProvider {
@@ -256,6 +299,26 @@ struct ACAppShortcuts: AppShortcutsProvider {
                     ],
                     shortTitle: "设置温度",
                     systemImageName: "thermometer.medium"
+                ),
+                AppShortcut(
+                    intent: TurnOffAllACIntent(),
+                    phrases: [
+                        "用 \(.applicationName) 关闭所有空调",
+                        "用 \(.applicationName) 全屋关机",
+                        "关闭全屋 \(.applicationName)",
+                    ],
+                    shortTitle: "关闭全屋空调",
+                    systemImageName: "power.circle.fill"
+                ),
+                AppShortcut(
+                    intent: StartSelfCleaningIntent(),
+                    phrases: [
+                        "用 \(.applicationName) 开启自清洁",
+                        "用 \(.applicationName) 启动自清洁",
+                        "清洗蒸发器 \(.applicationName)",
+                    ],
+                    shortTitle: "自清洁",
+                    systemImageName: "sparkles"
                 ),
                 AppShortcut(
                     intent: SetACModeIntent(),
@@ -317,6 +380,19 @@ struct ACAppShortcuts: AppShortcutsProvider {
                     intent: SetACTemperatureIntent(),
                     phrases: [
                         "用 \(.applicationName) 设置温度",
+                    ]
+                ),
+                AppShortcut(
+                    intent: TurnOffAllACIntent(),
+                    phrases: [
+                        "用 \(.applicationName) 关闭所有空调",
+                        "用 \(.applicationName) 全屋关机",
+                    ]
+                ),
+                AppShortcut(
+                    intent: StartSelfCleaningIntent(),
+                    phrases: [
+                        "用 \(.applicationName) 开启自清洁",
                     ]
                 ),
                 AppShortcut(
