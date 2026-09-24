@@ -1,69 +1,72 @@
-# Haier AC Mac v1.9.36 发布与巡检演进报告
+# Haier AC Mac v1.9.37 发布与巡检演进报告
 
 ## 1. 概述与版本定位
-- **版本号**：`v1.9.36`
-- **发版主题**：闭环 CR 审查缺陷、自然语言插字防误关、全屋/定向定时解耦、能耗动力学阻尼与状态栏全模式拓展
-- **核心目标**：
-  1. **彻底闭环外部 Code Review 审查报告（`docs/code-review/2026-09-24-1426.md`）中的全部遗留缺陷**：
-     - **P1-1**：重构 `VoiceCommandParser.containsNegativeAction`，解决否定动作词与否定前缀之间插入任意字符（如“全屋空调别都关了”、“不要全部关掉”、“先别急着关”）导致否定意图失效误关全屋的严重缺陷，并补充单元测试；
-     - **P1-2**：深度解耦全屋取消定时与定向单设备/多设备取消定时，新增 `VoiceCommand.cancelSchedulesAll`，统一执行范围与文案口径，补齐多设备定向定时批量清除；
-     - **P2-1**：统一能耗工况机时比例计算的单一事实来源，`EcoEnergySection` 全面改用引擎的 `coolingRatio`、`heatingRatio`、`dehumRatio`、`fanRatio` 与补齐的 `unknownRatio`，消除零调用点公开 API 与重复计算；
-     - **P2-2**：清理 `VoiceCapsuleWindowController.executeMultiDeviceCommand` 中不可达的死代码分支 `.adjustTemperatureAll`；
-     - **P2-3**：补齐状态栏全屋升降温 16/30°C 极限硬件边界判定，并在 `AppModel.adjustTemperature` 中增加实际变更检测，杜绝冗余硬件下发与虚假提示；
-     - **P2-4**：完善 `totalDeviceMinutes` 字段注释与文档说明，明确 v1.9.34 及更早记录的墙钟回填兼容策略。
-  2. **高价值架构与产品体验自主演进优化**：
-     - **优化点一（macOS 原生状态栏全模式对称拓展与运行态实时汇总）**：状态栏右键上下文菜单全面补齐「💧 全屋除湿」与「🍃 全屋送风」，在单设备菜单与设备矩阵各子菜单中同步增设「一键除湿」与「一键送风」；状态栏悬浮 Tooltip 顶部实时呈现全屋多设备运行汇总（如 `🏠 全屋 3 台空调中 2 台正在运行`）；
-     - **优化点二（变频压缩机恒温维持态低频阻尼动力学模型）**：在 `EnergyAnalyticsEngine.estimateInstantaneousPower` 中引入变频热阻尼模型，当室内外温差接近 0 时平滑过渡到超低频恒温维持态（制冷 220W 稳态，制热 300W 稳态），更真实反映变频一级能效空调物理能耗。
+- **版本号**：`v1.9.37`
+- **发版主题**：自然语言全链路否定安全防线、调度器解耦重置、除湿变频环境湿度动力学与多设备滤网自适应预测
+- **核心目标与架构演进**：
+  1. **自然语言全链路模式/情景/自清洁/睡眠温阶否定防护与防高温误烘烤**：
+     - 扩展否定语义保护网至全屋预设 (`parseAllPreset`)、运行模式 (`parseMode`)、情景模式 (`parseScene`) 以及全屋绝对/相对调温 (`parseAllTemperature` / `parseAllRelativeTemperature`)，杜绝口语否定词导致误开机或误切模式；
+     - 彻底消除当用户说“不要自清洁”、“别自清洁”、“别开自清洁”、“不要启动自清洁”等口令时，因仅匹配关停动作而落入缺省分支导致意外启动 56°C 蒸发器高温除菌烘烤的严重安全隐患，稳健识别否定词并安全降级为停止自清洁分支；
+     - 睡眠温阶启停同步引入否定保护，识别“不要开启智能睡眠”、“别开睡眠曲线”等输入并安全降级为退出；支持“别定时”、“不要定时”口语映射为定时任务取消；
+  2. **调度器解耦重置与原子全屋/定向定时管理**：
+     - 在 `AppModel` 中提供原子封装方法 `cancelAllSchedules()`、`cancelSchedules(for deviceIds:)` 与 `cancelSchedules(for deviceId:)`，统一处理内存数据清除、`wakeScheduler()` 定时器重置唤醒、`UserDefaults` 同步与运行日志记录；
+     - 解决语音胶囊在全屋及定向取消定时任务时直接操作集合而未调用 `wakeScheduler()` 导致后台定时休眠任务未被及时唤醒的隐患，全链路对齐执行范围与系统调度；
+  3. **滤网深度算法：历史机时自适应寿命预测与多设备全生命周期动态感知**：
+     - 深度打通 `EnergyAnalyticsEngine` 能耗历史与 `FilterCareSheet`，提取过去 14 天真实开机运行机时历史（如日均 8.5h），动态计算折算滤网剩余可用天数（呈现如“• 按近期日均 8.5h 习惯及当前工况估算约可用 45 天”），摆脱以往写死 6h 的生硬估算，兼顾无历史记录时的标准回退；
+     - 状态栏右键菜单与悬浮 Tooltip 升级支持全屋多设备滤网健康聚合监测：当任何房间空调洁净度 $\le 30\%$ 时，右键菜单标明“全屋最低 XX%”并加注警示徽标，悬浮提示中明确指出需要拆洗的具体空调，杜绝次卧/儿童房滤网被遗忘；
+  4. **除湿工况环境湿度变频能耗动力学建模**：
+     - 在 `DeviceEnergySample` 与瞬时功率估算算法中正式引入环境湿度 (`indoorHumidity`) 维度；
+     - 建立基于变频空调热力学除湿特性的三级动态响应机制：高湿重载区 ($\text{RH} \ge 70\%$) 蒸发器深度过冷持续冷凝 (520W~620W 基准)、中湿过渡区 ($55\% \le \text{RH} < 70\%$) 平衡变频除湿 (380W~500W 基准)、低湿/舒适区 ($\text{RH} < 55\%$) 防过度干燥与过冷超低频微载运转 (240W~320W 基准)；无湿度传感器时中性回归标准 420W 基准，使除湿能耗模拟更加拟真。
 
 ---
 
 ## 2. 关键架构变更与代码实现
 
-### 2.1 结构化否定动作识别器与插字防误触 (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)
-- **结构化正则匹配 (`negativeActionRegex`)**：
-  - 将否定词前缀（“别”、“不要”、“不用”、“不必”、“无需”、“先别”、“暂不”、“千万别”等）与动作谓词（“关”、“停”、“开”、“启动”、“运转”、“打开”、“关闭”）之间的插入字进行字符类限定（`[都全部屋所有一起统通马上立刻赶紧急着再又先直接也把给将空调设备机器电源它这个那房间主卧客厅]{0,6}`）；
-  - 彻底解决“全屋空调别都关了”、“不要全部关掉”、“先别急着关”、“别马上关”、“千万不要全部打开”、“别把全屋空调都关了”、“空调不用全开”等高频家庭口语；
-  - 避免“室温别太高开26度”等非否定电源动作被误拦截；
-- **测试回归防线**：
-  - `VoiceCommandParserTests.testNegationProtection` 扩充各类插字关机与插字开机用例，杜绝倒退。
+### 2.1 自然语言全链路否定语义防线 (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)
+- **全屋预设与模式否定防护**：
+  - `parseAllPreset`、`parseAllTemperature`、`parseAllRelativeTemperature` 前置注入 `guard !containsNegativeAction(text) else { return nil }`；
+  - `parseMode` 与 `parseScene` 注入否定动作检测与常用否定词过滤，彻底拦截“全屋空调别开冷气”、“千万别开除湿”、“不要开暖气”、“别开离家模式”等输入，防止误判开机；
+- **自清洁与睡眠温阶高温安全拦截**：
+  - 自清洁解析中，当输入包含否定词（“别”、“不要”、“不用”）或触发 `containsNegativeAction` 时，安全路由至 `.stopSelfCleaning`（“停止蒸发器自清洁”），杜绝意外启动 56°C 高温烘干；
+  - 睡眠曲线解析同步对齐，识别“不要开启智能睡眠”等指令并安全映射为 `.stopSleepCurve`；
+  - `isCancelSchedule` 补充“别定时”、“不要定时”、“不用定时”关键词。
 
-### 2.2 全屋与定向定时任务取消解耦 (`VoiceCommandParser.swift` / `VoiceCapsuleWindowController.swift`)
-- **指令模型拆分**：
-  - 新增 `VoiceCommand.cancelSchedulesAll`，解析器在遇到“取消所有定时”、“取消全部定时”、“取消全屋定时”、“全屋取消倒计时”等全屋口令时映射为 `.cancelSchedulesAll`，文案对齐为“取消全屋所有定时与倒计时”；单设备或未指明全屋时保持 `.cancelSchedules`；
-- **全屋与多设备执行闭环**：
-  - 顶层接入 `.cancelSchedulesAll`：原子清空 `model.scheduledActions.removeAll()`，并提示“已取消全屋所有定时与倒计时任务（共 N 个）”；
-  - 多设备 `executeMultiDeviceCommand` 补齐 `case .cancelSchedules`：遍历目标设备集合，批量清除对应定时任务并给出清晰统计文案；
-  - 移除不可达的 `.adjustTemperatureAll` 分支（闭环 CR P2-2）。
+### 2.2 调度器解耦重置与原子管理 (`AppModel.swift` / `VoiceCapsuleWindowController.swift`)
+- **AppModel 原生调度器重置方法**：
+  - `cancelAllSchedules() -> Int`：原子清空 `scheduledActions` 并触发 `wakeScheduler()` 重新计算最近触发时钟；
+  - `cancelSchedules(for deviceIds: [String]) -> Int`：按设备集合过滤并原子唤醒调度器；
+  - `cancelSchedules(for deviceId: String) -> Int`：单设备便捷方法；
+- **VoiceCapsuleWindowController 统一调用**：
+  - 全屋取消定时（`.cancelSchedulesAll`）、多设备定向批量取消（`executeMultiDeviceCommand`）与单设备定向取消（`executeCommand`）统一改调 `AppModel` 原子方法，彻底解决定时器线程未能及时重构的问题。
 
-### 2.3 状态栏 16/30°C 边界门禁与 AppModel 冗余指令消除 (`StatusItemController.swift` / `AppModel.swift`)
-- **状态栏全屋升降温边界校验**：
-  - 「🔼 全屋统一升温 1°C」：仅在当前存在目标温度 `< 30.0` 的在线开机设备时启用；
-  - 「🔽 全屋统一降温 1°C」：仅在当前存在目标温度 `> 16.0` 的在线开机设备时启用；
-- **AppModel 极值下发保护**：
-  - `adjustTemperature` 与 `adjustDeviceTemperature` 仅对目标温度与当前温度不相等的设备下发网络指令；
-  - 当所有运行中设备已在极限边界时返回 0，并给出中性提示“已达到最高/最低温度上限”，杜绝网络资源浪费与虚假成功提示。
+### 2.3 滤网深度算法与全屋健康聚合感知 (`FilterCareSheet.swift` / `AppModel.swift` / `StatusItemController.swift`)
+- **用户使用习惯自适应寿命推演**：
+  - `AppModel.estimatedFilterRemainingDays(for:)` 结合 `EnergyAnalyticsEngine.historyRecords` 近 14 天活跃开机时长计算设备日均机时；
+  - `FilterCareSheet` 根据用户真实作息与当前动力负荷自适应展示可用天数估算，极大提升维护参考价值；
+- **状态栏多设备最低洁净度预警与聚合 Tooltip**：
+  - 状态栏右键菜单在多设备环境下展示全屋最低洁净度（如 `⚠️ 滤网保养与自清洁 (全屋最低 25%)...`）；
+  - 悬浮 Tooltip 自动扫描并罗列洁净度低于 30% 的所有设备名称及当前数值。
 
-### 2.4 能耗工况比例单一事实来源与历史数据迁移 (`EnergyAnalyticsEngine.swift` / `EcoEnergySection.swift`)
-- **单一事实来源**：
-  - `EnergyDayRecord` 补齐 `unknownRatio` 计算属性；
-  - `EcoEnergySection.swift` 移除视图内的手动百分比重算，全面改用 `today.coolingRatio`、`today.heatingRatio`、`today.dehumRatio`、`today.fanRatio`、`today.unknownRatio`；
-- **历史记录向后兼容**：
-  - 明确标注并处理 v1.9.34 及更早版本历史数据回填机制，保障 60 天数据安全过渡。
-
-### 2.5 自主高价值优化点：全模式状态栏拓展与变频恒温阻尼
-- **状态栏全模式覆盖与全屋态汇总**：
-  - 右键菜单新增「💧 全屋舒爽除湿」与「🍃 全屋清新送风」；
-  - 设备级联矩阵子菜单与单设备菜单同步补齐「一键除湿」与「一键送风」；
-  - 菜单栏悬浮 Tooltip 顶部新增多设备汇总指示；
-- **变频压缩机恒温平衡态低频阻尼**：
-  - 当温差 $|\Delta T| \le 0.5^\circ\text{C}$ 时，变频压缩机功率平滑进入低频维持态（制冷 220W 稳态，制热 300W 稳态），消除突变跳变，精准契合物理规律。
+### 2.4 除湿工况环境湿度变频能耗动力学模型 (`EnergyAnalyticsEngine.swift` / `AppModel.swift`)
+- **湿度维度注入**：
+  - `DeviceEnergySample` 新增 `indoorHumidity: Double?` 字段并在 `AppModel.sampleMinuteEnergy` 中采集传入；
+- **热力学三级变频除湿动力模型**：
+  - $\text{RH} \ge 70\%$：高湿持续强冷凝负荷，功率上浮至 520W ~ 620W；
+  - $55\% \le \text{RH} < 70\%$：舒适平衡区变频调节，基准 380W ~ 500W；
+  - $\text{RH} < 55\%$：防过冷降频微载运转，功率下探至 240W ~ 320W；
+  - 传感器缺失时中性平滑回归 420W 标称基准。
 
 ---
 
-## 3. 构建、测试与验证闭环
+## 3. 构建、测试与打包验证闭环
 - **本地编译验证**：
-  - 使用 `SDKROOT=/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk swift build`，0 错误，0 警告构建成功；
+  - 执行 `SDKROOT=/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk swift build`，0 错误，0 警告构建成功；
 - **自动化测试断言验证**：
-  - 运行覆盖 18 组断言的独立测试套件，全面验证插字否定保护、全屋取消定时、定向取消定时、正常开关机等场景，100% 验证通过；
+  - 编写并执行针对模式否定、自清洁否定、预设否定、睡眠温阶否定、定时取消与开关机的 21 组独立测试用例，100% 通过；
 - **应用打包与签名**：
-  - 运行 `./build_app.sh 1.9.36`，生成 `dist/HaierAC.app`（包含 `HaierACWidget.appex` 桌面小组件扩展与沙盒权限配置）以及发布包 `dist/HaierAC-v1.9.36-macOS.zip`。
+  - 运行 `./build_app.sh 1.9.37`，打包生成 `dist/HaierAC.app`（包含小组件扩展与沙盒权限配置）以及发布包 `dist/HaierAC-v1.9.37-macOS.zip`。
+
+---
+
+## 4. 敏感数据安全审计
+- 全仓扫描确认无真实手机号、明文密码、第三方 Secret Token 或私人凭据提交。

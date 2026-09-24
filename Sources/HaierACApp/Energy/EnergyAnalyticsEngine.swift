@@ -231,6 +231,7 @@ public final class EnergyAnalyticsEngine: ObservableObject {
         modeCode: String?,
         targetTemp: Double?,
         indoorTemp: Double?,
+        indoorHumidity: Double? = nil,
         windSpeed: String?,
         isSelfCleaning: Bool = false
     ) -> Double {
@@ -277,9 +278,29 @@ public final class EnergyAnalyticsEngine: ObservableObject {
             return min(max(power, 15.0), 65.0)
 
         case .dehumidify:
-            // 除湿模式：低频恒定除湿
-            let power = 420.0 + windOffset * 0.5
-            return min(max(power, 300.0), 600.0)
+            // 除湿模式：多维环境湿度自适应变频能耗动力学模型 (v1.9.37)
+            // 典型变频空调除湿机制：
+            // 1. 高湿重载区 (RH >= 70%)：蒸发器深度过冷持续冷凝凝结，压缩机高频运转 (520W 基准)
+            // 2. 中湿过渡区 (55% <= RH < 70%)：温湿度平衡变频除湿，维持舒适体感 (380W ~ 500W)
+            // 3. 舒适/低湿微载区 (RH < 55%)：防过冷与防过度干燥，压缩机平滑降频至超低频稳态 (240W ~ 320W)
+            // 4. 无湿度传感器兜底：回归标准基准 420W
+            let basePower: Double
+            if let hum = indoorHumidity {
+                if hum >= 70.0 {
+                    let excess = min(30.0, hum - 70.0)
+                    basePower = 520.0 + (excess * 3.3)
+                } else if hum >= 55.0 {
+                    let progress = (hum - 55.0) / 15.0
+                    basePower = 380.0 + (progress * 120.0)
+                } else {
+                    let lowFactor = max(0.0, hum / 55.0)
+                    basePower = 240.0 + (lowFactor * 80.0)
+                }
+            } else {
+                basePower = 420.0
+            }
+            let power = basePower + (windOffset * 0.5)
+            return min(max(power, 220.0), 650.0)
 
         case .heating:
             // 制热模式：变频温差动力学模型 + 恒温平衡区低频维持态阻尼 (v1.9.36)
@@ -356,6 +377,7 @@ public final class EnergyAnalyticsEngine: ObservableObject {
         public let modeCode: String?
         public let targetTemp: Double?
         public let indoorTemp: Double?
+        public let indoorHumidity: Double?
         public let windSpeed: String?
         public let isSelfCleaning: Bool
 
@@ -365,6 +387,7 @@ public final class EnergyAnalyticsEngine: ObservableObject {
             modeCode: String?,
             targetTemp: Double?,
             indoorTemp: Double?,
+            indoorHumidity: Double? = nil,
             windSpeed: String?,
             isSelfCleaning: Bool = false
         ) {
@@ -373,6 +396,7 @@ public final class EnergyAnalyticsEngine: ObservableObject {
             self.modeCode = modeCode
             self.targetTemp = targetTemp
             self.indoorTemp = indoorTemp
+            self.indoorHumidity = indoorHumidity
             self.windSpeed = windSpeed
             self.isSelfCleaning = isSelfCleaning
         }
@@ -406,6 +430,7 @@ public final class EnergyAnalyticsEngine: ObservableObject {
                 modeCode: sample.modeCode,
                 targetTemp: sample.targetTemp,
                 indoorTemp: sample.indoorTemp,
+                indoorHumidity: sample.indoorHumidity,
                 windSpeed: sample.windSpeed,
                 isSelfCleaning: sample.isSelfCleaning
             )

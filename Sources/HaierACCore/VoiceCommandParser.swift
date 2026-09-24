@@ -99,7 +99,11 @@ public struct VoiceCommandParser {
         // 4. 智能睡眠温阶启停（放在立即开关机与情景模式前）
         if cleaned.contains("智能睡眠") || cleaned.contains("睡眠曲线") || cleaned.contains("睡眠温阶") ||
            (cleaned.contains("睡眠") && (cleaned.contains("开启") || cleaned.contains("启动") || cleaned.contains("打开") || cleaned.contains("关") || cleaned.contains("停") || cleaned.contains("退"))) {
-            if cleaned.contains("关") || cleaned.contains("停") || cleaned.contains("退") {
+            let isStop = cleaned.contains("关") || cleaned.contains("停") || cleaned.contains("退") ||
+                         cleaned.contains("取消") || cleaned.contains("中止") ||
+                         cleaned.contains("别") || cleaned.contains("不要") || cleaned.contains("不用") ||
+                         containsNegativeAction(cleaned)
+            if isStop {
                 return VoiceParseResult(command: .stopSleepCurve, displayText: "停止智能睡眠温阶")
             } else {
                 let curveName: String?
@@ -116,7 +120,11 @@ public struct VoiceCommandParser {
 
         // 5. 56°C 蒸发器自清洁启停 (v1.9.30)
         if cleaned.contains("自清洁") || cleaned.contains("清洗蒸发器") || cleaned.contains("蒸发器清洁") || cleaned.contains("高温除菌") {
-            if cleaned.contains("关") || cleaned.contains("停") || cleaned.contains("退") || cleaned.contains("取消") || cleaned.contains("中止") {
+            let isStop = cleaned.contains("关") || cleaned.contains("停") || cleaned.contains("退") ||
+                         cleaned.contains("取消") || cleaned.contains("中止") ||
+                         cleaned.contains("别") || cleaned.contains("不要") || cleaned.contains("不用") ||
+                         containsNegativeAction(cleaned)
+            if isStop {
                 return VoiceParseResult(command: .stopSelfCleaning, displayText: "停止蒸发器自清洁")
             } else {
                 return VoiceParseResult(command: .startSelfCleaning, displayText: "启动 56°C 蒸发器高温自清洁")
@@ -184,7 +192,7 @@ public struct VoiceCommandParser {
     // MARK: - 辅助解析子函数
 
     private static func isCancelSchedule(_ text: String) -> Bool {
-        let cancelKeywords = ["取消定时", "取消倒计时", "关闭定时", "清除定时", "删除定时", "取消预约", "别定了"]
+        let cancelKeywords = ["取消定时", "取消倒计时", "关闭定时", "清除定时", "删除定时", "取消预约", "别定了", "别定时", "不要定时", "不用定时"]
         if cancelKeywords.contains(where: { text.contains($0) }) {
             return true
         }
@@ -416,6 +424,7 @@ public struct VoiceCommandParser {
     }
 
     private static func parseAllPreset(_ text: String) -> VoiceParseResult? {
+        guard !containsNegativeAction(text) else { return nil }
         guard isAllDeviceScope(text) else { return nil }
 
         // 识别模式
@@ -462,6 +471,7 @@ public struct VoiceCommandParser {
     }
 
     private static func parseAllTemperature(_ text: String) -> VoiceParseResult? {
+        guard !containsNegativeAction(text) else { return nil }
         guard isAllDeviceScope(text) else { return nil }
         // 排除已指定运行模式的情况
         if text.contains("制冷") || text.contains("冷气") || text.contains("制热") || text.contains("暖气") ||
@@ -476,6 +486,7 @@ public struct VoiceCommandParser {
     }
 
     private static func parseAllRelativeTemperature(_ text: String) -> VoiceParseResult? {
+        guard !containsNegativeAction(text) else { return nil }
         guard isAllDeviceScope(text) else { return nil }
         // 排除已指定运行模式的情况
         if text.contains("制冷") || text.contains("冷气") || text.contains("制热") || text.contains("暖气") ||
@@ -606,6 +617,10 @@ public struct VoiceCommandParser {
     }
 
     private static func parseMode(_ text: String) -> VoiceParseResult? {
+        guard !containsNegativeAction(text) else { return nil }
+        if text.contains("不要") || text.contains("别") || text.contains("不用") || text.contains("暂不") {
+            return nil
+        }
         if text.contains("制冷") || text.contains("冷气") || text.contains("冷风") || text.contains("开冷") {
             return VoiceParseResult(command: .setMode("制冷"), displayText: "切换至制冷模式")
         }
@@ -645,6 +660,10 @@ public struct VoiceCommandParser {
     }
 
     private static func parseScene(_ text: String) -> VoiceParseResult? {
+        guard !containsNegativeAction(text) else { return nil }
+        if text.contains("不要") || text.contains("别") || text.contains("不用") || text.contains("暂不") {
+            return nil
+        }
         if text.contains("睡眠") || text.contains("睡觉") || text.contains("伴眠") {
             return VoiceParseResult(command: .applyScene("睡眠"), displayText: "应用「睡眠」情景")
         }

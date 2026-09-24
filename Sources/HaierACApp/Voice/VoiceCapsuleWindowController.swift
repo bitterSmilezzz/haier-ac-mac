@@ -297,9 +297,8 @@ public final class VoiceCapsuleWindowController: NSObject, NSWindowDelegate {
                 VoiceControlManager.shared.markSuccess("当前未在执行自清洁")
             }
         case .cancelSchedulesAll:
-            let count = model.scheduledActions.count
+            let count = model.cancelAllSchedules()
             if count > 0 {
-                model.scheduledActions.removeAll()
                 VoiceControlManager.shared.markSuccess("已取消全屋所有定时与倒计时任务（共 \(count) 个）")
             } else {
                 VoiceControlManager.shared.markSuccess("全屋当前没有正在运行的定时任务")
@@ -483,10 +482,9 @@ public final class VoiceCapsuleWindowController: NSObject, NSWindowDelegate {
             VoiceControlManager.shared.markSuccess("已为\(prefix)设定：\(actionName)")
 
         case .cancelSchedules:
-            // 严格按指定设备取消，杜绝定向无定时任务时穿透误删全屋其他设备定时 (v1.9.34 闭环 CR P2-1)
-            let count = model.scheduledActions.filter { $0.deviceId == deviceId }.count
+            // 严格按指定设备取消，杜绝定向无定时任务时穿透误删全屋其他设备定时 (v1.9.34 闭环 CR P2-1, v1.9.37 原子重置调度器)
+            let count = model.cancelSchedules(for: deviceId)
             if count > 0 {
-                model.scheduledActions.removeAll(where: { $0.deviceId == deviceId })
                 VoiceControlManager.shared.markSuccess("已取消\(prefix)定时任务（共 \(count) 个）")
             } else {
                 VoiceControlManager.shared.markSuccess("「\(targetName)」当前没有正在运行的定时任务")
@@ -583,14 +581,7 @@ public final class VoiceCapsuleWindowController: NSObject, NSWindowDelegate {
             VoiceControlManager.shared.markSuccess("已将\(prefix)统一\(dir) \(deltaStr)°C")
 
         case .cancelSchedules:
-            var totalRemoved = 0
-            for id in ids {
-                let count = model.scheduledActions.filter { $0.deviceId == id }.count
-                if count > 0 {
-                    model.scheduledActions.removeAll(where: { $0.deviceId == id })
-                    totalRemoved += count
-                }
-            }
+            let totalRemoved = model.cancelSchedules(for: ids)
             if totalRemoved > 0 {
                 VoiceControlManager.shared.markSuccess("已取消\(prefix)定时任务（共 \(totalRemoved) 个）")
             } else {

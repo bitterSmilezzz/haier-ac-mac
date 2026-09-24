@@ -204,9 +204,17 @@ final class StatusItemController: NSObject {
             tooltipParts.append("🎵 助眠白噪音播放中 (\(model.sleepAmbientSoundType.displayName))")
         }
 
-        let filterClean = model.filterCleanlinessPercentage
-        if filterClean <= 30 {
-            tooltipParts.append("⚠️ 滤网洁净度较低 (\(filterClean)%)，建议拆洗保养")
+        let lowCleanDevices = allDevices.compactMap { dev -> (name: String, pct: Int)? in
+            let pct = model.filterCleanlinessPercentage(for: dev.id)
+            return pct <= 30 ? (dev.name, pct) : nil
+        }
+        if !lowCleanDevices.isEmpty {
+            if lowCleanDevices.count == 1, let item = lowCleanDevices.first {
+                tooltipParts.append("⚠️ 「\(item.name)」滤网洁净度较低 (\(item.pct)%)，建议拆洗保养")
+            } else {
+                let summary = lowCleanDevices.map { "「\($0.name)」\($0.pct)%" }.joined(separator: "、")
+                tooltipParts.append("⚠️ 全屋 \(lowCleanDevices.count) 台空调滤网洁净度较低（\(summary)），建议拆洗保养")
+            }
         }
 
         tooltipParts.append("💡 左键呼出快捷控制面板，右键展开系统菜单")
@@ -508,10 +516,21 @@ final class StatusItemController: NSObject {
         ambientItem.target = self
         menu.addItem(ambientItem)
 
-        // 滤网健康与自清洁快速入口 (v1.9.21)
-        let filterTitle = model.isSelfCleaningActive ?
-            "56°C 自清洁进行中 (\(model.selfCleaningRemainingSeconds / 60)m\(model.selfCleaningRemainingSeconds % 60)s)..." :
-            "滤网保养与自清洁 (洁净度 \(model.filterCleanlinessPercentage)%)..."
+        // 滤网健康与自清洁快速入口 (v1.9.21, v1.9.37 多设备全屋最低洁净度预警)
+        let filterTitle: String = {
+            if model.isSelfCleaningActive {
+                return "56°C 自清洁进行中 (\(model.selfCleaningRemainingSeconds / 60)m\(model.selfCleaningRemainingSeconds % 60)s)..."
+            }
+            if allDevices.count > 1 {
+                let minClean = allDevices.map { model.filterCleanlinessPercentage(for: $0.id) }.min() ?? model.filterCleanlinessPercentage
+                let warn = minClean <= 30 ? "⚠️ " : ""
+                return "\(warn)滤网保养与自清洁 (全屋最低 \(minClean)%)..."
+            } else {
+                let clean = model.filterCleanlinessPercentage
+                let warn = clean <= 30 ? "⚠️ " : ""
+                return "\(warn)滤网保养与自清洁 (洁净度 \(clean)%)..."
+            }
+        }()
         let filterItem = NSMenuItem(title: filterTitle, action: #selector(openFilterCare), keyEquivalent: "")
         filterItem.target = self
         menu.addItem(filterItem)

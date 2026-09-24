@@ -411,6 +411,37 @@ final class VoiceCommandParserTests: XCTestCase {
         XCTAssertNil(VoiceCommandParser.parse("千万不要全部打开"))
         XCTAssertNil(VoiceCommandParser.parse("空调不用全开"))
         XCTAssertNil(VoiceCommandParser.parse("所有空调别急着开"))
+
+        // 模式与全屋预设否定保护 (v1.9.37)
+        XCTAssertNil(VoiceCommandParser.parse("全屋空调别开冷气"))
+        XCTAssertNil(VoiceCommandParser.parse("全屋不要开制热"))
+        XCTAssertNil(VoiceCommandParser.parse("所有空调别吹风"))
+        XCTAssertNil(VoiceCommandParser.parse("别开制冷"))
+        XCTAssertNil(VoiceCommandParser.parse("不要开暖气"))
+        XCTAssertNil(VoiceCommandParser.parse("千万别开除湿"))
+        XCTAssertNil(VoiceCommandParser.parse("不用送风"))
+        XCTAssertNil(VoiceCommandParser.parse("别开离家模式"))
+
+        // 自清洁与睡眠温阶否定拦截（安全降级为停止或取消，防高温误烘烤） (v1.9.37)
+        let sc1 = VoiceCommandParser.parse("不要自清洁")
+        XCTAssertEqual(sc1?.command, .stopSelfCleaning)
+        let sc2 = VoiceCommandParser.parse("别自清洁")
+        XCTAssertEqual(sc2?.command, .stopSelfCleaning)
+        let sc3 = VoiceCommandParser.parse("别开自清洁")
+        XCTAssertEqual(sc3?.command, .stopSelfCleaning)
+        let sc4 = VoiceCommandParser.parse("不要启动高温自清洁")
+        XCTAssertEqual(sc4?.command, .stopSelfCleaning)
+
+        let sl1 = VoiceCommandParser.parse("不要开启智能睡眠")
+        XCTAssertEqual(sl1?.command, .stopSleepCurve)
+        let sl2 = VoiceCommandParser.parse("别开睡眠曲线")
+        XCTAssertEqual(sl2?.command, .stopSleepCurve)
+
+        // 定时否定拦截映射为取消定时 (v1.9.37)
+        let sched1 = VoiceCommandParser.parse("别定时")
+        XCTAssertEqual(sched1?.command, .cancelSchedules)
+        let sched2 = VoiceCommandParser.parse("不要定时")
+        XCTAssertEqual(sched2?.command, .cancelSchedules)
     }
 
     // MARK: - 无效输入测试

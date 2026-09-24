@@ -6,6 +6,20 @@ A native SwiftUI app to control Haier / Leader (统帅) smart air conditioners o
 
 ## Features
 
+- 🏷 **Full-Chain Natural Language Negation Protection, Atomic Scheduler Decoupling, Humidity-Adaptive Dehumidification & Dynamic Filter Lifespan Prediction (v1.9.37)**:
+  - 🛡️ **Full-Chain Negation Guard across Modes, Scenes, Self-Cleaning & Sleep Curves (`VoiceCommandParser` / `VoiceCommandParserTests`)**:
+    - Broadened negation pattern screening across all-house presets (`parseAllPreset`), modes (`parseMode`), scenes (`parseScene`), and global temperature adjustments (`parseAllTemperature` / `parseAllRelativeTemperature`), preventing expressions like "全屋空调别开冷气", "千万别开除湿", "不要开暖气", or "别开离家模式" from mistakenly activating units or switching modes;
+    - Completely resolved the critical safety vulnerability where negative commands such as "不要自清洁", "别自清洁", "别开自清洁", or "不要启动自清洁" fell into the default branch due to missing "stop" verbs and accidentally initiated the 56°C high-temperature evaporator baking cycle, safely routing them to cancellation/stop;
+    - Extended negation protection to sleep curves ("不要开启智能睡眠", "别开睡眠曲线") and schedule commands ("别定时", "不要定时").
+  - ⏱️ **Atomic Scheduler Decoupling & Centralized Schedule Cancellation (`AppModel` / `VoiceCapsuleWindowController`)**:
+    - Provided atomic APIs in `AppModel` (`cancelAllSchedules()`, `cancelSchedules(for deviceIds:)`, `cancelSchedules(for deviceId:)`), unifying memory collection pruning, `wakeScheduler()` timer rescheduling, `UserDefaults` persistence, and diagnostic logging;
+    - Fixed the dormant timer issue in Voice Capsule where manual collection filtering bypassed `wakeScheduler()`, keeping background sleeping tasks synchronized with actual schedule cancellations.
+  - 🧼 **Deep Filter Health Analytics: Habit-Adaptive Lifespan Prediction & House-Wide Health Monitoring (`FilterCareSheet` / `AppModel` / `StatusItemController`)**:
+    - Connected `EnergyAnalyticsEngine` operational logs with `FilterCareSheet`, dynamically calculating remaining filter days based on actual running habits over the past 14 days (e.g. "• Based on recent avg 8.5h/day usage and current load, approx. 45 days remaining"), replacing rigid hardcoded 6h assumptions;
+    - Upgraded menu bar right-click menu and tooltip with house-wide filter health aggregation: displays "Whole-House Min XX%" and alert badges whenever any unit's cleanliness drops to $\le 30\%$, clearly identifying specific rooms needing filter washing.
+  - 💧 **Humidity-Adaptive Dehumidification Inverter Power Modeling (`EnergyAnalyticsEngine` / `AppModel`)**:
+    - Introduced ambient relative humidity (`indoorHumidity`) into `DeviceEnergySample` and power estimation algorithms;
+    - Implemented a 3-tier dynamic thermodynamic response model: heavy moisture condensation zone ($\text{RH} \ge 70\%$, 520W~620W base), balanced variable-frequency dehumidification zone ($55\% \le \text{RH} < 70\%$, 380W~500W base), and low-humidity micro-load protection zone ($\text{RH} < 55\%$, 240W~320W base to prevent overcooling/overdrying), seamlessly defaulting to 420W when humidity sensors are unavailable.
 - 🏷 **CR Defect Remediation, Structured Spoken Negation Protection, Decoupled Whole-House Scheduling, Inverter Thermal Damping & Menu Bar Mode Expansion (v1.9.36)**:
   - 🛡️ **Structured Spoken Negation Guard & Intervening Phrase Shield (`VoiceCommandParser` / `VoiceCommandParserTests`, Closed CR P1-1)**:
     - Overhauled `containsNegativeAction` from a rigid adjacent-substring dictionary into a structured regex with comprehensive Chinese character-class tolerance;

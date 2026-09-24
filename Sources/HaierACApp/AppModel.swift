@@ -673,6 +673,52 @@ final class AppModel: ObservableObject {
         operationNotice = OperationNotice(text: "🧼 \(devName) 滤网运行计时已重置，洁净度恢复 100%", isError: false)
     }
 
+    /// 计算指定设备当前实时工况的滤网空气动力学负荷系数 (v1.9.37)
+    public func calculateCurrentFilterWearFactor(for deviceId: String) -> Double {
+        let attrs = attributes[deviceId] ?? [:]
+        let isPowerOn = attrs["onOffStatus"]?.boolValue ?? false
+        if !isPowerOn { return 1.0 }
+        let mode = attrs["operationMode"]?.stringValue ?? "0"
+        let targetTemp = attrs["targetTemperature"]?.doubleValue ?? 26.0
+        let indoorTemp = currentIndoorTemperature(for: deviceId)
+        let indoorHum = Self.indoorHumidityAttribute(in: attrs)?.doubleValue
+        let windSpeed = attrs["windSpeed"]?.stringValue ?? "微风"
+        return calculateFilterWearFactor(
+            mode: mode,
+            targetTemp: targetTemp,
+            indoorTemp: indoorTemp,
+            indoorHumidity: indoorHum,
+            windSpeed: windSpeed,
+            deviceId: deviceId
+        )
+    }
+
+    /// 根据近期历史实际开机数据与当前工况自适应估算滤网剩余可用天数 (v1.9.37)
+    public func estimatedFilterRemainingDays(for deviceId: String) -> (days: Int, dailyHours: Double, isHistorical: Bool) {
+        let remainingMinutes = Double(max(0, Self.filterServiceLifeMinutes - filterAccumulatedMinutes(for: deviceId)))
+        guard remainingMinutes > 0 else { return (0, 0, false) }
+
+        // 提取近 14 天有开机记录的日均机时
+        let records = EnergyAnalyticsEngine.shared.historyRecords.prefix(14)
+        let activeRecords = records.filter { $0.totalMinutes > 0 }
+        let dailyMinutes: Double
+        let isHistorical: Bool
+        if activeRecords.count >= 3 {
+            let avgTotalMins = Double(activeRecords.map { $0.totalMinutes }.reduce(0, +)) / Double(activeRecords.count)
+            let devCount = max(1, allUnifiedDevices.count)
+            dailyMinutes = max(30.0, avgTotalMins / Double(devCount))
+            isHistorical = true
+        } else {
+            dailyMinutes = 6.0 * 60.0 // 标准默认 6 小时/天
+            isHistorical = false
+        }
+
+        let wearFactor = calculateCurrentFilterWearFactor(for: deviceId)
+        let effectiveDailyMinutes = dailyMinutes * max(0.5, wearFactor)
+        let estDays = max(1, Int(ceil(remainingMinutes / effectiveDailyMinutes)))
+        return (estDays, dailyMinutes / 60.0, isHistorical)
+    }
+
     /// 计算空气动力学、冷凝结露、环境湿度与蒸发器自清洁多维滤网负荷衰减系数 (v1.9.27)
     public func calculateFilterWearFactor(
         mode: String,
@@ -1036,6 +1082,7 @@ final class AppModel: ObservableObject {
                     modeCode: mode,
                     targetTemp: targetTemp,
                     indoorTemp: isOnline ? indoorTemp : nil,
+                    indoorHumidity: indoorHum,
                     windSpeed: windSpeed,
                     isSelfCleaning: isCleaning
                 )
@@ -1101,6 +1148,37 @@ final class AppModel: ObservableObject {
     func removeScheduledAction(_ action: ScheduledAction) {
         scheduledActions.removeAll { $0.id == action.id }
         wakeScheduler()
+    }
+
+    /// 取消全屋所有定时与倒计时任务并原子重置唤醒调度器 (v1.9.37)
+    @discardableResult
+    public func cancelAllSchedules() -> Int {
+        let count = scheduledActions.count
+        guard count > 0 else { return 0 }
+        scheduledActions.removeAll()
+        wakeScheduler()
+        AppLog.log("已取消全屋所有定时与倒计时任务（共 \(count) 个）")
+        return count
+    }
+
+    /// 取消指定设备集合的所有定时与倒计时任务并原子重置唤醒调度器 (v1.9.37)
+    @discardableResult
+    public func cancelSchedules(for deviceIds: [String]) -> Int {
+        let idSet = Set(deviceIds)
+        let beforeCount = scheduledActions.count
+        scheduledActions.removeAll { idSet.contains($0.deviceId) }
+        let removed = beforeCount - scheduledActions.count
+        if removed > 0 {
+            wakeScheduler()
+            AppLog.log("已取消指定设备定时任务（共 \(removed) 个，设备: \(deviceIds)）")
+        }
+        return removed
+    }
+
+    /// 取消单台设备的所有定时与倒计时任务并原子重置唤醒调度器 (v1.9.37)
+    @discardableResult
+    public func cancelSchedules(for deviceId: String) -> Int {
+        return cancelSchedules(for: [deviceId])
     }
 
     /// 更新已有调度任务（编辑模式；保留 id 与 enabled 状态）

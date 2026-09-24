@@ -201,11 +201,11 @@ struct FilterCareSheet: View {
                         }
 
                         if cleanlinessPercentage > 0 {
-                            let standardDailyHours: Double = 6.0
-                            let remainingMinutes = Double(max(0, AppModel.filterServiceLifeMinutes - model.filterAccumulatedMinutes(for: currentDeviceId)))
-                            let effectiveDailyMinutes = standardDailyHours * 60.0 * max(0.5, currentWearFactor)
-                            let estDays = max(1, Int(ceil(remainingMinutes / effectiveDailyMinutes)))
-                            Text("• 按日均 6h 及当前工况估算约可用 \(estDays) 天")
+                            let est = model.estimatedFilterRemainingDays(for: currentDeviceId)
+                            let habitText = est.isHistorical ?
+                                "• 按近期日均 \(String(format: "%.1f", est.dailyHours))h 习惯及当前工况估算约可用 \(est.days) 天" :
+                                "• 按标准日均 6h 及当前工况估算约可用 \(est.days) 天"
+                            Text(habitText)
                                 .font(.system(size: 11))
                                 .foregroundStyle(Theme.inkTertiary)
                         }
