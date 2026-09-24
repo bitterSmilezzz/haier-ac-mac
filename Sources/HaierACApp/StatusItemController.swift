@@ -273,9 +273,13 @@ final class StatusItemController: NSObject {
             model.reachability(for: dev.id).isControllable &&
             model.attribute("onOffStatus", deviceId: dev.id)?.boolValue == true
         }
+        let offDevices = allDevices.filter { dev in
+            model.reachability(for: dev.id).isControllable &&
+            model.attribute("onOffStatus", deviceId: dev.id)?.boolValue != true
+        }
 
         if allDevices.count > 1 {
-            // 多设备场景：提供全屋快捷协同操作 (v1.9.30, v1.9.32 增强制热与可达性门禁)
+            // 多设备场景：提供全屋快捷协同操作 (v1.9.30, v1.9.32 增强制热与可达性门禁, v1.9.34 增加全屋纯开机保持预设)
             let hasControllable = model.gatewayConnected && allDevices.contains(where: { model.reachability(for: $0.id).isControllable })
             let coolAllItem = NSMenuItem(title: "❄️ 全屋清爽制冷 26°C", action: #selector(applyQuickCoolingAll), keyEquivalent: "")
             coolAllItem.target = self
@@ -287,10 +291,17 @@ final class StatusItemController: NSObject {
             heatAllItem.isEnabled = hasControllable
             menu.addItem(heatAllItem)
 
+            if !offDevices.isEmpty {
+                let turnOnAllItem = NSMenuItem(title: "⏻ 开启全屋空调 (\(offDevices.count) 台待机)", action: #selector(turnOnAllDevices), keyEquivalent: "")
+                turnOnAllItem.target = self
+                turnOnAllItem.isEnabled = model.gatewayConnected && !offDevices.isEmpty
+                menu.addItem(turnOnAllItem)
+            }
+
             if !onDevices.isEmpty {
                 let turnOffAllItem = NSMenuItem(title: "⏻ 关闭全屋空调 (\(onDevices.count) 台运行中)", action: #selector(turnOffAllDevices), keyEquivalent: "")
                 turnOffAllItem.target = self
-                turnOffAllItem.isEnabled = model.gatewayConnected
+                turnOffAllItem.isEnabled = model.gatewayConnected && !onDevices.isEmpty
                 menu.addItem(turnOffAllItem)
             }
 
@@ -461,6 +472,10 @@ final class StatusItemController: NSObject {
 
     @objc private func turnOffAllDevices() {
         model.turnOffAllDevices()
+    }
+
+    @objc private func turnOnAllDevices() {
+        model.turnOnAllDevices()
     }
 
     @objc private func applyQuickCoolingAll() {

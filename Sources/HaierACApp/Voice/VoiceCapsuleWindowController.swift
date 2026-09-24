@@ -132,8 +132,6 @@ public final class VoiceCapsuleWindowController: NSObject, NSWindowDelegate {
 
     // MARK: - 指令解析与执行
 
-    // MARK: - 指令解析与执行
-
     /// 从用户输入的语音文本中智能提取定向控制的具体空调列表（支持多房间组合，如“客厅和主卧”、“次卧跟书房”） (v1.9.33)
     private func resolveTargetDevices(for text: String, model: AppModel) -> [AppModel.UnifiedDevice] {
         let cleanText = text.lowercased()
@@ -208,11 +206,16 @@ public final class VoiceCapsuleWindowController: NSObject, NSWindowDelegate {
                 scheduleAutoDismiss(delay: 2.5)
                 return
             }
-            let openedCount = model.applyPresetToAllDevices(mode: .cooling, temperature: 26.0)
+            let openedCount = model.turnOnAllDevices()
             if openedCount > 0 {
-                VoiceControlManager.shared.markSuccess("已为您开启全屋 \(openedCount) 台空调（制冷 26°C）")
+                VoiceControlManager.shared.markSuccess("已为您开启全屋 \(openedCount) 台空调")
             } else {
-                VoiceControlManager.shared.markFailed("未发现可控制的就绪空调设备")
+                let controllableCount = model.allUnifiedDevices.filter { model.reachability(for: $0.id).isControllable }.count
+                if controllableCount > 0 {
+                    VoiceControlManager.shared.markSuccess("全屋空调当前均已处于开机运行状态")
+                } else {
+                    VoiceControlManager.shared.markFailed("未发现可控制的就绪空调设备")
+                }
             }
             scheduleAutoDismiss(delay: 1.8)
             return
@@ -298,14 +301,19 @@ public final class VoiceCapsuleWindowController: NSObject, NSWindowDelegate {
         let targetDevice = targetDevices[0]
         let deviceId = targetDevice.id
         let targetName = targetDevice.name
-        let reach = model.reachability(for: deviceId)
-        guard reach.isControllable else {
-            let reason = reach == .gatewayReconnecting
-                ? "「\(targetName)」网关重连中，请稍后重试"
-                : "「\(targetName)」当前离线，无法执行语音指令"
-            VoiceControlManager.shared.markFailed(reason)
-            scheduleAutoDismiss(delay: 2.5)
-            return
+
+        // 可达性门禁：仅在真正下发硬件控制指令时拦截，放行纯本地查询、定时管理与睡眠曲线退出 (v1.9.34 闭环 CR P1-1)
+        let ensureControllable: () -> Bool = {
+            let reach = model.reachability(for: deviceId)
+            guard reach.isControllable else {
+                let reason = reach == .gatewayReconnecting
+                    ? "「\(targetName)」网关重连中，请稍后重试"
+                    : "「\(targetName)」当前离线，无法执行语音指令"
+                VoiceControlManager.shared.markFailed(reason)
+                self.scheduleAutoDismiss(delay: 2.5)
+                return false
+            }
+            return true
         }
 
         let isMultiDevice = model.allUnifiedDevices.count > 1
@@ -313,15 +321,18 @@ public final class VoiceCapsuleWindowController: NSObject, NSWindowDelegate {
 
         switch command {
         case .setPower(let on):
+            guard ensureControllable() else { return }
             model.sendAttribute("onOffStatus", value: .bool(on), deviceId: deviceId)
             VoiceControlManager.shared.markSuccess(on ? "已开启\(prefix)空调" : "已关闭\(prefix)空调")
 
         case .setTemperature(let temp):
+            guard ensureControllable() else { return }
             model.sendAttribute("targetTemperature", value: .double(temp), deviceId: deviceId)
             let formatted = temp.truncatingRemainder(dividingBy: 1.0) == 0 ? "\(Int(temp))" : String(format: "%.1f", temp)
             VoiceControlManager.shared.markSuccess("已将\(prefix)温度调至 \(formatted)°C")
 
         case .adjustTemperature(let delta):
+            guard ensureControllable() else { return }
             let currentTemp = model.attributes[deviceId]?["targetTemperature"]?.doubleValue ?? 26.0
             var newTemp = currentTemp + delta
             newTemp = min(max(newTemp, 16.0), 30.0) // 限制在 16~30
@@ -330,6 +341,7 @@ public final class VoiceCapsuleWindowController: NSObject, NSWindowDelegate {
             VoiceControlManager.shared.markSuccess("已微调\(prefix)温度至 \(formatted)°C")
 
         case .setMode(let modeName):
+            guard ensureControllable() else { return }
             // 在数字模型中匹配模式
             if let modeAttr = model.attributes[deviceId]?["operationMode"],
                case .list(let options) = modeAttr.valueRange,
@@ -347,6 +359,7 @@ public final class VoiceCapsuleWindowController: NSObject, NSWindowDelegate {
             }
 
         case .setWindSpeed(let speedName):
+            guard ensureControllable() else { return }
             if let windAttr = model.attributes[deviceId]?["windSpeed"],
                case .list(let options) = windAttr.valueRange,
                let match = options.first(where: { $0.desc.contains(speedName) || speedName.contains($0.desc) }) {
@@ -367,6 +380,7 @@ public final class VoiceCapsuleWindowController: NSObject, NSWindowDelegate {
             }
 
         case .applyScene(let sceneName):
+            guard ensureControllable() else { return }
             if let scene = model.scenes.first(where: { $0.name.contains(sceneName) }) {
                 model.applyScene(scene)
                 VoiceControlManager.shared.markSuccess("已应用「\(scene.name)」情景")
@@ -375,6 +389,7 @@ public final class VoiceCapsuleWindowController: NSObject, NSWindowDelegate {
             }
 
         case .countdownPower(let minutes, let on):
+            guard ensureControllable() else { return }
             let fireDate = Date().addingTimeInterval(TimeInterval(minutes * 60))
             let attrVal = AttrValue.bool(on)
             guard let valJSON = ScheduledAction.valueJSON(attrVal) else {
@@ -404,6 +419,7 @@ public final class VoiceCapsuleWindowController: NSObject, NSWindowDelegate {
             VoiceControlManager.shared.markSuccess("已为\(prefix)设置：\(actionName)")
 
         case .schedulePower(let hour, let minute, let on):
+            guard ensureControllable() else { return }
             let calendar = Calendar.current
             var components = calendar.dateComponents([.year, .month, .day], from: Date())
             components.hour = hour
@@ -441,19 +457,17 @@ public final class VoiceCapsuleWindowController: NSObject, NSWindowDelegate {
             VoiceControlManager.shared.markSuccess("已为\(prefix)设定：\(actionName)")
 
         case .cancelSchedules:
+            // 严格按指定设备取消，杜绝定向无定时任务时穿透误删全屋其他设备定时 (v1.9.34 闭环 CR P2-1)
             let count = model.scheduledActions.filter { $0.deviceId == deviceId }.count
             if count > 0 {
                 model.scheduledActions.removeAll(where: { $0.deviceId == deviceId })
                 VoiceControlManager.shared.markSuccess("已取消\(prefix)定时任务（共 \(count) 个）")
-            } else if model.scheduledActions.count > 0 {
-                let total = model.scheduledActions.count
-                model.scheduledActions.removeAll()
-                VoiceControlManager.shared.markSuccess("已取消所有定时任务（共 \(total) 个）")
             } else {
-                VoiceControlManager.shared.markSuccess("当前没有正在运行的定时任务")
+                VoiceControlManager.shared.markSuccess("「\(targetName)」当前没有正在运行的定时任务")
             }
 
         case .startSleepCurve(let curveName):
+            guard ensureControllable() else { return }
             let curve: SleepCurveConfig
             if let curveName, let match = SleepCurveConfig.allPresets.first(where: { $0.name.contains(curveName) }) {
                 curve = match
@@ -464,6 +478,7 @@ public final class VoiceCapsuleWindowController: NSObject, NSWindowDelegate {
             VoiceControlManager.shared.markSuccess("已为\(prefix)启动「\(curve.name)」睡眠温阶曲线")
 
         case .stopSleepCurve:
+            // 睡眠曲线退出与白噪音停止属于本地状态控制，即便网络临时颠簸也应允许停止 (v1.9.34)
             if model.activeSleepSession != nil {
                 model.stopSleepCurve()
                 VoiceControlManager.shared.markSuccess("已停止\(prefix)智能睡眠温阶")
@@ -472,6 +487,7 @@ public final class VoiceCapsuleWindowController: NSObject, NSWindowDelegate {
             }
 
         case .querySleepReport:
+            // 本地会话报告查询，无需硬件在线校验 (v1.9.34)
             if let session = model.activeSleepSession {
                 let stageName = session.currentStage?.name ?? "进行中"
                 let targetTemp = session.effectiveTargetTemperature ?? session.currentStage?.targetTemperature ?? 26.0
@@ -489,6 +505,7 @@ public final class VoiceCapsuleWindowController: NSObject, NSWindowDelegate {
             }
 
         case .startSelfCleaning:
+            guard ensureControllable() else { return }
             if model.isSelfCleaningActive {
                 let remaining = model.selfCleaningRemainingSeconds
                 VoiceControlManager.shared.markSuccess("56°C 蒸发器自清洁进行中（剩余 \(remaining / 60) 分钟）")

@@ -68,59 +68,81 @@ struct BatchControlPanel: View {
                 return model.attributes[deviceIds.first ?? ""] ?? [:]
             }()
 
-            // 批量一键预设与关机 (v1.9.32 目标严格隔离在当前选中的 deviceIds)
-            let isAllSelected = deviceIds.count == model.allUnifiedDevices.count
-            HStack(spacing: 8) {
-                Button {
-                    model.applyPreset(deviceIds: deviceIds, mode: .cooling, temperature: 26.0)
-                } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: "snowflake")
-                            .font(.system(size: 11))
-                        Text("清爽 26°C")
-                            .font(.system(size: 11, weight: .medium))
+            // 批量一键预设与电源控制 (v1.9.34 集合精确匹配 & 新增所选/全屋开机)
+            let allIds = Set(model.allUnifiedDevices.map(\.id))
+            let isAllSelected = !allIds.isEmpty && Set(deviceIds) == allIds
+            VStack(spacing: 6) {
+                HStack(spacing: 8) {
+                    Button {
+                        model.applyPreset(deviceIds: deviceIds, mode: .cooling, temperature: 26.0)
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "snowflake")
+                                .font(.system(size: 11))
+                            Text("清爽 26°C")
+                                .font(.system(size: 11, weight: .medium))
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 6)
+                        .background(Theme.surface2)
+                        .foregroundStyle(Theme.accent)
+                        .clipShape(RoundedRectangle(cornerRadius: Theme.radiusSM, style: .continuous))
                     }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 6)
-                    .background(Theme.surface2)
-                    .foregroundStyle(Theme.accent)
-                    .clipShape(RoundedRectangle(cornerRadius: Theme.radiusSM, style: .continuous))
-                }
-                .buttonStyle(.plain)
+                    .buttonStyle(.plain)
 
-                Button {
-                    model.applyPreset(deviceIds: deviceIds, mode: .heating, temperature: 20.0)
-                } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: "flame.fill")
-                            .font(.system(size: 11))
-                        Text("暖房 20°C")
-                            .font(.system(size: 11, weight: .medium))
+                    Button {
+                        model.applyPreset(deviceIds: deviceIds, mode: .heating, temperature: 20.0)
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "flame.fill")
+                                .font(.system(size: 11))
+                            Text("暖房 20°C")
+                                .font(.system(size: 11, weight: .medium))
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 6)
+                        .background(Theme.surface2)
+                        .foregroundStyle(Theme.warning)
+                        .clipShape(RoundedRectangle(cornerRadius: Theme.radiusSM, style: .continuous))
                     }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 6)
-                    .background(Theme.surface2)
-                    .foregroundStyle(Theme.warning)
-                    .clipShape(RoundedRectangle(cornerRadius: Theme.radiusSM, style: .continuous))
+                    .buttonStyle(.plain)
                 }
-                .buttonStyle(.plain)
 
-                Button {
-                    model.turnOffDevices(deviceIds: deviceIds)
-                } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: "power")
-                            .font(.system(size: 11))
-                        Text(isAllSelected ? "全屋关机" : "所选关机")
-                            .font(.system(size: 11, weight: .medium))
+                HStack(spacing: 8) {
+                    Button {
+                        model.turnOnDevices(deviceIds: deviceIds)
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "power.circle")
+                                .font(.system(size: 11))
+                            Text(isAllSelected ? "全屋开机" : "所选开机")
+                                .font(.system(size: 11, weight: .medium))
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 6)
+                        .background(Theme.surface2)
+                        .foregroundStyle(Theme.success)
+                        .clipShape(RoundedRectangle(cornerRadius: Theme.radiusSM, style: .continuous))
                     }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 6)
-                    .background(Theme.surface2)
-                    .foregroundStyle(Theme.inkMuted)
-                    .clipShape(RoundedRectangle(cornerRadius: Theme.radiusSM, style: .continuous))
+                    .buttonStyle(.plain)
+
+                    Button {
+                        model.turnOffDevices(deviceIds: deviceIds)
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "power")
+                                .font(.system(size: 11))
+                            Text(isAllSelected ? "全屋关机" : "所选关机")
+                                .font(.system(size: 11, weight: .medium))
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 6)
+                        .background(Theme.surface2)
+                        .foregroundStyle(Theme.inkMuted)
+                        .clipShape(RoundedRectangle(cornerRadius: Theme.radiusSM, style: .continuous))
+                    }
+                    .buttonStyle(.plain)
                 }
-                .buttonStyle(.plain)
             }
             .disabled(!isBatchAvailable)
             .opacity(isBatchAvailable ? 1.0 : 0.6)

@@ -1026,7 +1026,8 @@ final class AppModel: ObservableObject {
                 accumulateFilterMinutes(for: dev.id, minutes: elapsedMinutes, wearFactor: wearFactor)
             }
 
-            let isCleaning = isOnline && isSelfCleaningActive && (selfCleaningDeviceId == nil || selfCleaningDeviceId == dev.id)
+            // 自清洁工况归属判定：指定设备精确匹配，未指定仅在单设备时生效，阻断多设备 fail-open 风险 (v1.9.34)
+            let isCleaning = isOnline && isSelfCleaningActive && (selfCleaningDeviceId == dev.id || (selfCleaningDeviceId == nil && allUnifiedDevices.count == 1))
 
             samples.append(
                 EnergyAnalyticsEngine.DeviceEnergySample(
@@ -2701,12 +2702,13 @@ final class AppModel: ObservableObject {
         return sent
     }
 
-    /// 批量/全屋关机：关闭目标设备集（若为 nil 则默认全屋）中所有可达且处于开机状态的空调 (v1.9.32)
+    /// 批量/全屋关机：关闭目标设备集（若为 nil 则默认全屋）中所有可达且处于开机状态的空调 (v1.9.32, v1.9.34 修复集合包含判定)
     /// 返回实际关闭的设备数量
     @discardableResult
     public func turnOffDevices(deviceIds: [String]? = nil) -> Int {
         let targets = deviceIds ?? allUnifiedDevices.map(\.id)
-        let isAll = (deviceIds == nil) || (targets.count == allUnifiedDevices.count)
+        let allIds = Set(allUnifiedDevices.map(\.id))
+        let isAll = (deviceIds == nil) || (!allIds.isEmpty && Set(targets).isSuperset(of: allIds))
         let controllableOnIds = targets
             .filter { reachability(for: $0).isControllable && attribute("onOffStatus", deviceId: $0)?.boolValue == true }
         guard !controllableOnIds.isEmpty else {
@@ -2727,12 +2729,41 @@ final class AppModel: ObservableObject {
         return turnOffDevices(deviceIds: nil)
     }
 
-    /// 批量/全屋一键预设：将目标设备集（若为 nil 则默认全屋）中所有可达空调开启并设置为指定模式与温度 (v1.9.32)
+    /// 批量/全屋开机：开启目标设备集（若为 nil 则默认全屋）中所有可达且处于关机状态的空调 (v1.9.34)
+    /// 纯开机仅下发电源属性，保持各设备已记忆的模式与目标温度，彻底消灭全屋开机被强制切制冷 26°C 导致的冷暖倒置缺陷
+    /// 返回实际开启的设备数量
+    @discardableResult
+    public func turnOnDevices(deviceIds: [String]? = nil) -> Int {
+        let targets = deviceIds ?? allUnifiedDevices.map(\.id)
+        let allIds = Set(allUnifiedDevices.map(\.id))
+        let isAll = (deviceIds == nil) || (!allIds.isEmpty && Set(targets).isSuperset(of: allIds))
+        let controllableOffIds = targets
+            .filter { reachability(for: $0).isControllable && attribute("onOffStatus", deviceId: $0)?.boolValue != true }
+        guard !controllableOffIds.isEmpty else {
+            let desc = isAll ? "当前所有空调均已处于开机运行状态或离线" : "所选空调均已处于开机运行状态或离线"
+            operationNotice = OperationNotice(text: desc, isError: false)
+            return 0
+        }
+        let sent = sendAttributeToDevices("onOffStatus", value: .bool(true), deviceIds: controllableOffIds)
+        let desc = isAll ? "✅ 已开启全屋 \(sent) 台空调" : "✅ 已开启所选 \(sent) 台空调"
+        operationNotice = OperationNotice(text: desc, isError: false)
+        return sent
+    }
+
+    /// 全屋一键开机：开启所有可达且处于待机状态的空调 (v1.9.34)
+    /// 返回实际开启的设备数量
+    @discardableResult
+    public func turnOnAllDevices() -> Int {
+        return turnOnDevices(deviceIds: nil)
+    }
+
+    /// 批量/全屋一键预设：将目标设备集（若为 nil 则默认全屋）中所有可达空调开启并设置为指定模式与温度 (v1.9.32, v1.9.34 修复集合包含判定)
     /// 返回实际控制的设备数量
     @discardableResult
     public func applyPreset(deviceIds: [String]? = nil, mode: ACModeCode, temperature: Double, windSpeed: String? = nil) -> Int {
         let targets = deviceIds ?? allUnifiedDevices.map(\.id)
-        let isAll = (deviceIds == nil) || (targets.count == allUnifiedDevices.count)
+        let allIds = Set(allUnifiedDevices.map(\.id))
+        let isAll = (deviceIds == nil) || (!allIds.isEmpty && Set(targets).isSuperset(of: allIds))
         let controllableIds = targets.filter { reachability(for: $0).isControllable }
         guard !controllableIds.isEmpty else {
             let desc = isAll ? "⚠️ 当前无任何可控的在线空调设备" : "⚠️ 所选设备当前均不可控或离线"

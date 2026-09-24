@@ -253,22 +253,27 @@ struct TurnOffAllACIntent: AppIntent {
     }
 }
 
-// MARK: - 开启全屋空调 (v1.9.33)
+// MARK: - 开启全屋空调 (v1.9.34 消除冷暖倒置，保持已有预设)
 
 struct TurnOnAllACIntent: AppIntent {
     static var title: LocalizedStringResource = "开启全屋空调"
-    static var description = IntentDescription("一键开启全屋所有海尔空调并设置为清爽制冷 26°C", categoryName: "空调控制")
+    static var description = IntentDescription("一键开启全屋所有海尔空调设备，保持当前预设模式与温度", categoryName: "空调控制")
 
     @MainActor
     func perform() async throws -> some IntentResult & ProvidesDialog {
         guard AppModel.shared.gatewayConnected else {
             throw ACIntentError.message("空调连接中断，请稍后重试")
         }
-        let openedCount = AppModel.shared.applyPresetToAllDevices(mode: .cooling, temperature: 26.0)
+        let openedCount = AppModel.shared.turnOnAllDevices()
         if openedCount > 0 {
-            return .result(dialog: "已开启全屋 \(openedCount) 台空调（制冷 26°C）")
+            return .result(dialog: "已开启全屋 \(openedCount) 台空调")
         } else {
-            return .result(dialog: "未发现可控制的就绪空调设备")
+            let controllable = AppModel.shared.allUnifiedDevices.filter { AppModel.shared.reachability(for: $0.id).isControllable }
+            if !controllable.isEmpty {
+                return .result(dialog: "全屋空调当前均已处于开机运行状态")
+            } else {
+                return .result(dialog: "未发现可控制的就绪空调设备")
+            }
         }
     }
 }

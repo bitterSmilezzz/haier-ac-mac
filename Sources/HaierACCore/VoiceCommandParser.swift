@@ -349,7 +349,17 @@ public struct VoiceCommandParser {
         return (finalHour, minute)
     }
 
+    /// 检测文本中是否包含针对开关机动作的否定意图（如“别关”、“不要关”、“不用关”、“先别开”、“不要开”等，防止误触发） (v1.9.34)
+    private static func containsNegativeAction(_ text: String) -> Bool {
+        let negativePatterns = [
+            "别关", "不要关", "不用关", "先别关", "先不要关", "暂不关", "不能关", "不可以关", "别停", "不要停", "不用停",
+            "别开", "不要开", "不用开", "先别开", "先不要开", "暂不开", "不能开", "不可以开", "别启动", "不要启动"
+        ]
+        return negativePatterns.contains(where: { text.contains($0) })
+    }
+
     private static func isAllPowerOff(_ text: String) -> Bool {
+        guard !containsNegativeAction(text) else { return false }
         let allOffKeywords = [
             "关闭所有空调", "关掉所有空调", "关闭全部空调", "关掉全部空调",
             "关所有空调", "关全部空调", "全屋关机", "全部关机", "全关了", "都关了", "全都关了",
@@ -435,6 +445,7 @@ public struct VoiceCommandParser {
     }
 
     private static func isAllPowerOn(_ text: String) -> Bool {
+        guard !containsNegativeAction(text) else { return false }
         // 排除模式与温控命令（如“全屋开暖气”、“全屋开冷气”、“全屋开制热”、“全屋开到26度”），防止冷暖倒置 (v1.9.33)
         if text.contains("冷气") || text.contains("暖气") || text.contains("制冷") || text.contains("制热") ||
            text.contains("冷风") || text.contains("暖风") || text.contains("度") {
@@ -461,6 +472,7 @@ public struct VoiceCommandParser {
     }
 
     private static func isPowerOff(_ text: String) -> Bool {
+        guard !containsNegativeAction(text) else { return false }
         let offKeywords = [
             "关空调", "关闭空调", "关掉空调", "关机", "别吹了", "停机", "关闭", "关掉",
             "关了", "关上", "关一下", "关停", "关掉它", "断电"
@@ -477,6 +489,7 @@ public struct VoiceCommandParser {
     }
 
     private static func isPowerOn(_ text: String) -> Bool {
+        guard !containsNegativeAction(text) else { return false }
         // 排除模式切换命令（如“开冷气”、“开暖气”、“吹冷风”）
         if text.contains("冷气") || text.contains("暖气") || text.contains("冷风") || text.contains("暖风") {
             return false

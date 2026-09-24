@@ -356,6 +356,24 @@ final class VoiceCommandParserTests: XCTestCase {
         XCTAssertEqual(temp3?.command, .setTemperatureAll(26.0))
     }
 
+    // MARK: - 否定句与防误触测试 (v1.9.34)
+
+    func testNegationProtection() {
+        // 全屋与单机否定关机
+        XCTAssertNil(VoiceCommandParser.parse("全屋空调别关了"))
+        XCTAssertNil(VoiceCommandParser.parse("所有空调先不要关"))
+        XCTAssertNil(VoiceCommandParser.parse("客厅空调不要关"))
+        XCTAssertNil(VoiceCommandParser.parse("千万别关空调"))
+        XCTAssertNil(VoiceCommandParser.parse("先别关"))
+        XCTAssertNil(VoiceCommandParser.parse("不用关空调"))
+
+        // 全屋与单机否定开机
+        XCTAssertNil(VoiceCommandParser.parse("别开空调"))
+        XCTAssertNil(VoiceCommandParser.parse("先不要开空调"))
+        XCTAssertNil(VoiceCommandParser.parse("所有空调先别开"))
+        XCTAssertNil(VoiceCommandParser.parse("不用开"))
+    }
+
     // MARK: - 无效输入测试
 
     func testInvalidCommands() {
