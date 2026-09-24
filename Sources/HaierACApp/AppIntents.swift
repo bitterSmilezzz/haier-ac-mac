@@ -31,22 +31,18 @@ private enum ACIntentError: LocalizedError {
     }
 }
 
-/// 解析目标设备：优先按名称精确匹配，否则回退第一台设备
+/// 解析目标设备：优先按名称精确匹配，否则回退菜单栏选中或第一台设备 (v1.9.29)
 @MainActor
 private func resolveDeviceId(named name: String?) -> String? {
     let model = AppModel.shared
     if let name, !name.isEmpty,
-       let device = model.devices.first(where: { $0.deviceName.contains(name) }) {
+       let device = model.allUnifiedDevices.first(where: { $0.name.contains(name) }) {
         return device.id
     }
-    if let name, !name.isEmpty,
-       let manual = model.manualDevices.first(where: { $0.name.contains(name) }) {
-        return manual.deviceId
-    }
-    return model.devices.first?.id ?? model.manualDevices.first?.deviceId
+    return model.menuBarDeviceId ?? model.allUnifiedDevices.first?.id
 }
 
-/// 网关未连接/无设备时抛错，让 Siri/快捷指令给出明确失败信息
+/// 网关未连接/无设备或设备离线时抛错，让 Siri/快捷指令给出明确失败信息 (v1.9.29)
 @MainActor
 private func requireGatewayAndDevice(_ name: String?) throws -> String {
     guard AppModel.shared.gatewayConnected else {
@@ -54,6 +50,15 @@ private func requireGatewayAndDevice(_ name: String?) throws -> String {
     }
     guard let deviceId = resolveDeviceId(named: name) else {
         throw ACIntentError.message("没有可控制的空调设备")
+    }
+    let reach = AppModel.shared.reachability(for: deviceId)
+    guard reach.isControllable else {
+        let devName = AppModel.shared.allUnifiedDevices.first(where: { $0.id == deviceId })?.name ?? "目标空调"
+        if reach == .gatewayReconnecting {
+            throw ACIntentError.message("\(devName)网关重连中，请稍后重试")
+        } else {
+            throw ACIntentError.message("\(devName)当前离线，无法执行控制")
+        }
     }
     return deviceId
 }
@@ -166,9 +171,7 @@ struct GetACTemperatureIntent: AppIntent {
               let temp = attr.doubleValue else {
             throw ACIntentError.message("暂未获取到室内温度")
         }
-        let name = model.devices.first(where: { $0.id == deviceId })?.deviceName
-            ?? model.manualDevices.first(where: { $0.deviceId == deviceId })?.name
-            ?? "空调"
+        let name = model.allUnifiedDevices.first(where: { $0.id == deviceId })?.name ?? "空调"
         let text = String(format: "%.0f°", temp)
         return .result(value: text, dialog: "\(name)当前室内温度 \(text)")
     }
@@ -206,9 +209,7 @@ struct StartSleepCurveIntent: AppIntent {
         }
 
         model.startSleepCurve(curve: targetCurve, deviceId: deviceId)
-        let name = model.devices.first(where: { $0.id == deviceId })?.deviceName
-            ?? model.manualDevices.first(where: { $0.deviceId == deviceId })?.name
-            ?? "空调"
+        let name = model.allUnifiedDevices.first(where: { $0.id == deviceId })?.name ?? "空调"
         return .result(dialog: "已为\(name)启动「\(targetCurve.name)」智能睡眠温阶")
     }
 }

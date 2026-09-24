@@ -13,15 +13,11 @@ struct SleepCurveSection: View {
     @State private var templateTarget: SleepCurveConfig? = nil
     @State private var showHistorySheet = false
 
-    private var activeDevice: DeviceInfo? {
-        if !targetDeviceId.isEmpty, let d = model.devices.first(where: { $0.id == targetDeviceId }) {
-            return d
-        }
-        return model.devices.first
-    }
-
     private var effectiveDeviceId: String {
-        activeDevice?.id ?? model.manualDevices.first?.deviceId ?? ""
+        if !targetDeviceId.isEmpty && model.allUnifiedDevices.contains(where: { $0.id == targetDeviceId }) {
+            return targetDeviceId
+        }
+        return model.menuBarDeviceId ?? model.allUnifiedDevices.first?.id ?? ""
     }
 
     var body: some View {
@@ -594,6 +590,31 @@ struct SleepCurveSection: View {
             // 定时就寝与睡前预冷 (v1.9.19)
             bedtimeScheduleConfigSection
 
+            // 多设备目标空调选择 (v1.9.29)
+            if model.allUnifiedDevices.count > 1 {
+                HStack(spacing: 8) {
+                    Image(systemName: "air.conditioner.horizontal")
+                        .font(.system(size: 11))
+                        .foregroundStyle(Color.dynamic(light: 0x5E6AD2, dark: 0x9B8BFF))
+                    Text("应用设备:")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(Theme.ink)
+
+                    Picker("", selection: Binding(
+                        get: { effectiveDeviceId },
+                        set: { targetDeviceId = $0 }
+                    )) {
+                        ForEach(model.allUnifiedDevices, id: \.id) { dev in
+                            Text(dev.name).tag(dev.id)
+                        }
+                    }
+                    .labelsHidden()
+                    .frame(maxWidth: 180)
+                    Spacer()
+                }
+                .padding(.vertical, 2)
+            }
+
             // 启动按钮 (受可达性门禁约束，离线/重连中禁用并给出警示)
             let reachability = model.reachability(for: effectiveDeviceId)
             let isControllable = !effectiveDeviceId.isEmpty && reachability.isControllable
@@ -621,10 +642,17 @@ struct SleepCurveSection: View {
                 HStack(spacing: 6) {
                     Image(systemName: "moon.fill")
                         .font(.system(size: 12))
-                    Text("开启「\(selectedConfig.name)」睡眠温阶")
-                        .font(.system(size: 13, weight: .semibold))
+                    let targetName = model.allUnifiedDevices.first(where: { $0.id == effectiveDeviceId })?.name
+                    if let targetName, model.allUnifiedDevices.count > 1 {
+                        Text("为 \(targetName) 开启「\(selectedConfig.name)」睡眠温阶")
+                            .font(.system(size: 13, weight: .semibold))
+                    } else {
+                        Text("开启「\(selectedConfig.name)」睡眠温阶")
+                            .font(.system(size: 13, weight: .semibold))
+                    }
                 }
                 .frame(maxWidth: .infinity)
+                .padding(.vertical, 9)
             }
             .buttonStyle(Theme.primaryButtonStyle())
             .disabled(!isControllable)

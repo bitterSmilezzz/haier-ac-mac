@@ -172,12 +172,9 @@ public final class EnergyAnalyticsEngine: ObservableObject {
         modeCode: String?,
         targetTemp: Double?,
         indoorTemp: Double?,
-        windSpeed: String?
+        windSpeed: String?,
+        isSelfCleaning: Bool = false
     ) -> Double {
-        guard isPowerOn else {
-            return 1.5 // 待机微功耗 1.5W
-        }
-
         let windOffset: Double = {
             guard let wind = windSpeed?.lowercased() else { return 40.0 }
             if wind.contains("微") || wind.contains("静") { return 15.0 }
@@ -187,6 +184,16 @@ public final class EnergyAnalyticsEngine: ObservableObject {
             if wind.contains("强") { return 180.0 }
             return 40.0
         }()
+
+        if isSelfCleaning {
+            // 56°C 蒸发器高温除菌自清洁工况（急冷结霜、微波解冻与 56°C 恒温烘干灭菌）：
+            // 平均热力学电功率稳定在 880W ~ 1050W 之间
+            return 920.0 + (windOffset * 0.5)
+        }
+
+        guard isPowerOn else {
+            return 1.5 // 待机微功耗 1.5W
+        }
 
         // 未识别模式采用物理中性功率估算策略（冷热综合无偏估计）：
         // 1. 若室内温度与设定温度均有效，采用制冷动力曲线（380W + 95W/°C）与制热动力曲线（550W + 110W/°C）在温差绝对值 |ΔT| 下的均值基准：
@@ -254,6 +261,7 @@ public final class EnergyAnalyticsEngine: ObservableObject {
         public let targetTemp: Double?
         public let indoorTemp: Double?
         public let windSpeed: String?
+        public let isSelfCleaning: Bool
 
         public init(
             deviceId: String,
@@ -261,7 +269,8 @@ public final class EnergyAnalyticsEngine: ObservableObject {
             modeCode: String?,
             targetTemp: Double?,
             indoorTemp: Double?,
-            windSpeed: String?
+            windSpeed: String?,
+            isSelfCleaning: Bool = false
         ) {
             self.deviceId = deviceId
             self.isPowerOn = isPowerOn
@@ -269,6 +278,7 @@ public final class EnergyAnalyticsEngine: ObservableObject {
             self.targetTemp = targetTemp
             self.indoorTemp = indoorTemp
             self.windSpeed = windSpeed
+            self.isSelfCleaning = isSelfCleaning
         }
     }
 
@@ -300,16 +310,20 @@ public final class EnergyAnalyticsEngine: ObservableObject {
                 modeCode: sample.modeCode,
                 targetTemp: sample.targetTemp,
                 indoorTemp: sample.indoorTemp,
-                windSpeed: sample.windSpeed
+                windSpeed: sample.windSpeed,
+                isSelfCleaning: sample.isSelfCleaning
             )
             totalInstantaneousPower += power
 
-            if sample.isPowerOn {
+            if sample.isPowerOn || sample.isSelfCleaning {
                 hasAnyRunningDevice = true
                 let devKWh = (power * deltaHours) / 1000.0
                 totalIncrementalKWh += devKWh
 
-                if let sampleMode = ACModeCode.match(from: sample.modeCode) {
+                if sample.isSelfCleaning {
+                    // 自清洁归入高温热力学工况
+                    runningHeating += 1
+                } else if let sampleMode = ACModeCode.match(from: sample.modeCode) {
                     switch sampleMode {
                     case .cooling: runningCooling += 1
                     case .heating: runningHeating += 1

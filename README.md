@@ -8,6 +8,11 @@
 
 ## 功能
 
+- 🏷 **全屋设备全链路统一感知与能耗工况动力学升级 (v1.9.29)**：
+  - 🖥️ **macOS 状态栏全屋设备统一感知与 Tooltip 彻底重构**：将 `StatusItemController` 状态栏 Tooltip 与设备选择全面重构为基于 `allUnifiedDevices` 统一迭代；消除过去针对云端与手动设备的排他分支，多设备混合场景手动机型与云端机型均获得统一展示；补齐 `model.$manualDevices` Combine 发布者订阅，局域网设备增删即时触发状态栏刷新；待机设备补充展示室内回风传感器实时读数。
+  - ⚡️ **56°C 蒸发器高温自清洁热力学能耗动力学建模与积分**：`EnergyAnalyticsEngine` 建立 56°C 高温蒸发器自清洁阶段（急冷结霜、微波解冻与高温烘干灭菌）热力学动力模型（基础功耗 920W + 风速偏置），并在 `accumulateSample` 中准确累计自清洁电量并归入高温热力学工况时长，彻底终结以往自清洁阶段被误算为 1.5W 待机微功耗导致的能耗严重低估缺陷。
+  - 🎙️ **Siri 快捷指令与语音胶囊离线可达性拦截**：重构 `VoiceCapsuleWindowController` 与 `AppIntents`（`SetACPowerIntent`, `GetIndoorTemperatureIntent`, `StartSleepCurveIntent` 等）的目标设备解析与门禁逻辑，统一支持 `menuBarDeviceId` 优先与 `allUnifiedDevices` 全局解析；在指令执行前增加 `reachability(for: deviceId).isControllable` 校验，设备离线或网关重连中即时阻断并明确报错，杜绝向离线硬件虚报“操作成功”。
+  - 🌙 **全屋多设备智能睡眠温阶指定与视图统一**：`SleepCurveSection` 引入多设备目标空调选择器，突破以往仅依赖首台云端设备的局限，多房间用户可自由为任一指定房间/局域网空调单独开启或终止睡眠温阶曲线；`EcoEnergySection` 能效综合评分与 `NetworkPresenceGuard` 离家防空转守护全面升级为消费 `allUnifiedDevices`。
 - 🏷 **全屋统一设备模型与 AppKit 菜单原生门禁修复 (v1.9.28)**：
   - 🛡️ **AppKit NSMenu `autoenablesItems` 原生重写缺陷修复 (闭环 CR P1)**：全面为 `StatusItemController` 中的所有菜单实例（`menu`, `devicesMenu`, `devSubmenu`, `themeMenu`）设置 `autoenablesItems = false`，彻底消除 AppKit 在菜单展开时无视 `isEnabled` 重新强行启用菜单项的系统缺陷，确保离线与重连期间右键菜单中的设备控制项严格不可点击。
   - 🌙 **睡眠曲线「停止」会话纯本地解耦 (闭环 CR P2-1)**：细化睡眠卡片门禁粒度：由于 `stopSleepCurve()` 仅执行纯本地状态归档、定时器清理与助眠音频停止，解除了对其「停止」按钮的不可达禁用，确保设备离线或网关断开时用户依然能随时终止睡眠会话；同时在运行状态下提供柔性离线徽章，而空闲启动按钮严格维持可达性校验。

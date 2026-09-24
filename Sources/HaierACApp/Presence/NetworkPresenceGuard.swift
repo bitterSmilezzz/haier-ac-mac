@@ -144,8 +144,7 @@ public final class NetworkPresenceGuard: ObservableObject {
         let model = AppModel.shared
         var runningDevices: [(name: String, tempText: String)] = []
 
-        let allDevices = model.devices.map { (id: $0.id, name: $0.deviceName) } +
-            model.manualDevices.map { (id: $0.deviceId, name: $0.name) }
+        let allDevices = model.allUnifiedDevices.map { (id: $0.id, name: $0.name) }
 
         for dev in allDevices {
             let isPowerOn = model.attribute("onOffStatus", deviceId: dev.id)?.boolValue ?? false

@@ -16,8 +16,8 @@ struct EcoEnergySection: View {
     }
 
     private var ecoScore: Int {
-        // 全屋多设备运行加权能效评分 (v1.9.23)
-        let runningDevices = model.devices.filter {
+        // 全屋多设备运行加权能效评分 (v1.9.29 统一全屋设备)
+        let runningDevices = model.allUnifiedDevices.filter {
             model.attribute("onOffStatus", deviceId: $0.id)?.boolValue == true
         }
         let targetTemps = runningDevices.compactMap {
@@ -27,7 +27,7 @@ struct EcoEnergySection: View {
             if !targetTemps.isEmpty {
                 return targetTemps.reduce(0.0, +) / Double(targetTemps.count)
             }
-            let fallbackId = model.menuBarDeviceId ?? model.devices.first?.id ?? model.manualDevices.first?.deviceId ?? ""
+            let fallbackId = model.menuBarDeviceId ?? model.allUnifiedDevices.first?.id ?? ""
             return model.attribute("targetTemperature", deviceId: fallbackId)?.doubleValue
         }()
 

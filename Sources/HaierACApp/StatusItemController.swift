@@ -39,6 +39,7 @@ final class StatusItemController: NSObject {
         Publishers.MergeMany(
             model.$attributes.map { _ in () }.eraseToAnyPublisher(),
             model.$devices.map { _ in () }.eraseToAnyPublisher(),
+            model.$manualDevices.map { _ in () }.eraseToAnyPublisher(),
             model.$menuBarDeviceId.map { _ in () }.eraseToAnyPublisher(),
             model.$menuBarShowTemperature.map { _ in () }.eraseToAnyPublisher(),
             model.$isSelfCleaningActive.map { _ in () }.eraseToAnyPublisher(),
@@ -78,7 +79,7 @@ final class StatusItemController: NSObject {
                 button.title = ""
             }
         } else {
-            let targetId = model.menuBarDeviceId ?? model.devices.first?.id
+            let targetId = model.menuBarDeviceId ?? model.allUnifiedDevices.first?.id
             let isPowerOn: Bool = {
                 guard let targetId else { return false }
                 return model.attribute("onOffStatus", deviceId: targetId)?.boolValue ?? false
@@ -95,24 +96,25 @@ final class StatusItemController: NSObject {
         button.imagePosition = .imageLeft
         statusItem?.length = NSStatusItem.variableLength
 
-        // 动态构建悬浮 Tooltip 状态概览 (v1.9.25 增强网关连通性与多设备三态感知)
+        // 动态构建悬浮 Tooltip 状态概览 (v1.9.29 全量统一全屋设备与三态感知)
         var tooltipParts: [String] = [
             model.gatewayConnected ? "海尔空调控制 (网关在线)" : "⚠️ 海尔云端网关重连中..."
         ]
-        let allDevices = model.devices
+        let allDevices = model.allUnifiedDevices
+        let primaryTargetId = model.menuBarDeviceId ?? allDevices.first?.id
         if !allDevices.isEmpty {
             for dev in allDevices {
                 let devId = dev.id
-                let devName = dev.deviceName
+                let devName = dev.name
                 let attrs = model.attributes[devId] ?? [:]
                 let isPowerOn = attrs["onOffStatus"]?.boolValue ?? false
                 let rawMode = attrs["operationMode"]?.value?.stringValue
                 let modeCode = ACModeCode.match(from: rawMode)
                 let targetTemp = attrs["targetTemperature"]?.doubleValue ?? 26.0
                 let indoorTemp = model.currentIndoorTemperature(for: devId)
-                let isCurrentTarget = (devId == (model.menuBarDeviceId ?? allDevices.first?.id))
+                let isCurrentTarget = (devId == primaryTargetId)
 
-                let reach = model.reachability(for: dev)
+                let reach = model.reachability(for: devId)
                 let starPrefix = isCurrentTarget ? "★" : " "
                 switch reach {
                 case .gatewayReconnecting:
@@ -141,18 +143,13 @@ final class StatusItemController: NSObject {
                         }
                         tooltipParts.append(line)
                     } else {
-                        tooltipParts.append("\(starPrefix) \(devName): 关机待机")
+                        var line = "\(starPrefix) \(devName): 关机待机"
+                        if let indoor = indoorTemp {
+                            line += " (室内 \(String(format: "%.1f°C", indoor)))"
+                        }
+                        tooltipParts.append(line)
                     }
                 }
-            }
-        } else if let devId = model.menuBarDeviceId ?? model.manualDevices.first?.deviceId {
-            let devName = model.manualDevices.first(where: { $0.deviceId == devId })?.name ?? "空调"
-            let attrs = model.attributes[devId] ?? [:]
-            let isPowerOn = attrs["onOffStatus"]?.boolValue ?? false
-            if isPowerOn {
-                tooltipParts.append("📍 \(devName): 开机中")
-            } else {
-                tooltipParts.append("📍 \(devName): 关机待机中")
             }
         }
 

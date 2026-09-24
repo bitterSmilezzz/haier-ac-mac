@@ -367,6 +367,11 @@ final class AppModel: ObservableObject {
         return .available
     }
 
+    /// 获取统一设备的可达状态 (v1.9.29)
+    public func reachability(for device: UnifiedDevice) -> DeviceReachability {
+        return reachability(for: device.id)
+    }
+
     /// 根据设备 ID 获取可达状态（未知设备按离线 fail-closed 处理，杜绝虚报可用；支持手动直连设备）
     public func reachability(for deviceId: String) -> DeviceReachability {
         if !gatewayConnected {
@@ -379,6 +384,19 @@ final class AppModel: ObservableObject {
             return .available
         }
         return .deviceOffline
+    }
+
+    /// 全量有效设备列表（面向仅接受 DeviceInfo 的视图组件无缝映射） (v1.9.29)
+    public var effectiveDevices: [DeviceInfo] {
+        allUnifiedDevices.map { u in
+            u.rawDevice ?? DeviceInfo(
+                deviceId: u.id,
+                deviceName: u.name,
+                deviceType: "AirConditioner",
+                productNameT: "智能空调(局域网)",
+                online: reachability(for: u.id) == .available
+            )
+        }
     }
 
     /// 重连操作代际计数器，防止并发/连续重连时前序定时器竞态覆盖当前状态
@@ -482,7 +500,7 @@ final class AppModel: ObservableObject {
 
     /// 当前菜单栏温度文案（如 "26.0°"），无数据时返回 nil
     var menuBarTemperatureText: String? {
-        guard menuBarShowTemperature, let deviceId = menuBarDeviceId ?? devices.first?.id,
+        guard menuBarShowTemperature, let deviceId = menuBarDeviceId ?? allUnifiedDevices.first?.id,
               let attr = Self.indoorTemperatureAttribute(in: attributes[deviceId] ?? [:]),
               let value = attr.doubleValue else { return nil }
         return String(format: "%.0f°", value)
@@ -1006,6 +1024,8 @@ final class AppModel: ObservableObject {
                 accumulateFilterMinutes(for: dev.id, minutes: elapsedMinutes, wearFactor: wearFactor)
             }
 
+            let isCleaning = isSelfCleaningActive && (selfCleaningDeviceId == nil || selfCleaningDeviceId == dev.id)
+
             samples.append(
                 EnergyAnalyticsEngine.DeviceEnergySample(
                     deviceId: dev.id,
@@ -1013,7 +1033,8 @@ final class AppModel: ObservableObject {
                     modeCode: mode,
                     targetTemp: targetTemp,
                     indoorTemp: indoorTemp,
-                    windSpeed: windSpeed
+                    windSpeed: windSpeed,
+                    isSelfCleaning: isCleaning
                 )
             )
         }

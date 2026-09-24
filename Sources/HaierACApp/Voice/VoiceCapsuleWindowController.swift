@@ -123,11 +123,9 @@ public final class VoiceCapsuleWindowController: NSObject, NSWindowDelegate {
     }
 
     private func currentDeviceDisplayName(model: AppModel) -> String {
-        if let first = model.devices.first {
-            return first.deviceName
-        }
-        if let manual = model.manualDevices.first {
-            return manual.name
+        let targetId = model.menuBarDeviceId ?? model.allUnifiedDevices.first?.id
+        if let targetId, let u = model.allUnifiedDevices.first(where: { $0.id == targetId }) {
+            return u.name
         }
         return "未发现空调"
     }
@@ -146,9 +144,17 @@ public final class VoiceCapsuleWindowController: NSObject, NSWindowDelegate {
     }
 
     private func executeCommand(_ command: VoiceCommand, displayText: String, model: AppModel) {
-        guard let deviceId = model.devices.first?.id ?? model.manualDevices.first?.deviceId else {
+        guard let deviceId = model.menuBarDeviceId ?? model.allUnifiedDevices.first?.id else {
             VoiceControlManager.shared.markFailed("未检测到已连接的空调设备")
             scheduleAutoDismiss(delay: 2.0)
+            return
+        }
+
+        let reach = model.reachability(for: deviceId)
+        guard reach.isControllable else {
+            let reason = reach == .gatewayReconnecting ? "网关重连中，无法执行语音指令" : "设备当前离线，无法执行语音指令"
+            VoiceControlManager.shared.markFailed(reason)
+            scheduleAutoDismiss(delay: 2.5)
             return
         }
 
