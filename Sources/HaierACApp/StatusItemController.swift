@@ -330,12 +330,13 @@ final class StatusItemController: NSObject {
             autoAllItem.isEnabled = hasControllable
             menu.addItem(autoAllItem)
 
-            // 全屋统一相对调温 (v1.9.35, v1.9.36 闭环 CR P2-3 增设 16/30°C 极值边界判定)
+            // 全屋统一相对调温 (v1.9.35, v1.9.36 闭环 CR P2-3 增设 16/30°C 极值边界判定, v1.9.42 补齐运行台数精准反馈)
+            let runningCountDesc = !onDevices.isEmpty ? " (\(onDevices.count)台运行中)" : " (当前均未开机)"
             let canStepUpAll = model.gatewayConnected && onDevices.contains { dev in
                 let curTemp = model.attribute("targetTemperature", deviceId: dev.id)?.doubleValue ?? 26.0
                 return curTemp < 30.0
             }
-            let stepUpAllItem = NSMenuItem(title: "🔼 全屋统一升温 1°C", action: #selector(stepUpAllTemperature), keyEquivalent: "")
+            let stepUpAllItem = NSMenuItem(title: "🔼 全屋统一升温 1°C\(runningCountDesc)", action: #selector(stepUpAllTemperature), keyEquivalent: "")
             stepUpAllItem.target = self
             stepUpAllItem.isEnabled = canStepUpAll
             menu.addItem(stepUpAllItem)
@@ -344,7 +345,7 @@ final class StatusItemController: NSObject {
                 let curTemp = model.attribute("targetTemperature", deviceId: dev.id)?.doubleValue ?? 26.0
                 return curTemp > 16.0
             }
-            let stepDownAllItem = NSMenuItem(title: "🔽 全屋统一降温 1°C", action: #selector(stepDownAllTemperature), keyEquivalent: "")
+            let stepDownAllItem = NSMenuItem(title: "🔽 全屋统一降温 1°C\(runningCountDesc)", action: #selector(stepDownAllTemperature), keyEquivalent: "")
             stepDownAllItem.target = self
             stepDownAllItem.isEnabled = canStepDownAll
             menu.addItem(stepDownAllItem)
@@ -632,9 +633,9 @@ final class StatusItemController: NSObject {
         refreshTemperature()
     }
 
-    /// 当前首选控制设备 ID（优先读取菜单栏绑定设备，缺省回退第一台统一设备） (v1.9.38 统一路由)
+    /// 当前首选控制设备 ID（全仓收敛统一路由） (v1.9.42)
     private var primaryDeviceId: String? {
-        model.menuBarDeviceId ?? model.allUnifiedDevices.first?.id
+        model.primaryDeviceId
     }
 
     @objc private func togglePrimaryPower() {

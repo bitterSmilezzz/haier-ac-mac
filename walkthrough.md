@@ -1,71 +1,64 @@
-# Haier AC Mac v1.9.41 发布与巡检演进报告
+# Haier AC Mac v1.9.42 发布与巡检演进报告
 
 ## 1. 概述与版本定位
-- **版本号**：`v1.9.41`
-- **发版主题**：闭环全屋调温开机联动与风速协同调度、温限边界反馈优化、自动模式全天候极端动力学及状态栏视觉统一
+- **版本号**：`v1.9.42`
+- **发版主题**：闭环中文数十复合数字溢出缺陷、多房间定向协同防越权、全仓主显路由收敛与状态栏运行台数精准反馈
 - **核心目标与架构演进**：
-  1. **全屋调温待机联动唤醒与开字调温防线闭环**：
-     - 彻底根除口语“全屋开26度”、“所有空调开25”、“全屋开24”等带“开”字的全屋调温指令在设备关机待机时仅设置温度却未下发开机的严重交互缺陷；在 `VoiceCapsuleWindowController` 中无缝补齐待机设备联动唤醒开机（`onOffStatus = true`），反馈中明确标注“（并开启 N 台待机空调）”；
-     - 在 `isAllPowerOn` 中增加 16.0°C ~ 30.0°C 有效温度区间与风速词的严格排除，杜绝任何全屋设定指令被抢占误判为单纯全屋开机。
-  2. **全屋风速协同调度与全链路风速拓展**：
-     - 针对用户发出“全屋开大风”、“所有空调开微风”、“全屋自动风”、“把所有空调都调到中速风”等全屋风速口令以往因缺少全屋作用域而回退为单机控制的缺陷，新增 `VoiceCommand.setWindSpeedAll(String)` 指令；
-     - 在 `parseAllPreset` 中排除风速关键词，并在全屋流程中前置分发全屋风速；在 `AppModel` 中提供统一的批量与全屋风速控制 API `setWindSpeed(deviceIds:speedName:autoPowerOn:)` 与 `setWindSpeedAll`，全面支持开字联动唤醒待机设备。
-  3. **全屋与单机相对调温温限边界精准反馈**：
-     - 修复此前当全屋空调开机且已全部达到 30°C（或 16°C）极限时，用户说“全屋升温1度”，语音胶囊因变更数为 0 误报“当前无任何开机运行中的在线空调”的缺陷；完善两级判定：无运行空调报待机，运行中均达温限时给出明确温限提示（“全屋运行中的空调均已达到最高温度上限 30°C / 最低温度下限 16°C”）；
-     - 单设备与多设备调温同步对齐边界守卫，达到极限时中性提示，杜绝冗余指令下发与虚假成功文案。
-  4. **自动模式（Auto）全季节极端温差与环境湿度双控动力学深化**：
-     - 在 `EnergyAnalyticsEngine.estimateInstantaneousPower` 中，将酷暑极端高温（$\ge 30^\circ\text{C}$）冷凝器散热恶化超频补偿（`heatBoost` 100~280W，顶峰 1750W）与冬季严寒低温（$\le 15^\circ\text{C}$）大温差 PTC 电辅热与大压比高频超载补偿（`coldBoost` 120~320W，顶峰 1950W）完整融入 `.auto` 模式，并接入双向环境湿度动力学微调，实现制冷、制热与自动三大核心工况全季节极端气候动力学的 100% 对称。
-  5. **macOS 状态栏多设备控制矩阵视觉统一与 Tooltip 滤网健康正面提示**：
-     - 状态栏右键“空调设备控制矩阵...”各房间子菜单中，为一键制冷、制热、除湿、送风、自动等全部模式补齐统一的模式符号（❄️、🔥、💧、🍃、🔄），与顶层菜单保持视觉一致性；
-     - 状态栏悬浮 Tooltip 增加健康提示：当全屋滤网洁净度均处于良好状态时，显示“✨ 全屋空调滤网状态良好”。
+  1. **自然语言中文数十复合数字溢出与倒计时/定时缺陷根治**：
+     - 彻底根除中文数字转换器（`convertChineseNumbers`）以往仅映射 11~30、缺失 31~99 十位进阶导致的严重口语溢出缺陷；以往“四十分钟后关机”中“十”被替换为“10”，“四”被替换为“4”，拼接为 `410分钟`（近7小时）；“四十五分钟”被错误转化为 `415分钟`；“五十分钟”转化为 `510分钟`；“三十五分钟”转化为 `305分钟`；
+     - 全面升级为基于自然语法结构的复合数字解析（`([一二两三四五六七八九])?十([一二三四五六七八九])?`），100% 覆盖 1~99 的任意中文数字组合（如“四十五”-> 45，“四十”-> 40，“三十五”-> 35，“五十”-> 50，“六十”-> 60，“九十”-> 90），彻底消除时间膨胀隐患；补齐完整的复合中文数字倒计时单元测试用例。
+  2. **多房间定向协同“都关了/都开了”全屋越权抢占防御闭环**：
+     - 彻底修复用户针对特定多房间下达口令（例如：“客厅和主卧都关了”、“把客厅和主卧都关了”、“客厅和次卧都开了”）时，因命中关键词“都关了”/“都开了”被 `isAllPowerOff` / `isAllPowerOn` 贪婪抢占，导致全屋所有未涉空调（如儿童房、老人房、书房等）被一锅端全量关机/开机的严重越权缺陷；
+     - 在全屋开关机判定中增加房间/设备定向限定词防线（`hasTargetRoomKeyword`），确保当且仅当未指定特定房间时才视为全屋操作；定向多房间指令安全放行至多设备控制链路 `executeMultiDeviceCommand`，仅精准启停所指定的空调设备。
+  3. **多设备与单设备风速控制全链路下发与健壮兜底**：
+     - 修复此前多设备协同控制（`executeMultiDeviceCommand`）中调节风速时若设备属性元数据未就绪直接走 `else` 导致指令未真正下发的隐患；
+     - 统一收敛至 `model.setWindSpeed(deviceIds:speedName:autoPowerOn:)`，支持动态元数据与静态档位（1微/2中/3强/0自动）平滑降级，并支持带“开”字口令自动联动唤醒待机设备。
+  4. **全仓主显设备路由统一收敛与状态栏全屋相对调温台数对称**：
+     - 在 `AppModel` 中提供统一的公开只读属性 `public var primaryDeviceId: String?`，集中全仓主显/首选设备路由标准（`menuBarDeviceId ?? allUnifiedDevices.first?.id`），并对齐滤网保养计时累加与重置逻辑，消除多设备环境下硬编码首台设备造成的逻辑漂移；
+     - 状态栏右键菜单中，“🔼 全屋统一升温 1°C”与“🔽 全屋统一降温 1°C”全面补齐当前受影响的运行设备台数（如 `(N台运行中)` 或待机时提示 `(当前均未开机)`），与全屋模式预设保持 100% 交互信息对称。
+  5. **送风工况强劲风量阻力功耗拓展**：
+     - 拓展送风模式（`.fan`）在高风阻强劲档位（Turbo）下的动力学功率上限至 75W，使室内强风大风量状态下的热力与空气动力学仿真更为细腻真实。
 
 ---
 
 ## 2. 关键架构变更与代码实现
 
-### 2.1 全屋调温待机联动开机与防线加固 (`VoiceCommandParser.swift` / `VoiceCapsuleWindowController.swift`)
-- **联动开机补齐**：
-  - 在 `VoiceCapsuleWindowController.executeCommand` 的 `case .setTemperatureAll(let temp)` 分支中检测 `spokenText.contains("开")`；若为待机设备，在下发目标温度的同时批量下发 `onOffStatus = true`；
-  - 成功文案动态追加“（并开启 N 台待机空调）”，彻底消除了口语说“开”而硬件不开机的脱节问题；
-- **全屋开机防线对称**：
-  - 在 `isAllPowerOn` 中同步增加有效温度域（16.0 ~ 30.0°C）与风速词的严格排除，与单设备 `isPowerOn` 形成对称严密的安全防线。
+### 2.1 中文数十复合数字结构化解析 (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)
+- **根除数字拼接溢出**：
+  - 重构 `VoiceCommandParser.convertChineseNumbers`，采用结构化正则 `([一二两三四五六七八九])?十([一二三四五六七八九])?` 逆序提取十位与个位数值，计算 `tens * 10 + ones` 替换回原文；
+  - 完美解决“四十分钟”（40分）、“四十五分钟”（45分）、“五十分钟”（50分）、“六十分钟”（60分）、“九十分钟”（90分）、“三十五分钟”（35分）以及“二十六度”（26度）等各种口语定时与温控数字；
+  - 在 `VoiceCommandParserTests` 中追加多组中文数十复合倒计时测试用例，全量通过校验。
 
-### 2.2 全屋风速协同调度与全链路风速拓展 (`VoiceCommandParser.swift` / `VoiceCapsuleWindowController.swift` / `AppModel.swift`)
-- **指令模型拓展**：
-  - `VoiceCommand` 新增 `case setWindSpeedAll(String)`；
-  - `parseWindSpeed` 感知全屋范围 `isAllDeviceScope`，准确解析为全屋风速指令（如“全屋开大风”->`.setWindSpeedAll("强劲")`，“所有空调开微风”->`.setWindSpeedAll("微风")`，“全屋自动风”->`.setWindSpeedAll("自动")`）；
-  - `parseAllPreset` 排除风速词，避免模式抢占；并在全屋流程中前置分发；
-- **模型层与执行层批量 API**：
-  - `AppModel` 增设 `setWindSpeed(deviceIds:speedName:autoPowerOn:)` 与 `setWindSpeedAll(speedName:autoPowerOn:)`；
-  - `VoiceCapsuleWindowController` 前置接管 `.setWindSpeedAll`，一键为全屋空调设定目标风速并支持待机唤醒。
+### 2.2 多房间定向协同“都关了/都开了”越权抢占拦截 (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)
+- **定向房间限定词防线**：
+  - 新增 `targetRoomKeywords = ["客厅", "主卧", "次卧", "书房", "儿童房", "老人房", "客房", "餐厅", "阳台", "卧室", "厨房"]` 与 `hasTargetRoomKeyword` 判定；
+  - 在 `isAllPowerOff` 与 `isAllPowerOn` 中设置前置守卫：当语句中包含明确房间词且不包含全局全量词时，拒绝将其判定为全屋开关；
+  - 确保口令如“客厅和主卧都关了”正确解析为针对客厅与主卧的 `.setPower(false)`，经由 `executeMultiDeviceCommand` 仅关停这两台设备，防止误杀全屋其他房间空调。
 
-### 2.3 全屋与单机相对调温边界语义优化 (`VoiceCapsuleWindowController.swift`)
-- **根除误导性反馈**：
-  - `adjustTemperatureAll` 改为先判断是否存在开机设备；若无开机设备则提示待机，若有开机设备但 `count == 0` 则明确告知“全屋运行中的空调均已达到最高温度上限 30°C / 最低温度下限 16°C”；
-  - 单设备 `case .adjustTemperature(let delta)` 在已达极限（`currentTemp >= 30.0 && delta > 0` 或 `currentTemp <= 16.0 && delta < 0`）时，立即拦截并反馈“已达到最高/最低温限”，避免无效网络请求与文案误报；多设备批量调温同步补齐该逻辑。
+### 2.3 风速多设备全链路下发与待机唤醒 (`VoiceCapsuleWindowController.swift`)
+- **执行闭环与下发兜底**：
+  - 在 `executeMultiDeviceCommand` 与单设备 `executeCommand` 中，重构 `case .setWindSpeed` 调用 `model.setWindSpeed(deviceIds:speedName:autoPowerOn:)`；
+  - 无论设备的动态属性元数据是否已经从云端同步完成，均通过多级档位映射安全下发指令；并在口令含“开”（如“客厅和主卧开大风”）时联动唤醒待机设备。
 
-### 2.4 自动模式全气候极端温差与湿度双控动力学 (`EnergyAnalyticsEngine.swift`)
-- **全季节极端气候动力学对称**：
-  - 在 `estimateInstantaneousPower` 的 `case .auto` 自动模式中，将夏季酷暑高温冷凝恶化超频动力学（`heatBoost`）与冬季严寒大温差 PTC 电辅热动力学（`coldBoost`）全面接入；
-  - 当室内高温 $\ge 30^\circ\text{C}$ 且 $\Delta T \ge 5^\circ\text{C}$ 时，动态累加 100~280W 功耗，峰值功耗放宽至 1750W；
-  - 当室内低温 $\le 15^\circ\text{C}$ 且 $\Delta T \ge 5^\circ\text{C}$ 时，动态累加 120~320W 功耗，峰值功耗放宽至 1950W；
-  - 自动制热态接入环境湿度微调补偿，实现制冷、制热与自动三大工况全季节极端气候动力学的完全对称。
+### 2.4 全仓主显设备路由标准收敛与状态栏计数对称 (`AppModel.swift` / `StatusItemController.swift`)
+- **主显路由收敛**：
+  - `AppModel` 暴露公开属性 `primaryDeviceId`，统一将 `menuBarDeviceId ?? allUnifiedDevices.first?.id` 确立为全仓单例路由；
+  - 滤网保养计时累加（`accumulateFilterMinutes`）与手动重置（`resetFilterMaintenance`）全面对齐 `primaryDeviceId`；
+- **状态栏计数对称**：
+  - 状态栏右键菜单中，“🔼 全屋统一升温 1°C”与“🔽 全屋统一降温 1°C”追加当前运行设备计数提示 `(N台运行中)` 或 `(当前均未开机)`，使得用户在点击前即可直观预期下发影响范围。
 
-### 2.5 状态栏设备矩阵视觉 Emoji 统一与 Tooltip 优化 (`StatusItemController.swift`)
-- **子菜单 Emoji 对齐**：
-  - 在“空调设备控制矩阵...”各设备子菜单中，为一键制冷 26°C、一键制热 20°C、一键除湿、一键送风、一键智能自动 24°C 全面补齐模式符号（❄️、🔥、💧、🍃、🔄）；
-- **滤网健康状态正面反馈**：
-  - 悬浮 Tooltip 在全屋滤网洁净度良好（均在安全阈值以上）时，显示“✨ 全屋空调滤网状态良好”，使用户对全屋健康状态心中有数。
+### 2.5 送风工况强劲风量阻力动力学功率上限拓展 (`EnergyAnalyticsEngine.swift`)
+- 在 `EnergyAnalyticsEngine.estimateInstantaneousPower` 中，将 `.fan`（送风模式）瞬时功率上限从 65W 拓展至 75W，使强劲风速下的风机动力学能耗表现更加契合 1.5 匹大风量贯流风机特性。
 
 ---
 
 ## 3. 构建、测试与打包验证闭环
 - **本地编译验证**：
-  - 运行 `SDKROOT=/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk swift build`，0 错误构建成功；
+  - 运行 `SDKROOT=/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk swift build`，0 错误构建完成；
 - **全链路独立断言校验**：
-  - 针对 `VoiceCommandParserTests` 与全屋风速、全屋开字调温、相对调温边界、结构化否定等全部新增断言进行自动化测试，全部通过；
+  - 针对中文复合数字倒计时、定向多房间开关防抢占、全屋全量开关等共 18 项关键断言运行独立测试套件，全部 100% 通过；
 - **应用打包与签名**：
-  - 执行 `./build_app.sh 1.9.41`，成功生成 `dist/HaierAC.app`（含桌面小组件扩展）并导出分发包 `dist/HaierAC-v1.9.41-macOS.zip`（2.6MB）。
+  - 运行 `./build_app.sh 1.9.42`，成功构建并签名 `dist/HaierAC.app`（含桌面小组件扩展），并生成发布压缩包 `dist/HaierAC-v1.9.42-macOS.zip`。
 
 ---
 

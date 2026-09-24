@@ -273,9 +273,9 @@ public final class EnergyAnalyticsEngine: ObservableObject {
 
         switch mode {
         case .fan:
-            // 送风模式：仅室内风机运转，阶梯风速动力学梯度 (v1.9.39)
+            // 送风模式：仅室内风机运转，阶梯风速动力学梯度 (v1.9.39, v1.9.42 拓展强劲风量上限)
             let power = 14.0 + windOffset * 0.42
-            return min(max(power, 14.0), 65.0)
+            return min(max(power, 14.0), 75.0)
 
         case .dehumidify:
             // 除湿模式：多维环境湿度自适应变频能耗动力学模型 (v1.9.37)

@@ -614,13 +614,12 @@ public final class VoiceCapsuleWindowController: NSObject, NSWindowDelegate {
 
         case .setWindSpeed(let speedName):
             guard ensureControllable() else { return }
-            if let windAttr = model.attributes[deviceId]?["windSpeed"],
-               case .list(let options) = windAttr.valueRange,
-               let match = options.first(where: { $0.desc.contains(speedName) || speedName.contains($0.desc) }) {
-                model.sendAttribute("windSpeed", value: match.data, deviceId: deviceId)
-                VoiceControlManager.shared.markSuccess("已调节\(prefix)风速为「\(match.desc)」")
+            let autoOn = spokenText.contains("开")
+            let count = model.setWindSpeed(deviceIds: [deviceId], speedName: speedName, autoPowerOn: autoOn)
+            if count > 0 {
+                VoiceControlManager.shared.markSuccess("已调节\(prefix)风速为「\(speedName)」")
             } else {
-                VoiceControlManager.shared.markSuccess("已调节\(prefix)风速")
+                VoiceControlManager.shared.markFailed("未能完成风速调节")
             }
 
         case .queryStatus:
@@ -876,14 +875,12 @@ public final class VoiceCapsuleWindowController: NSObject, NSWindowDelegate {
             }
 
         case .setWindSpeed(let speedName):
-            if let firstId = ids.first,
-               let windAttr = model.attributes[firstId]?["windSpeed"],
-               case .list(let options) = windAttr.valueRange,
-               let match = options.first(where: { $0.desc.contains(speedName) || speedName.contains($0.desc) }) {
-                model.sendAttributeToDevices("windSpeed", value: match.data, deviceIds: ids)
-                VoiceControlManager.shared.markSuccess("已调节\(prefix)风速为「\(match.desc)」")
+            let autoOn = spokenText.contains("开")
+            let count = model.setWindSpeed(deviceIds: ids, speedName: speedName, autoPowerOn: autoOn)
+            if count > 0 {
+                VoiceControlManager.shared.markSuccess("已调节\(prefix)风速为「\(speedName)」")
             } else {
-                VoiceControlManager.shared.markSuccess("已调节\(prefix)风速")
+                VoiceControlManager.shared.markFailed("未能完成风速调节")
             }
 
         case .countdownPower(let minutes, let on):

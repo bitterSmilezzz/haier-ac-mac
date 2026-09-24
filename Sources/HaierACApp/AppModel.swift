@@ -356,6 +356,11 @@ final class AppModel: ObservableObject {
         return list
     }
 
+    /// 当前首选/主设备 ID（用户菜单栏选定设备或首台有效设备，全仓收敛统一路由）(v1.9.42)
+    public var primaryDeviceId: String? {
+        menuBarDeviceId ?? allUnifiedDevices.first?.id
+    }
+
     /// 获取指定设备的可达状态（三态判定：网关是否连通、设备是否连网）
     public func reachability(for device: DeviceInfo) -> DeviceReachability {
         if !gatewayConnected {
@@ -654,9 +659,9 @@ final class AppModel: ObservableObject {
         return percentages.min() ?? 100
     }
 
-    /// 重置滤网保养计时 (支持指定设备，默认主设备)
+    /// 重置滤网保养计时 (支持指定设备，默认主设备) (v1.9.42 对齐 primaryDeviceId)
     func resetFilterMaintenance(for deviceId: String? = nil) {
-        let primaryId = devices.first?.id ?? manualDevices.first?.deviceId ?? ""
+        let primaryId = primaryDeviceId ?? ""
         let targetId = deviceId ?? primaryId
         if !targetId.isEmpty {
             deviceFilterMinutes[targetId] = 0
@@ -795,13 +800,13 @@ final class AppModel: ObservableObject {
         return max(0.4, min(3.0, windFactor * modeFactor * humidityFactor * selfCleaningBonus))
     }
 
-    /// 累加特定设备的滤网运行时间（结合空气动力学负荷系数折算等效工时）
+    /// 累加特定设备的滤网运行时间（结合空气动力学负荷系数折算等效工时） (v1.9.42 对齐 primaryDeviceId)
     func accumulateFilterMinutes(for deviceId: String, minutes: Int, wearFactor: Double = 1.0) {
         let current = filterAccumulatedMinutes(for: deviceId)
         let effectiveMinutes = max(1, Int(round(Double(minutes) * wearFactor)))
         let updated = current + effectiveMinutes
         deviceFilterMinutes[deviceId] = updated
-        let primaryId = devices.first?.id ?? manualDevices.first?.deviceId
+        let primaryId = primaryDeviceId
         if deviceId == primaryId {
             filterAccumulatedMinutes = updated
         }

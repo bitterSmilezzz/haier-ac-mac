@@ -300,6 +300,31 @@ final class VoiceCommandParserTests: XCTestCase {
 
         let c13 = VoiceCommandParser.parse("所有空调1小时后关机")
         XCTAssertEqual(c13?.command, .countdownPower(minutes: 60, power: false))
+
+        // 中文复合数十数字倒计时测试 (v1.9.42: 彻底解决四十五/四十分钟溢出为415/410分钟缺陷)
+        let c14 = VoiceCommandParser.parse("四十分钟后关机")
+        XCTAssertEqual(c14?.command, .countdownPower(minutes: 40, power: false))
+
+        let c15 = VoiceCommandParser.parse("四十五分钟后关机")
+        XCTAssertEqual(c15?.command, .countdownPower(minutes: 45, power: false))
+
+        let c16 = VoiceCommandParser.parse("五十分钟后关机")
+        XCTAssertEqual(c16?.command, .countdownPower(minutes: 50, power: false))
+
+        let c17 = VoiceCommandParser.parse("六十分钟后关机")
+        XCTAssertEqual(c17?.command, .countdownPower(minutes: 60, power: false))
+
+        let c18 = VoiceCommandParser.parse("三十五分钟后关机")
+        XCTAssertEqual(c18?.command, .countdownPower(minutes: 35, power: false))
+
+        let c19 = VoiceCommandParser.parse("九十分钟后关机")
+        XCTAssertEqual(c19?.command, .countdownPower(minutes: 90, power: false))
+
+        let c20 = VoiceCommandParser.parse("全屋四十分钟后关机")
+        XCTAssertEqual(c20?.command, .countdownPower(minutes: 40, power: false))
+
+        let c21 = VoiceCommandParser.parse("全屋四十五分钟后开机")
+        XCTAssertEqual(c21?.command, .countdownPower(minutes: 45, power: true))
     }
 
     func testScheduleTime() {
@@ -464,6 +489,22 @@ final class VoiceCommandParserTests: XCTestCase {
 
         let roomMode = VoiceCommandParser.parse("主卧切换到制热模式")
         XCTAssertEqual(roomMode?.command, .setMode("制热"))
+
+        // 多房间定向协同带“都”字口语（v1.9.42: 严防误判为全屋一锅端关机/开机）
+        let multiOff1 = VoiceCommandParser.parse("客厅和主卧都关了")
+        XCTAssertEqual(multiOff1?.command, .setPower(false))
+
+        let multiOff2 = VoiceCommandParser.parse("把客厅和主卧都关了")
+        XCTAssertEqual(multiOff2?.command, .setPower(false))
+
+        let multiOff3 = VoiceCommandParser.parse("客厅和主卧都关掉")
+        XCTAssertEqual(multiOff3?.command, .setPower(false))
+
+        let multiOn1 = VoiceCommandParser.parse("客厅和次卧都开了")
+        XCTAssertEqual(multiOn1?.command, .setPower(true))
+
+        let multiOn2 = VoiceCommandParser.parse("把客厅和主卧都打开")
+        XCTAssertEqual(multiOn2?.command, .setPower(true))
     }
 
     // MARK: - 全屋模式与温控协同测试 (v1.9.33)

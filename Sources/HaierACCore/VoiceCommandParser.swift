@@ -422,10 +422,23 @@ public struct VoiceCommandParser {
         return regex.firstMatch(in: text, options: [], range: range) != nil
     }
 
+    private static let targetRoomKeywords = [
+        "客厅", "主卧", "次卧", "书房", "儿童房", "老人房", "客房", "餐厅", "阳台", "卧室", "厨房"
+    ]
+
+    private static func hasTargetRoomKeyword(_ text: String) -> Bool {
+        targetRoomKeywords.contains(where: { text.contains($0) })
+    }
+
     private static func isAllPowerOff(_ text: String) -> Bool {
         guard !containsNegativeAction(text) else { return false }
         // 排除定时与倒计时命令（如“全屋30分钟后关机”、“全屋定时关机”、“所有空调晚上10点关机”） (v1.9.40)
         if text.contains("后") || text.contains("倒计时") || text.contains("定时") || text.contains("预约") {
+            return false
+        }
+        // 若口令中包含明确的定向房间/设备词且未包含全屋全局作用域词（如“客厅和主卧都关了”），
+        // 其中的“都”为指代前述房间的副词，严禁越权泛化为全屋关机 (v1.9.42)
+        if hasTargetRoomKeyword(text) && !isAllDeviceScope(text) {
             return false
         }
         let allOffKeywords = [
@@ -441,7 +454,7 @@ public struct VoiceCommandParser {
             return true
         }
         // 自然语言容错：包含“所有/全部/全屋/全都”并包含“关/停”
-        if (text.contains("所有") || text.contains("全部") || text.contains("全屋") || text.contains("全都")) &&
+        if (text.contains("所有") || text.contains("全部") || text.contains("全屋") || text.contains("全都") || text.contains("全家") || text.contains("整套")) &&
            (text.contains("关") || text.contains("停")) {
             return true
         }
@@ -449,7 +462,7 @@ public struct VoiceCommandParser {
     }
 
     public static func isAllDeviceScope(_ text: String) -> Bool {
-        text.contains("所有") || text.contains("全部") || text.contains("全屋") || text.contains("全都")
+        text.contains("所有") || text.contains("全部") || text.contains("全屋") || text.contains("全都") || text.contains("全家") || text.contains("整套")
     }
 
     private static func parseAllPreset(_ text: String) -> VoiceParseResult? {
@@ -552,6 +565,11 @@ public struct VoiceCommandParser {
         if text.contains("后") || text.contains("倒计时") || text.contains("定时") || text.contains("预约") {
             return false
         }
+        // 若口令包含明确的定向房间/设备词且未包含全屋全局作用域词（如“客厅和次卧都开了”），
+        // 其中的“都”为指代前述房间的副词，严禁越权泛化为全屋开机 (v1.9.42)
+        if hasTargetRoomKeyword(text) && !isAllDeviceScope(text) {
+            return false
+        }
         // 排除带有具体有效温度（16~30°C）的口令（如“全屋开26度”、“全屋开26”、“所有空调开25”） (v1.9.41 完善全屋开机防线)
         if let temp = extractTemperatureValue(from: text), temp >= 16.0 && temp <= 30.0 {
             return false
@@ -581,7 +599,7 @@ public struct VoiceCommandParser {
             return true
         }
         // 自然语言容错：包含“所有/全部/全屋/全都”并包含“开/启”且不含关
-        if (text.contains("所有") || text.contains("全部") || text.contains("全屋") || text.contains("全都")) &&
+        if (text.contains("所有") || text.contains("全部") || text.contains("全屋") || text.contains("全都") || text.contains("全家") || text.contains("整套")) &&
            (text.contains("开") || text.contains("启")) && !text.contains("关") {
             return true
         }
@@ -864,7 +882,7 @@ public struct VoiceCommandParser {
         return nil
     }
 
-    /// 将常见的中文数字表达替换为阿拉伯数字
+    /// 将常见的中文数字表达替换为阿拉伯数字 (v1.9.42 升级为 1~99 结构化复合数字解析，彻底根除四十五/四十分钟溢出缺陷)
     private static func convertChineseNumbers(in input: String) -> String {
         var str = input
         // 先处理时间特定的固定搭配
@@ -873,46 +891,34 @@ public struct VoiceCommandParser {
         str = str.replacingOccurrences(of: "半小时", with: "30分钟")
         str = str.replacingOccurrences(of: "点半", with: "点30分")
         str = str.replacingOccurrences(of: "时半", with: "点30分")
-        str = str.replacingOccurrences(of: "两", with: "2")
+        str = str.replacingOccurrences(of: "一百", with: "100")
+        str = str.replacingOccurrences(of: "点五", with: ".5")
 
-        let mapping: [(String, String)] = [
-            ("三十", "30"),
-            ("二十九", "29"),
-            ("二十八", "28"),
-            ("二十七", "27"),
-            ("二十六", "26"),
-            ("二十五", "25"),
-            ("二十四", "24"),
-            ("二十三", "23"),
-            ("二十二", "22"),
-            ("二十一", "21"),
-            ("二十", "20"),
-            ("十九", "19"),
-            ("十八", "18"),
-            ("十七", "17"),
-            ("十六", "16"),
-            ("十五", "15"),
-            ("十四", "14"),
-            ("十三", "13"),
-            ("十二", "12"),
-            ("十一", "11"),
-            ("十", "10"),
-            ("一", "1"),
-            ("二", "2"),
-            ("三", "3"),
-            ("四", "4"),
-            ("五", "5"),
-            ("六", "6"),
-            ("七", "7"),
-            ("八", "8"),
-            ("九", "9"),
-            ("零", "0"),
-            ("点五", ".5")
+        let digitMap: [Character: Int] = [
+            "零": 0, "一": 1, "二": 2, "两": 2, "三": 3,
+            "四": 4, "五": 5, "六": 6, "七": 7, "八": 8, "九": 9
         ]
 
-        for (cn, ar) in mapping {
-            str = str.replacingOccurrences(of: cn, with: ar)
+        // 匹配 [一二两三四五六七八九]?十[一二三四五六七八九]? 复合中文数字（如：四十五 -> 45，四十 -> 40，十五 -> 15，十 -> 10）
+        let compoundPattern = #"([一二两三四五六七八九])?十([一二三四五六七八九])?"#
+        if let regex = try? NSRegularExpression(pattern: compoundPattern) {
+            let ns = str as NSString
+            let matches = regex.matches(in: str, range: NSRange(location: 0, length: ns.length)).reversed()
+            for m in matches {
+                let tensStr = m.range(at: 1).location != NSNotFound ? ns.substring(with: m.range(at: 1)) : nil
+                let onesStr = m.range(at: 2).location != NSNotFound ? ns.substring(with: m.range(at: 2)) : nil
+                let tens = tensStr.flatMap { digitMap[$0.first!] } ?? 1
+                let ones = onesStr.flatMap { digitMap[$0.first!] } ?? 0
+                let value = tens * 10 + ones
+                let range = Range(m.range, in: str)!
+                str.replaceSubrange(range, with: "\(value)")
+            }
         }
+
+        for (cn, val) in digitMap {
+            str = str.replacingOccurrences(of: String(cn), with: "\(val)")
+        }
+
         return str
     }
 

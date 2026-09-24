@@ -6,6 +6,21 @@ A native SwiftUI app to control Haier / Leader (统帅) smart air conditioners o
 
 ## Features
 
+- 🏷 **Chinese Compound Numeral Overflow Remediation, Multi-Room Targeted Power Scope Defense, Unified Primary Device Routing & Menu Bar Active Unit Counter (v1.9.42)**:
+  - 🔢 **Compound Chinese Numeral Overflow & Timer/Countdown Defect Remediation (`VoiceCommandParser` / `VoiceCommandParserTests`)**:
+    - Completely resolved the overflow flaw where `convertChineseNumbers` previously mapped only up to 30 while omitting decades 31~99; commands like "四十分钟后关机" (turn off after 40 minutes) had "十" replaced with 10 and "四" with 4, corrupting into `410 minutes` (nearly 7 hours); similarly "四十五分钟" produced `415 minutes`, "五十分钟" produced `510 minutes`, and "三十五分钟" produced `305 minutes`;
+    - Upgraded to structural compound numeral parsing (`([一二两三四五六七八九])?十([一二三四五六七八九])?`), offering 100% robust coverage across all 1~99 Chinese numbers ("四十五" -> 45, "四十" -> 40, "三十五" -> 35, "五十" -> 50, "六十" -> 60, "九十" -> 90) with full regression unit tests.
+  - 🛡️ **Multi-Room Targeted Power Preemption & All-House Scope Defense (`VoiceCommandParser` / `VoiceCapsuleWindowController` / `VoiceCommandParserTests`)**:
+    - Permanently fixed the critical bug where targeted multi-room commands containing phrases like "都关了" or "都开了" (e.g. "客厅和主卧都关了" - turn off both living room and master bedroom) were greedily intercepted by `isAllPowerOff` / `isAllPowerOn`, which mistakenly caused the entire house's ACs (including children's room, study, etc.) to shut down or turn on;
+    - Added room keyword scope validation (`hasTargetRoomKeyword`) to whole-house power rules, ensuring commands with specific room names cleanly bypass whole-house triggers and route into `executeMultiDeviceCommand` to act strictly upon the designated rooms.
+  - 🍃 **End-to-End Fan Speed Execution & Fallback Hardening (`VoiceCapsuleWindowController`)**:
+    - Eliminated the risk where multi-device fan speed adjustments failed silently without dispatching network commands when dynamic attribute metadata was not yet loaded;
+    - Unified dispatch through `model.setWindSpeed(deviceIds:speedName:autoPowerOn:)`, supporting dynamic options, robust static grade fallbacks (1=quiet, 2=mid, 3=high, 0=auto), and auto-power-on for phrases containing "开".
+  - 📍 **Centralized Primary Device Routing & Menu Bar Step-Adjust Device Counter (`AppModel` / `StatusItemController`)**:
+    - Exposed unified `public var primaryDeviceId: String?` in `AppModel` (`menuBarDeviceId ?? allUnifiedDevices.first?.id`), standardizing primary device resolution and aligning filter care accumulation and reset logic across the codebase;
+    - Enhanced right-click menu items "🔼 全屋统一升温 1°C" and "🔽 全屋统一降温 1°C" with real-time running device count indicators (e.g. `(N台运行中)` or `(当前均未开机)`), achieving 100% visual symmetry with whole-house preset actions.
+  - ⚡️ **Fan Mode High-Flow Turbo Aerodynamic Power Range (`EnergyAnalyticsEngine`)**:
+    - Expanded `.fan` mode power ceiling to 75.0W for high air volume turbo dynamics, providing richer thermodynamic and aerodynamic fidelity.
 - 🏷 **Whole-House Temperature Power Linking & Fan Speed Coordination, Boundary Feedback Hardening, All-Weather Auto Extreme Dynamics & Menu Bar Visual Polish (v1.9.41)**:
   - 🎙️ **Whole-House Temperature Standby Wakeup Linking & Power Guarding (`VoiceCommandParser` / `VoiceCapsuleWindowController` / `VoiceCommandParserTests`)**:
     - Completely resolved the interactive flaw where spoken whole-house temperature commands prefixed with "开" (e.g. "全屋开26度", "所有空调开25", "全屋开24") merely adjusted target temperature while leaving standby units off; seamlessly linked standby power-on (`onOffStatus = true`) in `VoiceCapsuleWindowController` with explicit feedback "（并开启 N 台待机空调）";
