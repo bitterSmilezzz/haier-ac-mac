@@ -331,7 +331,7 @@ public final class EnergyAnalyticsEngine: ObservableObject {
             return min(max(power, 220.0), 1950.0)
 
         case .cooling:
-            // 制冷模式：变频温差动力学模型 + 恒温平衡区低频维持态阻尼 (v1.9.36)
+            // 制冷模式：变频温差动力学模型 + 恒温平衡区低频维持态阻尼 + 酷暑高温大温差重载动力学校准 (v1.9.36, v1.9.40)
             let indoor = indoorTemp ?? 26.0
             let target = targetTemp ?? 25.0
             let delta = indoor - target
@@ -344,9 +344,20 @@ public final class EnergyAnalyticsEngine: ObservableObject {
                 power = 220.0 + (delta * 160.0) + (windOffset * 0.8)
             } else {
                 // 变频重载降温区 (ΔT >= 1.0°C)
-                power = 380.0 + ((delta - 1.0) * 95.0) + windOffset
+                // 酷暑高温大温差超载动力学补偿：当室内温度偏高（indoor >= 30.0°C）且大温差降温（delta >= 5.0°C）时，
+                // 拟真变频压缩机处于高频满载运转，且高温环境下外机冷凝器散热恶化导致冷凝压力与压比急剧攀升，
+                // 动态补偿热阻抗超载电热功率 (100W ~ 280W)，与严寒制热 PTC 形成全气候对称动力学仿真
+                let heatBoost: Double = {
+                    if indoor >= 30.0 && delta >= 5.0 {
+                        let excessIndoor = min(8.0, indoor - 30.0)
+                        let excessDelta = min(8.0, delta - 5.0)
+                        return 100.0 + (excessIndoor * 12.0) + (excessDelta * 10.0)
+                    }
+                    return 0.0
+                }()
+                power = 380.0 + ((delta - 1.0) * 95.0) + windOffset + heatBoost
             }
-            return min(max(power, 180.0), 1450.0)
+            return min(max(power, 180.0), 1750.0)
 
         case .auto:
             // 自动模式：根据室内与设定温差智能判别制冷或制热动力曲线，融合环境湿度微调补偿 (v1.9.36 统一阻尼, v1.9.38 湿度双控动力微调)

@@ -362,6 +362,104 @@ public final class VoiceCapsuleWindowController: NSObject, NSWindowDelegate {
             break
         }
 
+        // 全屋定时与倒计时协同调度 (v1.9.40)
+        if VoiceCommandParser.isAllDeviceScope(spokenText) {
+            switch command {
+            case .countdownPower(let minutes, let on):
+                guard model.gatewayConnected else {
+                    VoiceControlManager.shared.markFailed("网关重连中，无法执行全屋控制")
+                    scheduleAutoDismiss(delay: 2.5)
+                    return
+                }
+                let controllable = model.allUnifiedDevices.filter { model.reachability(for: $0.id).isControllable }
+                guard !controllable.isEmpty else {
+                    VoiceControlManager.shared.markFailed("未发现可控制的就绪空调设备")
+                    scheduleAutoDismiss(delay: 2.0)
+                    return
+                }
+                let fireDate = Date().addingTimeInterval(TimeInterval(minutes * 60))
+                let attrVal = AttrValue.bool(on)
+                guard let valJSON = ScheduledAction.valueJSON(attrVal) else {
+                    VoiceControlManager.shared.markFailed("参数构造失败")
+                    scheduleAutoDismiss(delay: 2.0)
+                    return
+                }
+                let timeDesc = (minutes >= 60 && minutes % 60 == 0) ? "\(minutes / 60) 小时" : "\(minutes) 分钟"
+                let actionName = "\(timeDesc)后\(on ? "开机" : "关机")"
+                for dev in controllable {
+                    let action = ScheduledAction(
+                        name: "「\(dev.name)」\(actionName)",
+                        deviceId: dev.id,
+                        attrName: "onOffStatus",
+                        attrDesc: "开关",
+                        attrValueJSON: valJSON,
+                        fireDate: fireDate,
+                        repeatsDaily: false,
+                        repeatWeekdays: [],
+                        enabled: true
+                    )
+                    model.addScheduledAction(action)
+                }
+                VoiceControlManager.shared.markSuccess("已为全屋 \(controllable.count) 台空调设置：\(actionName)")
+                scheduleAutoDismiss(delay: 1.8)
+                return
+
+            case .schedulePower(let hour, let minute, let on):
+                guard model.gatewayConnected else {
+                    VoiceControlManager.shared.markFailed("网关重连中，无法执行全屋控制")
+                    scheduleAutoDismiss(delay: 2.5)
+                    return
+                }
+                let controllable = model.allUnifiedDevices.filter { model.reachability(for: $0.id).isControllable }
+                guard !controllable.isEmpty else {
+                    VoiceControlManager.shared.markFailed("未发现可控制的就绪空调设备")
+                    scheduleAutoDismiss(delay: 2.0)
+                    return
+                }
+                let calendar = Calendar.current
+                var components = calendar.dateComponents([.year, .month, .day], from: Date())
+                components.hour = hour
+                components.minute = minute
+                components.second = 0
+                guard var targetDate = calendar.date(from: components) else {
+                    VoiceControlManager.shared.markFailed("时间解析失败")
+                    scheduleAutoDismiss(delay: 2.0)
+                    return
+                }
+                if targetDate <= Date() {
+                    targetDate = calendar.date(byAdding: .day, value: 1, to: targetDate) ?? targetDate
+                }
+                let timeStr = String(format: "%02d:%02d", hour, minute)
+                let actionName = "\(timeStr) \(on ? "开机" : "关机")"
+                let attrVal = AttrValue.bool(on)
+                guard let valJSON = ScheduledAction.valueJSON(attrVal) else {
+                    VoiceControlManager.shared.markFailed("参数构造失败")
+                    scheduleAutoDismiss(delay: 2.0)
+                    return
+                }
+                for dev in controllable {
+                    let action = ScheduledAction(
+                        name: "「\(dev.name)」\(actionName)",
+                        deviceId: dev.id,
+                        attrName: "onOffStatus",
+                        attrDesc: "开关",
+                        attrValueJSON: valJSON,
+                        fireDate: targetDate,
+                        repeatsDaily: false,
+                        repeatWeekdays: [],
+                        enabled: true
+                    )
+                    model.addScheduledAction(action)
+                }
+                VoiceControlManager.shared.markSuccess("已为全屋 \(controllable.count) 台空调设定：\(actionName)")
+                scheduleAutoDismiss(delay: 1.8)
+                return
+
+            default:
+                break
+            }
+        }
+
         // 2. 定向设备解析：支持单设备与多房间组合识别 (v1.9.33)
         let targetDevices = resolveTargetDevices(for: spokenText, model: model)
         guard !targetDevices.isEmpty else {
@@ -730,6 +828,70 @@ public final class VoiceCapsuleWindowController: NSObject, NSWindowDelegate {
             } else {
                 VoiceControlManager.shared.markSuccess("已调节\(prefix)风速")
             }
+
+        case .countdownPower(let minutes, let on):
+            let fireDate = Date().addingTimeInterval(TimeInterval(minutes * 60))
+            let attrVal = AttrValue.bool(on)
+            guard let valJSON = ScheduledAction.valueJSON(attrVal) else {
+                VoiceControlManager.shared.markFailed("参数构造失败")
+                scheduleAutoDismiss(delay: 2.0)
+                return
+            }
+            let timeDesc: String = (minutes >= 60 && minutes % 60 == 0) ? "\(minutes / 60) 小时" : "\(minutes) 分钟"
+            let actionName = "\(timeDesc)后\(on ? "开机" : "关机")"
+            for dev in controllable {
+                let action = ScheduledAction(
+                    name: "「\(dev.name)」\(actionName)",
+                    deviceId: dev.id,
+                    attrName: "onOffStatus",
+                    attrDesc: "开关",
+                    attrValueJSON: valJSON,
+                    fireDate: fireDate,
+                    repeatsDaily: false,
+                    repeatWeekdays: [],
+                    enabled: true
+                )
+                model.addScheduledAction(action)
+            }
+            VoiceControlManager.shared.markSuccess("已为\(prefix)设置：\(actionName)")
+
+        case .schedulePower(let hour, let minute, let on):
+            let calendar = Calendar.current
+            var components = calendar.dateComponents([.year, .month, .day], from: Date())
+            components.hour = hour
+            components.minute = minute
+            components.second = 0
+            guard var targetDate = calendar.date(from: components) else {
+                VoiceControlManager.shared.markFailed("时间解析失败")
+                scheduleAutoDismiss(delay: 2.0)
+                return
+            }
+            if targetDate <= Date() {
+                targetDate = calendar.date(byAdding: .day, value: 1, to: targetDate) ?? targetDate
+            }
+            let timeStr = String(format: "%02d:%02d", hour, minute)
+            let actionName = "\(timeStr) \(on ? "开机" : "关机")"
+            let attrVal = AttrValue.bool(on)
+            guard let valJSON = ScheduledAction.valueJSON(attrVal) else {
+                VoiceControlManager.shared.markFailed("参数构造失败")
+                scheduleAutoDismiss(delay: 2.0)
+                return
+            }
+            for dev in controllable {
+                let action = ScheduledAction(
+                    name: "「\(dev.name)」\(actionName)",
+                    deviceId: dev.id,
+                    attrName: "onOffStatus",
+                    attrDesc: "开关",
+                    attrValueJSON: valJSON,
+                    fireDate: targetDate,
+                    repeatsDaily: false,
+                    repeatWeekdays: [],
+                    enabled: true
+                )
+                model.addScheduledAction(action)
+            }
+            VoiceControlManager.shared.markSuccess("已为\(prefix)设定：\(actionName)")
 
         default:
             VoiceControlManager.shared.markFailed("该操作暂不支持多设备批量执行")

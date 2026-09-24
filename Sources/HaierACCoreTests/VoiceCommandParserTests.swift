@@ -51,7 +51,7 @@ final class VoiceCommandParserTests: XCTestCase {
         let t5 = VoiceCommandParser.parse("调到二十七度")
         XCTAssertEqual(t5?.command, .setTemperature(27.0))
 
-        // “开”字前缀绝对调温（口语高频指令，闭环 v1.9.38 误判为单纯开机缺陷）
+        // “开”字前缀绝对调温（口语高频指令，闭环 v1.9.38 误判为单纯开机缺陷，v1.9.40 覆盖省略“度”字口语）
         let t6 = VoiceCommandParser.parse("开26度")
         XCTAssertEqual(t6?.command, .setTemperature(26.0))
 
@@ -63,6 +63,15 @@ final class VoiceCommandParserTests: XCTestCase {
 
         let t9 = VoiceCommandParser.parse("空调开26度")
         XCTAssertEqual(t9?.command, .setTemperature(26.0))
+
+        let t10 = VoiceCommandParser.parse("开26")
+        XCTAssertEqual(t10?.command, .setTemperature(26.0))
+
+        let t11 = VoiceCommandParser.parse("打开25")
+        XCTAssertEqual(t11?.command, .setTemperature(25.0))
+
+        let t12 = VoiceCommandParser.parse("开24")
+        XCTAssertEqual(t12?.command, .setTemperature(24.0))
     }
 
     // MARK: - 相对温度微调测试
@@ -264,6 +273,18 @@ final class VoiceCommandParserTests: XCTestCase {
 
         let c10 = VoiceCommandParser.parse("10分钟后开空调")
         XCTAssertEqual(c10?.command, .countdownPower(minutes: 10, power: true))
+
+        // 全屋倒计时协同 (v1.9.40: 杜绝被全屋立即关机贪婪拦截)
+        let c11 = VoiceCommandParser.parse("全屋30分钟后关机")
+        XCTAssertEqual(c11?.command, .countdownPower(minutes: 30, power: false))
+        XCTAssertEqual(c11?.displayText, "全屋设定 30 分钟后关机")
+
+        let c12 = VoiceCommandParser.parse("全屋半小时后开机")
+        XCTAssertEqual(c12?.command, .countdownPower(minutes: 30, power: true))
+        XCTAssertEqual(c12?.displayText, "全屋设定 30 分钟后开机")
+
+        let c13 = VoiceCommandParser.parse("所有空调1小时后关机")
+        XCTAssertEqual(c13?.command, .countdownPower(minutes: 60, power: false))
     }
 
     func testScheduleTime() {
@@ -281,6 +302,14 @@ final class VoiceCommandParserTests: XCTestCase {
 
         let s5 = VoiceCommandParser.parse("22:30关机")
         XCTAssertEqual(s5?.command, .schedulePower(hour: 22, minute: 30, power: false))
+
+        // 全屋钟点定时 (v1.9.40)
+        let s6 = VoiceCommandParser.parse("全屋晚上10点关空调")
+        XCTAssertEqual(s6?.command, .schedulePower(hour: 22, minute: 0, power: false))
+        XCTAssertEqual(s6?.displayText, "定时全屋在 22:00 关机")
+
+        let s7 = VoiceCommandParser.parse("所有空调明早7点开机")
+        XCTAssertEqual(s7?.command, .schedulePower(hour: 7, minute: 0, power: true))
     }
 
     func testCancelSchedules() {
@@ -489,13 +518,20 @@ final class VoiceCommandParserTests: XCTestCase {
         XCTAssertNil(VoiceCommandParser.parse("千万别关空调"))
         XCTAssertNil(VoiceCommandParser.parse("先别关"))
         XCTAssertNil(VoiceCommandParser.parse("不用关空调"))
-        // 关键插字用例 (v1.9.36: 杜绝因插入字导致否定失效而误关全屋)
+        // 关键插字用例 (v1.9.36, v1.9.40: 杜绝因各种插入字导致否定失效而误关全屋或误开机)
         XCTAssertNil(VoiceCommandParser.parse("全屋空调别都关了"))
         XCTAssertNil(VoiceCommandParser.parse("不要全部关掉"))
         XCTAssertNil(VoiceCommandParser.parse("先别急着关"))
         XCTAssertNil(VoiceCommandParser.parse("别马上关"))
         XCTAssertNil(VoiceCommandParser.parse("别把全屋空调都关了"))
         XCTAssertNil(VoiceCommandParser.parse("别把空调都关了"))
+        XCTAssertNil(VoiceCommandParser.parse("别给我关了"))
+        XCTAssertNil(VoiceCommandParser.parse("千万别现在关"))
+        XCTAssertNil(VoiceCommandParser.parse("不用帮我关"))
+        XCTAssertNil(VoiceCommandParser.parse("别太快关"))
+        XCTAssertNil(VoiceCommandParser.parse("别乱调温度"))
+        XCTAssertNil(VoiceCommandParser.parse("不要随便开"))
+        XCTAssertNil(VoiceCommandParser.parse("千万别去开"))
 
         // 全屋与单机否定开机（紧邻与带插入字用例）
         XCTAssertNil(VoiceCommandParser.parse("别开空调"))

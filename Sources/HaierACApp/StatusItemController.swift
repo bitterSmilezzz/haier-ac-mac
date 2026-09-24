@@ -323,6 +323,11 @@ final class StatusItemController: NSObject {
             fanAllItem.isEnabled = hasControllable
             menu.addItem(fanAllItem)
 
+            let autoAllItem = NSMenuItem(title: "🔄 全屋智能自动 24°C\(countDesc)", action: #selector(applyQuickAutoAll), keyEquivalent: "")
+            autoAllItem.target = self
+            autoAllItem.isEnabled = hasControllable
+            menu.addItem(autoAllItem)
+
             // 全屋统一相对调温 (v1.9.35, v1.9.36 闭环 CR P2-3 增设 16/30°C 极值边界判定)
             let canStepUpAll = model.gatewayConnected && onDevices.contains { dev in
                 let curTemp = model.attribute("targetTemperature", deviceId: dev.id)?.doubleValue ?? 26.0
@@ -439,6 +444,17 @@ final class StatusItemController: NSObject {
                 fanItem.isEnabled = isControllable
                 devSubmenu.addItem(fanItem)
 
+                // 一键智能自动 24°C (v1.9.40)
+                let autoItem = NSMenuItem(
+                    title: "一键智能自动 24°C",
+                    action: #selector(setQuickAuto(_:)),
+                    keyEquivalent: ""
+                )
+                autoItem.target = self
+                autoItem.representedObject = devId
+                autoItem.isEnabled = isControllable
+                devSubmenu.addItem(autoItem)
+
                 // 升降温 1°C (v1.9.35)
                 let upItem = NSMenuItem(
                     title: "🔼 升温 1°C (当前 \(curTempStr)°C)",
@@ -508,6 +524,11 @@ final class StatusItemController: NSObject {
             fanItem.target = self
             fanItem.isEnabled = isControllable
             menu.addItem(fanItem)
+
+            let autoItem = NSMenuItem(title: "🔄 一键智能自动 24°C", action: #selector(applyQuickAutoPrimary), keyEquivalent: "")
+            autoItem.target = self
+            autoItem.isEnabled = isControllable
+            menu.addItem(autoItem)
 
             let stepUpItem = NSMenuItem(title: "🔼 升温 1°C (当前 \(curTempStr)°C)", action: #selector(stepUpPrimaryTemperature), keyEquivalent: "")
             stepUpItem.target = self
@@ -644,6 +665,10 @@ final class StatusItemController: NSObject {
         model.applyPresetToAllDevices(mode: .fan, temperature: 26.0)
     }
 
+    @objc private func applyQuickAutoAll() {
+        model.applyPresetToAllDevices(mode: .auto, temperature: 24.0)
+    }
+
     @objc private func stepUpAllTemperature() {
         model.adjustTemperatureAll(delta: 1.0)
     }
@@ -715,6 +740,13 @@ final class StatusItemController: NSObject {
         model.sendAttribute("targetTemperature", value: .double(26.0), deviceId: devId)
     }
 
+    @objc private func setQuickAuto(_ sender: NSMenuItem) {
+        guard let devId = sender.representedObject as? String else { return }
+        model.sendAttribute("onOffStatus", value: .bool(true), deviceId: devId)
+        model.sendAttribute("operationMode", value: .string(ACModeCode.auto.rawValue), deviceId: devId)
+        model.sendAttribute("targetTemperature", value: .double(24.0), deviceId: devId)
+    }
+
     @objc private func applyQuickCoolingPrimary() {
         guard let devId = primaryDeviceId else { return }
         model.sendAttribute("onOffStatus", value: .bool(true), deviceId: devId)
@@ -741,6 +773,13 @@ final class StatusItemController: NSObject {
         model.sendAttribute("onOffStatus", value: .bool(true), deviceId: devId)
         model.sendAttribute("operationMode", value: .string(ACModeCode.fan.rawValue), deviceId: devId)
         model.sendAttribute("targetTemperature", value: .double(26.0), deviceId: devId)
+    }
+
+    @objc private func applyQuickAutoPrimary() {
+        guard let devId = primaryDeviceId else { return }
+        model.sendAttribute("onOffStatus", value: .bool(true), deviceId: devId)
+        model.sendAttribute("operationMode", value: .string(ACModeCode.auto.rawValue), deviceId: devId)
+        model.sendAttribute("targetTemperature", value: .double(24.0), deviceId: devId)
     }
 
     @objc private func openFilterCare() {

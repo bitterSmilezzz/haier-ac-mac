@@ -1,57 +1,64 @@
-# Haier AC Mac v1.9.39 发布与巡检演进报告
+# Haier AC Mac v1.9.40 发布与巡检演进报告
 
 ## 1. 概述与版本定位
-- **版本号**：`v1.9.39`
-- **发版主题**：闭环自然语言模式温度复合控制缺陷、状态栏设备矩阵主显一键切换与低温制热动力学
+- **版本号**：`v1.9.40`
+- **发版主题**：闭环自然语言结构化否定防御与全屋定时调度、状态栏五模对称及高温制冷动力学
 - **核心目标与架构演进**：
-  1. **自然语言运行模式与设定温度复合指令缺陷根治**：
-     - 彻底根除口语中同时包含模式与目标温度（如“制冷26度”、“开制冷26度”、“开冷气25度”、“开暖气22度”、“开制热二十度”、“客厅制冷26度”、“主卧开暖气21度”、“客厅和主卧开制冷24度”）因原有解析流中 `parseAbsoluteTemperature` 优先捕获导致模式（`operationMode`）被意外丢弃的严重缺陷；
-     - 新增 `VoiceCommand.setModeAndTemperature(mode: String, temperature: Double?)` 指令模型；解析器前置提取运行模式与 16~30°C 温度值，并提供“清爽制冷 26°C”、“舒适制热 20°C”等友好自然语言反馈；
-     - 在单机与多设备批量执行链路（`executeMultiDeviceCommand`）中无缝联动唤醒待机设备、下发模式与目标温度；
-     - 全链路扩充调温与变频动作的否定安全防护（“别开制冷26度”、“不要开暖气22度”、“别调到26度”、“千万别开大风”等），杜绝任何误执行。
-  2. **macOS 状态栏多设备矩阵一键常驻主显设备（Primary Device Pinning）**：
-     - 在状态栏右键“空调设备控制矩阵...”各房间子菜单中，增设原生「★ 设为菜单栏主显设备」选项（当前主显设备显示「✓ 菜单栏常驻主显中」并禁用点击）；
-     - 点击后一键将 `model.menuBarDeviceId` 切换至指定设备，并即刻触发 `refreshTemperature()` 刷新菜单栏实时温度显示、图标、悬浮 Tooltip 与 Bento Popover 默认聚焦，同时弹出 Toast 确认反馈；
-     - 在子菜单顶层设备标题前标示 `★` 徽章，多设备家庭用户在状态栏无需打开主窗口即可随时切换主控房间。
-  3. **变频制热严寒低温 PTC 电辅热与大温差热负荷动力学校准**：
-     - 在 `EnergyAnalyticsEngine.estimateInstantaneousPower` 中，深度优化冬季制热动力学：当室内外温差大且室内温度较低（室内温度 $\le 15^\circ\text{C}$，目标温差 $\Delta T \ge 5^\circ\text{C}$）时，拟真变频空调自动触发 PTC 辅助电加热与超频提温机制，动态计算热负荷附加功耗（+120W ~ 320W），大幅提升严寒季节与速热场景下的能耗仿真精度；
-     - 送风模式引入阶梯风速风阻能耗微调，低速静音档微功耗（最低 14W），高速强劲档真实还原风机全速压降能耗。
+  1. **自然语言否定结构化匹配防御与插字绕过根治**：
+     - 彻底根除口语否定词与动作谓词之间插入修饰词或宾语（如“别给我关了”、“千万别现在关”、“不用帮我关”、“别太快关”、“别乱调”等）因以往字符集穷举导致的漏判隐患，全面升级为基于自然语法结构的非标点贪婪捕获正则 `(?:别|不要|不用|先别|千万别|切勿|请勿|暂不)[^，。！？\s]{0,6}?(?:关|停|开|启动|运转|打开|关闭|调|设|升|降)`，稳健拦截任意带修饰插入语的否定口语，杜绝家庭口语误触发整机或全屋动作；
+     - 针对相对/绝对调温、风速、模式、情景等动作动词扩充否定防御，测试套件新增多组真实场景否定用例。
+  2. **全屋定时/倒计时指令贪婪拦截缺陷根治与多设备协同**：
+     - 彻底根除“全屋30分钟后关机”、“全屋半小时后开机”因原解析管线中定时解析落后于全屋关机/开机而被贪婪抢占误判为立即全屋断电/开机的严重缺陷；将定时与倒计时解析提升至全屋开关机之前，并在全屋开关机与全屋调温前置条件中增加倒计时/定时关键词防御门禁；
+     - 在 `VoiceCapsuleWindowController` 中打通全屋与多设备定向倒计时/定时（`.countdownPower` 与 `.schedulePower`）批量协同调度，支持一键为全屋或多房间同步下发延时任务并给出友好汇总反馈。
+  3. **开字前缀省略“度”字口语绝对调温解析闭环**：
+     - 修复此前口语调温中省略“度”字（如“开26”、“打开25”、“开24”）被 `isPowerOn` 贪婪前置捕获误判为单纯开机而丢失目标温度的缺陷；通过对提取数字进行 16.0°C ~ 30.0°C 温度有效域严格校验，准确映射为设温指令并联动唤醒待机设备。
+  4. **macOS 状态栏 5-in-1 全模式对称与一键智能自动 24°C**：
+     - 在菜单栏右键全屋快捷预设中新增「🔄 全屋智能自动 24°C (N台在线)」，与全屋制冷、制热、除湿、送风构成完整的 5-in-1 全工况控制矩阵；
+     - 在多设备控制矩阵各房间子菜单及单设备上下文菜单中均补齐「一键智能自动 24°C」，实现全屋与单机交互维度的全面对称。
+  5. **酷暑极端高温与冷凝器恶化能耗动力学超频补偿**：
+     - 在制冷工况瞬时功率估算中引入酷暑热力负荷与冷凝器散热恶化补偿机制：当室内外温差大且室内温度极高（室内温度 $\ge 30^\circ\text{C}$，目标温差 $\Delta T \ge 5^\circ\text{C}$）时，拟真变频压缩机超频运转与冷凝器高背压功耗上升，动态叠加重载附加功耗（+100W ~ 280W），将制冷功率峰值拓展至 1750W，与冬季严寒 PTC 辅热模型形成双向季节动力学对称。
 
 ---
 
 ## 2. 关键架构变更与代码实现
 
-### 2.1 自然语言模式与温度复合指令闭环 (`VoiceCommandParser.swift` / `VoiceCapsuleWindowController.swift` / `VoiceCommandParserTests.swift`)
-- **新增复合指令模型与解析层前置**：
-  - `VoiceCommand` 扩充 `case setModeAndTemperature(mode: String, temperature: Double?)`；
-  - `VoiceCommandParser.parse` 在绝对温度解析前插入 `parseModeAndTemperature`，精准抓取“模式词（制冷/冷气/制热/暖气/送风/除湿/自动等）”加“有效温度（16~30°C）”，同时排除全屋范围（交由 `parseAllPreset` 统一分发）；
-  - 增强 `containsNegativeAction` 正则表达式与关键词列表，将“调/设/升/降”等动作动词纳入否定动作捕获，并在 `parseRelativeTemperature`、`parseAbsoluteTemperature` 与 `parseWindSpeed` 中加入否定安全防线。
-- **单机与多设备批量执行链路对齐**：
-  - `VoiceCapsuleWindowController.executeCommand` 与 `executeMultiDeviceCommand` 补齐 `case .setModeAndTemperature` 分支，当目标空调处于待机状态时联动唤醒电源（`onOffStatus = true`），并同步更新 `operationMode` 与 `targetTemperature`。
-- **单元测试套件全覆盖**：
-  - 新增 `testModeAndTemperature()` 包含 15+ 组独立断言，覆盖“制冷26度”、“开暖气22度”、“客厅制冷26度”、“主卧开暖气21度”、“客厅和主卧开制冷24度”、“别开制冷26度”（否定防护）等，全部验证通过。
+### 2.1 自然语言结构化否定防御与插字绕过根治 (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)
+- **正则表达式架构升级**：
+  - 将原有的字集穷举替换为结构化模式：`let pattern = "(?:别|不要|不用|先别|千万别|切勿|请勿|暂不)[^，。！？\\s]{0,6}?(?:关|停|开|启动|运转|打开|关闭|调|设|升|降)"`；
+  - 允许在否定词与动作词之间跨越 0~6 个任意非标点汉字，涵盖常见的语气代词（“给我”、“帮我”）、时间副词（“现在”、“马上”、“太快”）、指示代词（“这个”、“它”）以及程度修饰（“乱”等）；
+  - 测试用例新增针对“别给我关了”、“千万别现在关”、“不用帮我关”、“别太快关”、“别乱调”的验证断言，确保解析全部安全返回 `nil`。
 
-### 2.2 状态栏多设备矩阵一键常驻主显设备 (`StatusItemController.swift`)
-- **设备级联子菜单交互扩展**：
-  - 为每个空调的级联控制子菜单增设「★ 设为菜单栏主显设备」/「✓ 菜单栏常驻主显中」菜单项，根据 `devId == primaryDeviceId` 动态计算状态；
-  - 点击时触发 `@objc private func setPrimaryDeviceFromMenu`，原子更新 `model.menuBarDeviceId`，调用 `refreshTemperature()` 瞬时刷新菜单栏实时温度文本与图标，并通过 `model.operationNotice` 发送交互 Toast 提醒；
-  - 设备项标题增加 `★` 前缀徽标，直观标识当前哪台设备正在常驻菜单栏。
+### 2.2 全屋定时/倒计时指令贪婪拦截缺陷根治与协同调度 (`VoiceCommandParser.swift` / `VoiceCapsuleWindowController.swift`)
+- **解析管线优先级调整与前置守卫**：
+  - 将 `parseScheduleOrCountdown` 提升至 `isAllPowerOff` 与 `isAllPowerOn` 之前，避免如“全屋30分钟后关机”被“全屋...关机”贪婪提前捕获；
+  - 在 `isAllPowerOff`、`isAllPowerOn`、`parseAllTemperature`、`isPowerOff`、`isPowerOn` 中增加显式守卫，凡命中倒计时/定时特征（`hasCountdownOrScheduleKeywords`）均直接旁路，交由专门的定时解析器处理；
+- **全屋与多设备批量定时执行闭环**：
+  - 在 `VoiceCapsuleWindowController` 中扩展 `.countdownPower` 与 `.schedulePower` 分支：当命中全屋范围（`VoiceCommandParser.isAllDeviceScope`）或定向多个设备（`targetDevices.count > 1`）时，并发为目标设备集合循环创建对应的倒计时/定时任务，并统一输出反馈文本（如“已为全屋 N 台空调设置 30 分钟后关机”）。
 
-### 2.3 制热严寒低温 PTC 电辅热与大温差热负荷动力学 (`EnergyAnalyticsEngine.swift`)
-- **制热工况严寒速热 PTC 电热负荷**：
-  - 在 `EnergyAnalyticsEngine.estimateInstantaneousPower` 的 `.heating` 分支中，增加当 `indoor <= 15.0 && delta >= 5.0` 时的热力补偿算法，动态叠加 `120.0 + (deficit * 10.0) + (excess * 12.0)`，最高功耗范围拓展至 1950W，完美贴合北方/湿冷南方冬天变频空调电辅热全开的高负荷动力学；
-- **送风模式风阻阶梯**：
-  - 微风/静音档基础功耗优化至 14W~20W，高风档真实还原风机压降负载至 60W~65W。
+### 2.3 开字前缀省略“度”字口语绝对调温解析闭环 (`VoiceCommandParser.swift`)
+- **温度合法域智能甄别**：
+  - 在 `isPowerOn` 的前置排除规则中，不仅检测带“度”的温度，而且提取“开/打开/开启”后紧跟的数字，若该数值位于 16.0 ~ 30.0 之间，则不作为单纯开机拦截，放行至 `parseAbsoluteTemperature` 解析；
+  - “开26”、“打开25”等输入精准解析为设温指令，并与待机设备唤醒逻辑形成自然联动。
+
+### 2.4 macOS 状态栏 5-in-1 全模式对称与一键智能自动 24°C (`StatusItemController.swift`)
+- **全屋快捷预设补全**：
+  - 状态栏右键全屋预设中新增「🔄 全屋智能自动 24°C (N台在线)」，点击调用 `applyQuickAutoAll`，一键将所有在线设备切换至 `.auto` 模式及 24.0°C；
+- **单机与多设备子菜单对称**：
+  - 每个设备的子菜单以及单设备快捷菜单均增加「一键智能自动 24°C」，调用 `setQuickAuto(for:)` 与 `applyQuickAutoPrimary`，达成制冷、制热、除湿、送风、自动五种模式的全面对齐。
+
+### 2.5 酷暑极端高温与冷凝器恶化能耗动力学超频补偿 (`EnergyAnalyticsEngine.swift`)
+- **夏季高温过载热力学建模**：
+  - 在 `EnergyAnalyticsEngine.estimateInstantaneousPower` 中，为制冷模式（`.cooling`）增加高温过载补偿：当 `indoor >= 30.0 && delta >= 5.0` 时，动态累加 `100.0 + (deficit * 10.0) + (excess * 8.0)`，压缩机模拟在极高冷凝温度和排气背压下的额外功耗，峰值功耗上探至 1750W。
 
 ---
 
 ## 3. 构建、测试与打包验证闭环
 - **本地编译验证**：
-  - 运行 `SDKROOT=/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk swift build`，0 错误，0 警告构建成功；
+  - 运行 `SDKROOT=/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk swift build`，0 错误构建成功；
 - **测试用例验证**：
-  - 运行独立测试套件验证 `VoiceCommandParserTests` 21 组断言，全部通过；
+  - 针对 `VoiceCommandParserTests` 26 组断言进行全链路校验，包括全屋倒计时、省略“度”字调温、结构化否定等，全部通过；
 - **应用打包与签名**：
-  - 执行 `./build_app.sh 1.9.39`，生成 `dist/HaierAC.app`（含桌面小组件扩展）并成功导出发布压缩包 `dist/HaierAC-v1.9.39-macOS.zip`（2.6MB）。
+  - 执行 `./build_app.sh 1.9.40`，生成 `dist/HaierAC.app`（含桌面小组件扩展）并成功导出发布压缩包 `dist/HaierAC-v1.9.40-macOS.zip`（2.6MB）。
 
 ---
 

@@ -6,6 +6,20 @@ A native SwiftUI app to control Haier / Leader (统帅) smart air conditioners o
 
 ## Features
 
+- 🏷 **Structured Spoken Negation Guard, Whole-House Scheduling Dispatch, 5-in-1 Menu Bar Symmetry & Heatwave Cooling Dynamics (v1.9.40)**:
+  - 🛡️ **Structured Natural Language Negation Defense & Phrase Insertion Bypass Elimination (`VoiceCommandParser` / `VoiceCommandParserTests`)**:
+    - Completely resolved the bypass vulnerability where colloquial words, adverbs, or nouns inserted between negation words and action verbs (e.g., "别给我关了", "千万别现在关", "不用帮我关", "别太快关", "别乱调") failed to match whitelist character classes; upgraded to structural non-punctuation greedy matching `(?:别|不要|不用|先别|千万别|切勿|请勿|暂不)[^，。！？\s]{0,6}?(?:关|停|开|启动|运转|打开|关闭|调|设|升|降)` to robustly intercept conversational speech and prevent accidental whole-house or unit shutdowns;
+    - Broadened negation defense across relative/absolute temperature adjustments, fan speeds, modes, and scenes, with comprehensive real-world test cases added.
+  - ⏱️ **House-Wide Timer/Countdown Preemption Remediation & Multi-Device Coordination (`VoiceCommandParser` / `VoiceCapsuleWindowController` / `VoiceCommandParserTests`)**:
+    - Permanently eradicated the defect where commands like "全屋30分钟后关机" (turn off whole-house in 30 minutes) or "全屋半小时后开机" were greedily intercepted by immediate power-off/power-on logic due to pipeline order, which mistakenly caused immediate shutdowns; promoted schedule/countdown parsing prior to immediate power handlers and guarded power/temperature rules with countdown/timer filters;
+    - Integrated whole-house and targeted multi-device countdown/schedule dispatch in `VoiceCapsuleWindowController` (`.countdownPower` and `.schedulePower`), setting timers concurrently with unified conversational feedback.
+  - 🎙️ **Degree Suffix Omission in Spoken Absolute Temperature Parsing (`VoiceCommandParser` / `VoiceCommandParserTests`)**:
+    - Fixed the defect where spoken temperature commands omitting the word "度" (e.g., "开26", "打开25", "开24") were captured by `isPowerOn` as simple power toggles, discarding the target temperature; added 16.0°C ~ 30.0°C valid range validation to accurately set temperature and awaken standby units.
+  - 🍱 **macOS Menu Bar 5-in-1 Full Mode Matrix Symmetry & Quick Auto 24°C (`StatusItemController`)**:
+    - Added "🔄 全屋智能自动 24°C (N Online)" to the right-click whole-house presets, completing the 5-in-1 operating mode matrix alongside Cool, Heat, Dehumidify, and Fan;
+    - Added "一键智能自动 24°C" to per-device submenus and single-device context menus, establishing complete UI symmetry across all device tiers.
+  - ⚡️ **Extreme Heatwave Overload & Condenser Degradation Inverter Dynamics (`EnergyAnalyticsEngine`)**:
+    - Integrated extreme thermal load and condenser backpressure degradation into `.cooling` power estimation: when indoor temperatures are high ($\ge 30^\circ\text{C}$) and temperature difference is large ($\Delta T \ge 5^\circ\text{C}$), dynamically factors in inverter compressor over-frequency operation and thermal backpressure losses (+100W ~ 280W), expanding the cooling ceiling to 1750W for two-way seasonal symmetry with winter PTC heating.
 - 🏷 **Natural Language Mode & Temperature Compound Control Defect Remediation, Menu Bar Primary Device Pinning & Low-Temp Heating Dynamics (v1.9.39)**:
   - 🎙️ **Root Fix for Mode Loss in Combined Mode & Temperature Spoken Commands (`VoiceCommandParser` / `VoiceCapsuleWindowController` / `VoiceCommandParserTests`)**:
     - Completely resolved the defect where conversational commands combining both operation mode and target temperature (e.g. "制冷26度", "开制冷26度", "开冷气25度", "开暖气22度", "开制热二十度", "客厅制冷26度", "主卧开暖气21度", "客厅和主卧开制冷24度") lost their `operationMode` due to absolute temperature pattern matching precedence, preventing dangerous cold/hot inversion where units remained in winter heating mode despite summer cooling requests;
