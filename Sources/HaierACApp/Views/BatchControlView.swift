@@ -9,16 +9,14 @@ struct BatchControlPanel: View {
     let deviceIds: [String]
 
     var body: some View {
-        let onlineCount = deviceIds.filter { id in
-            model.devices.first(where: { $0.id == id })?.online ?? false
-        }.count
-        let isBatchAvailable = deviceIds.contains { id in
+        let controllableCount = deviceIds.filter { id in
             model.reachability(for: id).isControllable
-        }
+        }.count
+        let isBatchAvailable = controllableCount > 0
 
         VStack(alignment: .leading, spacing: Theme.spaceSM) {
             HStack {
-                Label("批量控制（\(deviceIds.count) 台设备，\(onlineCount) 台在线）", systemImage: "square.stack.3d.up.fill")
+                Label("批量控制（\(deviceIds.count) 台设备，\(controllableCount) 台就绪）", systemImage: "square.stack.3d.up.fill")
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(Theme.ink)
                 Spacer()
@@ -26,7 +24,7 @@ struct BatchControlPanel: View {
                     Text("网关重连中")
                         .font(.system(size: 10, weight: .medium))
                         .foregroundStyle(Theme.warning)
-                } else if onlineCount == 0 {
+                } else if controllableCount == 0 {
                     Text("所选设备均离线")
                         .font(.system(size: 10, weight: .medium))
                         .foregroundStyle(Theme.offline)
@@ -46,12 +44,12 @@ struct BatchControlPanel: View {
                 .padding(.vertical, 6)
                 .background(Theme.surface2)
                 .clipShape(RoundedRectangle(cornerRadius: Theme.radiusSM, style: .continuous))
-            } else if onlineCount < deviceIds.count && onlineCount > 0 {
+            } else if controllableCount < deviceIds.count && controllableCount > 0 {
                 HStack(spacing: 6) {
                     Image(systemName: "info.circle")
                         .font(.system(size: 11))
                         .foregroundStyle(Theme.inkSubtle)
-                    Text("部分设备离线（\(deviceIds.count - onlineCount) 台），指令将自动跳过并仅发给在线设备")
+                    Text("部分设备离线（\(deviceIds.count - controllableCount) 台），指令将自动跳过并仅发给就绪设备")
                         .font(.system(size: 11))
                         .foregroundStyle(Theme.inkSubtle)
                 }

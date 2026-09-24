@@ -10,8 +10,7 @@ struct FilterCareSheet: View {
     @State private var selectedDeviceId: String? = nil
 
     private var allDeviceList: [(id: String, name: String)] {
-        model.devices.map { ($0.id, $0.deviceName) } +
-        model.manualDevices.map { ($0.deviceId, $0.name) }
+        model.allUnifiedDevices.map { ($0.id, $0.name) }
     }
 
     private var currentDeviceId: String {
@@ -169,12 +168,12 @@ struct FilterCareSheet: View {
                         .background(Theme.surface2)
                         .clipShape(Capsule())
 
-                        // 蒸发器自清洁 7 天除菌保护徽章 (v1.9.27)
+                        // 蒸发器自清洁 7 天保养激励徽章 (v1.9.28: 策略性深度保养激励)
                         if model.isSelfCleaningProtectionActive(for: currentDeviceId) {
                             HStack(spacing: 3) {
                                 Image(systemName: "sparkles")
                                     .font(.system(size: 9))
-                                Text("56°C除菌保护 (-10%)")
+                                Text("56°C除菌保养激励 (-10%负荷)")
                                     .font(.system(size: 10, weight: .medium))
                             }
                             .foregroundStyle(Theme.success)
@@ -182,10 +181,11 @@ struct FilterCareSheet: View {
                             .padding(.vertical, 2)
                             .background(Theme.success.opacity(0.12))
                             .clipShape(Capsule())
+                            .help("主动保养激励：7 天内享受整机深度健康维护期，折算等效负荷减免 10%")
                         }
                     }
 
-                    Text("空气动力学等效工时: \(String(format: "%.1f", runningHours)) / \(AppModel.filterServiceLifeMinutes / 60) 小时（含风量、凝露与湿度加权）")
+                    Text("空气动力学等效工时: \(String(format: "%.1f", runningHours)) / \(AppModel.filterServiceLifeMinutes / 60) 小时（含风量、凝露与自清洁保养激励）")
                         .font(.system(size: 12))
                         .foregroundStyle(Theme.inkSubtle)
 

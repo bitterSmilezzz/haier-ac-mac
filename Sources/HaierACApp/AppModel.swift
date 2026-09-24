@@ -324,6 +324,38 @@ final class AppModel: ObservableObject {
         }
     }
 
+    /// 统一设备模型（融合云端发现设备与手动添加设备，自动有序去重） (v1.9.28)
+    public struct UnifiedDevice: Identifiable, Hashable {
+        public let id: String
+        public let name: String
+        public let isManual: Bool
+        public let rawDevice: DeviceInfo?
+
+        public init(id: String, name: String, isManual: Bool, rawDevice: DeviceInfo? = nil) {
+            self.id = id
+            self.name = name
+            self.isManual = isManual
+            self.rawDevice = rawDevice
+        }
+    }
+
+    /// 全屋全量设备统一列表（已去重：先云端后手动） (v1.9.28)
+    public var allUnifiedDevices: [UnifiedDevice] {
+        var seen = Set<String>()
+        var list: [UnifiedDevice] = []
+        for dev in devices {
+            if seen.insert(dev.id).inserted {
+                list.append(UnifiedDevice(id: dev.id, name: dev.deviceName, isManual: false, rawDevice: dev))
+            }
+        }
+        for manual in manualDevices {
+            if seen.insert(manual.deviceId).inserted {
+                list.append(UnifiedDevice(id: manual.deviceId, name: manual.name, isManual: true, rawDevice: nil))
+            }
+        }
+        return list
+    }
+
     /// 获取指定设备的可达状态（三态判定：网关是否连通、设备是否连网）
     public func reachability(for device: DeviceInfo) -> DeviceReachability {
         if !gatewayConnected {
@@ -335,15 +367,18 @@ final class AppModel: ObservableObject {
         return .available
     }
 
-    /// 根据设备 ID 获取可达状态（未知设备按离线 fail-closed 处理，杜绝虚报可用）
+    /// 根据设备 ID 获取可达状态（未知设备按离线 fail-closed 处理，杜绝虚报可用；支持手动直连设备）
     public func reachability(for deviceId: String) -> DeviceReachability {
         if !gatewayConnected {
             return .gatewayReconnecting
         }
-        guard let dev = devices.first(where: { $0.id == deviceId }) else {
-            return .deviceOffline
+        if let dev = devices.first(where: { $0.id == deviceId }) {
+            return reachability(for: dev)
         }
-        return reachability(for: dev)
+        if manualDevices.contains(where: { $0.deviceId == deviceId }) {
+            return .available
+        }
+        return .deviceOffline
     }
 
     /// 重连操作代际计数器，防止并发/连续重连时前序定时器竞态覆盖当前状态
@@ -684,7 +719,7 @@ final class AppModel: ObservableObject {
             humidityFactor = 1.00
         }
 
-        // 4. 蒸发器自清洁除菌防护因子（完成 56°C 高温自清洁后 7 天内，翅片无污垢杂菌、风道通畅阻力小，积尘截留速率减缓 10%）
+        // 4. 蒸发器自清洁健康激励策略因子 (产品策略激励：完成 56°C 高温自清洁后 7 天内，空调处于深度洁净健康维护期，作为主动保养激励给予等效负荷 10% 减免奖励；注：此项为产品策略激励而非物理截留过滤差异)
         let selfCleaningBonus: Double
         if let devId = deviceId, isSelfCleaningProtectionActive(for: devId) {
             selfCleaningBonus = 0.90
@@ -948,8 +983,7 @@ final class AppModel: ObservableObject {
         let elapsedMinutes = max(1, Int(round(effectiveElapsed / 60.0)))
 
         var samples: [EnergyAnalyticsEngine.DeviceEnergySample] = []
-        let allDevices = devices.map { (id: $0.id, name: $0.deviceName) } +
-            manualDevices.map { (id: $0.deviceId, name: $0.name) }
+        let allDevices = allUnifiedDevices.map { (id: $0.id, name: $0.name) }
 
         for dev in allDevices {
             let attrs = attributes[dev.id] ?? [:]
@@ -2434,7 +2468,11 @@ final class AppModel: ObservableObject {
             let devices = try await provider.fetchDevices(context: context)
             guard generation == sessionGeneration else { return }  // 期间已登出
             self.devices = devices
-            deviceIds = devices.map(\.deviceId)
+            var allSubIds = devices.map(\.deviceId)
+            for m in manualDevices where !allSubIds.contains(m.deviceId) {
+                allSubIds.append(m.deviceId)
+            }
+            deviceIds = allSubIds
             AppLog.log("设备列表: \(devices.map { $0.deviceName }.joined(separator: ", "))")
 
             // 拉取所有设备数字模型（初始快照）；多设备并行以加快加载
@@ -2553,14 +2591,16 @@ final class AppModel: ObservableObject {
     func sendAttribute(_ name: String, value: AttrValue, deviceId: String) {
         AppLog.log("sendAttribute: \(name)=\(value.stringValue) device=\(deviceId)")
 
-        // 防御性校验：设备物理离线拦截（未连网无法执行控制，避免产生虚假的乐观更新）
-        if let dev = devices.first(where: { $0.id == deviceId }), !dev.online {
-            operationNotice = OperationNotice(text: "⚠️ 设备离线：\(dev.deviceName) 未连网，无法执行控制", isError: true)
+        // 防御性校验：设备可达性拦截（未连网或未知设备无法执行控制，避免产生虚假的乐观更新）
+        let reach = reachability(for: deviceId)
+        if reach == .deviceOffline {
+            let devName = allUnifiedDevices.first(where: { $0.id == deviceId })?.name ?? "设备"
+            operationNotice = OperationNotice(text: "⚠️ 设备离线：\(devName) 未连网，无法执行控制", isError: true)
             return
         }
 
         // 失效预案：网关未连接时明确提示，不静默失败
-        guard gatewayConnected, let handle = gatewayHandle else {
+        guard gatewayConnected, let handle = gatewayHandle, reach.isControllable else {
             operationNotice = OperationNotice(text: "⚠️ 连接中断，指令未发送（自动重连中）", isError: true)
             return
         }
@@ -2598,19 +2638,18 @@ final class AppModel: ObservableObject {
             return 0
         }
 
-        // 统一过滤物理在线的设备（未知设备默认离线 fail-closed）
-        let targetIds = uniqueDeviceIds.filter { id in
-            devices.first(where: { $0.id == id })?.online ?? false
+        // 失效预案：网关未连接时直接拦截并提示
+        guard gatewayConnected, let handle = gatewayHandle else {
+            operationNotice = OperationNotice(text: "⚠️ 网关连接中断，指令未发送（自动重连中）", isError: true)
+            return 0
         }
+
+        // 统一过滤可达设备（网关已连通 + 设备物理在线/可控，未知设备 fail-closed）
+        let targetIds = uniqueDeviceIds.filter { reachability(for: $0).isControllable }
         let offlineCount = uniqueDeviceIds.count - targetIds.count
 
         guard !targetIds.isEmpty else {
             operationNotice = OperationNotice(text: "⚠️ 选中的 \(uniqueDeviceIds.count) 台设备均处于离线状态", isError: true)
-            return 0
-        }
-
-        guard gatewayConnected, let handle = gatewayHandle else {
-            operationNotice = OperationNotice(text: "⚠️ 网关连接中断，指令未发送（自动重连中）", isError: true)
             return 0
         }
         var sent = 0

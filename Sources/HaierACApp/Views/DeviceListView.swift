@@ -601,9 +601,25 @@ struct DeviceCard: View {
             }
 
             // 在线状态指示点
+            let reach = model.reachability(for: device)
+            let dotColor: Color = {
+                switch reach {
+                case .gatewayReconnecting: return Theme.warning
+                case .deviceOffline: return Theme.offline
+                case .available: return isPowerOn ? Theme.success : Theme.inkTertiary
+                }
+            }()
+            let dotHelp: String = {
+                switch reach {
+                case .gatewayReconnecting: return "网关重连中..."
+                case .deviceOffline: return "设备离线 (未连网)"
+                case .available: return isPowerOn ? "运行中" : "待机"
+                }
+            }()
             Circle()
-                .fill(device.online ? (isPowerOn ? Theme.success : Theme.inkTertiary) : Theme.warning)
+                .fill(dotColor)
                 .frame(width: 8, height: 8)
+                .help(dotHelp)
 
             Image(systemName: "chevron.right")
                 .font(.system(size: 11, weight: .semibold))

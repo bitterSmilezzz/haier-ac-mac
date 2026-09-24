@@ -246,17 +246,19 @@ final class StatusItemController: NSObject {
     /// 右键：上下文菜单（打开主窗口 / 助眠白噪音 / 滤网自清洁 / 开机自启 / 主题 / 退出）
     private func showContextMenu() {
         let menu = NSMenu()
+        menu.autoenablesItems = false
         let voiceItem = NSMenuItem(title: "语音控制... (⌃⌥A)", action: #selector(openVoiceControl), keyEquivalent: "")
         voiceItem.target = self
         menu.addItem(voiceItem)
 
-        let allDevices = model.devices
+        let allDevices = model.allUnifiedDevices
         let onDevices = allDevices.filter { dev in
+            model.reachability(for: dev.id).isControllable &&
             model.attribute("onOffStatus", deviceId: dev.id)?.boolValue == true
         }
 
         if allDevices.count > 1 {
-            // 多设备场景：若有空调处于开机状态，提供全屋一键快速关机 (v1.9.27)
+            // 多设备场景：若有空调处于开机状态，提供全屋一键快速关机 (v1.9.28)
             if !onDevices.isEmpty {
                 let turnOffAllItem = NSMenuItem(title: "⏻ 关闭全屋空调 (\(onDevices.count) 台运行中)", action: #selector(turnOffAllDevices), keyEquivalent: "")
                 turnOffAllItem.target = self
@@ -264,15 +266,17 @@ final class StatusItemController: NSObject {
                 menu.addItem(turnOffAllItem)
             }
 
-            // 多设备级联控制子菜单 (v1.9.27)
+            // 多设备级联控制子菜单 (v1.9.28)
             let devicesMenu = NSMenu()
+            devicesMenu.autoenablesItems = false
             for dev in allDevices {
                 let devId = dev.id
                 let isPowerOn = model.attribute("onOffStatus", deviceId: devId)?.boolValue ?? false
-                let reach = model.reachability(for: dev)
+                let reach = model.reachability(for: devId)
                 let isControllable = reach.isControllable
 
                 let devSubmenu = NSMenu()
+                devSubmenu.autoenablesItems = false
 
                 // 开关机切换
                 let togglePowerItem = NSMenuItem(
@@ -314,7 +318,7 @@ final class StatusItemController: NSObject {
                 case .available: statusBadge = isPowerOn ? "🟢 开机" : "⚪️ 待机"
                 }
 
-                let devItem = NSMenuItem(title: "\(dev.deviceName) (\(statusBadge))", action: nil, keyEquivalent: "")
+                let devItem = NSMenuItem(title: "\(dev.name) (\(statusBadge))", action: nil, keyEquivalent: "")
                 devicesMenu.setSubmenu(devSubmenu, for: devItem)
                 devicesMenu.addItem(devItem)
             }
@@ -325,10 +329,10 @@ final class StatusItemController: NSObject {
         } else if let dev = allDevices.first {
             // 单设备场景：保留快速电源开关
             let isPowerOn = model.attribute("onOffStatus", deviceId: dev.id)?.boolValue ?? false
-            let powerTitle = isPowerOn ? "关机「\(dev.deviceName)」" : "开机「\(dev.deviceName)」"
+            let powerTitle = isPowerOn ? "关机「\(dev.name)」" : "开机「\(dev.name)」"
             let powerItem = NSMenuItem(title: powerTitle, action: #selector(togglePrimaryPower), keyEquivalent: "")
             powerItem.target = self
-            powerItem.isEnabled = model.reachability(for: dev).isControllable
+            powerItem.isEnabled = model.reachability(for: dev.id).isControllable
             menu.addItem(powerItem)
         }
 
@@ -365,6 +369,7 @@ final class StatusItemController: NSObject {
         menu.addItem(tempItem)
 
         let themeMenu = NSMenu()
+        themeMenu.autoenablesItems = false
         for mode in ThemeMode.allCases {
             let item = NSMenuItem(title: mode.label, action: #selector(setTheme(_:)), keyEquivalent: "")
             item.target = self
@@ -410,14 +415,17 @@ final class StatusItemController: NSObject {
     }
 
     @objc private func togglePrimaryPower() {
-        guard let targetId = model.menuBarDeviceId ?? model.devices.first?.id else { return }
+        guard let targetId = model.menuBarDeviceId ?? model.allUnifiedDevices.first?.id else { return }
         let currentPower = model.attribute("onOffStatus", deviceId: targetId)?.boolValue ?? false
         model.sendAttribute("onOffStatus", value: .bool(!currentPower), deviceId: targetId)
     }
 
     @objc private func turnOffAllDevices() {
-        let allIds = model.devices.map(\.id)
-        model.sendAttributeToDevices("onOffStatus", value: .bool(false), deviceIds: allIds)
+        let controllableOnIds = model.allUnifiedDevices
+            .filter { model.reachability(for: $0.id).isControllable && model.attribute("onOffStatus", deviceId: $0.id)?.boolValue == true }
+            .map(\.id)
+        guard !controllableOnIds.isEmpty else { return }
+        model.sendAttributeToDevices("onOffStatus", value: .bool(false), deviceIds: controllableOnIds)
     }
 
     @objc private func toggleDevicePower(_ sender: NSMenuItem) {

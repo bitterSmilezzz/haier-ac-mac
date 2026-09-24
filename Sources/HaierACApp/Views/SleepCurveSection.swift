@@ -164,6 +164,17 @@ struct SleepCurveSection: View {
                             .padding(.vertical, 2)
                             .background(Theme.surface2)
                             .cornerRadius(Theme.radiusSM)
+
+                        let reach = model.reachability(for: session.deviceId)
+                        if !reach.isControllable {
+                            Text(reach == .gatewayReconnecting ? "重连中" : "离线")
+                                .font(.system(size: 10, weight: .semibold))
+                                .foregroundStyle(reach == .gatewayReconnecting ? Theme.warning : Theme.offline)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background((reach == .gatewayReconnecting ? Theme.warning : Theme.offline).opacity(0.12))
+                                .cornerRadius(Theme.radiusSM)
+                        }
                     }
 
                     if let current = session.currentStage {
@@ -583,9 +594,28 @@ struct SleepCurveSection: View {
             // 定时就寝与睡前预冷 (v1.9.19)
             bedtimeScheduleConfigSection
 
-            // 启动按钮
+            // 启动按钮 (受可达性门禁约束，离线/重连中禁用并给出警示)
+            let reachability = model.reachability(for: effectiveDeviceId)
+            let isControllable = !effectiveDeviceId.isEmpty && reachability.isControllable
+
+            if !effectiveDeviceId.isEmpty && !reachability.isControllable {
+                HStack(spacing: 6) {
+                    Image(systemName: reachability == .gatewayReconnecting ? "antenna.radiowaves.left.and.right.slash" : "bolt.slash.fill")
+                        .font(.system(size: 11))
+                        .foregroundStyle(reachability == .gatewayReconnecting ? Theme.warning : Theme.offline)
+                    Text(reachability == .gatewayReconnecting ? "网关连接重试中，睡眠温阶暂不可启动" : "当前设备处于离线状态，无法启动睡眠曲线")
+                        .font(.system(size: 11))
+                        .foregroundStyle(reachability == .gatewayReconnecting ? Theme.warning : Theme.offline)
+                    Spacer()
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(Theme.surface2)
+                .clipShape(RoundedRectangle(cornerRadius: Theme.radiusSM, style: .continuous))
+            }
+
             Button {
-                guard !effectiveDeviceId.isEmpty else { return }
+                guard isControllable else { return }
                 model.startSleepCurve(curve: selectedConfig, deviceId: effectiveDeviceId)
             } label: {
                 HStack(spacing: 6) {
@@ -597,7 +627,8 @@ struct SleepCurveSection: View {
                 .frame(maxWidth: .infinity)
             }
             .buttonStyle(Theme.primaryButtonStyle())
-            .disabled(effectiveDeviceId.isEmpty)
+            .disabled(!isControllable)
+            .opacity(isControllable ? 1.0 : 0.6)
 
             // 全局快捷键极速启停提示
             HStack(spacing: 4) {

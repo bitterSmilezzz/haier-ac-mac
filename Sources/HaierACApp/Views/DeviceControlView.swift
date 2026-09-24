@@ -116,22 +116,27 @@ struct DeviceControlView: View {
             // 设备型号与连接状态
             HStack(spacing: Theme.spaceSM) {
                 HStack(spacing: 6) {
+                    let reachability = model.reachability(for: device)
                     let dotColor: Color = {
-                        if !model.gatewayConnected { return Theme.warning }
-                        if !device.online { return Theme.offline }
-                        return isPowerOn ? Theme.success : Theme.inkTertiary
+                        switch reachability {
+                        case .gatewayReconnecting: return Theme.warning
+                        case .deviceOffline: return Theme.offline
+                        case .available: return isPowerOn ? Theme.success : Theme.inkTertiary
+                        }
                     }()
                     let statusLabel: String = {
-                        if !model.gatewayConnected { return "网关重连中..." }
-                        if !device.online { return "设备离线 (未连网)" }
-                        return isPowerOn ? "实时网关连接建立" : "空调已关机"
+                        switch reachability {
+                        case .gatewayReconnecting: return "网关重连中..."
+                        case .deviceOffline: return "设备离线 (未连网)"
+                        case .available: return isPowerOn ? "实时网关连接建立" : "空调已关机"
+                        }
                     }()
                     Circle()
                         .fill(dotColor)
                         .frame(width: 8, height: 8)
                     Text(statusLabel)
                         .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(model.gatewayConnected ? Theme.inkMuted : Theme.warning)
+                        .foregroundStyle(reachability == .gatewayReconnecting ? Theme.warning : Theme.inkMuted)
                 }
 
                 Spacer()

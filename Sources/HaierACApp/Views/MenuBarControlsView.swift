@@ -93,10 +93,8 @@ struct MenuBarControlsView: View {
                     .disabled(!reachability.isControllable)
                     .opacity(reachability.isControllable ? 1.0 : 0.6)
 
-                // 2.1 智能睡眠快速启停模块 (运行中显示进度与停止，空闲时支持选择方案与一键启动)
+                // 2.1 智能睡眠快速启停模块 (运行中显示进度与随时停止，空闲时开启受设备可达性门禁保护)
                 sleepControlPod(device: device)
-                    .disabled(!reachability.isControllable)
-                    .opacity(reachability.isControllable ? 1.0 : 0.6)
 
                 // 2.2 蒸发器自清洁状态指示 (若处于清洁中)
                 if model.isSelfCleaningActive {
@@ -706,9 +704,10 @@ struct MenuBarControlsView: View {
     // MARK: - 智能睡眠快速启停模块
 
     private func sleepControlPod(device: DeviceInfo) -> some View {
-        Group {
+        let reachability = model.reachability(for: device)
+        return Group {
             if let session = model.activeSleepSession {
-                // 运行中状态
+                // 运行中状态 (停止按钮始终可用，离线时展示警示标签)
                 HStack(spacing: 8) {
                     Image(systemName: "moon.stars.fill")
                         .font(.system(size: 12))
@@ -719,6 +718,16 @@ struct MenuBarControlsView: View {
                             Text("智能睡眠中 · \(session.curveConfig.name)")
                                 .font(.system(size: 11, weight: .semibold))
                                 .foregroundStyle(Theme.ink)
+
+                            if !reachability.isControllable {
+                                Text(reachability == .gatewayReconnecting ? "重连中" : "离线")
+                                    .font(.system(size: 8, weight: .bold))
+                                    .foregroundStyle(reachability == .gatewayReconnecting ? Theme.warning : Theme.offline)
+                                    .padding(.horizontal, 4)
+                                    .padding(.vertical, 1)
+                                    .background((reachability == .gatewayReconnecting ? Theme.warning : Theme.offline).opacity(0.12))
+                                    .clipShape(Capsule())
+                            }
 
                             if session.compensationOffset != 0.0 {
                                 let sign = session.compensationOffset > 0 ? "+" : ""
@@ -783,7 +792,7 @@ struct MenuBarControlsView: View {
                         .strokeBorder(Color.dynamic(light: 0xD0D4FF, dark: 0x2A2E50), lineWidth: 1)
                 )
             } else {
-                // 空闲未运行状态：方案选择与一键开启
+                // 空闲未运行状态：方案选择与一键开启（开启按钮受可达性门禁保护）
                 HStack(spacing: 8) {
                     Image(systemName: "moon.fill")
                         .font(.system(size: 11))
@@ -823,8 +832,10 @@ struct MenuBarControlsView: View {
 
                     Spacer()
 
-                    // 一键开启按钮
+                    // 一键开启按钮 (受可达性门禁约束，离线/重连中禁用)
+                    let isControllable = reachability.isControllable
                     Button {
+                        guard isControllable else { return }
                         model.startSleepCurve(curve: selectedSleepCurve, deviceId: device.id)
                     } label: {
                         HStack(spacing: 4) {
@@ -833,14 +844,17 @@ struct MenuBarControlsView: View {
                             Text("开启睡眠")
                                 .font(.system(size: 10, weight: .semibold))
                         }
-                        .foregroundStyle(Color.white)
+                        .foregroundStyle(isControllable ? Color.white : Theme.inkTertiary)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 4)
                         .background(
                             LinearGradient(
-                                colors: [
+                                colors: isControllable ? [
                                     Color.dynamic(light: 0x5E6AD2, dark: 0x6E78E8),
                                     Color.dynamic(light: 0x4D58C4, dark: 0x5862D6)
+                                ] : [
+                                    Theme.surface3,
+                                    Theme.surface3
                                 ],
                                 startPoint: .topLeading,
                                 endPoint: .bottomTrailing
@@ -849,6 +863,8 @@ struct MenuBarControlsView: View {
                         .cornerRadius(Theme.radiusSM)
                     }
                     .buttonStyle(.plain)
+                    .disabled(!isControllable)
+                    .opacity(isControllable ? 1.0 : 0.6)
                 }
                 .padding(.horizontal, 10)
                 .padding(.vertical, 6)

@@ -8,6 +8,12 @@
 
 ## 功能
 
+- 🏷 **全屋统一设备模型与 AppKit 菜单原生门禁修复 (v1.9.28)**：
+  - 🛡️ **AppKit NSMenu `autoenablesItems` 原生重写缺陷修复 (闭环 CR P1)**：全面为 `StatusItemController` 中的所有菜单实例（`menu`, `devicesMenu`, `devSubmenu`, `themeMenu`）设置 `autoenablesItems = false`，彻底消除 AppKit 在菜单展开时无视 `isEnabled` 重新强行启用菜单项的系统缺陷，确保离线与重连期间右键菜单中的设备控制项严格不可点击。
+  - 🌙 **睡眠曲线「停止」会话纯本地解耦 (闭环 CR P2-1)**：细化睡眠卡片门禁粒度：由于 `stopSleepCurve()` 仅执行纯本地状态归档、定时器清理与助眠音频停止，解除了对其「停止」按钮的不可达禁用，确保设备离线或网关断开时用户依然能随时终止睡眠会话；同时在运行状态下提供柔性离线徽章，而空闲启动按钮严格维持可达性校验。
+  - 🏠 **全屋关机计数与可控目标集严格对齐 (闭环 CR P2-2)**：修正状态栏右键「关闭全屋空调 (N 台运行中)」计数与执行逻辑，N 仅统计当前既可达 (`isControllable`) 又处于开机中的空调设备；`turnOffAllDevices` 下发目标集与标题计数 100% 绝对一致，杜绝向离线设备盲目发送指令。
+  - 🌿 **56°C 深度保养产品激励策略因果链澄清 (闭环 CR P2-3)**：将 56°C 蒸发器自清洁后 7 天内的 10% 动力学负荷减免，在代码模型注释、界面徽章文案与文档中统一明确为「主动维护与深度清洁的产品健康激励策略」，消除与物理滤网截留机制的概念混淆。
+  - 🧬 **全屋全形态设备统一抽象 (`UnifiedDevice`)**：在 `AppModel` 引入 `UnifiedDevice`，自动对云端绑定的 `devices` 与手动添加的 `manualDevices` 进行去重聚合，重构全屋统一设备视图 `allUnifiedDevices`；解决手动空调无法参与能耗动力学聚合、滤网健康跟踪及开机实时属性订阅的问题。
 - 🏷 **闭环架构巡检与蒸发器自清洁健康生态联动 (v1.9.27)**：
   - 🛡️ **审查缺陷全面闭环与可达性 Fail-Closed 熔断**：闭环 CR P1 审查，在 `MenuBarControlsView` 中补齐智能睡眠卡片不可达门禁，并在 `AppModel.startSleepCurve` 入口增加守卫与通知；闭环 CR P2-1 审查，`reachability(for:)` 对未匹配设备改为 fail-closed（`.deviceOffline`），`MenuBarControlsView` header 状态圆点与文案全面收敛消费 `reachability`，`BatchControlView` 及 `sendAttributeToDevices` 修复 fail-open 风险并实现设备 ID 去重。
   - ⚡️ **反序列化逐条容错与无偏功率物理模型**：闭环 CR P2-3 审查，`EnergyDayRecord` 所有字段采用 `decodeIfPresent` 安全回退，引入 `FailableDecodable` 逐条解码容错，损坏单条记录隔离输出警告，杜绝整组清空；闭环 CR P2-2 审查，未识别模式功率估算采用制冷制热基于温差绝对值的无偏物理均值模型，消除系统偏差。
