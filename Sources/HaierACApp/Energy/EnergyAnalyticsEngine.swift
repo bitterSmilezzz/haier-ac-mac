@@ -273,9 +273,9 @@ public final class EnergyAnalyticsEngine: ObservableObject {
 
         switch mode {
         case .fan:
-            // 送风模式：仅室内风机运转，极其省电
-            let power = 15.0 + windOffset * 0.4
-            return min(max(power, 15.0), 65.0)
+            // 送风模式：仅室内风机运转，阶梯风速动力学梯度 (v1.9.39)
+            let power = 14.0 + windOffset * 0.42
+            return min(max(power, 14.0), 65.0)
 
         case .dehumidify:
             // 除湿模式：多维环境湿度自适应变频能耗动力学模型 (v1.9.37)
@@ -303,7 +303,7 @@ public final class EnergyAnalyticsEngine: ObservableObject {
             return min(max(power, 220.0), 650.0)
 
         case .heating:
-            // 制热模式：变频温差动力学模型 + 恒温平衡区低频维持态阻尼 (v1.9.36)
+            // 制热模式：变频温差动力学模型 + 恒温平衡区低频维持态阻尼 + 低温速热 PTC 辅助电热动力学 (v1.9.36, v1.9.39)
             let indoor = indoorTemp ?? 18.0
             let target = targetTemp ?? 20.0
             let delta = target - indoor
@@ -316,9 +316,19 @@ public final class EnergyAnalyticsEngine: ObservableObject {
                 power = 300.0 + (delta * 250.0) + (windOffset * 0.8)
             } else {
                 // 变频重载升温区 (ΔT >= 1.0°C)
-                power = 550.0 + ((delta - 1.0) * 110.0) + windOffset
+                // 严寒低温速热热力补偿：当室内温度偏低（indoor <= 15°C）且大温差升温（delta >= 5.0°C）时，
+                // 拟真变频空调自动启动 PTC 辅助加热与大压比高频超载运转，动态补偿热负荷功率 (120W ~ 320W)
+                let coldBoost: Double = {
+                    if indoor <= 15.0 && delta >= 5.0 {
+                        let deficit = min(10.0, 15.0 - indoor)
+                        let excess = min(8.0, delta - 5.0)
+                        return 120.0 + (deficit * 10.0) + (excess * 12.0)
+                    }
+                    return 0.0
+                }()
+                power = 550.0 + ((delta - 1.0) * 110.0) + windOffset + coldBoost
             }
-            return min(max(power, 220.0), 1650.0)
+            return min(max(power, 220.0), 1950.0)
 
         case .cooling:
             // 制冷模式：变频温差动力学模型 + 恒温平衡区低频维持态阻尼 (v1.9.36)

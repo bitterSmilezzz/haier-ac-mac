@@ -1,57 +1,47 @@
-# Haier AC Mac v1.9.38 发布与巡检演进报告
+# Haier AC Mac v1.9.39 发布与巡检演进报告
 
 ## 1. 概述与版本定位
-- **版本号**：`v1.9.38`
-- **发版主题**：闭环自然语言开字模式/调温拦截缺陷、状态栏首选设备路由对齐、多设备状态聚合查询与自动模式湿度动力学
+- **版本号**：`v1.9.39`
+- **发版主题**：闭环自然语言模式温度复合控制缺陷、状态栏设备矩阵主显一键切换与低温制热动力学
 - **核心目标与架构演进**：
-  1. **自然语言开字前缀与调温拦截缺陷根治**：
-     - 彻底修复以“开/打开/开启”为前缀的复合指令（如“开除湿”、“开制冷”、“开制热”、“开送风”、“开26度”、“开到26度”、“开大风”等）被 `isPowerOn` 贪婪前置拦截误判为单纯开机的严重缺陷；增加模式名、带“度”温度值、风速和情景关键词的显式排除，使其准确映射为对应的模式切换与温度调整；
-     - 修复“关小风”、“风速关小一点”、“关小一点”等风量下调口语被误判为整机断电关机的问题；
-     - 新增 `.queryStatusAll` 全屋状态查询指令模型，区分全屋状态查询（“全屋空调多少度”、“全屋空调状态”）与单机状态查询；
-  2. **自清洁控制流与多设备批量状态聚合闭环**：
-     - 修复 `VoiceCapsuleWindowController` 中 `.stopSelfCleaning` 分支遗漏的 `scheduleAutoDismiss(delay: 1.8)` 与 `return`，消除控制流泄漏至兜底逻辑的隐患；
-     - 将 `.stopSleepCurve` 与 `.queryStatusAll` 提升至顶层多设备/单设备前置分发，避免误报“该操作暂不支持多设备批量执行”；
-     - 在 `executeMultiDeviceCommand` 中补齐 `case .queryStatus` 状态聚合查询，按房间格式化汇总运行态与室内温度（如“「客厅」运行中，室温 24.5°C，制冷 26.0°C；「主卧」待机，室温 25.0°C”）；
-     - 引入智能待机联动：当用户发出带“开”字的调温或模式切换时，自动为待机设备联锁唤醒开机（`onOffStatus = true`）；
-  3. **macOS 状态栏首选设备路由对齐与动态设备计数**：
-     - 修复状态栏右键菜单中的单机温度步进（`stepUpPrimaryTemperature` / `stepDownPrimaryTemperature`）与快捷模式预设（制冷/制热/除湿/送风）硬编码抓取 `allUnifiedDevices.first?.id` 导致的路由漂移缺陷，全面收敛对齐至用户当前选定的首选主控设备 `primaryDeviceId` (`model.menuBarDeviceId ?? model.allUnifiedDevices.first?.id`)；
-     - 状态栏右键全屋快捷预设菜单项（全屋制冷/全屋制热/全屋除湿/全屋送风）动态显示当前在线可控设备数量（如 `❄️ 全屋清爽制冷 26°C (2台在线)`），反馈更加透明精准；
-  4. **自动模式温湿度协同动力学建模**：
-     - 在自动模式（`.auto`）瞬时功率估算中引入室内相对湿度（`indoorHumidity`）动力学补偿：高湿工况 ($\text{RH} \ge 65\%$) 自动叠加除湿蒸发负荷补偿，干爽工况 ($\text{RH} \le 45\%$) 相应平滑缩减微载功率，使自动工况功率响应更贴合变频空调的舒适平衡热力学。
+  1. **自然语言运行模式与设定温度复合指令缺陷根治**：
+     - 彻底根除口语中同时包含模式与目标温度（如“制冷26度”、“开制冷26度”、“开冷气25度”、“开暖气22度”、“开制热二十度”、“客厅制冷26度”、“主卧开暖气21度”、“客厅和主卧开制冷24度”）因原有解析流中 `parseAbsoluteTemperature` 优先捕获导致模式（`operationMode`）被意外丢弃的严重缺陷；
+     - 新增 `VoiceCommand.setModeAndTemperature(mode: String, temperature: Double?)` 指令模型；解析器前置提取运行模式与 16~30°C 温度值，并提供“清爽制冷 26°C”、“舒适制热 20°C”等友好自然语言反馈；
+     - 在单机与多设备批量执行链路（`executeMultiDeviceCommand`）中无缝联动唤醒待机设备、下发模式与目标温度；
+     - 全链路扩充调温与变频动作的否定安全防护（“别开制冷26度”、“不要开暖气22度”、“别调到26度”、“千万别开大风”等），杜绝任何误执行。
+  2. **macOS 状态栏多设备矩阵一键常驻主显设备（Primary Device Pinning）**：
+     - 在状态栏右键“空调设备控制矩阵...”各房间子菜单中，增设原生「★ 设为菜单栏主显设备」选项（当前主显设备显示「✓ 菜单栏常驻主显中」并禁用点击）；
+     - 点击后一键将 `model.menuBarDeviceId` 切换至指定设备，并即刻触发 `refreshTemperature()` 刷新菜单栏实时温度显示、图标、悬浮 Tooltip 与 Bento Popover 默认聚焦，同时弹出 Toast 确认反馈；
+     - 在子菜单顶层设备标题前标示 `★` 徽章，多设备家庭用户在状态栏无需打开主窗口即可随时切换主控房间。
+  3. **变频制热严寒低温 PTC 电辅热与大温差热负荷动力学校准**：
+     - 在 `EnergyAnalyticsEngine.estimateInstantaneousPower` 中，深度优化冬季制热动力学：当室内外温差大且室内温度较低（室内温度 $\le 15^\circ\text{C}$，目标温差 $\Delta T \ge 5^\circ\text{C}$）时，拟真变频空调自动触发 PTC 辅助电加热与超频提温机制，动态计算热负荷附加功耗（+120W ~ 320W），大幅提升严寒季节与速热场景下的能耗仿真精度；
+     - 送风模式引入阶梯风速风阻能耗微调，低速静音档微功耗（最低 14W），高速强劲档真实还原风机全速压降能耗。
 
 ---
 
 ## 2. 关键架构变更与代码实现
 
-### 2.1 自然语言开字前缀与调温拦截缺陷根治 (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)
-- **开机与关机前置判定精准边界**：
-  - `isPowerOn` 增加排除规则：排除任何包含模式名（制冷、冷气、制热、暖气、除湿、抽湿、送风、自动）、带“度”的温度表达（如“26度”、“26.5度”）、风速词（大风、小风、微风）以及情景模式的句式；
-  - `isPowerOff` 增加排除“关小风”、“风速关小”、“关小一点”等调速句式；
-  - 扩展 `VoiceCommand` 枚举新增 `queryStatusAll`；当口语包含“全屋/所有/全部”与“多少度/温度/状态”时精准解析为全屋查询。
+### 2.1 自然语言模式与温度复合指令闭环 (`VoiceCommandParser.swift` / `VoiceCapsuleWindowController.swift` / `VoiceCommandParserTests.swift`)
+- **新增复合指令模型与解析层前置**：
+  - `VoiceCommand` 扩充 `case setModeAndTemperature(mode: String, temperature: Double?)`；
+  - `VoiceCommandParser.parse` 在绝对温度解析前插入 `parseModeAndTemperature`，精准抓取“模式词（制冷/冷气/制热/暖气/送风/除湿/自动等）”加“有效温度（16~30°C）”，同时排除全屋范围（交由 `parseAllPreset` 统一分发）；
+  - 增强 `containsNegativeAction` 正则表达式与关键词列表，将“调/设/升/降”等动作动词纳入否定动作捕获，并在 `parseRelativeTemperature`、`parseAbsoluteTemperature` 与 `parseWindSpeed` 中加入否定安全防线。
+- **单机与多设备批量执行链路对齐**：
+  - `VoiceCapsuleWindowController.executeCommand` 与 `executeMultiDeviceCommand` 补齐 `case .setModeAndTemperature` 分支，当目标空调处于待机状态时联动唤醒电源（`onOffStatus = true`），并同步更新 `operationMode` 与 `targetTemperature`。
 - **单元测试套件全覆盖**：
-  - 新增 30 项独立断言验证“开除湿”、“开制冷”、“开制热”、“开送风”、“开26度”、“开到25.5度”、“开大风”、“关小风”、“全屋空调多少度”等，全部一次性通过。
+  - 新增 `testModeAndTemperature()` 包含 15+ 组独立断言，覆盖“制冷26度”、“开暖气22度”、“客厅制冷26度”、“主卧开暖气21度”、“客厅和主卧开制冷24度”、“别开制冷26度”（否定防护）等，全部验证通过。
 
-### 2.2 自清洁控制流与多设备状态聚合 (`VoiceCapsuleWindowController.swift`)
-- **控制流补丁**：
-  - 为 `.stopSelfCleaning` 补充 `scheduleAutoDismiss(delay: 1.8)` 与 `return`，消除掉入未捕获状态分支的隐患；
-- **顶层指令前置分发**：
-  - 将 `.stopSleepCurve` 和 `.queryStatusAll` 提取至 `targetDevices.count > 1` 的判断之前，避免多设备下报出“不支持批量执行”；
-- **多设备状态聚合查询与口语格式化**：
-  - `executeMultiDeviceCommand` 新增 `case .queryStatus`，自动遍历目标设备并按「设备名」+「运行态」+「室温」+「模式设定」格式化拼接多设备语音与界面反馈；
-- **智能开机联动**：
-  - 当通过“开”字设定温度或模式时，如果目标设备当前处于待机状态，则在下发温度/模式的同时将其电源状态自动联动置为 `true`。
+### 2.2 状态栏多设备矩阵一键常驻主显设备 (`StatusItemController.swift`)
+- **设备级联子菜单交互扩展**：
+  - 为每个空调的级联控制子菜单增设「★ 设为菜单栏主显设备」/「✓ 菜单栏常驻主显中」菜单项，根据 `devId == primaryDeviceId` 动态计算状态；
+  - 点击时触发 `@objc private func setPrimaryDeviceFromMenu`，原子更新 `model.menuBarDeviceId`，调用 `refreshTemperature()` 瞬时刷新菜单栏实时温度文本与图标，并通过 `model.operationNotice` 发送交互 Toast 提醒；
+  - 设备项标题增加 `★` 前缀徽标，直观标识当前哪台设备正在常驻菜单栏。
 
-### 2.3 状态栏首选设备路由对齐与右键计数 (`StatusItemController.swift`)
-- **主选设备 ID 单一事实来源**：
-  - 废弃 `model.allUnifiedDevices.first?.id` 的生硬引用，重构为统一计算属性 `primaryDeviceId` (`model.menuBarDeviceId ?? model.allUnifiedDevices.first?.id`)；
-  - 单机调温（`stepUpPrimaryTemperature` / `stepDownPrimaryTemperature`）与快捷模式预设（`applyQuickCoolingPrimary` 等）全部改走 `primaryDeviceId`；
-- **全屋快捷项动态可控设备计数**：
-  - 右键上下文菜单的「全屋清爽制冷」、「全屋舒适制热」、「全屋舒爽除湿」、「全屋清新送风」标题中动态加入 `(N台在线)` 数量提示。
-
-### 2.4 自动模式温湿度协同动力学建模 (`EnergyAnalyticsEngine.swift`)
-- **自动模式湿度动力学补偿**：
-  - 自动模式引入 `indoorHumidity` 判定：当 $\text{RH} \ge 65\%$ 时叠加潜热除湿负荷补偿（基准功耗与上限相应上浮）；
-  - 当 $\text{RH} \le 45\%$ 时适当下调基础功耗（防过度耗能），真实还原变频空调微电脑对温湿度的多维度综合调控机制。
+### 2.3 制热严寒低温 PTC 电辅热与大温差热负荷动力学 (`EnergyAnalyticsEngine.swift`)
+- **制热工况严寒速热 PTC 电热负荷**：
+  - 在 `EnergyAnalyticsEngine.estimateInstantaneousPower` 的 `.heating` 分支中，增加当 `indoor <= 15.0 && delta >= 5.0` 时的热力补偿算法，动态叠加 `120.0 + (deficit * 10.0) + (excess * 12.0)`，最高功耗范围拓展至 1950W，完美贴合北方/湿冷南方冬天变频空调电辅热全开的高负荷动力学；
+- **送风模式风阻阶梯**：
+  - 微风/静音档基础功耗优化至 14W~20W，高风档真实还原风机压降负载至 60W~65W。
 
 ---
 
@@ -59,9 +49,9 @@
 - **本地编译验证**：
   - 运行 `SDKROOT=/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk swift build`，0 错误，0 警告构建成功；
 - **测试用例验证**：
-  - 独立运行 `VoiceCommandParserTests` 30 组用例，全部验证通过；
+  - 运行独立测试套件验证 `VoiceCommandParserTests` 21 组断言，全部通过；
 - **应用打包与签名**：
-  - 执行 `./build_app.sh 1.9.38`，构建生成 `dist/HaierAC.app`（包含 App 及小组件插件包）并打包为发布归档 `dist/HaierAC-v1.9.38-macOS.zip`。
+  - 执行 `./build_app.sh 1.9.39`，生成 `dist/HaierAC.app`（含桌面小组件扩展）并成功导出发布压缩包 `dist/HaierAC-v1.9.39-macOS.zip`（2.6MB）。
 
 ---
 

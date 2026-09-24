@@ -443,6 +443,30 @@ public final class VoiceCapsuleWindowController: NSObject, NSWindowDelegate {
                 }
             }
 
+        case .setModeAndTemperature(let modeName, let temp):
+            guard ensureControllable() else { return }
+            // 联动开机：若当前处于关机/待机状态，自动唤醒电源 (v1.9.39)
+            if model.attribute("onOffStatus", deviceId: deviceId)?.boolValue != true {
+                model.sendAttribute("onOffStatus", value: .bool(true), deviceId: deviceId)
+            }
+            // 下发运行模式
+            if let matched = ACModeCode.match(from: modeName) {
+                model.sendAttribute("operationMode", value: .string(matched.rawValue), deviceId: deviceId)
+            } else if let modeAttr = model.attributes[deviceId]?["operationMode"],
+                      case .list(let options) = modeAttr.valueRange,
+                      let match = options.first(where: { $0.desc.contains(modeName) || modeName.contains($0.desc) }) {
+                model.sendAttribute("operationMode", value: match.data, deviceId: deviceId)
+            }
+            // 下发设定温度
+            let modeDesc = ACModeCode.match(from: modeName)?.desc ?? modeName
+            if let temp = temp {
+                model.sendAttribute("targetTemperature", value: .double(temp), deviceId: deviceId)
+                let formatted = temp.truncatingRemainder(dividingBy: 1.0) == 0 ? "\(Int(temp))" : String(format: "%.1f", temp)
+                VoiceControlManager.shared.markSuccess("已将\(prefix)切换至「\(modeDesc)」并设为 \(formatted)°C")
+            } else {
+                VoiceControlManager.shared.markSuccess("已将\(prefix)切换至「\(modeDesc)」模式")
+            }
+
         case .setWindSpeed(let speedName):
             guard ensureControllable() else { return }
             if let windAttr = model.attributes[deviceId]?["windSpeed"],
@@ -674,6 +698,24 @@ public final class VoiceCapsuleWindowController: NSObject, NSWindowDelegate {
                 }
                 model.sendAttributeToDevices("operationMode", value: .string(matched.rawValue), deviceIds: ids)
                 VoiceControlManager.shared.markSuccess("已将\(prefix)切换至「\(matched.desc)」模式")
+            } else {
+                VoiceControlManager.shared.markFailed("未能识别「\(modeName)」模式")
+            }
+
+        case .setModeAndTemperature(let modeName, let temp):
+            if let matched = ACModeCode.match(from: modeName) {
+                let standbyIds = ids.filter { model.attribute("onOffStatus", deviceId: $0)?.boolValue != true }
+                if !standbyIds.isEmpty {
+                    model.sendAttributeToDevices("onOffStatus", value: .bool(true), deviceIds: standbyIds)
+                }
+                model.sendAttributeToDevices("operationMode", value: .string(matched.rawValue), deviceIds: ids)
+                if let temp = temp {
+                    model.sendAttributeToDevices("targetTemperature", value: .double(temp), deviceIds: ids)
+                    let formatted = temp.truncatingRemainder(dividingBy: 1.0) == 0 ? "\(Int(temp))" : String(format: "%.1f", temp)
+                    VoiceControlManager.shared.markSuccess("已将\(prefix)切换至「\(matched.desc)」并设为 \(formatted)°C")
+                } else {
+                    VoiceControlManager.shared.markSuccess("已将\(prefix)切换至「\(matched.desc)」模式")
+                }
             } else {
                 VoiceControlManager.shared.markFailed("未能识别「\(modeName)」模式")
             }

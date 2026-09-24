@@ -128,6 +128,52 @@ final class VoiceCommandParserTests: XCTestCase {
         XCTAssertEqual(auto?.command, .setMode("自动"))
     }
 
+    // MARK: - 模式与温度复合指令测试 (v1.9.39 彻底解决复合口令模式丢失缺陷)
+
+    func testModeAndTemperature() {
+        // 单设备/定向设备复合模式与温度
+        let c1 = VoiceCommandParser.parse("制冷26度")
+        XCTAssertEqual(c1?.command, .setModeAndTemperature(mode: "制冷", temperature: 26.0))
+        XCTAssertEqual(c1?.displayText, "清爽制冷 26°C")
+
+        let c2 = VoiceCommandParser.parse("开制冷26度")
+        XCTAssertEqual(c2?.command, .setModeAndTemperature(mode: "制冷", temperature: 26.0))
+
+        let c3 = VoiceCommandParser.parse("开冷气25度")
+        XCTAssertEqual(c3?.command, .setModeAndTemperature(mode: "制冷", temperature: 25.0))
+
+        let h1 = VoiceCommandParser.parse("制热20度")
+        XCTAssertEqual(h1?.command, .setModeAndTemperature(mode: "制热", temperature: 20.0))
+        XCTAssertEqual(h1?.displayText, "舒适制热 20°C")
+
+        let h2 = VoiceCommandParser.parse("开暖气22度")
+        XCTAssertEqual(h2?.command, .setModeAndTemperature(mode: "制热", temperature: 22.0))
+
+        let h3 = VoiceCommandParser.parse("开制热二十度")
+        XCTAssertEqual(h3?.command, .setModeAndTemperature(mode: "制热", temperature: 20.0))
+
+        let r1 = VoiceCommandParser.parse("客厅制冷26度")
+        XCTAssertEqual(r1?.command, .setModeAndTemperature(mode: "制冷", temperature: 26.0))
+
+        let r2 = VoiceCommandParser.parse("主卧开暖气21度")
+        XCTAssertEqual(r2?.command, .setModeAndTemperature(mode: "制热", temperature: 21.0))
+
+        let r3 = VoiceCommandParser.parse("客厅和主卧开制冷24度")
+        XCTAssertEqual(r3?.command, .setModeAndTemperature(mode: "制冷", temperature: 24.0))
+
+        let auto1 = VoiceCommandParser.parse("自动模式25度")
+        XCTAssertEqual(auto1?.command, .setModeAndTemperature(mode: "自动", temperature: 25.0))
+
+        // 否定保护：带模式与温度的否定句严禁误触发
+        XCTAssertNil(VoiceCommandParser.parse("别开制冷26度"))
+        XCTAssertNil(VoiceCommandParser.parse("不要开暖气22度"))
+        XCTAssertNil(VoiceCommandParser.parse("千万别开制热20度"))
+        XCTAssertNil(VoiceCommandParser.parse("不用制冷26度"))
+        XCTAssertNil(VoiceCommandParser.parse("别调到26度"))
+        XCTAssertNil(VoiceCommandParser.parse("不要调高两度"))
+        XCTAssertNil(VoiceCommandParser.parse("千万别开大风"))
+    }
+
     // MARK: - 风速测试
 
     func testWindSpeed() {

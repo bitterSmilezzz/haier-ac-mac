@@ -370,6 +370,20 @@ final class StatusItemController: NSObject {
                 let devSubmenu = NSMenu()
                 devSubmenu.autoenablesItems = false
 
+                // 设为菜单栏主显设备 (v1.9.39)
+                let isPrimary = (devId == primaryDeviceId)
+                let pinTitle = isPrimary ? "✓ 菜单栏常驻主显中" : "★ 设为菜单栏主显设备"
+                let pinItem = NSMenuItem(
+                    title: pinTitle,
+                    action: #selector(setPrimaryDeviceFromMenu(_:)),
+                    keyEquivalent: ""
+                )
+                pinItem.target = self
+                pinItem.representedObject = devId
+                pinItem.isEnabled = !isPrimary
+                devSubmenu.addItem(pinItem)
+                devSubmenu.addItem(.separator())
+
                 // 开关机切换
                 let togglePowerItem = NSMenuItem(
                     title: isPowerOn ? "关机" : "开机",
@@ -453,7 +467,8 @@ final class StatusItemController: NSObject {
                 case .available: statusBadge = isPowerOn ? "🟢 开机" : "⚪️ 待机"
                 }
 
-                let devItem = NSMenuItem(title: "\(dev.name) (\(statusBadge))", action: nil, keyEquivalent: "")
+                let pinBadge = isPrimary ? "★ " : ""
+                let devItem = NSMenuItem(title: "\(pinBadge)\(dev.name) (\(statusBadge))", action: nil, keyEquivalent: "")
                 devicesMenu.setSubmenu(devSubmenu, for: devItem)
                 devicesMenu.addItem(devItem)
             }
@@ -655,6 +670,15 @@ final class StatusItemController: NSObject {
     @objc private func stepDownDeviceTemperature(_ sender: NSMenuItem) {
         guard let devId = sender.representedObject as? String else { return }
         model.adjustDeviceTemperature(deviceId: devId, delta: -1.0)
+    }
+
+    /// 设为菜单栏主显常驻设备 (v1.9.39)
+    @objc private func setPrimaryDeviceFromMenu(_ sender: NSMenuItem) {
+        guard let devId = sender.representedObject as? String else { return }
+        model.menuBarDeviceId = devId
+        refreshTemperature()
+        let name = model.allUnifiedDevices.first(where: { $0.id == devId })?.name ?? "目标空调"
+        model.operationNotice = AppModel.OperationNotice(text: "已将「\(name)」设为菜单栏主显设备", isError: false)
     }
 
     @objc private func toggleDevicePower(_ sender: NSMenuItem) {

@@ -6,6 +6,19 @@ A native SwiftUI app to control Haier / Leader (统帅) smart air conditioners o
 
 ## Features
 
+- 🏷 **Natural Language Mode & Temperature Compound Control Defect Remediation, Menu Bar Primary Device Pinning & Low-Temp Heating Dynamics (v1.9.39)**:
+  - 🎙️ **Root Fix for Mode Loss in Combined Mode & Temperature Spoken Commands (`VoiceCommandParser` / `VoiceCapsuleWindowController` / `VoiceCommandParserTests`)**:
+    - Completely resolved the defect where conversational commands combining both operation mode and target temperature (e.g. "制冷26度", "开制冷26度", "开冷气25度", "开暖气22度", "开制热二十度", "客厅制冷26度", "主卧开暖气21度", "客厅和主卧开制冷24度") lost their `operationMode` due to absolute temperature pattern matching precedence, preventing dangerous cold/hot inversion where units remained in winter heating mode despite summer cooling requests;
+    - Introduced `VoiceCommand.setModeAndTemperature(mode:temperature:)` command model with pre-dispatch parsing of valid mode names and 16~30°C temperature ranges;
+    - Seamlessly wakes standby units, synchronizes operation mode and target temperature across both single-device and multi-device pipelines (`executeMultiDeviceCommand`), providing natural conversational feedback ("清爽制冷 26°C", "舒适制热 20°C");
+    - Extended structured negation protection to all temperature adjustment and inverter mode actions ("别开制冷26度", "不要开暖气22度", "别调到26度", "千万别开大风").
+  - 🍱 **Menu Bar Primary Device Pinning in Device Matrix (`StatusItemController`)**:
+    - Added native "★ 设为菜单栏主显设备" ("Pin as Menu Bar Primary Device") in right-click "空调设备控制矩阵..." device submenus (shows "✓ 菜单栏常驻主显中" when active);
+    - Instantly switches `model.menuBarDeviceId`, triggers `refreshTemperature()` to update menu bar live temperature, icon, tooltip, and Bento popover focus, accompanied by an in-app confirmation Toast;
+    - Badges primary devices with `★` in matrix menu titles, giving multi-unit users instant switching right from the status bar without opening the main window.
+  - ⚡️ **Inverter Heating Low-Temp PTC Auxiliary Thermal Load Dynamics (`EnergyAnalyticsEngine`)**:
+    - Deepened heating power thermodynamics in `estimateInstantaneousPower`: when indoor temperatures are low ($\le 15^\circ\text{C}$) and temperature difference is high ($\Delta T \ge 5^\circ\text{C}$), dynamically factors in PTC auxiliary electric heating and high-compression ratio boosts (+120W ~ 320W), vastly improving simulation accuracy for severe winter cold-starts;
+    - Refined fan mode step dynamics, maintaining ultra-low micro-power (min 14W) at quiet speeds while capturing aerodynamic load at maximum blower speeds.
 - 🏷 **Natural Language "Turn On" Mode/Temp Interception Fix, Menu Bar Primary Device Routing, Multi-Device Aggregated Status Query & Auto Mode Humidity Dynamics (v1.9.38)**:
   - 🎙️ **Root Fix for "Turn On" Mode & Temperature Preemption (`VoiceCommandParser` / `VoiceCommandParserTests`)**:
     - Completely resolved the defect where conversational phrases prefixed with "开/打开/开启" (e.g. "开除湿", "开制冷", "开制热", "开送风", "开26度", "开到26度", "开大风") were greedily preempted by `isPowerOn` and misclassified as simple power toggles; added explicit keyword exclusions for mode names, temperature values with "度", fan speeds, and scenes to ensure direct routing to mode switching and temperature adjustments;

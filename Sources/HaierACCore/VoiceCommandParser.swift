@@ -42,6 +42,8 @@ public enum VoiceCommand: Equatable {
     case setTemperatureAll(Double)
     /// 全屋/所有设备统一相对调温 (v1.9.35)
     case adjustTemperatureAll(delta: Double)
+    /// 设定运行模式与目标温度 (mode: 模式名称如"制冷"/"制热", temperature: 可选温度) (v1.9.39)
+    case setModeAndTemperature(mode: String, temperature: Double?)
     /// 启动 56°C 蒸发器高温自清洁 (v1.9.30)
     case startSelfCleaning
     /// 停止蒸发器自清洁 (v1.9.30)
@@ -168,12 +170,17 @@ public struct VoiceCommandParser {
             return VoiceParseResult(command: .setPower(true), displayText: "打开空调电源")
         }
 
-        // 6. 相对温度微调（太冷了/太热了/高一度/低一度）
+        // 9. 运行模式 + 温度复合设定（如“制冷26度”、“开暖气22度”、“开制冷26度”、“客厅制冷24度”）(v1.9.39 彻底解决复合口令模式丢失缺陷)
+        if let modeAndTemp = parseModeAndTemperature(cleaned) {
+            return modeAndTemp
+        }
+
+        // 10. 相对温度微调（太冷了/太热了/高一度/低一度）
         if let relative = parseRelativeTemperature(cleaned) {
             return relative
         }
 
-        // 7. 绝对温度设定（调到26度 / 26度 / 二十六度）
+        // 11. 绝对温度设定（调到26度 / 26度 / 二十六度）
         if let absolute = parseAbsoluteTemperature(cleaned) {
             return absolute
         }
@@ -386,17 +393,18 @@ public struct VoiceCommandParser {
     private static let negativeActionRegex: NSRegularExpression? = {
         // 否定词（别/不要/不用/不必/无需/先别/先不要/暂不/暂不要/千万别/千万不要/不能/不可以/切勿/切莫/不要再/别再/暂时不用/暂时不要）
         // 允许插入 0~6 个修饰词、量词、介词或设备名词（都/全/全部/全屋/全都/一起/统统/通通/马上/立刻/赶快/赶紧/急着/再/又/先/直接/也/把/给/将/空调/设备/机器/电源）
-        // 动作谓词（关/停/开/启动/运转/打开/关闭）
-        let pattern = #"(?:别|不要|不用|不必|无需|先别|先不要|暂不|暂不要|千万别|千万不要|不能|不可以|切勿|切莫|不要再|别再|暂时不用|暂时不要)[都全部屋所有一起统通马上立刻赶紧急着再又先直接也把给将空调设备机器电源它这个那房间主卧客厅]{0,6}(?:关|停|开|启动|运转|打开|关闭)"#
+        // 动作谓词（关/停/开/启动/运转/打开/关闭/调/设/升/降） (v1.9.39 扩展调温与变频动作否定)
+        let pattern = #"(?:别|不要|不用|不必|无需|先别|先不要|暂不|暂不要|千万别|千万不要|不能|不可以|切勿|切莫|不要再|别再|暂时不用|暂时不要)[都全部屋所有一起统通马上立刻赶紧急着再又先直接也把给将空调设备机器电源它这个那房间主卧客厅]{0,6}(?:关|停|开|启动|运转|打开|关闭|调|设|升|降)"#
         return try? NSRegularExpression(pattern: pattern)
     }()
 
-    /// 检测文本中是否包含针对开关机动作的否定意图（如“别关”、“不要全部关”、“别急着关”、“先别开”等，防止误触发） (v1.9.36 闭环 CR P1-1)
+    /// 检测文本中是否包含针对开关机/调温/模式动作的否定意图（如“别关”、“不要开”、“先别急着关”、“别开制冷”、“不要调”等，防止误触发） (v1.9.36, v1.9.39)
     private static func containsNegativeAction(_ text: String) -> Bool {
         guard let regex = negativeActionRegex else {
             let fallbackPatterns = [
                 "别关", "不要关", "不用关", "先别关", "先不要关", "暂不关", "不能关", "不可以关", "别停", "不要停", "不用停",
-                "别开", "不要开", "不用开", "先别开", "先不要开", "暂不开", "不能开", "不可以开", "别启动", "不要启动"
+                "别开", "不要开", "不用开", "先别开", "先不要开", "暂不开", "不能开", "不可以开", "别启动", "不要启动",
+                "别调", "不要调", "不用调", "别设", "不要设", "别升", "不要升", "别降", "不要降"
             ]
             return fallbackPatterns.contains(where: { text.contains($0) })
         }
@@ -606,6 +614,10 @@ public struct VoiceCommandParser {
     }
 
     private static func parseRelativeTemperature(_ text: String) -> VoiceParseResult? {
+        guard !containsNegativeAction(text) else { return nil }
+        if text.contains("不要") || text.contains("别") || text.contains("不用") || text.contains("暂不") {
+            return nil
+        }
         // 优先匹配带明确方向与幅度的口令（如“太冷了调高两度”、“升温2度”、“降温两度”、“降温1度”）
         if text.contains("高") || text.contains("升") || text.contains("加") || text.contains("热一点") || text.contains("暖和一点") {
             let delta = extractNumber(from: text) ?? 1.0
@@ -636,7 +648,50 @@ public struct VoiceCommandParser {
         return nil
     }
 
+    /// 运行模式 + 设定温度复合口令解析（如“制冷26度”、“开暖气22度”、“客厅制冷24度”）(v1.9.39)
+    private static func parseModeAndTemperature(_ text: String) -> VoiceParseResult? {
+        guard !containsNegativeAction(text) else { return nil }
+        if text.contains("不要") || text.contains("别") || text.contains("不用") || text.contains("暂不") {
+            return nil
+        }
+        // 若为全屋作用域，由 parseAllPreset 优先分发处理
+        guard !isAllDeviceScope(text) else { return nil }
+
+        // 识别模式
+        let detectedMode: String? = {
+            if text.contains("制冷") || text.contains("冷气") || text.contains("冷风") || text.contains("开冷") { return "制冷" }
+            if text.contains("制热") || text.contains("暖气") || text.contains("暖风") || text.contains("开暖") || text.contains("加热") { return "制热" }
+            if text.contains("送风") || text.contains("吹风") || text.contains("通风") || text.contains("自然风") { return "送风" }
+            if text.contains("除湿") || text.contains("抽湿") || text.contains("干燥") { return "除湿" }
+            if (text.contains("自动") || text.contains("智能")) && !text.contains("自动风") && !text.contains("风速") { return "自动" }
+            return nil
+        }()
+
+        guard let mode = detectedMode else { return nil }
+
+        // 必须同时包含有效目标温度区间（16~30°C），否则放行至后续纯模式或纯风速解析流程
+        guard let temp = extractTemperatureValue(from: text), temp >= 16.0 && temp <= 30.0 else {
+            return nil
+        }
+
+        let tempStr = formatTemp(temp)
+        let display: String
+        if mode == "制热" {
+            display = "舒适制热 \(tempStr)°C"
+        } else if mode == "制冷" {
+            display = "清爽制冷 \(tempStr)°C"
+        } else {
+            display = "\(mode)模式 \(tempStr)°C"
+        }
+
+        return VoiceParseResult(command: .setModeAndTemperature(mode: mode, temperature: temp), displayText: display)
+    }
+
     private static func parseAbsoluteTemperature(_ text: String) -> VoiceParseResult? {
+        guard !containsNegativeAction(text) else { return nil }
+        if text.contains("不要") || text.contains("别") || text.contains("不用") || text.contains("暂不") {
+            return nil
+        }
         guard let temp = extractTemperatureValue(from: text) else { return nil }
 
         // 空调常见合理温度区间：16°C ~ 30°C
@@ -673,6 +728,10 @@ public struct VoiceCommandParser {
     }
 
     private static func parseWindSpeed(_ text: String) -> VoiceParseResult? {
+        guard !containsNegativeAction(text) else { return nil }
+        if text.contains("不要") || text.contains("别") || text.contains("不用") || text.contains("暂不") {
+            return nil
+        }
         if text.contains("自动风") || text.contains("风速自动") || text.contains("自动风速") {
             return VoiceParseResult(command: .setWindSpeed("自动"), displayText: "切换至自动风速")
         }
