@@ -386,14 +386,14 @@ final class AppModel: ObservableObject {
         return .deviceOffline
     }
 
-    /// 全量有效设备列表（面向仅接受 DeviceInfo 的视图组件无缝映射） (v1.9.29)
+    /// 全量有效设备列表（面向仅接受 DeviceInfo 的视图组件无缝映射） (v1.9.30)
     public var effectiveDevices: [DeviceInfo] {
         allUnifiedDevices.map { u in
-            u.rawDevice ?? DeviceInfo(
+            DeviceInfo(
                 deviceId: u.id,
                 deviceName: u.name,
-                deviceType: "AirConditioner",
-                productNameT: "智能空调(局域网)",
+                deviceType: u.rawDevice?.deviceType ?? "AirConditioner",
+                productNameT: u.rawDevice?.productNameT ?? "智能空调",
                 online: reachability(for: u.id) == .available
             )
         }
@@ -498,9 +498,10 @@ final class AppModel: ObservableObject {
         }
     }
 
-    /// 当前菜单栏温度文案（如 "26.0°"），无数据时返回 nil
+    /// 当前菜单栏温度文案（如 "26.0°"），无数据或设备离线时返回 nil
     var menuBarTemperatureText: String? {
         guard menuBarShowTemperature, let deviceId = menuBarDeviceId ?? allUnifiedDevices.first?.id,
+              reachability(for: deviceId) == .available,
               let attr = Self.indoorTemperatureAttribute(in: attributes[deviceId] ?? [:]),
               let value = attr.doubleValue else { return nil }
         return String(format: "%.0f°", value)
@@ -813,8 +814,7 @@ final class AppModel: ObservableObject {
             stopSelfCleaning()
         }
 
-        let devName = devices.first(where: { $0.id == deviceId })?.deviceName ??
-                      manualDevices.first(where: { $0.deviceId == deviceId })?.name ?? "海尔空调"
+        let devName = allUnifiedDevices.first(where: { $0.id == deviceId })?.name ?? "海尔空调"
 
         // 尝试下发海尔标准自清洁控制指令
         let attrs = attributes[deviceId] ?? [:]
@@ -1004,8 +1004,10 @@ final class AppModel: ObservableObject {
         let allDevices = allUnifiedDevices.map { (id: $0.id, name: $0.name) }
 
         for dev in allDevices {
+            let reach = reachability(for: dev.id)
+            let isOnline = (reach == .available)
             let attrs = attributes[dev.id] ?? [:]
-            let isPowerOn = attrs["onOffStatus"]?.boolValue ?? false
+            let isPowerOn = isOnline && (attrs["onOffStatus"]?.boolValue ?? false)
             let mode = attrs["operationMode"]?.stringValue ?? "0"
             let targetTemp = attrs["targetTemperature"]?.doubleValue ?? 26.0
             let indoorTemp = currentIndoorTemperature(for: dev.id)
@@ -1024,7 +1026,7 @@ final class AppModel: ObservableObject {
                 accumulateFilterMinutes(for: dev.id, minutes: elapsedMinutes, wearFactor: wearFactor)
             }
 
-            let isCleaning = isSelfCleaningActive && (selfCleaningDeviceId == nil || selfCleaningDeviceId == dev.id)
+            let isCleaning = isOnline && isSelfCleaningActive && (selfCleaningDeviceId == nil || selfCleaningDeviceId == dev.id)
 
             samples.append(
                 EnergyAnalyticsEngine.DeviceEnergySample(
@@ -1032,7 +1034,7 @@ final class AppModel: ObservableObject {
                     isPowerOn: isPowerOn,
                     modeCode: mode,
                     targetTemp: targetTemp,
-                    indoorTemp: indoorTemp,
+                    indoorTemp: isOnline ? indoorTemp : nil,
                     windSpeed: windSpeed,
                     isSelfCleaning: isCleaning
                 )
@@ -2195,16 +2197,17 @@ final class AppModel: ObservableObject {
             operationNotice = OperationNotice(text: "⚠️ 连接中断，情景未应用", isError: true)
             return
         }
-        let fallbackId = targetDeviceId ?? devices.first?.id
+        let fallbackId = targetDeviceId ?? allUnifiedDevices.first?.id
         // 空 deviceId 动作的目标设备列表：全部设备 or 单台
         let emptyTargets: [String] = allDevices
-            ? devices.map(\.id) + manualDevices.map(\.deviceId)
+            ? allUnifiedDevices.map(\.id)
             : (fallbackId.map { [$0] } ?? [])
         var sent = 0
         for action in scene.actions {
             guard let value = action.value else { continue }
             let targets = action.deviceId.isEmpty ? emptyTargets : [action.deviceId]
             for deviceId in targets where !deviceId.isEmpty {
+                guard reachability(for: deviceId).isControllable else { continue }
                 gatewayHandle?.sendControl(deviceId: deviceId, attributes: [action.attrName: value.jsonValue], completion: nil)
                 // 乐观更新
                 if var map = attributes[deviceId], let old = map[action.attrName] {
@@ -2215,7 +2218,7 @@ final class AppModel: ObservableObject {
             }
         }
         AppLog.log("应用情景: \(scene.name) (\(sent) 个动作, allDevices=\(allDevices))")
-        operationNotice = OperationNotice(text: sent > 0 ? "✅ 情景「\(scene.name)」已下发（\(sent) 项）" : "⚠️ 情景「\(scene.name)」无可下发的动作", isError: sent == 0)
+        operationNotice = OperationNotice(text: sent > 0 ? "✅ 情景「\(scene.name)」已下发（\(sent) 项）" : "⚠️ 情景「\(scene.name)」无可下发的动作（目标设备可能离线）", isError: sent == 0)
     }
 
     private var provider: (any DeviceProvider)?
@@ -2360,7 +2363,7 @@ final class AppModel: ObservableObject {
                 // 1.5s 后若仍未收到 didOpen，但已有本地缓存设备，平滑恢复 ready，避免停留在转圈中
                 try? await Task.sleep(nanoseconds: 1_500_000_000)
                 guard self.reconnectGeneration == currentGen else { return }
-                if case .connecting = self.phase, !self.devices.isEmpty {
+                if case .connecting = self.phase, !self.allUnifiedDevices.isEmpty {
                     self.phase = .ready
                 }
             }
@@ -2696,6 +2699,44 @@ final class AppModel: ObservableObject {
             operationNotice = OperationNotice(text: "已发送：\(desc) → \(sent) 台设备", isError: false)
         }
         return sent
+    }
+
+    /// 全屋一键关机：关闭所有可达且处于开机状态的空调 (v1.9.30)
+    /// 返回实际关闭的设备数量
+    @discardableResult
+    public func turnOffAllDevices() -> Int {
+        let controllableOnIds = allUnifiedDevices
+            .filter { reachability(for: $0.id).isControllable && attribute("onOffStatus", deviceId: $0.id)?.boolValue == true }
+            .map(\.id)
+        guard !controllableOnIds.isEmpty else {
+            operationNotice = OperationNotice(text: "当前所有空调均处于关机或离线状态", isError: false)
+            return 0
+        }
+        let sent = sendAttributeToDevices("onOffStatus", value: .bool(false), deviceIds: controllableOnIds)
+        operationNotice = OperationNotice(text: "✅ 已关闭全屋 \(sent) 台运行中的空调", isError: false)
+        return sent
+    }
+
+    /// 全屋一键清爽/开机预设：将所有可达空调开启并设置为指定模式与温度 (v1.9.30)
+    /// 返回实际控制的设备数量
+    @discardableResult
+    public func applyPresetToAllDevices(mode: ACModeCode, temperature: Double, windSpeed: String? = nil) -> Int {
+        let controllableIds = allUnifiedDevices
+            .filter { reachability(for: $0.id).isControllable }
+            .map(\.id)
+        guard !controllableIds.isEmpty else {
+            operationNotice = OperationNotice(text: "⚠️ 当前无任何可控的在线空调设备", isError: true)
+            return 0
+        }
+        sendAttributeToDevices("onOffStatus", value: .bool(true), deviceIds: controllableIds)
+        sendAttributeToDevices("operationMode", value: .string(mode.rawValue), deviceIds: controllableIds)
+        sendAttributeToDevices("targetTemperature", value: .double(temperature), deviceIds: controllableIds)
+        if let windSpeed {
+            sendAttributeToDevices("windSpeed", value: .string(windSpeed), deviceIds: controllableIds)
+        }
+        let tempDesc = temperature.truncatingRemainder(dividingBy: 1.0) == 0 ? "\(Int(temperature))" : String(format: "%.1f", temperature)
+        operationNotice = OperationNotice(text: "✅ 已将全屋 \(controllableIds.count) 台空调设为「\(mode.desc) \(tempDesc)°C」", isError: false)
+        return controllableIds.count
     }
 
     /// 网关推送属性时调用：确认待生效操作

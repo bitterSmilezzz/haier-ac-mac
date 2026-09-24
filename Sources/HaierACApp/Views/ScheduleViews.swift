@@ -68,8 +68,7 @@ private struct ScheduleRow: View {
     var onEdit: () -> Void
 
     private var deviceName: String {
-        model.devices.first(where: { $0.id == action.deviceId })?.deviceName
-            ?? model.manualDevices.first(where: { $0.deviceId == action.deviceId })?.name
+        model.allUnifiedDevices.first(where: { $0.id == action.deviceId })?.name
             ?? action.deviceId
     }
 
@@ -190,9 +189,7 @@ struct AddScheduleSheet: View {
     @State private var stepValue: Double = 26
 
     private var selectableDevices: [(id: String, name: String)] {
-        let cloud = model.devices.map { (id: $0.id, name: $0.deviceName) }
-        let manual = model.manualDevices.map { (id: $0.deviceId, name: $0.name) }
-        return cloud + manual
+        model.allUnifiedDevices.map { ($0.id, $0.name) }
     }
 
     private var attrs: [String: DeviceAttribute] {

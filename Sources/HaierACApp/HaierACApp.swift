@@ -54,7 +54,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if action == "stop" || url.path == "/stop" {
             model.stopSleepCurve()
         } else if action == "start" || url.path == "/start" {
-            guard let deviceId = model.devices.first?.id ?? model.manualDevices.first?.deviceId else { return }
+            guard let deviceId = model.menuBarDeviceId ?? model.allUnifiedDevices.first?.id else { return }
             let curve = model.allSleepCurves.first(where: { $0.name == model.bedtimeSchedule.curveName }) ?? model.allSleepCurves.first ?? .standard
             model.startSleepCurve(curve: curve, deviceId: deviceId)
         } else if action == "toggle" || url.path == "/toggle" {

@@ -13,10 +13,9 @@ struct DeviceListView: View {
     @State private var batchMode = false
     @State private var selectedDeviceIds: Set<String> = []
 
-    /// 可批量操作的设备（云端 + 手动）
+    /// 可批量操作的设备（全屋统一设备）
     private var batchableDevices: [(id: String, name: String)] {
-        model.devices.map { (id: $0.id, name: $0.deviceName) } +
-        model.manualDevices.map { (id: $0.deviceId, name: $0.name) }
+        model.allUnifiedDevices.map { ($0.id, $0.name) }
     }
 
     var body: some View {
@@ -135,7 +134,7 @@ struct DeviceListView: View {
     }
 
     private var totalCount: Int {
-        model.devices.count + model.manualDevices.count
+        model.allUnifiedDevices.count
     }
 
     // MARK: - 云端设备
@@ -482,8 +481,7 @@ struct DiscoveredDeviceRow: View {
     @State private var added = false
 
     private var isInList: Bool {
-        model.devices.contains { $0.id == device.deviceId } ||
-        model.manualDevices.contains { $0.deviceId == device.deviceId }
+        model.allUnifiedDevices.contains { $0.id == device.deviceId }
     }
 
     var body: some View {

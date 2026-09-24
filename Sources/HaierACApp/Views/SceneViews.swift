@@ -37,15 +37,14 @@ struct SceneSection: View {
                     .background(Theme.cardBackground(Theme.surface1))
             } else {
                 // 目标设备选择（多设备时显示）
-                if model.devices.count + model.manualDevices.count > 1 {
+                if model.allUnifiedDevices.count > 1 {
                     HStack(spacing: 8) {
                         Image(systemName: "target")
                             .font(.system(size: 11))
                             .foregroundStyle(Theme.inkTertiary)
                         Picker("", selection: $targetDeviceId) {
                             Text("第一台设备").tag("")
-                            ForEach(model.devices.map { (id: $0.id, name: $0.deviceName) } +
-                                    model.manualDevices.map { (id: $0.deviceId, name: $0.name) }, id: \.id) { d in
+                            ForEach(model.allUnifiedDevices, id: \.id) { d in
                                 Text(d.name).tag(d.id)
                             }
                         }
@@ -135,7 +134,7 @@ private struct SceneCard: View {
             .disabled(!model.gatewayConnected)
 
             // 应用到所有设备（仅多设备时显示）
-            if model.devices.count + model.manualDevices.count > 1 {
+            if model.allUnifiedDevices.count > 1 {
                 Button {
                     model.applyScene(scene, allDevices: true)
                 } label: {
@@ -181,8 +180,7 @@ struct AddSceneSheet: View {
     @State private var pendingActions: [AppModel.SceneAction] = []
 
     private var selectableDevices: [(id: String, name: String)] {
-        model.devices.map { (id: $0.id, name: $0.deviceName) } +
-        model.manualDevices.map { (id: $0.deviceId, name: $0.name) }
+        model.allUnifiedDevices.map { ($0.id, $0.name) }
     }
 
     private var attrs: [String: DeviceAttribute] { model.attributes[deviceId] ?? [:] }

@@ -21,8 +21,7 @@ struct MenuBarControlsView: View {
     }
 
     private var activeDevices: [DeviceInfo] {
-        guard case .ready = model.phase else { return [] }
-        return model.devices
+        model.effectiveDevices
     }
 
     private var currentDevice: DeviceInfo? {

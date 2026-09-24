@@ -222,6 +222,49 @@ final class VoiceCommandParserTests: XCTestCase {
         XCTAssertEqual(sc6?.command, .stopSleepCurve)
     }
 
+    // MARK: - 全屋协同与自清洁测试 (v1.9.30)
+
+    func testAllDevicesAndSelfCleaningControl() {
+        // 全屋关机
+        let off1 = VoiceCommandParser.parse("关闭所有空调")
+        XCTAssertEqual(off1?.command, .turnOffAll)
+
+        let off2 = VoiceCommandParser.parse("关掉所有空调")
+        XCTAssertEqual(off2?.command, .turnOffAll)
+
+        let off3 = VoiceCommandParser.parse("全屋关机")
+        XCTAssertEqual(off3?.command, .turnOffAll)
+
+        let off4 = VoiceCommandParser.parse("关闭全屋空调")
+        XCTAssertEqual(off4?.command, .turnOffAll)
+
+        // 全屋开机
+        let on1 = VoiceCommandParser.parse("打开所有空调")
+        XCTAssertEqual(on1?.command, .turnOnAll)
+
+        let on2 = VoiceCommandParser.parse("开启所有空调")
+        XCTAssertEqual(on2?.command, .turnOnAll)
+
+        let on3 = VoiceCommandParser.parse("全屋开机")
+        XCTAssertEqual(on3?.command, .turnOnAll)
+
+        // 56°C 蒸发器自清洁
+        let clean1 = VoiceCommandParser.parse("开启自清洁")
+        XCTAssertEqual(clean1?.command, .startSelfCleaning)
+
+        let clean2 = VoiceCommandParser.parse("清洗蒸发器")
+        XCTAssertEqual(clean2?.command, .startSelfCleaning)
+
+        let clean3 = VoiceCommandParser.parse("启动蒸发器自清洁")
+        XCTAssertEqual(clean3?.command, .startSelfCleaning)
+
+        let clean4 = VoiceCommandParser.parse("停止自清洁")
+        XCTAssertEqual(clean4?.command, .stopSelfCleaning)
+
+        let clean5 = VoiceCommandParser.parse("取消自清洁")
+        XCTAssertEqual(clean5?.command, .stopSelfCleaning)
+    }
+
     // MARK: - 无效输入测试
 
     func testInvalidCommands() {

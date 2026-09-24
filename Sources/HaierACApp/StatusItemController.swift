@@ -82,7 +82,7 @@ final class StatusItemController: NSObject {
             let targetId = model.menuBarDeviceId ?? model.allUnifiedDevices.first?.id
             let isPowerOn: Bool = {
                 guard let targetId else { return false }
-                return model.attribute("onOffStatus", deviceId: targetId)?.boolValue ?? false
+                return model.reachability(for: targetId) == .available && (model.attribute("onOffStatus", deviceId: targetId)?.boolValue ?? false)
             }()
             let symbolName = isPowerOn ? "air.conditioner.horizontal.fill" : "air.conditioner.horizontal"
             button.image = NSImage(systemSymbolName: symbolName, accessibilityDescription: isPowerOn ? "海尔空调 (运行中)" : "海尔空调 (待机)")

@@ -144,6 +144,52 @@ public final class VoiceCapsuleWindowController: NSObject, NSWindowDelegate {
     }
 
     private func executeCommand(_ command: VoiceCommand, displayText: String, model: AppModel) {
+        // 1. 全屋指令与全局自清洁停止：不受单一设备离线约束 (v1.9.30)
+        switch command {
+        case .turnOffAll:
+            guard model.gatewayConnected else {
+                VoiceControlManager.shared.markFailed("网关重连中，无法执行全屋控制")
+                scheduleAutoDismiss(delay: 2.5)
+                return
+            }
+            let closedCount = model.turnOffAllDevices()
+            if closedCount > 0 {
+                VoiceControlManager.shared.markSuccess("已为您关闭全屋 \(closedCount) 台运行中的空调")
+            } else {
+                VoiceControlManager.shared.markSuccess("全屋空调当前均已处于关机或待机状态")
+            }
+            scheduleAutoDismiss(delay: 1.8)
+            return
+
+        case .turnOnAll:
+            guard model.gatewayConnected else {
+                VoiceControlManager.shared.markFailed("网关重连中，无法执行全屋控制")
+                scheduleAutoDismiss(delay: 2.5)
+                return
+            }
+            let openedCount = model.applyPresetToAllDevices(mode: .cooling, temperature: 26.0)
+            if openedCount > 0 {
+                VoiceControlManager.shared.markSuccess("已为您开启全屋 \(openedCount) 台空调（制冷 26°C）")
+            } else {
+                VoiceControlManager.shared.markFailed("未发现可控制的就绪空调设备")
+            }
+            scheduleAutoDismiss(delay: 1.8)
+            return
+
+        case .stopSelfCleaning:
+            if model.isSelfCleaningActive {
+                model.stopSelfCleaning()
+                VoiceControlManager.shared.markSuccess("已停止蒸发器自清洁")
+            } else {
+                VoiceControlManager.shared.markSuccess("当前未在执行自清洁")
+            }
+            scheduleAutoDismiss(delay: 1.5)
+            return
+
+        default:
+            break
+        }
+
         guard let deviceId = model.menuBarDeviceId ?? model.allUnifiedDevices.first?.id else {
             VoiceControlManager.shared.markFailed("未检测到已连接的空调设备")
             scheduleAutoDismiss(delay: 2.0)
@@ -328,6 +374,19 @@ public final class VoiceCapsuleWindowController: NSObject, NSWindowDelegate {
             } else {
                 VoiceControlManager.shared.markSuccess("暂无睡眠调温记录")
             }
+
+        case .startSelfCleaning:
+            if model.isSelfCleaningActive {
+                let remaining = model.selfCleaningRemainingSeconds
+                VoiceControlManager.shared.markSuccess("56°C 蒸发器自清洁进行中（剩余 \(remaining / 60) 分钟）")
+            } else {
+                model.startSelfCleaning(deviceId: deviceId)
+                let devName = model.allUnifiedDevices.first(where: { $0.id == deviceId })?.name ?? "海尔空调"
+                VoiceControlManager.shared.markSuccess("已为「\(devName)」启动 56°C 蒸发器高温自清洁")
+            }
+
+        case .turnOffAll, .turnOnAll, .stopSelfCleaning:
+            break // 已在指令前置流程中由全局调度完成分发
         }
 
         scheduleAutoDismiss(delay: 1.5)

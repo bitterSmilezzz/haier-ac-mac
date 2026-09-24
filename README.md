@@ -8,6 +8,11 @@
 
 ## 功能
 
+- 🏷 **全屋设备全链路平权与离线虚假能耗阻断 (v1.9.30)**：
+  - 🏠 **全屋设备全链路 100% 平权对齐**：彻底消除项目中分散的 `model.devices.map + model.manualDevices.map` 拼接，全面收敛使用统一去重视图 `allUnifiedDevices`。菜单栏控制面板 `activeDevices` 接入 `effectiveDevices`，使局域网手动直连空调与云端空调在菜单栏弹窗中享有完全平等的设备切换、控制与状态感知能力；情景模式（`SceneViews`）、自动化定时调度（`ScheduleViews`）、主设备列表（`DeviceListView`）及 URL Scheme 启停全链路无死角对齐。
+  - ⚡️ **动态可达性感知模型 (`effectiveDevices`)**：重构 `effectiveDevices` 计算属性，动态对齐底层 `reachability(for: u.id) == .available` 真实状态，杜绝云端初始抓取时的陈旧静态在线标记误导视图层。
+  - 🛡️ **离线幽灵能耗与虚假滤网磨损彻底拦截**：在能耗动力学后台积分 `accumulatePeriodicWork` 中引入设备物理在线校验 `let isOnline = (reachability(for: dev.id) == .available)`。当空调硬件离线断电断网时，自动将其从高负荷压缩机运行工况切断，不再持续积分数百瓦虚假运行功率，不再为离线空调无故虚耗空气动力学滤网等效使用寿命。
+  - 🌤️ **状态栏离线严谨防护与情景下发安全守卫**：状态栏主设备图标 `isPowerOn` 状态接入可达性校验，防止设备断网后图标依然错误高亮为空调运行中；`menuBarTemperatureText` 在设备离线时优雅置空，消除状态栏停留在离线前陈旧温度的误导；`applyScene` 全屋情景动作下发引入可达性熔断门禁，跳过不可控目标。
 - 🏷 **全屋设备全链路统一感知与能耗工况动力学升级 (v1.9.29)**：
   - 🖥️ **macOS 状态栏全屋设备统一感知与 Tooltip 彻底重构**：将 `StatusItemController` 状态栏 Tooltip 与设备选择全面重构为基于 `allUnifiedDevices` 统一迭代；消除过去针对云端与手动设备的排他分支，多设备混合场景手动机型与云端机型均获得统一展示；补齐 `model.$manualDevices` Combine 发布者订阅，局域网设备增删即时触发状态栏刷新；待机设备补充展示室内回风传感器实时读数。
   - ⚡️ **56°C 蒸发器高温自清洁热力学能耗动力学建模与积分**：`EnergyAnalyticsEngine` 建立 56°C 高温蒸发器自清洁阶段（急冷结霜、微波解冻与高温烘干灭菌）热力学动力模型（基础功耗 920W + 风速偏置），并在 `accumulateSample` 中准确累计自清洁电量并归入高温热力学工况时长，彻底终结以往自清洁阶段被误算为 1.5W 待机微功耗导致的能耗严重低估缺陷。

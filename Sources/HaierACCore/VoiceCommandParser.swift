@@ -28,6 +28,14 @@ public enum VoiceCommand: Equatable {
     case stopSleepCurve
     /// 查询智能睡眠状态或昨晚睡眠报告（v1.9.18）
     case querySleepReport
+    /// 关闭全屋所有空调 (v1.9.30)
+    case turnOffAll
+    /// 开启全屋所有空调 (v1.9.30)
+    case turnOnAll
+    /// 启动 56°C 蒸发器高温自清洁 (v1.9.30)
+    case startSelfCleaning
+    /// 停止蒸发器自清洁 (v1.9.30)
+    case stopSelfCleaning
 }
 
 /// 语音指令解析结果
@@ -94,12 +102,29 @@ public struct VoiceCommandParser {
             }
         }
 
-        // 4. 定时与倒计时任务（放在立即开关机前，避免“30分钟后关机”被提前作为立即关机拦截）
+        // 5. 56°C 蒸发器自清洁启停 (v1.9.30)
+        if cleaned.contains("自清洁") || cleaned.contains("清洗蒸发器") || cleaned.contains("蒸发器清洁") || cleaned.contains("高温除菌") {
+            if cleaned.contains("关") || cleaned.contains("停") || cleaned.contains("退") || cleaned.contains("取消") || cleaned.contains("中止") {
+                return VoiceParseResult(command: .stopSelfCleaning, displayText: "停止蒸发器自清洁")
+            } else {
+                return VoiceParseResult(command: .startSelfCleaning, displayText: "启动 56°C 蒸发器高温自清洁")
+            }
+        }
+
+        // 6. 全屋多设备协同开/关控制 (v1.9.30，放在单设备开/关机前拦截)
+        if isAllPowerOff(cleaned) {
+            return VoiceParseResult(command: .turnOffAll, displayText: "关闭全屋所有空调")
+        }
+        if isAllPowerOn(cleaned) {
+            return VoiceParseResult(command: .turnOnAll, displayText: "开启全屋所有空调")
+        }
+
+        // 7. 定时与倒计时任务（放在立即开关机前，避免“30分钟后关机”被提前作为立即关机拦截）
         if let scheduleOrCountdown = parseScheduleOrCountdown(cleaned) {
             return scheduleOrCountdown
         }
 
-        // 5. 立即关机 / 开机（注意：关机判定放在开机前，避免“关闭空调”因含有“开”而被误判）
+        // 8. 立即关机 / 开机（注意：关机判定放在开机前，避免“关闭空调”因含有“开”而被误判）
         if isPowerOff(cleaned) {
             return VoiceParseResult(command: .setPower(false), displayText: "关闭空调电源")
         }
@@ -312,6 +337,24 @@ public struct VoiceCommandParser {
         }
 
         return (finalHour, minute)
+    }
+
+    private static func isAllPowerOff(_ text: String) -> Bool {
+        let allOffKeywords = [
+            "关闭所有空调", "关掉所有空调", "关闭全部空调", "关掉全部空调",
+            "关所有空调", "关全部空调", "全屋关机", "全部关机", "全关了",
+            "关闭全屋空调", "关掉全屋空调", "全屋关空调", "所有空调关机", "全屋关"
+        ]
+        return allOffKeywords.contains(where: { text.contains($0) })
+    }
+
+    private static func isAllPowerOn(_ text: String) -> Bool {
+        let allOnKeywords = [
+            "打开所有空调", "开启所有空调", "打开全部空调", "开启全部空调",
+            "开所有空调", "开全部空调", "全屋开机", "全部开机", "全开了",
+            "开启全屋空调", "打开全屋空调", "全屋开空调", "所有空调开机", "全屋开"
+        ]
+        return allOnKeywords.contains(where: { text.contains($0) })
     }
 
     private static func isPowerOff(_ text: String) -> Bool {
