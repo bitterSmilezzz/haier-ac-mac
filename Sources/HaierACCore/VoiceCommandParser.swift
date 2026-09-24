@@ -20,8 +20,10 @@ public enum VoiceCommand: Equatable {
     case countdownPower(minutes: Int, power: Bool)
     /// 指定钟点开关机（hour: 0~23, minute: 0~59, power: true=开机, false=关机）
     case schedulePower(hour: Int, minute: Int, power: Bool)
-    /// 取消所有定时与倒计时
+    /// 取消定向/当前设备定时与倒计时
     case cancelSchedules
+    /// 取消全屋所有设备的定时与倒计时任务 (v1.9.36)
+    case cancelSchedulesAll
     /// 启动智能睡眠温阶（curveName: 可选曲线名称）
     case startSleepCurve(curveName: String?)
     /// 停止智能睡眠温阶
@@ -76,9 +78,13 @@ public struct VoiceCommandParser {
             return VoiceParseResult(command: .queryStatus, displayText: "查询室内温度")
         }
 
-        // 2. 定时与倒计时取消
+        // 2. 定时与倒计时取消 (v1.9.36 闭环 CR P1-2: 区分全屋取消与定向设备取消)
         if isCancelSchedule(cleaned) {
-            return VoiceParseResult(command: .cancelSchedules, displayText: "取消所有定时与倒计时")
+            if isAllDeviceScope(cleaned) {
+                return VoiceParseResult(command: .cancelSchedulesAll, displayText: "取消全屋所有定时与倒计时")
+            } else {
+                return VoiceParseResult(command: .cancelSchedules, displayText: "取消定时与倒计时")
+            }
         }
 
         // 3. 睡眠状态与报告查询（v1.9.18，优先于通用睡眠开关）
@@ -179,7 +185,15 @@ public struct VoiceCommandParser {
 
     private static func isCancelSchedule(_ text: String) -> Bool {
         let cancelKeywords = ["取消定时", "取消倒计时", "关闭定时", "清除定时", "删除定时", "取消预约", "别定了"]
-        return cancelKeywords.contains(where: { text.contains($0) })
+        if cancelKeywords.contains(where: { text.contains($0) }) {
+            return true
+        }
+        // 自然语言容错：包含“取消/关闭/清除/删除/撤销”且包含“定时/倒计时/预约”（如“取消所有定时任务”、“关闭全屋倒计时”）
+        if (text.contains("取消") || text.contains("关闭") || text.contains("清除") || text.contains("删除") || text.contains("撤销")) &&
+           (text.contains("定时") || text.contains("倒计时") || text.contains("预约")) {
+            return true
+        }
+        return false
     }
 
     private static func parseScheduleOrCountdown(_ text: String) -> VoiceParseResult? {
@@ -354,13 +368,25 @@ public struct VoiceCommandParser {
         return (finalHour, minute)
     }
 
-    /// 检测文本中是否包含针对开关机动作的否定意图（如“别关”、“不要关”、“不用关”、“先别开”、“不要开”等，防止误触发） (v1.9.34)
+    private static let negativeActionRegex: NSRegularExpression? = {
+        // 否定词（别/不要/不用/不必/无需/先别/先不要/暂不/暂不要/千万别/千万不要/不能/不可以/切勿/切莫/不要再/别再/暂时不用/暂时不要）
+        // 允许插入 0~6 个修饰词、量词、介词或设备名词（都/全/全部/全屋/全都/一起/统统/通通/马上/立刻/赶快/赶紧/急着/再/又/先/直接/也/把/给/将/空调/设备/机器/电源）
+        // 动作谓词（关/停/开/启动/运转/打开/关闭）
+        let pattern = #"(?:别|不要|不用|不必|无需|先别|先不要|暂不|暂不要|千万别|千万不要|不能|不可以|切勿|切莫|不要再|别再|暂时不用|暂时不要)[都全部屋所有一起统通马上立刻赶紧急着再又先直接也把给将空调设备机器电源它这个那房间主卧客厅]{0,6}(?:关|停|开|启动|运转|打开|关闭)"#
+        return try? NSRegularExpression(pattern: pattern)
+    }()
+
+    /// 检测文本中是否包含针对开关机动作的否定意图（如“别关”、“不要全部关”、“别急着关”、“先别开”等，防止误触发） (v1.9.36 闭环 CR P1-1)
     private static func containsNegativeAction(_ text: String) -> Bool {
-        let negativePatterns = [
-            "别关", "不要关", "不用关", "先别关", "先不要关", "暂不关", "不能关", "不可以关", "别停", "不要停", "不用停",
-            "别开", "不要开", "不用开", "先别开", "先不要开", "暂不开", "不能开", "不可以开", "别启动", "不要启动"
-        ]
-        return negativePatterns.contains(where: { text.contains($0) })
+        guard let regex = negativeActionRegex else {
+            let fallbackPatterns = [
+                "别关", "不要关", "不用关", "先别关", "先不要关", "暂不关", "不能关", "不可以关", "别停", "不要停", "不用停",
+                "别开", "不要开", "不用开", "先别开", "先不要开", "暂不开", "不能开", "不可以开", "别启动", "不要启动"
+            ]
+            return fallbackPatterns.contains(where: { text.contains($0) })
+        }
+        let range = NSRange(text.startIndex..<text.endIndex, in: text)
+        return regex.firstMatch(in: text, options: [], range: range) != nil
     }
 
     private static func isAllPowerOff(_ text: String) -> Bool {

@@ -2791,7 +2791,7 @@ final class AppModel: ObservableObject {
         return applyPreset(deviceIds: nil, mode: mode, temperature: temperature, windSpeed: windSpeed)
     }
 
-    /// 调整单个空调的设定温度（相对步进 delta，如 +1.0 或 -1.0） (v1.9.35)
+    /// 调整单个空调的设定温度（相对步进 delta，如 +1.0 或 -1.0） (v1.9.35, v1.9.36 极值边界防护)
     @discardableResult
     public func adjustDeviceTemperature(deviceId: String, delta: Double) -> Double? {
         guard reachability(for: deviceId).isControllable else {
@@ -2800,14 +2800,19 @@ final class AppModel: ObservableObject {
         }
         let current = attribute("targetTemperature", deviceId: deviceId)?.doubleValue ?? 26.0
         let target = min(30.0, max(16.0, current + delta))
-        sendAttribute("targetTemperature", value: .double(target), deviceId: deviceId)
         let devName = allUnifiedDevices.first(where: { $0.id == deviceId })?.name ?? "空调"
+        if target == current {
+            let limitDesc = delta > 0 ? "已达到最高温度上限 30°C" : "已达到最低温度下限 16°C"
+            operationNotice = OperationNotice(text: "「\(devName)」\(limitDesc)", isError: false)
+            return current
+        }
+        sendAttribute("targetTemperature", value: .double(target), deviceId: deviceId)
         let tempDesc = target.truncatingRemainder(dividingBy: 1.0) == 0 ? "\(Int(target))" : String(format: "%.1f", target)
         operationNotice = OperationNotice(text: "✅ 已将「\(devName)」温度调至 \(tempDesc)°C", isError: false)
         return target
     }
 
-    /// 批量/全屋相对调温：为目标设备集（若为 nil 则默认全屋）中所有可控且开机运行的空调按 delta 步进调温 (v1.9.35)
+    /// 批量/全屋相对调温：为目标设备集（若为 nil 则默认全屋）中所有可控且开机运行的空调按 delta 步进调温 (v1.9.35, v1.9.36 极值边界防护)
     @discardableResult
     public func adjustTemperature(deviceIds: [String]? = nil, delta: Double) -> Int {
         let targets = deviceIds ?? allUnifiedDevices.map(\.id)
@@ -2821,19 +2826,29 @@ final class AppModel: ObservableObject {
             operationNotice = OperationNotice(text: desc, isError: false)
             return 0
         }
+        var changedCount = 0
         for id in controllableOnIds {
             let current = attribute("targetTemperature", deviceId: id)?.doubleValue ?? 26.0
             let target = min(30.0, max(16.0, current + delta))
-            sendAttribute("targetTemperature", value: .double(target), deviceId: id)
+            if target != current {
+                sendAttribute("targetTemperature", value: .double(target), deviceId: id)
+                changedCount += 1
+            }
+        }
+        if changedCount == 0 {
+            let limitDesc = delta > 0 ? "已达到最高温度上限 30°C" : "已达到最低温度下限 16°C"
+            let desc = isAll ? "全屋运行中的空调均\(limitDesc)" : "所选运行中的空调均\(limitDesc)"
+            operationNotice = OperationNotice(text: desc, isError: false)
+            return 0
         }
         let deltaAbs = abs(delta)
         let deltaDesc = deltaAbs.truncatingRemainder(dividingBy: 1.0) == 0 ? "\(Int(deltaAbs))" : String(format: "%.1f", deltaAbs)
         let dirDesc = delta > 0 ? "升温 \(deltaDesc)°C" : "降温 \(deltaDesc)°C"
         let desc = isAll
-            ? "✅ 已将全屋 \(controllableOnIds.count) 台运行中的空调统一\(dirDesc)"
-            : "✅ 已将所选 \(controllableOnIds.count) 台运行中的空调统一\(dirDesc)"
+            ? "✅ 已将全屋 \(changedCount) 台运行中的空调统一\(dirDesc)"
+            : "✅ 已将所选 \(changedCount) 台运行中的空调统一\(dirDesc)"
         operationNotice = OperationNotice(text: desc, isError: false)
-        return controllableOnIds.count
+        return changedCount
     }
 
     /// 全屋一键相对调温 (v1.9.35)

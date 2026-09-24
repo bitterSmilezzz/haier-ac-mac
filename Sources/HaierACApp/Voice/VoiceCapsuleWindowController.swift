@@ -296,7 +296,15 @@ public final class VoiceCapsuleWindowController: NSObject, NSWindowDelegate {
             } else {
                 VoiceControlManager.shared.markSuccess("当前未在执行自清洁")
             }
-            scheduleAutoDismiss(delay: 1.5)
+        case .cancelSchedulesAll:
+            let count = model.scheduledActions.count
+            if count > 0 {
+                model.scheduledActions.removeAll()
+                VoiceControlManager.shared.markSuccess("已取消全屋所有定时与倒计时任务（共 \(count) 个）")
+            } else {
+                VoiceControlManager.shared.markSuccess("全屋当前没有正在运行的定时任务")
+            }
+            scheduleAutoDismiss(delay: 1.8)
             return
 
         default:
@@ -532,7 +540,7 @@ public final class VoiceCapsuleWindowController: NSObject, NSWindowDelegate {
                 VoiceControlManager.shared.markSuccess("已为\(prefix)启动 56°C 蒸发器高温自清洁")
             }
 
-        case .turnOffAll, .turnOnAll, .stopSelfCleaning, .presetAll, .setTemperatureAll, .adjustTemperatureAll:
+        case .turnOffAll, .turnOnAll, .stopSelfCleaning, .presetAll, .setTemperatureAll, .adjustTemperatureAll, .cancelSchedulesAll:
             break // 已在指令前置流程中由全局调度完成分发
         }
 
@@ -567,12 +575,27 @@ public final class VoiceCapsuleWindowController: NSObject, NSWindowDelegate {
             let formatted = temp.truncatingRemainder(dividingBy: 1.0) == 0 ? "\(Int(temp))" : String(format: "%.1f", temp)
             VoiceControlManager.shared.markSuccess("已将\(prefix)温度调至 \(formatted)°C")
 
-        case .adjustTemperature(let delta), .adjustTemperatureAll(let delta):
+        case .adjustTemperature(let delta):
             _ = model.adjustTemperature(deviceIds: ids, delta: delta)
             let dir = delta > 0 ? "升温" : "降温"
             let deltaAbs = abs(delta)
             let deltaStr = deltaAbs.truncatingRemainder(dividingBy: 1.0) == 0 ? "\(Int(deltaAbs))" : String(format: "%.1f", deltaAbs)
             VoiceControlManager.shared.markSuccess("已将\(prefix)统一\(dir) \(deltaStr)°C")
+
+        case .cancelSchedules:
+            var totalRemoved = 0
+            for id in ids {
+                let count = model.scheduledActions.filter { $0.deviceId == id }.count
+                if count > 0 {
+                    model.scheduledActions.removeAll(where: { $0.deviceId == id })
+                    totalRemoved += count
+                }
+            }
+            if totalRemoved > 0 {
+                VoiceControlManager.shared.markSuccess("已取消\(prefix)定时任务（共 \(totalRemoved) 个）")
+            } else {
+                VoiceControlManager.shared.markSuccess("\(prefix)当前没有正在运行的定时任务")
+            }
 
         case .setMode(let modeName):
             if let matched = ACModeCode.match(from: modeName) {

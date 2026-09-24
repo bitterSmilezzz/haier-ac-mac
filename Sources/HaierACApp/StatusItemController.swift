@@ -112,11 +112,22 @@ final class StatusItemController: NSObject {
         button.imagePosition = .imageLeft
         statusItem?.length = NSStatusItem.variableLength
 
-        // 动态构建悬浮 Tooltip 状态概览 (v1.9.29 全量统一全屋设备与三态感知)
+        // 动态构建悬浮 Tooltip 状态概览 (v1.9.29 全量统一全屋设备与三态感知, v1.9.36 全屋概览)
         var tooltipParts: [String] = [
             model.gatewayConnected ? "海尔空调控制 (网关在线)" : "⚠️ 海尔云端网关重连中..."
         ]
         let allDevices = model.allUnifiedDevices
+        let activeRunningDevices = allDevices.filter { dev in
+            model.reachability(for: dev.id) == .available &&
+            (model.attributes[dev.id]?["onOffStatus"]?.boolValue == true)
+        }
+        if allDevices.count > 1 {
+            if !activeRunningDevices.isEmpty {
+                tooltipParts.append("🏠 全屋 \(allDevices.count) 台空调中 \(activeRunningDevices.count) 台正在运行")
+            } else {
+                tooltipParts.append("🏠 全屋 \(allDevices.count) 台空调当前均处于待机状态")
+            }
+        }
         let primaryTargetId = model.menuBarDeviceId ?? allDevices.first?.id
         if !allDevices.isEmpty {
             for dev in allDevices {
@@ -291,16 +302,33 @@ final class StatusItemController: NSObject {
             heatAllItem.isEnabled = hasControllable
             menu.addItem(heatAllItem)
 
-            // 全屋统一相对调温 (v1.9.35)
-            let canAdjustTempAll = model.gatewayConnected && !onDevices.isEmpty
+            let dehumAllItem = NSMenuItem(title: "💧 全屋舒爽除湿", action: #selector(applyQuickDehumidifyAll), keyEquivalent: "")
+            dehumAllItem.target = self
+            dehumAllItem.isEnabled = hasControllable
+            menu.addItem(dehumAllItem)
+
+            let fanAllItem = NSMenuItem(title: "🍃 全屋清新送风", action: #selector(applyQuickFanAll), keyEquivalent: "")
+            fanAllItem.target = self
+            fanAllItem.isEnabled = hasControllable
+            menu.addItem(fanAllItem)
+
+            // 全屋统一相对调温 (v1.9.35, v1.9.36 闭环 CR P2-3 增设 16/30°C 极值边界判定)
+            let canStepUpAll = model.gatewayConnected && onDevices.contains { dev in
+                let curTemp = model.attribute("targetTemperature", deviceId: dev.id)?.doubleValue ?? 26.0
+                return curTemp < 30.0
+            }
             let stepUpAllItem = NSMenuItem(title: "🔼 全屋统一升温 1°C", action: #selector(stepUpAllTemperature), keyEquivalent: "")
             stepUpAllItem.target = self
-            stepUpAllItem.isEnabled = canAdjustTempAll
+            stepUpAllItem.isEnabled = canStepUpAll
             menu.addItem(stepUpAllItem)
 
+            let canStepDownAll = model.gatewayConnected && onDevices.contains { dev in
+                let curTemp = model.attribute("targetTemperature", deviceId: dev.id)?.doubleValue ?? 26.0
+                return curTemp > 16.0
+            }
             let stepDownAllItem = NSMenuItem(title: "🔽 全屋统一降温 1°C", action: #selector(stepDownAllTemperature), keyEquivalent: "")
             stepDownAllItem.target = self
-            stepDownAllItem.isEnabled = canAdjustTempAll
+            stepDownAllItem.isEnabled = canStepDownAll
             menu.addItem(stepDownAllItem)
 
             if !offDevices.isEmpty {
@@ -364,6 +392,28 @@ final class StatusItemController: NSObject {
                 heatItem.isEnabled = isControllable
                 devSubmenu.addItem(heatItem)
 
+                // 一键除湿 (v1.9.36)
+                let dehumItem = NSMenuItem(
+                    title: "一键除湿",
+                    action: #selector(setQuickDehumidify(_:)),
+                    keyEquivalent: ""
+                )
+                dehumItem.target = self
+                dehumItem.representedObject = devId
+                dehumItem.isEnabled = isControllable
+                devSubmenu.addItem(dehumItem)
+
+                // 一键送风 (v1.9.36)
+                let fanItem = NSMenuItem(
+                    title: "一键送风",
+                    action: #selector(setQuickFan(_:)),
+                    keyEquivalent: ""
+                )
+                fanItem.target = self
+                fanItem.representedObject = devId
+                fanItem.isEnabled = isControllable
+                devSubmenu.addItem(fanItem)
+
                 // 升降温 1°C (v1.9.35)
                 let upItem = NSMenuItem(
                     title: "🔼 升温 1°C (当前 \(curTempStr)°C)",
@@ -401,7 +451,7 @@ final class StatusItemController: NSObject {
             menu.setSubmenu(devicesMenu, for: devicesParentItem)
             menu.addItem(devicesParentItem)
         } else if let dev = allDevices.first {
-            // 单设备场景：保留快速电源开关与一键冷暖预设及升降温步进 (v1.9.33, v1.9.35)
+            // 单设备场景：保留快速电源开关与一键冷暖预设及升降温步进 (v1.9.33, v1.9.35, v1.9.36 补齐除湿送风)
             let isPowerOn = model.attribute("onOffStatus", deviceId: dev.id)?.boolValue ?? false
             let isControllable = model.reachability(for: dev.id).isControllable
             let curTemp = model.attribute("targetTemperature", deviceId: dev.id)?.doubleValue ?? 26.0
@@ -422,6 +472,16 @@ final class StatusItemController: NSObject {
             heatItem.target = self
             heatItem.isEnabled = isControllable
             menu.addItem(heatItem)
+
+            let dehumItem = NSMenuItem(title: "💧 一键除湿", action: #selector(applyQuickDehumidifyPrimary), keyEquivalent: "")
+            dehumItem.target = self
+            dehumItem.isEnabled = isControllable
+            menu.addItem(dehumItem)
+
+            let fanItem = NSMenuItem(title: "🍃 一键送风", action: #selector(applyQuickFanPrimary), keyEquivalent: "")
+            fanItem.target = self
+            fanItem.isEnabled = isControllable
+            menu.addItem(fanItem)
 
             let stepUpItem = NSMenuItem(title: "🔼 升温 1°C (当前 \(curTempStr)°C)", action: #selector(stepUpPrimaryTemperature), keyEquivalent: "")
             stepUpItem.target = self
@@ -534,6 +594,14 @@ final class StatusItemController: NSObject {
         model.applyPresetToAllDevices(mode: .heating, temperature: 20.0)
     }
 
+    @objc private func applyQuickDehumidifyAll() {
+        model.applyPresetToAllDevices(mode: .dehumidify, temperature: 24.0)
+    }
+
+    @objc private func applyQuickFanAll() {
+        model.applyPresetToAllDevices(mode: .fan, temperature: 26.0)
+    }
+
     @objc private func stepUpAllTemperature() {
         model.adjustTemperatureAll(delta: 1.0)
     }
@@ -582,6 +650,20 @@ final class StatusItemController: NSObject {
         model.sendAttribute("targetTemperature", value: .double(20.0), deviceId: devId)
     }
 
+    @objc private func setQuickDehumidify(_ sender: NSMenuItem) {
+        guard let devId = sender.representedObject as? String else { return }
+        model.sendAttribute("onOffStatus", value: .bool(true), deviceId: devId)
+        model.sendAttribute("operationMode", value: .string(ACModeCode.dehumidify.rawValue), deviceId: devId)
+        model.sendAttribute("targetTemperature", value: .double(24.0), deviceId: devId)
+    }
+
+    @objc private func setQuickFan(_ sender: NSMenuItem) {
+        guard let devId = sender.representedObject as? String else { return }
+        model.sendAttribute("onOffStatus", value: .bool(true), deviceId: devId)
+        model.sendAttribute("operationMode", value: .string(ACModeCode.fan.rawValue), deviceId: devId)
+        model.sendAttribute("targetTemperature", value: .double(26.0), deviceId: devId)
+    }
+
     @objc private func applyQuickCoolingPrimary() {
         guard let devId = model.allUnifiedDevices.first?.id else { return }
         model.sendAttribute("onOffStatus", value: .bool(true), deviceId: devId)
@@ -594,6 +676,20 @@ final class StatusItemController: NSObject {
         model.sendAttribute("onOffStatus", value: .bool(true), deviceId: devId)
         model.sendAttribute("operationMode", value: .string(ACModeCode.heating.rawValue), deviceId: devId)
         model.sendAttribute("targetTemperature", value: .double(20.0), deviceId: devId)
+    }
+
+    @objc private func applyQuickDehumidifyPrimary() {
+        guard let devId = model.allUnifiedDevices.first?.id else { return }
+        model.sendAttribute("onOffStatus", value: .bool(true), deviceId: devId)
+        model.sendAttribute("operationMode", value: .string(ACModeCode.dehumidify.rawValue), deviceId: devId)
+        model.sendAttribute("targetTemperature", value: .double(24.0), deviceId: devId)
+    }
+
+    @objc private func applyQuickFanPrimary() {
+        guard let devId = model.allUnifiedDevices.first?.id else { return }
+        model.sendAttribute("onOffStatus", value: .bool(true), deviceId: devId)
+        model.sendAttribute("operationMode", value: .string(ACModeCode.fan.rawValue), deviceId: devId)
+        model.sendAttribute("targetTemperature", value: .double(26.0), deviceId: devId)
     }
 
     @objc private func openFilterCare() {

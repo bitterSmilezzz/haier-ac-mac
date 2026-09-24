@@ -77,6 +77,10 @@ public struct EnergyDayRecord: Codable, Equatable, Identifiable {
         if let d = decodedDevMins, d > 0 {
             totalDeviceMinutes = d
         } else {
+            // 兼容性迁移策略 (v1.9.36 闭环 CR P2-4):
+            // v1.9.34 及更早版本写入的历史记录无 totalDeviceMinutes 字段，其模式工况分钟为墙钟口径；
+            // 回填采用工况分钟之和与总墙钟时长之最大值平滑过渡，确保老版本 60 天数据不丢失且占比正常解析；
+            // 新写入记录则完全统一为设备机时精确积分口径（各工况机时之和恒等于总机时）。
             let sumModes = coolingMinutes + heatingMinutes + fanMinutes + dehumMinutes + unknownMinutes
             totalDeviceMinutes = max(sumModes, totalMinutes)
         }
@@ -129,6 +133,13 @@ public struct EnergyDayRecord: Codable, Equatable, Identifiable {
         let total = effectiveDeviceMinutes
         guard total > 0 else { return 0.0 }
         return min(1.0, Double(fanMinutes) / Double(total))
+    }
+
+    /// 其他/未知工况机时占比（0.0 ~ 1.0） (v1.9.36)
+    public var unknownRatio: Double {
+        let total = effectiveDeviceMinutes
+        guard total > 0 else { return 0.0 }
+        return min(1.0, Double(unknownMinutes) / Double(total))
     }
 }
 
@@ -271,29 +282,66 @@ public final class EnergyAnalyticsEngine: ObservableObject {
             return min(max(power, 300.0), 600.0)
 
         case .heating:
-            // 制热模式：基准功率较高
-            let delta = max(0.0, (targetTemp ?? 20.0) - (indoorTemp ?? 18.0))
-            let power = 550.0 + (delta * 110.0) + windOffset
+            // 制热模式：变频温差动力学模型 + 恒温平衡区低频维持态阻尼 (v1.9.36)
+            let indoor = indoorTemp ?? 18.0
+            let target = targetTemp ?? 20.0
+            let delta = target - indoor
+            let power: Double
+            if delta <= 0.0 {
+                // 已达到或高于设定温度：压缩机进入超节能恒温维持态
+                power = 300.0 + (windOffset * 0.6)
+            } else if delta < 1.0 {
+                // 接近目标温差 (0 < ΔT < 1.0°C)：平滑过渡至稳态低频
+                power = 300.0 + (delta * 250.0) + (windOffset * 0.8)
+            } else {
+                // 变频重载升温区 (ΔT >= 1.0°C)
+                power = 550.0 + ((delta - 1.0) * 110.0) + windOffset
+            }
             return min(max(power, 220.0), 1650.0)
 
         case .cooling:
-            // 制冷模式：温差驱动变频功率
-            let delta = max(0.0, (indoorTemp ?? 26.0) - (targetTemp ?? 25.0))
-            let power = 380.0 + (delta * 95.0) + windOffset
+            // 制冷模式：变频温差动力学模型 + 恒温平衡区低频维持态阻尼 (v1.9.36)
+            let indoor = indoorTemp ?? 26.0
+            let target = targetTemp ?? 25.0
+            let delta = indoor - target
+            let power: Double
+            if delta <= 0.0 {
+                // 已达到或低于设定温度：压缩机进入超节能恒温维持态
+                power = 220.0 + (windOffset * 0.6)
+            } else if delta < 1.0 {
+                // 接近目标温差 (0 < ΔT < 1.0°C)：平滑过渡至稳态低频
+                power = 220.0 + (delta * 160.0) + (windOffset * 0.8)
+            } else {
+                // 变频重载降温区 (ΔT >= 1.0°C)
+                power = 380.0 + ((delta - 1.0) * 95.0) + windOffset
+            }
             return min(max(power, 180.0), 1450.0)
 
         case .auto:
-            // 自动模式：根据室内与设定温差智能判别制冷或制热动力曲线
-            // 注：若双温度均缺失，默认室内 25°C、设定 24°C，温差为 1°C 的轻载中性工况
+            // 自动模式：根据室内与设定温差智能判别制冷或制热动力曲线 (v1.9.36 统一阻尼模型)
             let indoor = indoorTemp ?? 25.0
             let target = targetTemp ?? 24.0
             if indoor >= target {
                 let delta = indoor - target
-                let power = 380.0 + (delta * 95.0) + windOffset
+                let power: Double
+                if delta <= 0.0 {
+                    power = 220.0 + (windOffset * 0.6)
+                } else if delta < 1.0 {
+                    power = 220.0 + (delta * 160.0) + (windOffset * 0.8)
+                } else {
+                    power = 380.0 + ((delta - 1.0) * 95.0) + windOffset
+                }
                 return min(max(power, 180.0), 1450.0)
             } else {
                 let delta = target - indoor
-                let power = 550.0 + (delta * 110.0) + windOffset
+                let power: Double
+                if delta <= 0.0 {
+                    power = 300.0 + (windOffset * 0.6)
+                } else if delta < 1.0 {
+                    power = 300.0 + (delta * 250.0) + (windOffset * 0.8)
+                } else {
+                    power = 550.0 + ((delta - 1.0) * 110.0) + windOffset
+                }
                 return min(max(power, 220.0), 1650.0)
             }
         }

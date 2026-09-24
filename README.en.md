@@ -6,6 +6,26 @@ A native SwiftUI app to control Haier / Leader (统帅) smart air conditioners o
 
 ## Features
 
+- 🏷 **CR Defect Remediation, Structured Spoken Negation Protection, Decoupled Whole-House Scheduling, Inverter Thermal Damping & Menu Bar Mode Expansion (v1.9.36)**:
+  - 🛡️ **Structured Spoken Negation Guard & Intervening Phrase Shield (`VoiceCommandParser` / `VoiceCommandParserTests`, Closed CR P1-1)**:
+    - Overhauled `containsNegativeAction` from a rigid adjacent-substring dictionary into a structured regex with comprehensive Chinese character-class tolerance;
+    - Robustly intercepts negation clauses where modifier adverbs, quantifiers, disposal markers, or nouns intervene between negation words ("别", "不要", "不用", "先别", "千万别") and actuation verbs ("关", "开", "停")—covering patterns like "全屋空调别都关了", "不要全部关掉", "先别急着关", "别马上关", "别把全屋空调都关了", and "空调不用全开";
+    - Expanded test suite with real-world inserted-word test cases, permanently eliminating false-positive whole-house power cutoffs triggered by colloquial negations.
+  - ⏱️ **Decoupled Whole-House vs Targeted Schedule Cancellation & Batch Cancellation (`VoiceCommandParser` / `VoiceCapsuleWindowController` / `VoiceCommandParserTests`, Closed CR P1-2)**:
+    - Introduced `.cancelSchedulesAll` in `VoiceCommand`; verbal parser differentiates between all-house cancellations ("取消所有/全部/全屋定时") and targeted single-unit cancellations;
+    - Voice Capsule cleanly routes `.cancelSchedulesAll` to wipe all active schedules and timers with distinct whole-house user feedback;
+    - Added `case .cancelSchedules` in `executeMultiDeviceCommand` to support multi-room targeted schedule deletions (e.g., "取消客厅和主卧的定时"), aligning scope and voice confirmation while cleaning up unreachable dead code patterns (Closed CR P2-2).
+  - ⚡️ **Single Source of Truth for Energy Ratios & Migration Compatibility (`EnergyAnalyticsEngine` / `EcoEnergySection`, Closed CR P2-1, P2-4)**:
+    - Added `unknownRatio` to `EnergyDayRecord` and refactored UI layer (`EcoEnergySection`) to directly consume engine properties (`coolingRatio`, `heatingRatio`, `dehumRatio`, `fanRatio`, `unknownRatio`), eliminating duplicate math and unused public APIs;
+    - Documented backward-compatibility migration: legacy pre-v1.9.35 records gracefully backfill from wall-clock sums, while new records calculate strict machine-minutes.
+  - 🌡️ **Status Bar 16/30°C Limit Gating & Redundant Command Elimination (`StatusItemController` / `AppModel`, Closed CR P2-3)**:
+    - Reinforced menu bar step-up/step-down items ("🔼 Step Up All ACs 1°C" / "🔽 Step Down All ACs 1°C") with boundary checks, enabling them only when running units are below 30°C or above 16°C;
+    - Updated `AppModel.adjustTemperature` to filter out devices already at limits, returning 0 with a neutral notice when all units have reached the boundary, preventing redundant network commands.
+  - 🍱 **macOS Menu Bar Dehumidify/Fan Mode Expansion & Whole-House Running Summary (High-Value Optimization 1)**:
+    - Added "💧 Whole-House Dehumidify" and "🍃 Whole-House Fan" quick presets to the right-click menu, matching device submenus and single-device options for full mode coverage;
+    - Enriched menu bar tooltip with a live house-wide summary header (e.g., `🏠 2 of 3 ACs running across the house`).
+  - 💨 **Inverter Compressor Thermal Equilibrium Damping Model (High-Value Optimization 2)**:
+    - Upgraded `EnergyAnalyticsEngine.estimateInstantaneousPower` with continuous thermal damping; when room temperature approaches the target setpoint ($|\Delta T| \le 0.5^\circ\text{C}$), the inverter compressor smoothly throttles down to ultra-low-frequency steady-state maintenance (220W for cooling, 300W for heating), eliminating step jumps and accurately reflecting Grade-1 energy efficiency.
 - 🏷 **Thermodynamic Mode Dimensional Consistency, Device-Hours Analytics, Stepped Menu Bar Temperature Matrix & Whole-House Voice Temperature Stepping (v1.9.35)**:
   - ⚡️ **Thermodynamic Energy Analytics Calibration & Machine-Hours Precision (`EnergyAnalyticsEngine` / `EcoEnergySection`, Closed CR P2-1/2)**:
     - Resolved dimensional conflicts where aggregate operation mode minutes exceeded physical clock time under multi-device operation, establishing a dual-axis accounting model: natural elapsed wall-clock time (`totalMinutes`) vs total accumulated device machine-hours (`totalDeviceMinutes`, unit·min);

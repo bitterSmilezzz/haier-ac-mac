@@ -190,14 +190,30 @@ final class VoiceCommandParserTests: XCTestCase {
     }
 
     func testCancelSchedules() {
+        // 定向/单设备取消定时
         let c1 = VoiceCommandParser.parse("取消定时")
         XCTAssertEqual(c1?.command, .cancelSchedules)
+        XCTAssertEqual(c1?.displayText, "取消定时与倒计时")
 
         let c2 = VoiceCommandParser.parse("取消倒计时")
         XCTAssertEqual(c2?.command, .cancelSchedules)
 
         let c3 = VoiceCommandParser.parse("清除定时")
         XCTAssertEqual(c3?.command, .cancelSchedules)
+
+        // 全屋所有设备取消定时 (v1.9.36 闭环 CR P1-2)
+        let ca1 = VoiceCommandParser.parse("取消所有定时")
+        XCTAssertEqual(ca1?.command, .cancelSchedulesAll)
+        XCTAssertEqual(ca1?.displayText, "取消全屋所有定时与倒计时")
+
+        let ca2 = VoiceCommandParser.parse("取消全部定时任务")
+        XCTAssertEqual(ca2?.command, .cancelSchedulesAll)
+
+        let ca3 = VoiceCommandParser.parse("取消全屋定时")
+        XCTAssertEqual(ca3?.command, .cancelSchedulesAll)
+
+        let ca4 = VoiceCommandParser.parse("全屋取消倒计时")
+        XCTAssertEqual(ca4?.command, .cancelSchedulesAll)
     }
 
     // MARK: - 智能睡眠温阶测试
@@ -369,22 +385,32 @@ final class VoiceCommandParserTests: XCTestCase {
         XCTAssertEqual(rel4?.command, .adjustTemperatureAll(delta: -1.0))
     }
 
-    // MARK: - 否定句与防误触测试 (v1.9.34)
+    // MARK: - 否定句与防误触测试 (v1.9.34, v1.9.36 闭环 CR P1-1)
 
     func testNegationProtection() {
-        // 全屋与单机否定关机
+        // 全屋与单机否定关机（紧邻与带插入字用例）
         XCTAssertNil(VoiceCommandParser.parse("全屋空调别关了"))
         XCTAssertNil(VoiceCommandParser.parse("所有空调先不要关"))
         XCTAssertNil(VoiceCommandParser.parse("客厅空调不要关"))
         XCTAssertNil(VoiceCommandParser.parse("千万别关空调"))
         XCTAssertNil(VoiceCommandParser.parse("先别关"))
         XCTAssertNil(VoiceCommandParser.parse("不用关空调"))
+        // 关键插字用例 (v1.9.36: 杜绝因插入字导致否定失效而误关全屋)
+        XCTAssertNil(VoiceCommandParser.parse("全屋空调别都关了"))
+        XCTAssertNil(VoiceCommandParser.parse("不要全部关掉"))
+        XCTAssertNil(VoiceCommandParser.parse("先别急着关"))
+        XCTAssertNil(VoiceCommandParser.parse("别马上关"))
+        XCTAssertNil(VoiceCommandParser.parse("别把全屋空调都关了"))
+        XCTAssertNil(VoiceCommandParser.parse("别把空调都关了"))
 
-        // 全屋与单机否定开机
+        // 全屋与单机否定开机（紧邻与带插入字用例）
         XCTAssertNil(VoiceCommandParser.parse("别开空调"))
         XCTAssertNil(VoiceCommandParser.parse("先不要开空调"))
         XCTAssertNil(VoiceCommandParser.parse("所有空调先别开"))
         XCTAssertNil(VoiceCommandParser.parse("不用开"))
+        XCTAssertNil(VoiceCommandParser.parse("千万不要全部打开"))
+        XCTAssertNil(VoiceCommandParser.parse("空调不用全开"))
+        XCTAssertNil(VoiceCommandParser.parse("所有空调别急着开"))
     }
 
     // MARK: - 无效输入测试

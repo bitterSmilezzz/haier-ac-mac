@@ -224,33 +224,32 @@ struct EcoEnergySection: View {
         return "\(parts[1])/\(parts[2])"
     }
 
-    // MARK: - 今日各工况运行时长分布 (v1.9.26, v1.9.35: 支持机时占比精确展示)
+    // MARK: - 今日各工况运行时长分布 (v1.9.26, v1.9.36: 统一采用 EnergyDayRecord 比例模型)
 
     private func todayModeBreakdownView(today: EnergyDayRecord) -> some View {
-        let totalDevMins = today.effectiveDeviceMinutes
-        return HStack(spacing: 8) {
+        HStack(spacing: 8) {
             Text("工况分布:")
                 .font(.system(size: 10, weight: .medium))
                 .foregroundStyle(Theme.inkSubtle)
 
             if today.coolingMinutes > 0 {
-                let pct = totalDevMins > 0 ? Int(round(Double(today.coolingMinutes) / Double(totalDevMins) * 100)) : 0
+                let pct = Int(round(today.coolingRatio * 100))
                 modeTimeTag(label: "制冷", minutes: today.coolingMinutes, percentage: pct, color: Color.blue)
             }
             if today.heatingMinutes > 0 {
-                let pct = totalDevMins > 0 ? Int(round(Double(today.heatingMinutes) / Double(totalDevMins) * 100)) : 0
+                let pct = Int(round(today.heatingRatio * 100))
                 modeTimeTag(label: "制热", minutes: today.heatingMinutes, percentage: pct, color: Color.orange)
             }
             if today.dehumMinutes > 0 {
-                let pct = totalDevMins > 0 ? Int(round(Double(today.dehumMinutes) / Double(totalDevMins) * 100)) : 0
+                let pct = Int(round(today.dehumRatio * 100))
                 modeTimeTag(label: "除湿", minutes: today.dehumMinutes, percentage: pct, color: Color.teal)
             }
             if today.fanMinutes > 0 {
-                let pct = totalDevMins > 0 ? Int(round(Double(today.fanMinutes) / Double(totalDevMins) * 100)) : 0
+                let pct = Int(round(today.fanRatio * 100))
                 modeTimeTag(label: "送风", minutes: today.fanMinutes, percentage: pct, color: Color.gray)
             }
             if today.unknownMinutes > 0 {
-                let pct = totalDevMins > 0 ? Int(round(Double(today.unknownMinutes) / Double(totalDevMins) * 100)) : 0
+                let pct = Int(round(today.unknownRatio * 100))
                 modeTimeTag(label: "其他", minutes: today.unknownMinutes, percentage: pct, color: Color.purple)
             }
 
