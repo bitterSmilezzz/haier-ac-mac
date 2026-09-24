@@ -8,6 +8,19 @@
 
 ## 功能
 
+- 🏷 **能耗工况量纲与设备机时精准化闭环、全屋与单机状态栏步进调温矩阵及语音全屋相对调温 (v1.9.35)**：
+  - ⚡️ **能耗工况动力学量纲校准与设备机时精准分析 (`EnergyAnalyticsEngine` / `EcoEnergySection`，闭环 CR P2-1/2)**：
+    - 解决多设备并发运行时各模式工况分钟数之和超过自然墙钟时长的量纲冲突，建立「全屋自然流逝时长（`totalMinutes`，分）」与「设备累计总机时（`totalDeviceMinutes`，台·分）」双轴核算体系；
+    - 在 `EnergyDayRecord` 中引入 `totalDeviceMinutes` 字段，实现自定义 `Codable` 编解码向后兼容，自动平滑迁移历史存档；
+    - 在各工况比例计算中封装安全无溢出属性（`effectiveDeviceMinutes`、`coolingRatio`、`heatingRatio`、`dehumRatio`、`fanRatio`），严密钳制除以零风险；
+    - 升级能耗仪表板工况看板，直观呈现如 `制冷 120m (60%)` 的机时占比百分比，使多设备运行下的能耗分布一目了然。
+  - 🍱 **macOS 状态栏温度微调控制矩阵 (`StatusItemController` / `AppModel`)**：
+    - 状态栏右键上下文菜单全面补齐调温操作：多设备场景新增「🔼 全屋统一升温 1°C」与「🔽 全屋统一降温 1°C」，单设备场景及各空调子菜单新增「🔼 升温 1°C (当前 XX°C)」与「🔽 降温 1°C (当前 XX°C)」；
+    - 精确联动 16.0°C ~ 30.0°C 硬件极限与开机可达性门禁，触达极值或设备待机/离线时自动禁用，杜绝越界与无效操作；
+    - `AppModel` 原生提供 `adjustDeviceTemperature`、`adjustTemperature`、`adjustTemperatureAll` 等批量与单机调温 API。
+  - 🎙️ **语音胶囊全屋相对调温与自然语言扩展 (`VoiceCommandParser` / `VoiceCapsuleWindowController` / `VoiceCommandParserTests`)**：
+    - 拓展全屋相对调温语音解析，支持“全屋调高两度”、“把所有空调都升温1度”、“全部空调调低一度”等自然语言，自动映射至 `.adjustTemperatureAll(delta:)` 指令；
+    - 语音胶囊与多设备定向调度打通全屋与定向多设备相对调温执行与成功反馈提示。
 - 🏷 **离线本地操作平权放行、纯电源开机防倒置与否定意图过滤 (v1.9.34)**：
   - 🛡️ **语音执行链门禁下移与本地操作全面平权 (`VoiceCapsuleWindowController`，闭环 CR P1-1)**：重构单设备指令派发的可达性门禁位置，从分发总入口后移至各硬件下发分支。针对状态查询（`.queryStatus`）、定时任务取消（`.cancelSchedules`）、睡眠曲线退出（`.stopSleepCurve`）以及睡眠报告读取（`.querySleepReport`）等纯本地逻辑全面放行，彻底消除当空调处于离线或网关重连时用户无法取消本地定时或查看状态的阻塞缺陷。
   - ⚡️ **纯电源全屋开机防冷暖倒置 (`AppModel` / `AppIntents` / `VoiceCapsule`，闭环 CR P1-2)**：新增 `turnOnDevices(deviceIds:)` 与 `turnOnAllDevices()`，仅下发 `onOffStatus = true`，严格保留并沿用各空调已有设定的运行模式与目标温度；将快捷指令 `TurnOnAllACIntent` 及全屋语音开机 `.turnOnAll` 彻底重构为调用纯电源开机，彻底根除以往全屋开机强行切换为制冷 26°C 导致的冬季冷暖颠倒隐患。

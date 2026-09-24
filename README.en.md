@@ -6,6 +6,19 @@ A native SwiftUI app to control Haier / Leader (统帅) smart air conditioners o
 
 ## Features
 
+- 🏷 **Thermodynamic Mode Dimensional Consistency, Device-Hours Analytics, Stepped Menu Bar Temperature Matrix & Whole-House Voice Temperature Stepping (v1.9.35)**:
+  - ⚡️ **Thermodynamic Energy Analytics Calibration & Machine-Hours Precision (`EnergyAnalyticsEngine` / `EcoEnergySection`, Closed CR P2-1/2)**:
+    - Resolved dimensional conflicts where aggregate operation mode minutes exceeded physical clock time under multi-device operation, establishing a dual-axis accounting model: natural elapsed wall-clock time (`totalMinutes`) vs total accumulated device machine-hours (`totalDeviceMinutes`, unit·min);
+    - Integrated `totalDeviceMinutes` into `EnergyDayRecord` with backward-compatible custom `Codable` serialization, migrating legacy JSON records seamlessly;
+    - Encapsulated zero-division safe metrics (`effectiveDeviceMinutes`, `coolingRatio`, `heatingRatio`, `dehumRatio`, `fanRatio`), hardening boundary calculations;
+    - Enhanced Eco Energy Dashboard with contextual machine-hour percentages (e.g., `Cooling 120m (60%)`), giving immediate clarity on multi-room energy distribution.
+  - 🍱 **macOS Menu Bar Fine-Grained Temperature Stepping Matrix (`StatusItemController` / `AppModel`)**:
+    - Contextual right-click menu now provides complete temperature step controls: "🔼 Step Up All ACs 1°C" & "🔽 Step Down All ACs 1°C" in multi-device mode, plus "🔼 Step Up 1°C (Current XX°C)" & "🔽 Step Down 1°C (Current XX°C)" across individual submenus and single-device mode;
+    - Coupled strictly with 16.0°C ~ 30.0°C hardware boundaries and power/reachability gating, dynamically disabling actions at limit values or when units are offline/idle;
+    - Added core batch/single-device temperature stepping APIs in `AppModel` (`adjustDeviceTemperature`, `adjustTemperature`, `adjustTemperatureAll`).
+  - 🎙️ **Voice Capsule Whole-House Relative Temperature Stepping (`VoiceCommandParser` / `VoiceCapsuleWindowController` / `VoiceCommandParserTests`)**:
+    - Expanded voice recognition grammar to interpret natural relative temperature commands ("全屋调高两度", "所有空调升温1度", "全部空调调低一度"), mapping them to `.adjustTemperatureAll(delta:)`;
+    - Connected Voice Capsule and multi-device dispatch to orchestrate concurrent relative temperature stepping with unified spoken confirmation.
 - 🏷 **Offline Local Action Parity, Pure Power-On Safeguard & Negation Intent Filtering (v1.9.34)**:
   - 🛡️ **Reachability Guard Relocation & Local Action Parity (`VoiceCapsuleWindowController`, Closed CR P1-1)**: Relocated reachability gating from the overall dispatch entry down into individual physical actuator branches. Purely local operations—including status queries (`.queryStatus`), schedule cancellations (`.cancelSchedules`), sleep curve terminations (`.stopSleepCurve`), and sleep session reports (`.querySleepReport`)—now execute uninhibited, completely eliminating offline or reconnecting blockage when inspecting or managing local tasks.
   - ⚡️ **Pure Power-On Thermal Inversion Shield (`AppModel` / `AppIntents` / `VoiceCapsule`, Closed CR P1-2)**: Introduced `turnOnDevices(deviceIds:)` and `turnOnAllDevices()` to strictly transmit `onOffStatus = true` while preserving existing operational modes and target temperatures. Upgraded Siri's `TurnOnAllACIntent` and voice command `.turnOnAll` to pure power-on dispatch, eradicating winter thermal inversion caused by legacy hardcoded cooling resets.

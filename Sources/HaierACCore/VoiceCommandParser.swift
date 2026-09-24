@@ -36,6 +36,8 @@ public enum VoiceCommand: Equatable {
     case presetAll(mode: String, temperature: Double?)
     /// 全屋/所有设备统一设置目标温度 (v1.9.33)
     case setTemperatureAll(Double)
+    /// 全屋/所有设备统一相对调温 (v1.9.35)
+    case adjustTemperatureAll(delta: Double)
     /// 启动 56°C 蒸发器高温自清洁 (v1.9.30)
     case startSelfCleaning
     /// 停止蒸发器自清洁 (v1.9.30)
@@ -124,6 +126,9 @@ public struct VoiceCommandParser {
         }
         if let allTemp = parseAllTemperature(cleaned) {
             return allTemp
+        }
+        if let allRelativeTemp = parseAllRelativeTemperature(cleaned) {
+            return allRelativeTemp
         }
         if isAllPowerOn(cleaned) {
             return VoiceParseResult(command: .turnOnAll, displayText: "开启全屋所有空调")
@@ -442,6 +447,27 @@ public struct VoiceCommandParser {
         }
         let tempStr = formatTemp(temp)
         return VoiceParseResult(command: .setTemperatureAll(temp), displayText: "全屋温度调至 \(tempStr)°C")
+    }
+
+    private static func parseAllRelativeTemperature(_ text: String) -> VoiceParseResult? {
+        guard isAllDeviceScope(text) else { return nil }
+        // 排除已指定运行模式的情况
+        if text.contains("制冷") || text.contains("冷气") || text.contains("制热") || text.contains("暖气") ||
+           text.contains("送风") || text.contains("除湿") || text.contains("吹风") || text.contains("抽湿") {
+            return nil
+        }
+        if let rel = parseRelativeTemperature(text) {
+            if case .adjustTemperature(let delta) = rel.command {
+                let dir = delta > 0 ? "升温" : "降温"
+                let deltaAbs = abs(delta)
+                let deltaStr = formatTemp(deltaAbs)
+                return VoiceParseResult(
+                    command: .adjustTemperatureAll(delta: delta),
+                    displayText: "全屋\(dir) \(deltaStr)°C"
+                )
+            }
+        }
+        return nil
     }
 
     private static func isAllPowerOn(_ text: String) -> Bool {

@@ -19,10 +19,12 @@ private struct FailableDecodable<T: Decodable>: Decodable {
 /// - `totalKWh`: 全屋所有设备累计消耗电量（度/kWh）。采用多台空调物理叠加口径，结合各设备当前运行模式、
 ///   风速档位、设定温度与室内温差动力学模型动态逐分钟积分累加。
 /// - `totalCost`: 全屋累计预估电费金额（元），支持单一电价与峰谷分时时段自动折算。
+/// - `totalDeviceMinutes`: 全屋所有空调累计设备机时（台·分钟），各工况机时之和恒等于总机时 (v1.9.35)。
 public struct EnergyDayRecord: Codable, Equatable, Identifiable {
     public var id: String { date }
     public var date: String // "yyyy-MM-dd"
     public var totalMinutes: Int
+    public var totalDeviceMinutes: Int // 全屋设备累计机时 (台·分钟) (v1.9.35)
     public var coolingMinutes: Int
     public var heatingMinutes: Int
     public var fanMinutes: Int
@@ -34,6 +36,7 @@ public struct EnergyDayRecord: Codable, Equatable, Identifiable {
     public init(
         date: String,
         totalMinutes: Int = 0,
+        totalDeviceMinutes: Int = 0,
         coolingMinutes: Int = 0,
         heatingMinutes: Int = 0,
         fanMinutes: Int = 0,
@@ -44,6 +47,7 @@ public struct EnergyDayRecord: Codable, Equatable, Identifiable {
     ) {
         self.date = date
         self.totalMinutes = totalMinutes
+        self.totalDeviceMinutes = totalDeviceMinutes > 0 ? totalDeviceMinutes : (coolingMinutes + heatingMinutes + fanMinutes + dehumMinutes + unknownMinutes)
         self.coolingMinutes = coolingMinutes
         self.heatingMinutes = heatingMinutes
         self.fanMinutes = fanMinutes
@@ -54,13 +58,14 @@ public struct EnergyDayRecord: Codable, Equatable, Identifiable {
     }
 
     enum CodingKeys: String, CodingKey {
-        case date, totalMinutes, coolingMinutes, heatingMinutes, fanMinutes, dehumMinutes, unknownMinutes, totalKWh, totalCost
+        case date, totalMinutes, totalDeviceMinutes, coolingMinutes, heatingMinutes, fanMinutes, dehumMinutes, unknownMinutes, totalKWh, totalCost
     }
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         date = try container.decodeIfPresent(String.self, forKey: .date) ?? ""
         totalMinutes = try container.decodeIfPresent(Int.self, forKey: .totalMinutes) ?? 0
+        let decodedDevMins = try container.decodeIfPresent(Int.self, forKey: .totalDeviceMinutes)
         coolingMinutes = try container.decodeIfPresent(Int.self, forKey: .coolingMinutes) ?? 0
         heatingMinutes = try container.decodeIfPresent(Int.self, forKey: .heatingMinutes) ?? 0
         fanMinutes = try container.decodeIfPresent(Int.self, forKey: .fanMinutes) ?? 0
@@ -68,12 +73,20 @@ public struct EnergyDayRecord: Codable, Equatable, Identifiable {
         unknownMinutes = try container.decodeIfPresent(Int.self, forKey: .unknownMinutes) ?? 0
         totalKWh = try container.decodeIfPresent(Double.self, forKey: .totalKWh) ?? 0.0
         totalCost = try container.decodeIfPresent(Double.self, forKey: .totalCost) ?? 0.0
+
+        if let d = decodedDevMins, d > 0 {
+            totalDeviceMinutes = d
+        } else {
+            let sumModes = coolingMinutes + heatingMinutes + fanMinutes + dehumMinutes + unknownMinutes
+            totalDeviceMinutes = max(sumModes, totalMinutes)
+        }
     }
 
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(date, forKey: .date)
         try container.encode(totalMinutes, forKey: .totalMinutes)
+        try container.encode(totalDeviceMinutes, forKey: .totalDeviceMinutes)
         try container.encode(coolingMinutes, forKey: .coolingMinutes)
         try container.encode(heatingMinutes, forKey: .heatingMinutes)
         try container.encode(fanMinutes, forKey: .fanMinutes)
@@ -81,6 +94,41 @@ public struct EnergyDayRecord: Codable, Equatable, Identifiable {
         try container.encode(unknownMinutes, forKey: .unknownMinutes)
         try container.encode(totalKWh, forKey: .totalKWh)
         try container.encode(totalCost, forKey: .totalCost)
+    }
+
+    /// 有效总设备机时（台·分钟），用于计算模式分布占比 (v1.9.35)
+    public var effectiveDeviceMinutes: Int {
+        if totalDeviceMinutes > 0 { return totalDeviceMinutes }
+        let modeSum = coolingMinutes + heatingMinutes + fanMinutes + dehumMinutes + unknownMinutes
+        return max(modeSum, totalMinutes)
+    }
+
+    /// 制冷工况机时占比（0.0 ~ 1.0）
+    public var coolingRatio: Double {
+        let total = effectiveDeviceMinutes
+        guard total > 0 else { return 0.0 }
+        return min(1.0, Double(coolingMinutes) / Double(total))
+    }
+
+    /// 制热工况机时占比（0.0 ~ 1.0）
+    public var heatingRatio: Double {
+        let total = effectiveDeviceMinutes
+        guard total > 0 else { return 0.0 }
+        return min(1.0, Double(heatingMinutes) / Double(total))
+    }
+
+    /// 除湿工况机时占比（0.0 ~ 1.0）
+    public var dehumRatio: Double {
+        let total = effectiveDeviceMinutes
+        guard total > 0 else { return 0.0 }
+        return min(1.0, Double(dehumMinutes) / Double(total))
+    }
+
+    /// 送风工况机时占比（0.0 ~ 1.0）
+    public var fanRatio: Double {
+        let total = effectiveDeviceMinutes
+        guard total > 0 else { return 0.0 }
+        return min(1.0, Double(fanMinutes) / Double(total))
     }
 }
 
@@ -349,28 +397,39 @@ public final class EnergyAnalyticsEngine: ObservableObject {
 
         let totalCostDelta = totalIncrementalKWh * rate
         let incrementalMinutes = max(1, Int(round(elapsedSeconds / 60.0)))
+        let totalRunningDevices = runningCooling + runningHeating + runningFan + runningDehum + runningUnknown
+        let incrementalDeviceMinutes = totalRunningDevices * incrementalMinutes
+
+        // 各工况设备机时增量（台·分钟）(v1.9.35: 彻底消除多设备并发运行时各模式累加和超出全屋运行时长的量纲冲突)
+        let incCooling = runningCooling * incrementalMinutes
+        let incHeating = runningHeating * incrementalMinutes
+        let incFan = runningFan * incrementalMinutes
+        let incDehum = runningDehum * incrementalMinutes
+        let incUnknown = runningUnknown * incrementalMinutes
 
         if let idx = historyRecords.firstIndex(where: { $0.date == dateKey }) {
             historyRecords[idx].totalMinutes += incrementalMinutes
+            historyRecords[idx].totalDeviceMinutes += incrementalDeviceMinutes
             historyRecords[idx].totalKWh += totalIncrementalKWh
             historyRecords[idx].totalCost += totalCostDelta
 
-            if runningCooling > 0 { historyRecords[idx].coolingMinutes += incrementalMinutes }
-            if runningHeating > 0 { historyRecords[idx].heatingMinutes += incrementalMinutes }
-            if runningFan > 0 { historyRecords[idx].fanMinutes += incrementalMinutes }
-            if runningDehum > 0 { historyRecords[idx].dehumMinutes += incrementalMinutes }
-            if runningUnknown > 0 { historyRecords[idx].unknownMinutes += incrementalMinutes }
+            if incCooling > 0 { historyRecords[idx].coolingMinutes += incCooling }
+            if incHeating > 0 { historyRecords[idx].heatingMinutes += incHeating }
+            if incFan > 0 { historyRecords[idx].fanMinutes += incFan }
+            if incDehum > 0 { historyRecords[idx].dehumMinutes += incDehum }
+            if incUnknown > 0 { historyRecords[idx].unknownMinutes += incUnknown }
         } else {
             var newRecord = EnergyDayRecord(date: dateKey)
             newRecord.totalMinutes = incrementalMinutes
+            newRecord.totalDeviceMinutes = incrementalDeviceMinutes
             newRecord.totalKWh = totalIncrementalKWh
             newRecord.totalCost = totalCostDelta
 
-            if runningCooling > 0 { newRecord.coolingMinutes = incrementalMinutes }
-            if runningHeating > 0 { newRecord.heatingMinutes = incrementalMinutes }
-            if runningFan > 0 { newRecord.fanMinutes = incrementalMinutes }
-            if runningDehum > 0 { newRecord.dehumMinutes = incrementalMinutes }
-            if runningUnknown > 0 { newRecord.unknownMinutes = incrementalMinutes }
+            if incCooling > 0 { newRecord.coolingMinutes = incCooling }
+            if incHeating > 0 { newRecord.heatingMinutes = incHeating }
+            if incFan > 0 { newRecord.fanMinutes = incFan }
+            if incDehum > 0 { newRecord.dehumMinutes = incDehum }
+            if incUnknown > 0 { newRecord.unknownMinutes = incUnknown }
 
             historyRecords.insert(newRecord, at: 0)
             if historyRecords.count > 60 {

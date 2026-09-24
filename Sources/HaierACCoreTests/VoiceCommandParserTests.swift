@@ -354,6 +354,19 @@ final class VoiceCommandParserTests: XCTestCase {
 
         let temp3 = VoiceCommandParser.parse("把所有的空调都调到26度")
         XCTAssertEqual(temp3?.command, .setTemperatureAll(26.0))
+
+        // 全屋相对调温 (v1.9.35)
+        let rel1 = VoiceCommandParser.parse("全屋调高两度")
+        XCTAssertEqual(rel1?.command, .adjustTemperatureAll(delta: 2.0))
+
+        let rel2 = VoiceCommandParser.parse("所有空调升温1度")
+        XCTAssertEqual(rel2?.command, .adjustTemperatureAll(delta: 1.0))
+
+        let rel3 = VoiceCommandParser.parse("把所有空调都降温两度")
+        XCTAssertEqual(rel3?.command, .adjustTemperatureAll(delta: -2.0))
+
+        let rel4 = VoiceCommandParser.parse("全部空调调低一度")
+        XCTAssertEqual(rel4?.command, .adjustTemperatureAll(delta: -1.0))
     }
 
     // MARK: - 否定句与防误触测试 (v1.9.34)

@@ -224,28 +224,34 @@ struct EcoEnergySection: View {
         return "\(parts[1])/\(parts[2])"
     }
 
-    // MARK: - 今日各工况运行时长分布 (v1.9.26)
+    // MARK: - 今日各工况运行时长分布 (v1.9.26, v1.9.35: 支持机时占比精确展示)
 
     private func todayModeBreakdownView(today: EnergyDayRecord) -> some View {
-        HStack(spacing: 8) {
+        let totalDevMins = today.effectiveDeviceMinutes
+        return HStack(spacing: 8) {
             Text("工况分布:")
                 .font(.system(size: 10, weight: .medium))
                 .foregroundStyle(Theme.inkSubtle)
 
             if today.coolingMinutes > 0 {
-                modeTimeTag(label: "制冷", minutes: today.coolingMinutes, color: Color.blue)
+                let pct = totalDevMins > 0 ? Int(round(Double(today.coolingMinutes) / Double(totalDevMins) * 100)) : 0
+                modeTimeTag(label: "制冷", minutes: today.coolingMinutes, percentage: pct, color: Color.blue)
             }
             if today.heatingMinutes > 0 {
-                modeTimeTag(label: "制热", minutes: today.heatingMinutes, color: Color.orange)
+                let pct = totalDevMins > 0 ? Int(round(Double(today.heatingMinutes) / Double(totalDevMins) * 100)) : 0
+                modeTimeTag(label: "制热", minutes: today.heatingMinutes, percentage: pct, color: Color.orange)
             }
             if today.dehumMinutes > 0 {
-                modeTimeTag(label: "除湿", minutes: today.dehumMinutes, color: Color.teal)
+                let pct = totalDevMins > 0 ? Int(round(Double(today.dehumMinutes) / Double(totalDevMins) * 100)) : 0
+                modeTimeTag(label: "除湿", minutes: today.dehumMinutes, percentage: pct, color: Color.teal)
             }
             if today.fanMinutes > 0 {
-                modeTimeTag(label: "送风", minutes: today.fanMinutes, color: Color.gray)
+                let pct = totalDevMins > 0 ? Int(round(Double(today.fanMinutes) / Double(totalDevMins) * 100)) : 0
+                modeTimeTag(label: "送风", minutes: today.fanMinutes, percentage: pct, color: Color.gray)
             }
             if today.unknownMinutes > 0 {
-                modeTimeTag(label: "其他", minutes: today.unknownMinutes, color: Color.purple)
+                let pct = totalDevMins > 0 ? Int(round(Double(today.unknownMinutes) / Double(totalDevMins) * 100)) : 0
+                modeTimeTag(label: "其他", minutes: today.unknownMinutes, percentage: pct, color: Color.purple)
             }
 
             Spacer()
@@ -256,10 +262,11 @@ struct EcoEnergySection: View {
         .clipShape(RoundedRectangle(cornerRadius: Theme.radiusSM, style: .continuous))
     }
 
-    private func modeTimeTag(label: String, minutes: Int, color: Color) -> some View {
+    private func modeTimeTag(label: String, minutes: Int, percentage: Int = 0, color: Color) -> some View {
         HStack(spacing: 3) {
             Circle().fill(color).frame(width: 5, height: 5)
-            Text("\(label) \(minutes)m")
+            let text = percentage > 0 ? "\(label) \(minutes)m (\(percentage)%)" : "\(label) \(minutes)m"
+            Text(text)
                 .font(.system(size: 10, weight: .medium, design: .rounded))
                 .foregroundStyle(Theme.ink)
         }

@@ -271,6 +271,24 @@ public final class VoiceCapsuleWindowController: NSObject, NSWindowDelegate {
             scheduleAutoDismiss(delay: 1.8)
             return
 
+        case .adjustTemperatureAll(let delta):
+            guard model.gatewayConnected else {
+                VoiceControlManager.shared.markFailed("网关重连中，无法执行全屋控制")
+                scheduleAutoDismiss(delay: 2.5)
+                return
+            }
+            let count = model.adjustTemperatureAll(delta: delta)
+            if count > 0 {
+                let dir = delta > 0 ? "升温" : "降温"
+                let deltaAbs = abs(delta)
+                let deltaStr = deltaAbs.truncatingRemainder(dividingBy: 1.0) == 0 ? "\(Int(deltaAbs))" : String(format: "%.1f", deltaAbs)
+                VoiceControlManager.shared.markSuccess("已将全屋 \(count) 台空调统一\(dir) \(deltaStr)°C")
+            } else {
+                VoiceControlManager.shared.markFailed("当前无任何开机运行中的在线空调")
+            }
+            scheduleAutoDismiss(delay: 1.8)
+            return
+
         case .stopSelfCleaning:
             if model.isSelfCleaningActive {
                 model.stopSelfCleaning()
@@ -514,7 +532,7 @@ public final class VoiceCapsuleWindowController: NSObject, NSWindowDelegate {
                 VoiceControlManager.shared.markSuccess("已为\(prefix)启动 56°C 蒸发器高温自清洁")
             }
 
-        case .turnOffAll, .turnOnAll, .stopSelfCleaning, .presetAll, .setTemperatureAll:
+        case .turnOffAll, .turnOnAll, .stopSelfCleaning, .presetAll, .setTemperatureAll, .adjustTemperatureAll:
             break // 已在指令前置流程中由全局调度完成分发
         }
 
@@ -549,14 +567,12 @@ public final class VoiceCapsuleWindowController: NSObject, NSWindowDelegate {
             let formatted = temp.truncatingRemainder(dividingBy: 1.0) == 0 ? "\(Int(temp))" : String(format: "%.1f", temp)
             VoiceControlManager.shared.markSuccess("已将\(prefix)温度调至 \(formatted)°C")
 
-        case .adjustTemperature(let delta):
-            for devId in ids {
-                let currentTemp = model.attributes[devId]?["targetTemperature"]?.doubleValue ?? 26.0
-                var newTemp = currentTemp + delta
-                newTemp = min(max(newTemp, 16.0), 30.0)
-                model.sendAttribute("targetTemperature", value: .double(newTemp), deviceId: devId)
-            }
-            VoiceControlManager.shared.markSuccess("已微调\(prefix)温度")
+        case .adjustTemperature(let delta), .adjustTemperatureAll(let delta):
+            _ = model.adjustTemperature(deviceIds: ids, delta: delta)
+            let dir = delta > 0 ? "升温" : "降温"
+            let deltaAbs = abs(delta)
+            let deltaStr = deltaAbs.truncatingRemainder(dividingBy: 1.0) == 0 ? "\(Int(deltaAbs))" : String(format: "%.1f", deltaAbs)
+            VoiceControlManager.shared.markSuccess("已将\(prefix)统一\(dir) \(deltaStr)°C")
 
         case .setMode(let modeName):
             if let matched = ACModeCode.match(from: modeName) {

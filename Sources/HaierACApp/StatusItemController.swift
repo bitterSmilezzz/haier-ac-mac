@@ -291,6 +291,18 @@ final class StatusItemController: NSObject {
             heatAllItem.isEnabled = hasControllable
             menu.addItem(heatAllItem)
 
+            // 全屋统一相对调温 (v1.9.35)
+            let canAdjustTempAll = model.gatewayConnected && !onDevices.isEmpty
+            let stepUpAllItem = NSMenuItem(title: "🔼 全屋统一升温 1°C", action: #selector(stepUpAllTemperature), keyEquivalent: "")
+            stepUpAllItem.target = self
+            stepUpAllItem.isEnabled = canAdjustTempAll
+            menu.addItem(stepUpAllItem)
+
+            let stepDownAllItem = NSMenuItem(title: "🔽 全屋统一降温 1°C", action: #selector(stepDownAllTemperature), keyEquivalent: "")
+            stepDownAllItem.target = self
+            stepDownAllItem.isEnabled = canAdjustTempAll
+            menu.addItem(stepDownAllItem)
+
             if !offDevices.isEmpty {
                 let turnOnAllItem = NSMenuItem(title: "⏻ 开启全屋空调 (\(offDevices.count) 台待机)", action: #selector(turnOnAllDevices), keyEquivalent: "")
                 turnOnAllItem.target = self
@@ -305,7 +317,7 @@ final class StatusItemController: NSObject {
                 menu.addItem(turnOffAllItem)
             }
 
-            // 多设备级联控制子菜单 (v1.9.28)
+            // 多设备级联控制子菜单 (v1.9.28, v1.9.35 增设微调温阶)
             let devicesMenu = NSMenu()
             devicesMenu.autoenablesItems = false
             for dev in allDevices {
@@ -313,6 +325,8 @@ final class StatusItemController: NSObject {
                 let isPowerOn = model.attribute("onOffStatus", deviceId: devId)?.boolValue ?? false
                 let reach = model.reachability(for: devId)
                 let isControllable = reach.isControllable
+                let curTemp = model.attribute("targetTemperature", deviceId: devId)?.doubleValue ?? 26.0
+                let curTempStr = curTemp.truncatingRemainder(dividingBy: 1.0) == 0 ? "\(Int(curTemp))" : String(format: "%.1f", curTemp)
 
                 let devSubmenu = NSMenu()
                 devSubmenu.autoenablesItems = false
@@ -350,6 +364,27 @@ final class StatusItemController: NSObject {
                 heatItem.isEnabled = isControllable
                 devSubmenu.addItem(heatItem)
 
+                // 升降温 1°C (v1.9.35)
+                let upItem = NSMenuItem(
+                    title: "🔼 升温 1°C (当前 \(curTempStr)°C)",
+                    action: #selector(stepUpDeviceTemperature(_:)),
+                    keyEquivalent: ""
+                )
+                upItem.target = self
+                upItem.representedObject = devId
+                upItem.isEnabled = isControllable && isPowerOn && curTemp < 30.0
+                devSubmenu.addItem(upItem)
+
+                let downItem = NSMenuItem(
+                    title: "🔽 降温 1°C (当前 \(curTempStr)°C)",
+                    action: #selector(stepDownDeviceTemperature(_:)),
+                    keyEquivalent: ""
+                )
+                downItem.target = self
+                downItem.representedObject = devId
+                downItem.isEnabled = isControllable && isPowerOn && curTemp > 16.0
+                devSubmenu.addItem(downItem)
+
                 let statusBadge: String
                 switch reach {
                 case .gatewayReconnecting: statusBadge = "⏳ 重连中"
@@ -366,9 +401,12 @@ final class StatusItemController: NSObject {
             menu.setSubmenu(devicesMenu, for: devicesParentItem)
             menu.addItem(devicesParentItem)
         } else if let dev = allDevices.first {
-            // 单设备场景：保留快速电源开关与一键冷暖预设 (v1.9.33)
+            // 单设备场景：保留快速电源开关与一键冷暖预设及升降温步进 (v1.9.33, v1.9.35)
             let isPowerOn = model.attribute("onOffStatus", deviceId: dev.id)?.boolValue ?? false
             let isControllable = model.reachability(for: dev.id).isControllable
+            let curTemp = model.attribute("targetTemperature", deviceId: dev.id)?.doubleValue ?? 26.0
+            let curTempStr = curTemp.truncatingRemainder(dividingBy: 1.0) == 0 ? "\(Int(curTemp))" : String(format: "%.1f", curTemp)
+
             let powerTitle = isPowerOn ? "关机「\(dev.name)」" : "开机「\(dev.name)」"
             let powerItem = NSMenuItem(title: powerTitle, action: #selector(togglePrimaryPower), keyEquivalent: "")
             powerItem.target = self
@@ -384,6 +422,16 @@ final class StatusItemController: NSObject {
             heatItem.target = self
             heatItem.isEnabled = isControllable
             menu.addItem(heatItem)
+
+            let stepUpItem = NSMenuItem(title: "🔼 升温 1°C (当前 \(curTempStr)°C)", action: #selector(stepUpPrimaryTemperature), keyEquivalent: "")
+            stepUpItem.target = self
+            stepUpItem.isEnabled = isControllable && isPowerOn && curTemp < 30.0
+            menu.addItem(stepUpItem)
+
+            let stepDownItem = NSMenuItem(title: "🔽 降温 1°C (当前 \(curTempStr)°C)", action: #selector(stepDownPrimaryTemperature), keyEquivalent: "")
+            stepDownItem.target = self
+            stepDownItem.isEnabled = isControllable && isPowerOn && curTemp > 16.0
+            menu.addItem(stepDownItem)
         }
 
         let openItem = NSMenuItem(title: "打开主窗口", action: #selector(openMainWindow), keyEquivalent: "")
@@ -484,6 +532,34 @@ final class StatusItemController: NSObject {
 
     @objc private func applyQuickHeatingAll() {
         model.applyPresetToAllDevices(mode: .heating, temperature: 20.0)
+    }
+
+    @objc private func stepUpAllTemperature() {
+        model.adjustTemperatureAll(delta: 1.0)
+    }
+
+    @objc private func stepDownAllTemperature() {
+        model.adjustTemperatureAll(delta: -1.0)
+    }
+
+    @objc private func stepUpPrimaryTemperature() {
+        guard let devId = model.allUnifiedDevices.first?.id else { return }
+        model.adjustDeviceTemperature(deviceId: devId, delta: 1.0)
+    }
+
+    @objc private func stepDownPrimaryTemperature() {
+        guard let devId = model.allUnifiedDevices.first?.id else { return }
+        model.adjustDeviceTemperature(deviceId: devId, delta: -1.0)
+    }
+
+    @objc private func stepUpDeviceTemperature(_ sender: NSMenuItem) {
+        guard let devId = sender.representedObject as? String else { return }
+        model.adjustDeviceTemperature(deviceId: devId, delta: 1.0)
+    }
+
+    @objc private func stepDownDeviceTemperature(_ sender: NSMenuItem) {
+        guard let devId = sender.representedObject as? String else { return }
+        model.adjustDeviceTemperature(deviceId: devId, delta: -1.0)
     }
 
     @objc private func toggleDevicePower(_ sender: NSMenuItem) {

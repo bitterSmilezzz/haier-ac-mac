@@ -1,53 +1,51 @@
-# Haier AC Mac v1.9.33 发布与巡检演进报告
+# Haier AC Mac v1.9.35 发布与巡检演进报告
 
 ## 1. 概述与版本定位
-- **版本号**：`v1.9.33`
-- **发版主题**：全屋语音模式智能辨识与温控协同路由、防冷暖倒置
+- **版本号**：`v1.9.35`
+- **发版主题**：能耗工况动力学量纲校准、全屋设备机时精准分析、状态栏温阶微调矩阵与语音全屋相对调温
 - **核心目标**：
-  1. 彻底根除「全屋开暖气/制热」因误判为纯开机导致执行默认制冷 26°C 的**严重冷暖颠倒缺陷**，打通全屋自然语言模式与温控协同通道。
-  2. 增强自然语言多设备复合路由能力，原生支持“客厅和主卧一起关了”、“次卧跟客厅调到26度”等跨房间多目标批量原子控制。
-  3. 完善 macOS 状态栏单机与多机场景体验对齐，单机模式新增一键冷暖预设，状态栏图标引入全屋活动感知，瞬时总功率智能切换 W / kW 格式。
-  4. 完善 Apple 快捷指令与 Siri 生态闭环，新增 `TurnOnAllACIntent`（开启全屋空调），在 macOS 14+ 及回退分支完整注册。
+  1. **彻底闭环外部 Code Review 审查遗留项（CR P2-1/2）**：消除 `EnergyAnalyticsEngine.swift` 中多设备并发运行时各模式工况分钟数之和超过自然自然墙钟时长的量纲冲突，建立「全屋自然流逝时长（`totalMinutes`）」与「设备累计总机时（`totalDeviceMinutes`，台·分）」双轴核算体系，提供无溢出安全比例计算，并在能耗仪表盘提供机时占比百分比看板。
+  2. **完善 macOS 状态栏温度微调控制矩阵**：在 `StatusItemController` 右键菜单中为多设备场景提供「全屋统一升温/降温 1°C」，为单设备及多设备子菜单提供「升温/降温 1°C (当前 XX°C)」，严格联动 16~30°C 极值与在线开机可达性门禁。
+  3. **增强自然语言语音交互（语音胶囊）**：支持“全屋调高两度”、“把所有空调都升温1度”、“全部空调调低一度”等全屋相对调温口语意图，打通全屋与多设备定向批量相对调温分发链路。
 
 ---
 
 ## 2. 关键架构变更与代码实现
 
-### 2.1 全屋自然语言模式与温控协同管道 (`VoiceCommandParser.swift`)
-- **全新指令抽象模型**：
-  - 新增 `VoiceParseResult.Command.presetAll(mode: String, temperature: Double?)` 与 `VoiceParseResult.Command.setTemperatureAll(Double)` 枚举；
-- **防冷暖倒置与智能分流**：
-  - 在 `VoiceCommandParser.parse` 顶层优先调度 `parseAllPreset` 与 `parseAllTemperature`；
-  - 针对 `isAllPowerOn` 增加冷暖及温度词汇严格排除（“冷气”、“暖气”、“制冷”、“制热”、“冷风”、“暖风”、“度”），彻底消除了“全屋开暖气”被误判为全屋开机导致强制执行制冷 26°C 的严重逻辑倒置；
-  - 智能基准温阶：制热指令（“全屋制热”、“全屋开暖气”）缺省温度映射为舒适制热 20°C，制冷指令（“全屋制冷”、“所有空调开冷气”）缺省温度映射为清爽制冷 26°C，送风与除湿指令保留模式不带温度，同时支持自定义温度（如“全屋开冷气25度”、“全屋制热22度”）。
+### 2.1 能耗动力学工况量纲与设备机时精准化 (`EnergyAnalyticsEngine.swift` / `EcoEnergySection.swift`)
+- **双轴核算模型**：
+  - 将 `totalMinutes` 严格定义为全屋当日自然墙钟流逝分钟数（0~1440）；
+  - 新增 `totalDeviceMinutes: Int`（全屋设备累计总机时，单位：台·分钟），在多设备同时工作时，每台运行中的设备产生的分钟数准确累加至对应的运行工况（`coolingMinutes`, `heatingMinutes` 等）以及 `totalDeviceMinutes` 中；
+  - 各工况运行分钟数之和恒等于 `totalDeviceMinutes`，彻底消除了各工况分钟相加大于自然分钟数的量纲混淆；
+- **Codable 向后兼容与安全防御**：
+  - 自定义 `init(from decoder:)`，对历史存档中缺失 `totalDeviceMinutes` 字段的数据自动智能回退为 `max(sumOfModes, totalMinutes)`，保证旧版本数据 100% 优雅反序列化；
+  - 新增 `effectiveDeviceMinutes`、`coolingRatio`、`heatingRatio`、`dehumRatio`、`fanRatio` 等安全计算属性，严格钳制除以零风险；
+- **仪表板可视化升级**：
+  - 在 `EcoEnergySection.swift` 的工况看板中引入设备机时占比百分比（如 `制冷 120m (60%)`），让用户直观掌握家庭全屋冷暖负荷分布。
 
-### 2.2 多房间复合自然语言协同控制 (`VoiceCapsuleWindowController.swift`)
-- **多房间目标解析升级**：
-  - 将单设备解析器重构升级为 `resolveTargetDevices(for:model:) -> [AppModel.UnifiedDevice]`，能够准确提取语音指令中包含的多个房间（如“客厅和主卧”、“次卧跟主卧”）；
-  - 新增 `executeMultiDeviceCommand`：结合 `model.sendAttributeToDevices` 与 `model.turnOffDevices`，支持多房间并发执行电源开关、温度调节、风速控制，并反馈精准多房间确认提示（如“已将「客厅空调, 主卧空调」温度调至 26.0°C”）。
-- **全屋预设与调温执行调度**：
-  - 处理 `.presetAll`：联动 `model.applyPresetToAllDevices`，针对除湿/送风批量下发模式，制冷/制热同步下发模式与目标温阶；
-  - 处理 `.setTemperatureAll`：全屋联动下发 `targetTemperature` 属性，提供“已将全屋空调温度调至 24.0°C”直观回显。
+### 2.2 macOS 状态栏温度微调控制矩阵 (`StatusItemController.swift` / `AppModel.swift`)
+- **AppModel 相对与绝对调温 API**：
+  - 新增 `adjustDeviceTemperature(deviceId:delta:)`：精准相对步进单台设备目标温度，严格限制在 16.0°C ~ 30.0°C 并在开机且可达时下发；
+  - 新增 `adjustTemperature(deviceIds:delta:)` 与 `adjustTemperatureAll(delta:)`：支持指定多设备或全屋在线运行设备统一相对步进调温；
+- **状态栏右键上下文菜单深度集成**：
+  - 多设备全屋快捷区新增「🔼 全屋统一升温 1°C」与「🔽 全屋统一降温 1°C」，绑定 `stepUpAllTemperature` 与 `stepDownAllTemperature`；
+  - 各设备子菜单新增「🔼 升温 1°C (当前 XX°C)」与「🔽 降温 1°C (当前 XX°C)」；
+  - 单设备主菜单同步挂载单机升温与降温快捷项，当温度到达极限（30°C / 16°C）或设备关机离线时动态禁用，防止越界。
 
-### 2.3 macOS 状态栏交互与感知体验升级 (`StatusItemController.swift`)
-- **单设备场景快捷冷暖直达**：
-  - 单设备场景上下文菜单补齐「❄️ 一键制冷 26°C」与「🔥 一键制热 20°C」快捷操作，使单设备与多设备用户在右键菜单中享有完全一致的舒适温控体验；
-- **全屋空调运行状态联动感知**：
-  - 状态栏图标双态判定引入 `anyDeviceRunning` 检测：当主选空调待机但家中其他房间空调处于工作状态时，图标自动呈现实心运行态 `air.conditioner.horizontal.fill`，并在悬浮 Tooltip 中展示多房间运行状态；
-- **瞬时功率智能单位自适应**：
-  - 瞬时总功率在超过 1000W 时自动切换为双精度 `kW` 呈现（如 `1.45 kW`），千瓦以下保持 `W` 显示，数值清晰易读。
-
-### 2.4 Siri 与快捷指令生态闭环 (`AppIntents.swift`)
-- **新增全屋开机 Intent**：
-  - 实现 `TurnOnAllACIntent`（开启全屋空调），一键开启全屋所有在线海尔空调并设置为清爽制冷 26°C；
-  - 在 `ACAppShortcuts` 中为 macOS 14+ 及低版本回退分支注册“开启所有空调”、“全屋开机”语音短语与图标。
+### 2.3 语音胶囊自然语言全屋相对调温 (`VoiceCommandParser.swift` / `VoiceCapsuleWindowController.swift`)
+- **自然语言解析升级**：
+  - 在 `VoiceCommand` 扩充 `adjustTemperatureAll(delta: Double)` 指令；
+  - 新增 `parseAllRelativeTemperature` 模式，匹配包含“全屋/所有/全部/全都”以及升降温意图的口令（如“全屋调高两度”、“把所有空调都降温两度”、“全部空调调低一度”），排除模式关键词干扰；
+- **语音胶囊执行分发与多设备定向联动**：
+  - 在 `VoiceCapsuleWindowController` 中接入 `.adjustTemperatureAll` 全局分发，调用 `model.adjustTemperatureAll(delta:)`，精准反馈执行台数及升降温步进；
+  - 在 `executeMultiDeviceCommand` 中打通多设备定向相对调温执行与反馈。
 
 ---
 
-## 3. 构建、测试与打包验证
+## 3. 构建、测试与验证闭环
 - **本地编译验证**：
-  - `SDKROOT=/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk swift build` 验证 100% 编译成功，0 错误，0 警告；
-- **单元测试套件**：
-  - `VoiceCommandParserTests` 新增 `testWholeHousePresetAndTemperature`，全面覆盖全屋制冷、全屋制热、全屋开暖气防倒置、全屋送风/除湿及统一温控命令用例；
-- **分发打包**：
-  - 执行 `./build_app.sh 1.9.33`，生成包含 Widget 扩展与原生代码签名的 `dist/HaierAC.app` 及分发包 `dist/HaierAC-v1.9.33-macOS.zip`。
+  - 采用 `SDKROOT=/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk swift build`，构建耗时 19.26 秒，0 错误，0 警告通过；
+- **自动化测试套件**：
+  - `VoiceCommandParserTests.swift` 扩充 `adjustTemperatureAll` 单元测试，测试覆盖“全屋调高两度”、“所有空调升温1度”、“把所有空调都降温两度”、“全部空调调低一度”用例；
+- **打包分发**：
+  - 运行 `./build_app.sh 1.9.35`，完成 `dist/HaierAC.app`（含小组件扩展及代码重签名）构建及 `dist/HaierAC-v1.9.35-macOS.zip` 打包输出。

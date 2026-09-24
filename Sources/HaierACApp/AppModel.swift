@@ -2791,6 +2791,85 @@ final class AppModel: ObservableObject {
         return applyPreset(deviceIds: nil, mode: mode, temperature: temperature, windSpeed: windSpeed)
     }
 
+    /// 调整单个空调的设定温度（相对步进 delta，如 +1.0 或 -1.0） (v1.9.35)
+    @discardableResult
+    public func adjustDeviceTemperature(deviceId: String, delta: Double) -> Double? {
+        guard reachability(for: deviceId).isControllable else {
+            operationNotice = OperationNotice(text: "⚠️ 设备不可控或离线", isError: true)
+            return nil
+        }
+        let current = attribute("targetTemperature", deviceId: deviceId)?.doubleValue ?? 26.0
+        let target = min(30.0, max(16.0, current + delta))
+        sendAttribute("targetTemperature", value: .double(target), deviceId: deviceId)
+        let devName = allUnifiedDevices.first(where: { $0.id == deviceId })?.name ?? "空调"
+        let tempDesc = target.truncatingRemainder(dividingBy: 1.0) == 0 ? "\(Int(target))" : String(format: "%.1f", target)
+        operationNotice = OperationNotice(text: "✅ 已将「\(devName)」温度调至 \(tempDesc)°C", isError: false)
+        return target
+    }
+
+    /// 批量/全屋相对调温：为目标设备集（若为 nil 则默认全屋）中所有可控且开机运行的空调按 delta 步进调温 (v1.9.35)
+    @discardableResult
+    public func adjustTemperature(deviceIds: [String]? = nil, delta: Double) -> Int {
+        let targets = deviceIds ?? allUnifiedDevices.map(\.id)
+        let allIds = Set(allUnifiedDevices.map(\.id))
+        let isAll = (deviceIds == nil) || (!allIds.isEmpty && Set(targets).isSuperset(of: allIds))
+        let controllableOnIds = targets.filter {
+            reachability(for: $0).isControllable && attribute("onOffStatus", deviceId: $0)?.boolValue == true
+        }
+        guard !controllableOnIds.isEmpty else {
+            let desc = isAll ? "当前无任何开机运行中的在线空调" : "所选设备中无开机运行中的在线空调"
+            operationNotice = OperationNotice(text: desc, isError: false)
+            return 0
+        }
+        for id in controllableOnIds {
+            let current = attribute("targetTemperature", deviceId: id)?.doubleValue ?? 26.0
+            let target = min(30.0, max(16.0, current + delta))
+            sendAttribute("targetTemperature", value: .double(target), deviceId: id)
+        }
+        let deltaAbs = abs(delta)
+        let deltaDesc = deltaAbs.truncatingRemainder(dividingBy: 1.0) == 0 ? "\(Int(deltaAbs))" : String(format: "%.1f", deltaAbs)
+        let dirDesc = delta > 0 ? "升温 \(deltaDesc)°C" : "降温 \(deltaDesc)°C"
+        let desc = isAll
+            ? "✅ 已将全屋 \(controllableOnIds.count) 台运行中的空调统一\(dirDesc)"
+            : "✅ 已将所选 \(controllableOnIds.count) 台运行中的空调统一\(dirDesc)"
+        operationNotice = OperationNotice(text: desc, isError: false)
+        return controllableOnIds.count
+    }
+
+    /// 全屋一键相对调温 (v1.9.35)
+    @discardableResult
+    public func adjustTemperatureAll(delta: Double) -> Int {
+        return adjustTemperature(deviceIds: nil, delta: delta)
+    }
+
+    /// 批量/全屋绝对温度设定：将目标设备集（若为 nil 则默认全屋）中所有可控空调设置为指定温度 (v1.9.35)
+    @discardableResult
+    public func setTemperature(deviceIds: [String]? = nil, temperature: Double) -> Int {
+        let targets = deviceIds ?? allUnifiedDevices.map(\.id)
+        let allIds = Set(allUnifiedDevices.map(\.id))
+        let isAll = (deviceIds == nil) || (!allIds.isEmpty && Set(targets).isSuperset(of: allIds))
+        let safeTemp = min(30.0, max(16.0, temperature))
+        let controllableIds = targets.filter { reachability(for: $0).isControllable }
+        guard !controllableIds.isEmpty else {
+            let desc = isAll ? "⚠️ 当前无任何可控的在线空调设备" : "⚠️ 所选设备当前均不可控或离线"
+            operationNotice = OperationNotice(text: desc, isError: true)
+            return 0
+        }
+        sendAttributeToDevices("targetTemperature", value: .double(safeTemp), deviceIds: controllableIds)
+        let tempDesc = safeTemp.truncatingRemainder(dividingBy: 1.0) == 0 ? "\(Int(safeTemp))" : String(format: "%.1f", safeTemp)
+        let desc = isAll
+            ? "✅ 已将全屋 \(controllableIds.count) 台空调目标温度统一设为 \(tempDesc)°C"
+            : "✅ 已将所选 \(controllableIds.count) 台空调目标温度统一设为 \(tempDesc)°C"
+        operationNotice = OperationNotice(text: desc, isError: false)
+        return controllableIds.count
+    }
+
+    /// 全屋一键绝对温度设定 (v1.9.35)
+    @discardableResult
+    public func setTemperatureAll(temperature: Double) -> Int {
+        return setTemperature(deviceIds: nil, temperature: temperature)
+    }
+
     /// 网关推送属性时调用：确认待生效操作
     private func confirmPendingIfNeeded(deviceId: String, attrs: [String: DeviceAttribute]) {
         guard let pending = pendingConfirm,
