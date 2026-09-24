@@ -342,32 +342,76 @@ public struct VoiceCommandParser {
     private static func isAllPowerOff(_ text: String) -> Bool {
         let allOffKeywords = [
             "关闭所有空调", "关掉所有空调", "关闭全部空调", "关掉全部空调",
-            "关所有空调", "关全部空调", "全屋关机", "全部关机", "全关了",
-            "关闭全屋空调", "关掉全屋空调", "全屋关空调", "所有空调关机", "全屋关"
+            "关所有空调", "关全部空调", "全屋关机", "全部关机", "全关了", "都关了", "全都关了",
+            "关闭全屋空调", "关掉全屋空调", "全屋关空调", "所有空调关机", "全屋关",
+            "把所有的空调都关了", "把所有空调都关了", "把空调都关了", "把空调全都关了",
+            "把所有的空调都关掉", "把所有空调都关掉", "把空调都关掉", "把空调全都关掉",
+            "把全部空调关了", "把全部空调关掉", "所有空调都关了", "全部空调都关了",
+            "所有空调关掉", "全部空调关掉", "空调全关了", "空调都关了", "全关掉"
         ]
-        return allOffKeywords.contains(where: { text.contains($0) })
+        if allOffKeywords.contains(where: { text.contains($0) }) {
+            return true
+        }
+        // 自然语言容错：包含“所有/全部/全屋/全都”并包含“关/停”
+        if (text.contains("所有") || text.contains("全部") || text.contains("全屋") || text.contains("全都")) &&
+           (text.contains("关") || text.contains("停")) {
+            return true
+        }
+        return false
     }
 
     private static func isAllPowerOn(_ text: String) -> Bool {
         let allOnKeywords = [
             "打开所有空调", "开启所有空调", "打开全部空调", "开启全部空调",
-            "开所有空调", "开全部空调", "全屋开机", "全部开机", "全开了",
-            "开启全屋空调", "打开全屋空调", "全屋开空调", "所有空调开机", "全屋开"
+            "开所有空调", "开全部空调", "全屋开机", "全部开机", "全开了", "都开了", "全都开了",
+            "开启全屋空调", "打开全屋空调", "全屋开空调", "所有空调开机", "全屋开",
+            "把所有的空调都开了", "把所有空调都开了", "把空调都打开", "把空调全都打开",
+            "把所有的空调都打开", "把所有空调都打开", "把全部空调打开", "把全部空调开了",
+            "所有空调都开了", "全部空调都开了", "所有空调打开", "全部空调打开",
+            "空调全开了", "空调都开了", "全打开"
         ]
-        return allOnKeywords.contains(where: { text.contains($0) })
+        if allOnKeywords.contains(where: { text.contains($0) }) {
+            return true
+        }
+        // 自然语言容错：包含“所有/全部/全屋/全都”并包含“开/启”且不含关
+        if (text.contains("所有") || text.contains("全部") || text.contains("全屋") || text.contains("全都")) &&
+           (text.contains("开") || text.contains("启")) && !text.contains("关") {
+            return true
+        }
+        return false
     }
 
     private static func isPowerOff(_ text: String) -> Bool {
-        let offKeywords = ["关空调", "关闭空调", "关掉空调", "关机", "别吹了", "停机", "关闭", "关掉"]
-        return offKeywords.contains(where: { text.contains($0) })
+        let offKeywords = [
+            "关空调", "关闭空调", "关掉空调", "关机", "别吹了", "停机", "关闭", "关掉",
+            "关了", "关上", "关一下", "关停", "关掉它", "断电"
+        ]
+        if offKeywords.contains(where: { text.contains($0) }) {
+            return true
+        }
+        // 典型把字句与口语结构：包含“关了”、“关掉”、“关上”或以“关”开头/结尾
+        if (text.contains("把") && (text.contains("关了") || text.contains("关掉") || text.contains("关上"))) ||
+           text.hasPrefix("关") || text.hasSuffix("关") || text.hasSuffix("关了") || text.hasSuffix("关机") || text.hasSuffix("关一下") {
+            return true
+        }
+        return false
     }
 
     private static func isPowerOn(_ text: String) -> Bool {
-        let onKeywords = ["开空调", "打开空调", "开一下空调", "开机", "启动空调", "开启空调", "开开空调"]
+        // 排除模式切换命令（如“开冷气”、“开暖气”、“吹冷风”）
+        if text.contains("冷气") || text.contains("暖气") || text.contains("冷风") || text.contains("暖风") {
+            return false
+        }
+        let onKeywords = [
+            "开空调", "打开空调", "开一下空调", "开机", "启动空调", "开启空调", "开开空调",
+            "开一下", "打开", "开启", "开开", "开了", "开上", "启动", "运转"
+        ]
         if onKeywords.contains(where: { text.contains($0) }) {
             return true
         }
-        if text == "打开" || text == "开启" || text == "开" {
+        // 典型把字句与口语结构：包含“开了”、“打开”、“开启”或以“开”开头/结尾
+        if (text.contains("把") && (text.contains("开了") || text.contains("打开") || text.contains("开启"))) ||
+           text.hasPrefix("开") || text.hasSuffix("开") || text.hasSuffix("开了") || text.hasSuffix("开机") || text.hasSuffix("开一下") {
             return true
         }
         return false

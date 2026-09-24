@@ -68,10 +68,11 @@ struct BatchControlPanel: View {
                 return model.attributes[deviceIds.first ?? ""] ?? [:]
             }()
 
-            // 全屋快捷一键预设 (v1.9.30)
+            // 批量一键预设与关机 (v1.9.32 目标严格隔离在当前选中的 deviceIds)
+            let isAllSelected = deviceIds.count == model.allUnifiedDevices.count
             HStack(spacing: 8) {
                 Button {
-                    model.applyPresetToAllDevices(mode: .cooling, temperature: 26.0)
+                    model.applyPreset(deviceIds: deviceIds, mode: .cooling, temperature: 26.0)
                 } label: {
                     HStack(spacing: 4) {
                         Image(systemName: "snowflake")
@@ -88,7 +89,7 @@ struct BatchControlPanel: View {
                 .buttonStyle(.plain)
 
                 Button {
-                    model.applyPresetToAllDevices(mode: .heating, temperature: 20.0)
+                    model.applyPreset(deviceIds: deviceIds, mode: .heating, temperature: 20.0)
                 } label: {
                     HStack(spacing: 4) {
                         Image(systemName: "flame.fill")
@@ -105,12 +106,12 @@ struct BatchControlPanel: View {
                 .buttonStyle(.plain)
 
                 Button {
-                    model.turnOffAllDevices()
+                    model.turnOffDevices(deviceIds: deviceIds)
                 } label: {
                     HStack(spacing: 4) {
                         Image(systemName: "power")
                             .font(.system(size: 11))
-                        Text("全屋关机")
+                        Text(isAllSelected ? "全屋关机" : "所选关机")
                             .font(.system(size: 11, weight: .medium))
                     }
                     .frame(maxWidth: .infinity)

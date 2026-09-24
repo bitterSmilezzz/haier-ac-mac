@@ -2701,31 +2701,42 @@ final class AppModel: ObservableObject {
         return sent
     }
 
+    /// 批量/全屋关机：关闭目标设备集（若为 nil 则默认全屋）中所有可达且处于开机状态的空调 (v1.9.32)
+    /// 返回实际关闭的设备数量
+    @discardableResult
+    public func turnOffDevices(deviceIds: [String]? = nil) -> Int {
+        let targets = deviceIds ?? allUnifiedDevices.map(\.id)
+        let isAll = (deviceIds == nil) || (targets.count == allUnifiedDevices.count)
+        let controllableOnIds = targets
+            .filter { reachability(for: $0).isControllable && attribute("onOffStatus", deviceId: $0)?.boolValue == true }
+        guard !controllableOnIds.isEmpty else {
+            let desc = isAll ? "当前所有空调均处于关机或离线状态" : "所选空调均处于关机或离线状态"
+            operationNotice = OperationNotice(text: desc, isError: false)
+            return 0
+        }
+        let sent = sendAttributeToDevices("onOffStatus", value: .bool(false), deviceIds: controllableOnIds)
+        let desc = isAll ? "✅ 已关闭全屋 \(sent) 台运行中的空调" : "✅ 已关闭所选 \(sent) 台运行中的空调"
+        operationNotice = OperationNotice(text: desc, isError: false)
+        return sent
+    }
+
     /// 全屋一键关机：关闭所有可达且处于开机状态的空调 (v1.9.30)
     /// 返回实际关闭的设备数量
     @discardableResult
     public func turnOffAllDevices() -> Int {
-        let controllableOnIds = allUnifiedDevices
-            .filter { reachability(for: $0.id).isControllable && attribute("onOffStatus", deviceId: $0.id)?.boolValue == true }
-            .map(\.id)
-        guard !controllableOnIds.isEmpty else {
-            operationNotice = OperationNotice(text: "当前所有空调均处于关机或离线状态", isError: false)
-            return 0
-        }
-        let sent = sendAttributeToDevices("onOffStatus", value: .bool(false), deviceIds: controllableOnIds)
-        operationNotice = OperationNotice(text: "✅ 已关闭全屋 \(sent) 台运行中的空调", isError: false)
-        return sent
+        return turnOffDevices(deviceIds: nil)
     }
 
-    /// 全屋一键清爽/开机预设：将所有可达空调开启并设置为指定模式与温度 (v1.9.30)
+    /// 批量/全屋一键预设：将目标设备集（若为 nil 则默认全屋）中所有可达空调开启并设置为指定模式与温度 (v1.9.32)
     /// 返回实际控制的设备数量
     @discardableResult
-    public func applyPresetToAllDevices(mode: ACModeCode, temperature: Double, windSpeed: String? = nil) -> Int {
-        let controllableIds = allUnifiedDevices
-            .filter { reachability(for: $0.id).isControllable }
-            .map(\.id)
+    public func applyPreset(deviceIds: [String]? = nil, mode: ACModeCode, temperature: Double, windSpeed: String? = nil) -> Int {
+        let targets = deviceIds ?? allUnifiedDevices.map(\.id)
+        let isAll = (deviceIds == nil) || (targets.count == allUnifiedDevices.count)
+        let controllableIds = targets.filter { reachability(for: $0).isControllable }
         guard !controllableIds.isEmpty else {
-            operationNotice = OperationNotice(text: "⚠️ 当前无任何可控的在线空调设备", isError: true)
+            let desc = isAll ? "⚠️ 当前无任何可控的在线空调设备" : "⚠️ 所选设备当前均不可控或离线"
+            operationNotice = OperationNotice(text: desc, isError: true)
             return 0
         }
         sendAttributeToDevices("onOffStatus", value: .bool(true), deviceIds: controllableIds)
@@ -2735,8 +2746,18 @@ final class AppModel: ObservableObject {
             sendAttributeToDevices("windSpeed", value: .string(windSpeed), deviceIds: controllableIds)
         }
         let tempDesc = temperature.truncatingRemainder(dividingBy: 1.0) == 0 ? "\(Int(temperature))" : String(format: "%.1f", temperature)
-        operationNotice = OperationNotice(text: "✅ 已将全屋 \(controllableIds.count) 台空调设为「\(mode.desc) \(tempDesc)°C」", isError: false)
+        let desc = isAll
+            ? "✅ 已将全屋 \(controllableIds.count) 台空调设为「\(mode.desc) \(tempDesc)°C」"
+            : "✅ 已将所选 \(controllableIds.count) 台空调设为「\(mode.desc) \(tempDesc)°C」"
+        operationNotice = OperationNotice(text: desc, isError: false)
         return controllableIds.count
+    }
+
+    /// 全屋一键清爽/开机预设：将所有可达空调开启并设置为指定模式与温度 (v1.9.30)
+    /// 返回实际控制的设备数量
+    @discardableResult
+    public func applyPresetToAllDevices(mode: ACModeCode, temperature: Double, windSpeed: String? = nil) -> Int {
+        return applyPreset(deviceIds: nil, mode: mode, temperature: temperature, windSpeed: windSpeed)
     }
 
     /// 网关推送属性时调用：确认待生效操作

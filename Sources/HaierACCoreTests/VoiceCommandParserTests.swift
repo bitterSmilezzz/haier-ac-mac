@@ -265,6 +265,53 @@ final class VoiceCommandParserTests: XCTestCase {
         XCTAssertEqual(clean5?.command, .stopSelfCleaning)
     }
 
+    // MARK: - 口语化与定向房间测试 (v1.9.32)
+
+    func testSpokenAndRoomPhrases() {
+        // 口语全屋关
+        let off1 = VoiceCommandParser.parse("把所有的空调都关了")
+        XCTAssertEqual(off1?.command, .turnOffAll)
+
+        let off2 = VoiceCommandParser.parse("把空调全都关了")
+        XCTAssertEqual(off2?.command, .turnOffAll)
+
+        let off3 = VoiceCommandParser.parse("全部空调关掉")
+        XCTAssertEqual(off3?.command, .turnOffAll)
+
+        // 口语全屋开
+        let on1 = VoiceCommandParser.parse("把所有的空调都打开")
+        XCTAssertEqual(on1?.command, .turnOnAll)
+
+        let on2 = VoiceCommandParser.parse("把全部空调打开")
+        XCTAssertEqual(on2?.command, .turnOnAll)
+
+        // 房间定向与把字句单控
+        let roomOff1 = VoiceCommandParser.parse("把客厅空调关了")
+        XCTAssertEqual(roomOff1?.command, .setPower(false))
+
+        let roomOff2 = VoiceCommandParser.parse("次卧空调关一下")
+        XCTAssertEqual(roomOff2?.command, .setPower(false))
+
+        let roomOff3 = VoiceCommandParser.parse("关闭次卧")
+        XCTAssertEqual(roomOff3?.command, .setPower(false))
+
+        let roomOn1 = VoiceCommandParser.parse("打开客厅空调")
+        XCTAssertEqual(roomOn1?.command, .setPower(true))
+
+        let roomOn2 = VoiceCommandParser.parse("开启主卧")
+        XCTAssertEqual(roomOn2?.command, .setPower(true))
+
+        // 房间定向调温与模式
+        let roomTemp1 = VoiceCommandParser.parse("客厅调到26度")
+        XCTAssertEqual(roomTemp1?.command, .setTemperature(26.0))
+
+        let roomTemp2 = VoiceCommandParser.parse("次卧太热了")
+        XCTAssertEqual(roomTemp2?.command, .adjustTemperature(delta: -1.0))
+
+        let roomMode = VoiceCommandParser.parse("主卧切换到制热模式")
+        XCTAssertEqual(roomMode?.command, .setMode("制热"))
+    }
+
     // MARK: - 无效输入测试
 
     func testInvalidCommands() {

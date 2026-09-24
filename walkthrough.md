@@ -1,65 +1,55 @@
-# Haier AC Mac v1.9.31 发布与巡检演进报告
+# Haier AC Mac v1.9.32 发布与巡检演进报告
 
 ## 1. 概述与版本定位
-- **版本号**：`v1.9.31`
-- **发版主题**：全屋智能协同控制、自然语言自清洁与状态栏实时功率感知
+- **版本号**：`v1.9.32`
+- **发版主题**：批量控制设备作用域隔离、多设备自然语言目标路由与菜单栏全屋制热
 - **核心目标**：
-  1. 打通全屋多设备并发一键协同调度（全屋一键关机、全屋舒适预设）。
-  2. 扩展自然语言语音胶囊控制体系，支持全屋级语义理解与 56°C 蒸发器高温自清洁自然语言托管，重构门禁防止单设备离线误拦。
-  3. 扩充 macOS 系统原生快捷指令与 Siri 生态（`TurnOffAllACIntent`、`StartSelfCleaningIntent`），修复温度调整浮点截断。
-  4. macOS 状态栏原生上下文菜单增强，Tooltip 接入实时瞬时总功率与滤网损耗 Combine 响应流。
-  5. 严谨隔离离线设备室内温度采样，消除断电设备陈旧数据对动力学能耗模型的干扰。
+  1. 彻底根除多设备批量控制面板中的越权穿透漏洞，使批量预设与关机严格限定在用户勾选的设备子集。
+  2. 增强自然语言语音胶囊控制的定向路由能力，支持按房间或设备名（“客厅”、“主卧”、“次卧”等）精准定向执行。
+  3. 大幅拓宽中文口语化句式与把字句容错语法（“把所有的空调都关了”、“次卧关一下”、“打开客厅空调”等）。
+  4. macOS 状态栏右键上下文菜单增加「🔥 全屋舒适制热 20°C」，并全链路补全 `hasControllable` 物理设备可达性门禁。
 
 ---
 
 ## 2. 关键架构变更与代码实现
 
-### 2.1 全屋一键协同控制 (`AppModel.swift`)
-- **`turnOffAllDevices() -> Int`**：
-  - 自动识别当前既在线可达 (`reachability.isControllable`) 又处于开机中的空调设备；
-  - 并发下发 `onOffStatus = false`，向用户即时反馈关闭的设备台数，杜绝无效空发。
-- **`applyPresetToAllDevices(mode:temperature:windSpeed:) -> Int`**：
-  - 将所有在线可达的空调一键配置为指定模式（如制冷 26°C、制热 20°C），并同步设置风速；
-  - 浮点温度格式化优化，整数自动消除 `.0`。
+### 2.1 批量控制设备作用域隔离与重构 (`AppModel.swift` & `BatchControlView.swift`)
+- **API 作用域解耦**：
+  - 将原有的 `turnOffAllDevices` 升级为 `turnOffDevices(deviceIds: [String]? = nil)`，在保留无参全屋兼容的同时，支持指定目标设备 ID 列表；
+  - 将 `applyPresetToAllDevices` 升级为 `applyPreset(deviceIds: [String]? = nil, mode:temperature:windSpeed:)`；
+  - 自动对目标列表中的设备进行在线可达性 (`isControllable`) 校验与去重，杜绝空发与向离线设备盲目发送。
+- **批量面板联动与交互加固**：
+  - `BatchControlView` Bento 卡片中的预设按钮全面传入当前选中的 `deviceIds`；
+  - 关机按钮文案动态适配：全选时显示「全屋关机」，局部选中时明确显示「所选关机」，消除用户心理疑惑。
 
-### 2.2 自然语言语音指令系统重构 (`VoiceCommandParser.swift` & `VoiceCapsuleWindowController.swift`)
-- **新增指令枚举**：
-  - `.turnOffAll`：全屋关机、关闭所有空调、把所有的空调都关了、全部关机；
-  - `.turnOnAll`：开启所有空调、全部开机、全屋开机；
-  - `.startSelfCleaning`：启动自清洁、蒸发器高温自清洁、清洗蒸发器；
-  - `.stopSelfCleaning`：停止自清洁、关闭自清洁。
-- **执行生命周期容错重构**：
-  - 将全屋指令（`.turnOffAll` / `.turnOnAll`）和自清洁停止指令（`.stopSelfCleaning`）置于单一主设备可达性门禁之前先行拦截处理；
-  - 彻底解决主选空调离线导致用户喊“关闭所有空调”被误拦报错的架构缺陷。
+### 2.2 多房间自然语言目标智能路由 (`VoiceCapsuleWindowController.swift`)
+- **房间与设备名智能探测**：
+  - 引入 `resolveTargetDevice(for:model:)`，优先进行完整设备名比对，其次进行去除“空调/海尔”后缀的房间核心词匹配（“客厅”、“主卧”、“次卧”、“书房”等）；
+  - 未指定具体房间时，无缝回退为主控空调（`menuBarDeviceId ?? allUnifiedDevices.first?.id`）。
+- **目标设备精准门禁与反馈**：
+  - 针对解析出的具体目标设备执行可达性检查，离线时明确提醒（如“「客厅空调」当前离线，无法执行语音指令”）；
+  - 成功执行后在反馈中附带房间/设备前缀（如“已开启「客厅空调」”或“已为「次卧空调」设定：22:00 关机”），多设备状态清晰透明。
 
-### 2.3 批量控制面板优化 (`BatchControlView.swift`)
-- **控制属性探测容错**：
-  - 扫描选中的多设备，优先采用首个属性非空的设备作为控制模板，杜绝首台设备离线导致控制面板变成空白；
-- **全屋一键预设 Bento 卡片组**：
-  - 在批量面板顶部新增「❄️ 清爽 26°C」、「🔥 暖房 20°C」与「⏻ 全屋关机」快捷预设卡片。
+### 2.3 中文口语化与把字句语法增强 (`VoiceCommandParser.swift`)
+- **全屋指令口语丰富**：
+  - 支持“把所有的空调都关了”、“把空调全都关了”、“把全部空调关掉”、“所有空调都关了”等句式；
+  - 引入“所有/全部/全屋/全都” + “关/停”的自然语言结构组合匹配。
+- **单设备与定向控制语法拓展**：
+  - 丰富 `isPowerOff` 与 `isPowerOn`，支持“把...关了/关掉/关上”、“关一下”、“打开”、“开启”等口语化句式；
+  - 在 `isPowerOn` 中增加模式切换冲突防御（排除“冷气”、“暖气”、“冷风”、“暖风”等），防止“开冷气”等模式指令被误拦为普通开机。
 
-### 2.4 Siri / 系统快捷指令扩展 (`AppIntents.swift`)
-- **新增 Intent**：
-  - `TurnOffAllACIntent`：一键关闭全屋所有正在运行的空调；
-  - `StartSelfCleaningIntent`：启动 56°C 蒸发器高温除菌自清洁托管；
-- **Bug 修复**：
-  - 修复 `SetACTemperatureIntent` 中将 Double 温度截断为 `Int` 的问题，完整支持海尔空调 0.5°C 精度细腻微调回显。
-- **快捷指令自动发现注册**：
-  - 在 `ACAppShortcuts` 中注册系统 Short Title 与 Siri 触发口令。
-
-### 2.5 状态栏动态响应与菜单扩展 (`StatusItemController.swift`)
-- **Combine 响应流补齐**：
-  - 接入 `EnergyAnalyticsEngine.shared.$currentInstantaneousPower` 与 `model.$filterAccumulatedMinutes`；
-  - 瞬时功率与滤网告警实时计算并刷新 Tooltip；
-- **右键菜单扩展**：
-  - 多设备场景下增加「❄️ 全屋清爽制冷 26°C」一键直达，关机动作直接复用 `model.turnOffAllDevices()`。
+### 2.4 状态栏季节适应全屋制热与可达性守卫 (`StatusItemController.swift`)
+- **冷暖双向全屋快捷协同**：
+  - 状态栏原生右键菜单新增「🔥 全屋舒适制热 20°C」快捷协同选项，实现冬夏双季一键温控。
+- **可达性门禁闭环**：
+  - 全屋制冷、全屋制热菜单项的 `isEnabled` 统一受控于 `hasControllable`（网关连接且至少有一台空调在线可控），网关断开或全屋离线时严格置灰。
 
 ---
 
 ## 3. 构建、测试与打包验证
 - **本地编译验证**：
-  - `SDKROOT=/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk swift build` 验证 100% 编译成功；
-- **单元测试验证**：
-  - 补充 `VoiceCommandParserTests` 自动化单元测试用例，覆盖全屋开关与自清洁语法解析；
-- **发布产物打包**：
-  - 执行 `./build_app.sh 1.9.30`，成功生成签名完整的 `dist/HaierAC.app`（含小组件插件）与发布包 `dist/HaierAC-v1.9.30-macOS.zip` (2.5MB)。
+  - `SDKROOT=/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk swift build` 100% 编译通过；
+- **自动化测试验证**：
+  - `VoiceCommandParserTests` 新增 `testSpokenAndRoomPhrases` 测试用例，全面覆盖全屋口语、房间定向把字句与调温/模式解析；
+- **生产发布产物**：
+  - 运行 `./build_app.sh 1.9.32`，生成 `dist/HaierAC.app`（含 WidgetKit 扩展与原生代码签名）及分发包 `dist/HaierAC-v1.9.32-macOS.zip` (2.5MB)。

@@ -257,11 +257,17 @@ final class StatusItemController: NSObject {
         }
 
         if allDevices.count > 1 {
-            // 多设备场景：提供全屋快捷协同操作 (v1.9.30)
+            // 多设备场景：提供全屋快捷协同操作 (v1.9.30, v1.9.32 增强制热与可达性门禁)
+            let hasControllable = model.gatewayConnected && allDevices.contains(where: { model.reachability(for: $0.id).isControllable })
             let coolAllItem = NSMenuItem(title: "❄️ 全屋清爽制冷 26°C", action: #selector(applyQuickCoolingAll), keyEquivalent: "")
             coolAllItem.target = self
-            coolAllItem.isEnabled = model.gatewayConnected
+            coolAllItem.isEnabled = hasControllable
             menu.addItem(coolAllItem)
+
+            let heatAllItem = NSMenuItem(title: "🔥 全屋舒适制热 20°C", action: #selector(applyQuickHeatingAll), keyEquivalent: "")
+            heatAllItem.target = self
+            heatAllItem.isEnabled = hasControllable
+            menu.addItem(heatAllItem)
 
             if !onDevices.isEmpty {
                 let turnOffAllItem = NSMenuItem(title: "⏻ 关闭全屋空调 (\(onDevices.count) 台运行中)", action: #selector(turnOffAllDevices), keyEquivalent: "")
@@ -430,6 +436,10 @@ final class StatusItemController: NSObject {
 
     @objc private func applyQuickCoolingAll() {
         model.applyPresetToAllDevices(mode: .cooling, temperature: 26.0)
+    }
+
+    @objc private func applyQuickHeatingAll() {
+        model.applyPresetToAllDevices(mode: .heating, temperature: 20.0)
     }
 
     @objc private func toggleDevicePower(_ sender: NSMenuItem) {
