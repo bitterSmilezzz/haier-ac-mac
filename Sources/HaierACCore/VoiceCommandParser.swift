@@ -32,6 +32,10 @@ public enum VoiceCommand: Equatable {
     case turnOffAll
     /// 开启全屋所有空调 (v1.9.30)
     case turnOnAll
+    /// 全屋/所有设备批量模式与温度预设 (mode: 模式名称如"制冷"/"制热", temperature: 可选温度) (v1.9.33)
+    case presetAll(mode: String, temperature: Double?)
+    /// 全屋/所有设备统一设置目标温度 (v1.9.33)
+    case setTemperatureAll(Double)
     /// 启动 56°C 蒸发器高温自清洁 (v1.9.30)
     case startSelfCleaning
     /// 停止蒸发器自清洁 (v1.9.30)
@@ -111,9 +115,15 @@ public struct VoiceCommandParser {
             }
         }
 
-        // 6. 全屋多设备协同开/关控制 (v1.9.30，放在单设备开/关机前拦截)
+        // 6. 全屋多设备协同开/关控制与模式/温度预设 (v1.9.33，放在单设备开/关机前拦截)
         if isAllPowerOff(cleaned) {
             return VoiceParseResult(command: .turnOffAll, displayText: "关闭全屋所有空调")
+        }
+        if let allPreset = parseAllPreset(cleaned) {
+            return allPreset
+        }
+        if let allTemp = parseAllTemperature(cleaned) {
+            return allTemp
         }
         if isAllPowerOn(cleaned) {
             return VoiceParseResult(command: .turnOnAll, displayText: "开启全屋所有空调")
@@ -360,7 +370,76 @@ public struct VoiceCommandParser {
         return false
     }
 
+    private static func isAllDeviceScope(_ text: String) -> Bool {
+        text.contains("所有") || text.contains("全部") || text.contains("全屋") || text.contains("全都")
+    }
+
+    private static func parseAllPreset(_ text: String) -> VoiceParseResult? {
+        guard isAllDeviceScope(text) else { return nil }
+
+        // 识别模式
+        let detectedMode: String? = {
+            if text.contains("制冷") || text.contains("冷气") || text.contains("冷风") { return "制冷" }
+            if text.contains("制热") || text.contains("暖气") || text.contains("暖风") || text.contains("加热") { return "制热" }
+            if text.contains("送风") || text.contains("吹风") || text.contains("通风") { return "送风" }
+            if text.contains("除湿") || text.contains("抽湿") || text.contains("干燥") { return "除湿" }
+            if text.contains("自动") || text.contains("智能") { return "自动" }
+            return nil
+        }()
+
+        guard let mode = detectedMode else { return nil }
+
+        // 识别温度（若有）
+        var targetTemp: Double? = nil
+        if let val = extractTemperatureValue(from: text), val >= 16.0 && val <= 30.0 {
+            targetTemp = val
+        } else {
+            if mode == "制热" {
+                targetTemp = 20.0
+            } else if mode == "制冷" {
+                targetTemp = 26.0
+            } else if mode == "自动" {
+                targetTemp = 24.0
+            }
+        }
+
+        let display: String
+        if let t = targetTemp {
+            let tempStr = formatTemp(t)
+            if mode == "制热" {
+                display = "全屋舒适制热 \(tempStr)°C"
+            } else if mode == "制冷" {
+                display = "全屋清爽制冷 \(tempStr)°C"
+            } else {
+                display = "全屋\(mode)模式 \(tempStr)°C"
+            }
+        } else {
+            display = "全屋\(mode)模式"
+        }
+
+        return VoiceParseResult(command: .presetAll(mode: mode, temperature: targetTemp), displayText: display)
+    }
+
+    private static func parseAllTemperature(_ text: String) -> VoiceParseResult? {
+        guard isAllDeviceScope(text) else { return nil }
+        // 排除已指定运行模式的情况
+        if text.contains("制冷") || text.contains("冷气") || text.contains("制热") || text.contains("暖气") ||
+           text.contains("送风") || text.contains("除湿") || text.contains("吹风") || text.contains("抽湿") {
+            return nil
+        }
+        guard let temp = extractTemperatureValue(from: text), temp >= 16.0 && temp <= 30.0 else {
+            return nil
+        }
+        let tempStr = formatTemp(temp)
+        return VoiceParseResult(command: .setTemperatureAll(temp), displayText: "全屋温度调至 \(tempStr)°C")
+    }
+
     private static func isAllPowerOn(_ text: String) -> Bool {
+        // 排除模式与温控命令（如“全屋开暖气”、“全屋开冷气”、“全屋开制热”、“全屋开到26度”），防止冷暖倒置 (v1.9.33)
+        if text.contains("冷气") || text.contains("暖气") || text.contains("制冷") || text.contains("制热") ||
+           text.contains("冷风") || text.contains("暖风") || text.contains("度") {
+            return false
+        }
         let allOnKeywords = [
             "打开所有空调", "开启所有空调", "打开全部空调", "开启全部空调",
             "开所有空调", "开全部空调", "全屋开机", "全部开机", "全开了", "都开了", "全都开了",

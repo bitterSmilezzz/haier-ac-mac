@@ -8,6 +8,14 @@
 
 ## 功能
 
+- 🏷 **全屋语音模式智能辨识与温控协同路由、防冷暖倒置 (v1.9.33)**：
+  - 🎙️ **全屋自然语言模式与温控协同路由 (`VoiceCommandParser` / `VoiceCapsuleWindowController`)**：重构全屋语音解析与执行管道，彻底消除「全屋开暖气/制热」被 `isAllPowerOn` 误判为开机并执行默认制冷 26°C 导致的**冷暖颠倒严重缺陷**；新增 `presetAll(mode:temperature:)` 与 `setTemperatureAll(Double)` 指令模型，支持“全屋开暖气”、“全屋制热22度”、“所有空调开冷气25度”、“全屋调到24度”、“全屋送风”等自然语言语义直接映射，根据冷暖模式智能设定舒适基准温阶（制热 20°C / 制冷 26°C / 自动 24°C）。
+  - 🏠 **多房间组合自然语言协同控制 (`VoiceCapsuleWindowController`)**：将设备目标解析器升级为多设备返回的 `resolveTargetDevices(for:model:)`，支持“客厅和主卧一起关了”、“把次卧跟客厅调到26度”等跨房间复合定向口语，通过 `executeMultiDeviceCommand` 实现多设备并发原子下发与统一成功反馈提示。
+  - 🍱 **状态栏单机冷暖直达、多设备运行感知与功率动态格式化 (`StatusItemController`)**：
+    - 单设备场景上下文菜单补齐「❄️ 一键制冷 26°C」与「🔥 一键制热 20°C」快捷操作，单双设备场景体验完全对齐；
+    - 状态栏图标双态检测引入 `anyDeviceRunning` 判定，当主选设备待机而家中其他房间空调运行时，图标自动呈现实心工作态 `air.conditioner.horizontal.fill`，并在悬浮 Tooltip 中展示多房间运行状态；
+    - 瞬时总功率智能自适应：超过 1000W 时自动切换为双精度 `kW` 呈现（如 `1.45 kW`），千瓦以下保持 `W` 显示。
+  - 📱 **Siri 与系统快捷指令生态对齐 (`AppIntents`)**：新增 `TurnOnAllACIntent`（开启全屋空调），在 macOS 14+ 及回退分支完整注册至 `ACAppShortcutsProvider`，实现全屋开/关/清洁/调温在 Siri 端的双向闭环。
 - 🏷 **批量控制设备作用域隔离、多设备自然语言目标路由与菜单栏全屋制热 (v1.9.32)**：
   - 🛡️ **批量控制面板设备穿透漏洞彻底隔离 (`BatchControlView` / `AppModel`)**：重构 `AppModel` 批量控制 API，将 `turnOffAllDevices` 与 `applyPresetToAllDevices` 升级为支持目标设备集合的 `turnOffDevices(deviceIds:)` 与 `applyPreset(deviceIds:mode:temperature:windSpeed:)`；批量控制面板中的快捷预设（清爽 26°C、暖房 20°C）与关机按钮严格绑定当前用户选中的 `deviceIds` 集合，按钮标题动态智能呈现「全屋关机」vs「所选关机」，彻底杜绝部分勾选时穿透控制未选中房间空调的越权缺陷。
   - 🎙️ **多房间自然语言设备目标智能路由 (`VoiceCapsuleWindowController`)**：新增 `resolveTargetDevice(for:model:)` 房间与设备名称解析器，智能匹配语音指令中的房间名词（如“客厅”、“主卧”、“次卧”、“书房”等），自动将指令路由至对应的具体空调，未指定时平滑回退为主控设备；针对目标设备增加离线与重连拦截（如“「客厅空调」当前离线，无法执行语音指令”），并在指令执行成功后提供具体设备反馈（如“已开启「客厅空调」”）。

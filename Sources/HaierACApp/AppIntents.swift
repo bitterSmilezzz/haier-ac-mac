@@ -253,6 +253,26 @@ struct TurnOffAllACIntent: AppIntent {
     }
 }
 
+// MARK: - 开启全屋空调 (v1.9.33)
+
+struct TurnOnAllACIntent: AppIntent {
+    static var title: LocalizedStringResource = "开启全屋空调"
+    static var description = IntentDescription("一键开启全屋所有海尔空调并设置为清爽制冷 26°C", categoryName: "空调控制")
+
+    @MainActor
+    func perform() async throws -> some IntentResult & ProvidesDialog {
+        guard AppModel.shared.gatewayConnected else {
+            throw ACIntentError.message("空调连接中断，请稍后重试")
+        }
+        let openedCount = AppModel.shared.applyPresetToAllDevices(mode: .cooling, temperature: 26.0)
+        if openedCount > 0 {
+            return .result(dialog: "已开启全屋 \(openedCount) 台空调（制冷 26°C）")
+        } else {
+            return .result(dialog: "未发现可控制的就绪空调设备")
+        }
+    }
+}
+
 // MARK: - 启动蒸发器自清洁 (v1.9.30)
 
 struct StartSelfCleaningIntent: AppIntent {
@@ -309,6 +329,16 @@ struct ACAppShortcuts: AppShortcutsProvider {
                     ],
                     shortTitle: "关闭全屋空调",
                     systemImageName: "power.circle.fill"
+                ),
+                AppShortcut(
+                    intent: TurnOnAllACIntent(),
+                    phrases: [
+                        "用 \(.applicationName) 开启所有空调",
+                        "用 \(.applicationName) 全屋开机",
+                        "开启全屋 \(.applicationName)",
+                    ],
+                    shortTitle: "开启全屋空调",
+                    systemImageName: "air.conditioner.horizontal.fill"
                 ),
                 AppShortcut(
                     intent: StartSelfCleaningIntent(),
@@ -387,6 +417,13 @@ struct ACAppShortcuts: AppShortcutsProvider {
                     phrases: [
                         "用 \(.applicationName) 关闭所有空调",
                         "用 \(.applicationName) 全屋关机",
+                    ]
+                ),
+                AppShortcut(
+                    intent: TurnOnAllACIntent(),
+                    phrases: [
+                        "用 \(.applicationName) 开启所有空调",
+                        "用 \(.applicationName) 全屋开机",
                     ]
                 ),
                 AppShortcut(

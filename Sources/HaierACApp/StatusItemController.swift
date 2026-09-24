@@ -86,8 +86,22 @@ final class StatusItemController: NSObject {
                 guard let targetId else { return false }
                 return model.reachability(for: targetId) == .available && (model.attribute("onOffStatus", deviceId: targetId)?.boolValue ?? false)
             }()
-            let symbolName = isPowerOn ? "air.conditioner.horizontal.fill" : "air.conditioner.horizontal"
-            button.image = NSImage(systemSymbolName: symbolName, accessibilityDescription: isPowerOn ? "海尔空调 (运行中)" : "海尔空调 (待机)")
+            let anyDeviceRunning = model.allUnifiedDevices.contains { dev in
+                model.reachability(for: dev.id) == .available &&
+                (model.attribute("onOffStatus", deviceId: dev.id)?.boolValue ?? false)
+            }
+            let isDisplayActive = isPowerOn || anyDeviceRunning
+            let symbolName = isDisplayActive ? "air.conditioner.horizontal.fill" : "air.conditioner.horizontal"
+            let desc: String = {
+                if isPowerOn {
+                    return "海尔空调 (运行中)"
+                } else if anyDeviceRunning {
+                    return "海尔空调 (其他房间运行中)"
+                } else {
+                    return "海尔空调 (待机)"
+                }
+            }()
+            button.image = NSImage(systemSymbolName: symbolName, accessibilityDescription: desc)
             button.image?.isTemplate = true
             if let text = model.menuBarTemperatureText {
                 button.title = " \(text)"
@@ -139,13 +153,13 @@ final class StatusItemController: NSObject {
                         } else {
                             modeGlyph = "⚙️ 运行中"
                         }
-                        var line = "\(starPrefix) \(devName): \(modeGlyph) \(String(format: "%.0f°C", targetTemp))"
+                        var line = "\(starPrefix) \(devName): \(modeGlyph) \(String(format: "%.1f°C", targetTemp))"
                         if let indoor = indoorTemp {
                             line += " (室内 \(String(format: "%.1f°C", indoor)))"
                         }
                         tooltipParts.append(line)
                     } else {
-                        var line = "\(starPrefix) \(devName): 关机待机"
+                        var line = "\(starPrefix) \(devName): ⚪️ 待机"
                         if let indoor = indoorTemp {
                             line += " (室内 \(String(format: "%.1f°C", indoor)))"
                         }
@@ -155,10 +169,14 @@ final class StatusItemController: NSObject {
             }
         }
 
-        // 瞬时总功率 (v1.9.23)
+        // 瞬时总功率 (v1.9.33: 智能适配 W / kW 格式)
         let instantPower = EnergyAnalyticsEngine.shared.currentInstantaneousPower
         if instantPower > 10.0 {
-            tooltipParts.append("⚡️ 全屋空调瞬时功率: \(Int(round(instantPower))) W")
+            if instantPower >= 1000.0 {
+                tooltipParts.append(String(format: "⚡️ 全屋空调瞬时功率: %.2f kW", instantPower / 1000.0))
+            } else {
+                tooltipParts.append("⚡️ 全屋空调瞬时功率: \(Int(round(instantPower))) W")
+            }
         }
 
         if model.isSelfCleaningActive {
@@ -337,13 +355,24 @@ final class StatusItemController: NSObject {
             menu.setSubmenu(devicesMenu, for: devicesParentItem)
             menu.addItem(devicesParentItem)
         } else if let dev = allDevices.first {
-            // 单设备场景：保留快速电源开关
+            // 单设备场景：保留快速电源开关与一键冷暖预设 (v1.9.33)
             let isPowerOn = model.attribute("onOffStatus", deviceId: dev.id)?.boolValue ?? false
+            let isControllable = model.reachability(for: dev.id).isControllable
             let powerTitle = isPowerOn ? "关机「\(dev.name)」" : "开机「\(dev.name)」"
             let powerItem = NSMenuItem(title: powerTitle, action: #selector(togglePrimaryPower), keyEquivalent: "")
             powerItem.target = self
-            powerItem.isEnabled = model.reachability(for: dev.id).isControllable
+            powerItem.isEnabled = isControllable
             menu.addItem(powerItem)
+
+            let coolItem = NSMenuItem(title: "❄️ 一键制冷 26°C", action: #selector(applyQuickCoolingPrimary), keyEquivalent: "")
+            coolItem.target = self
+            coolItem.isEnabled = isControllable
+            menu.addItem(coolItem)
+
+            let heatItem = NSMenuItem(title: "🔥 一键制热 20°C", action: #selector(applyQuickHeatingPrimary), keyEquivalent: "")
+            heatItem.target = self
+            heatItem.isEnabled = isControllable
+            menu.addItem(heatItem)
         }
 
         let openItem = NSMenuItem(title: "打开主窗口", action: #selector(openMainWindow), keyEquivalent: "")
@@ -457,6 +486,20 @@ final class StatusItemController: NSObject {
 
     @objc private func setQuickHeating(_ sender: NSMenuItem) {
         guard let devId = sender.representedObject as? String else { return }
+        model.sendAttribute("onOffStatus", value: .bool(true), deviceId: devId)
+        model.sendAttribute("operationMode", value: .string(ACModeCode.heating.rawValue), deviceId: devId)
+        model.sendAttribute("targetTemperature", value: .double(20.0), deviceId: devId)
+    }
+
+    @objc private func applyQuickCoolingPrimary() {
+        guard let devId = model.allUnifiedDevices.first?.id else { return }
+        model.sendAttribute("onOffStatus", value: .bool(true), deviceId: devId)
+        model.sendAttribute("operationMode", value: .string(ACModeCode.cooling.rawValue), deviceId: devId)
+        model.sendAttribute("targetTemperature", value: .double(26.0), deviceId: devId)
+    }
+
+    @objc private func applyQuickHeatingPrimary() {
+        guard let devId = model.allUnifiedDevices.first?.id else { return }
         model.sendAttribute("onOffStatus", value: .bool(true), deviceId: devId)
         model.sendAttribute("operationMode", value: .string(ACModeCode.heating.rawValue), deviceId: devId)
         model.sendAttribute("targetTemperature", value: .double(20.0), deviceId: devId)

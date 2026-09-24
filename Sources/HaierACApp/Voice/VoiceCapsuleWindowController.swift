@@ -134,14 +134,18 @@ public final class VoiceCapsuleWindowController: NSObject, NSWindowDelegate {
 
     // MARK: - 指令解析与执行
 
-    /// 从用户输入的语音文本中智能提取定向控制的具体空调（如“客厅”、“主卧”、“次卧”） (v1.9.32)
-    private func resolveTargetDevice(for text: String, model: AppModel) -> AppModel.UnifiedDevice? {
+    /// 从用户输入的语音文本中智能提取定向控制的具体空调列表（支持多房间组合，如“客厅和主卧”、“次卧跟书房”） (v1.9.33)
+    private func resolveTargetDevices(for text: String, model: AppModel) -> [AppModel.UnifiedDevice] {
         let cleanText = text.lowercased()
+        var matched: [AppModel.UnifiedDevice] = []
+
         // 1. 优先按完整设备名称匹配（如“客厅空调”、“主卧空调”）
         for dev in model.allUnifiedDevices {
             let name = dev.name.lowercased()
             if cleanText.contains(name) {
-                return dev
+                if !matched.contains(where: { $0.id == dev.id }) {
+                    matched.append(dev)
+                }
             }
         }
         // 2. 尝试按房间名或核心词匹配（去除“空调”、“海尔”等后缀，保留“客厅”、“主卧”、“次卧”、“书房”等，至少2个字符）
@@ -151,12 +155,22 @@ public final class VoiceCapsuleWindowController: NSObject, NSWindowDelegate {
             coreName = coreName.replacingOccurrences(of: "海尔", with: "")
             coreName = coreName.trimmingCharacters(in: .whitespacesAndNewlines)
             if coreName.count >= 2 && cleanText.contains(coreName) {
-                return dev
+                if !matched.contains(where: { $0.id == dev.id }) {
+                    matched.append(dev)
+                }
             }
         }
+
+        if !matched.isEmpty {
+            return matched
+        }
+
         // 3. 回退为菜单栏选中的设备或首个设备
         let fallbackId = model.menuBarDeviceId ?? model.allUnifiedDevices.first?.id
-        return model.allUnifiedDevices.first(where: { $0.id == fallbackId })
+        if let fallbackDev = model.allUnifiedDevices.first(where: { $0.id == fallbackId }) {
+            return [fallbackDev]
+        }
+        return []
     }
 
     private func handleVoiceInput(_ text: String) {
@@ -171,7 +185,7 @@ public final class VoiceCapsuleWindowController: NSObject, NSWindowDelegate {
     }
 
     private func executeCommand(_ command: VoiceCommand, displayText: String, spokenText: String, model: AppModel) {
-        // 1. 全屋指令与全局自清洁停止：不受单一设备离线约束 (v1.9.30)
+        // 1. 全屋指令与全局自清洁停止：不受单一设备离线约束 (v1.9.30 / v1.9.33)
         switch command {
         case .turnOffAll:
             guard model.gatewayConnected else {
@@ -203,6 +217,57 @@ public final class VoiceCapsuleWindowController: NSObject, NSWindowDelegate {
             scheduleAutoDismiss(delay: 1.8)
             return
 
+        case .presetAll(let modeName, let temp):
+            guard model.gatewayConnected else {
+                VoiceControlManager.shared.markFailed("网关重连中，无法执行全屋控制")
+                scheduleAutoDismiss(delay: 2.5)
+                return
+            }
+            let mode = ACModeCode.match(from: modeName) ?? .cooling
+            let targetTemp: Double = {
+                if let t = temp { return t }
+                switch mode {
+                case .heating: return 20.0
+                case .cooling: return 26.0
+                case .dehumidify: return 24.0
+                case .auto: return 24.0
+                case .fan: return 26.0
+                }
+            }()
+            let count = model.applyPresetToAllDevices(mode: mode, temperature: targetTemp)
+            if count > 0 {
+                let tempDesc = targetTemp.truncatingRemainder(dividingBy: 1.0) == 0 ? "\(Int(targetTemp))" : String(format: "%.1f", targetTemp)
+                if mode == .fan {
+                    VoiceControlManager.shared.markSuccess("已开启全屋 \(count) 台空调（送风模式）")
+                } else if mode == .dehumidify {
+                    VoiceControlManager.shared.markSuccess("已开启全屋 \(count) 台空调（除湿模式）")
+                } else {
+                    VoiceControlManager.shared.markSuccess("已开启全屋 \(count) 台空调（\(mode.desc) \(tempDesc)°C）")
+                }
+            } else {
+                VoiceControlManager.shared.markFailed("未发现可控制的就绪空调设备")
+            }
+            scheduleAutoDismiss(delay: 1.8)
+            return
+
+        case .setTemperatureAll(let temp):
+            guard model.gatewayConnected else {
+                VoiceControlManager.shared.markFailed("网关重连中，无法执行全屋控制")
+                scheduleAutoDismiss(delay: 2.5)
+                return
+            }
+            let controllableDevices = model.allUnifiedDevices.filter { model.reachability(for: $0.id).isControllable }
+            guard !controllableDevices.isEmpty else {
+                VoiceControlManager.shared.markFailed("未发现可控制的就绪空调设备")
+                scheduleAutoDismiss(delay: 2.0)
+                return
+            }
+            model.sendAttributeToDevices("targetTemperature", value: .double(temp), deviceIds: controllableDevices.map(\.id))
+            let formatted = temp.truncatingRemainder(dividingBy: 1.0) == 0 ? "\(Int(temp))" : String(format: "%.1f", temp)
+            VoiceControlManager.shared.markSuccess("已将全屋 \(controllableDevices.count) 台空调温度调至 \(formatted)°C")
+            scheduleAutoDismiss(delay: 1.8)
+            return
+
         case .stopSelfCleaning:
             if model.isSelfCleaningActive {
                 model.stopSelfCleaning()
@@ -217,13 +282,20 @@ public final class VoiceCapsuleWindowController: NSObject, NSWindowDelegate {
             break
         }
 
-        // 2. 单设备定向解析：优先匹配语音提及的具体房间/设备，未明确提及则回退到主控设备 (v1.9.32)
-        guard let targetDevice = resolveTargetDevice(for: spokenText, model: model) else {
+        // 2. 定向设备解析：支持单设备与多房间组合识别 (v1.9.33)
+        let targetDevices = resolveTargetDevices(for: spokenText, model: model)
+        guard !targetDevices.isEmpty else {
             VoiceControlManager.shared.markFailed("未检测到已连接的空调设备")
             scheduleAutoDismiss(delay: 2.0)
             return
         }
 
+        if targetDevices.count > 1 {
+            executeMultiDeviceCommand(command, targetDevices: targetDevices, model: model)
+            return
+        }
+
+        let targetDevice = targetDevices[0]
         let deviceId = targetDevice.id
         let targetName = targetDevice.name
         let reach = model.reachability(for: deviceId)
@@ -425,11 +497,74 @@ public final class VoiceCapsuleWindowController: NSObject, NSWindowDelegate {
                 VoiceControlManager.shared.markSuccess("已为\(prefix)启动 56°C 蒸发器高温自清洁")
             }
 
-        case .turnOffAll, .turnOnAll, .stopSelfCleaning:
+        case .turnOffAll, .turnOnAll, .stopSelfCleaning, .presetAll, .setTemperatureAll:
             break // 已在指令前置流程中由全局调度完成分发
         }
 
         scheduleAutoDismiss(delay: 1.5)
+    }
+
+    /// 多设备定向协同控制执行 (v1.9.33)
+    private func executeMultiDeviceCommand(_ command: VoiceCommand, targetDevices: [AppModel.UnifiedDevice], model: AppModel) {
+        let controllable = targetDevices.filter { model.reachability(for: $0.id).isControllable }
+        guard !controllable.isEmpty else {
+            let names = targetDevices.map(\.name).joined(separator: "、")
+            VoiceControlManager.shared.markFailed("「\(names)」当前均处于离线或不可控状态")
+            scheduleAutoDismiss(delay: 2.5)
+            return
+        }
+
+        let prefix = "「\(controllable.map(\.name).joined(separator: "、"))」"
+        let ids = controllable.map(\.id)
+
+        switch command {
+        case .setPower(let on):
+            if on {
+                model.sendAttributeToDevices("onOffStatus", value: .bool(true), deviceIds: ids)
+                VoiceControlManager.shared.markSuccess("已开启\(prefix)电源")
+            } else {
+                model.turnOffDevices(deviceIds: ids)
+                VoiceControlManager.shared.markSuccess("已关闭\(prefix)电源")
+            }
+
+        case .setTemperature(let temp):
+            model.sendAttributeToDevices("targetTemperature", value: .double(temp), deviceIds: ids)
+            let formatted = temp.truncatingRemainder(dividingBy: 1.0) == 0 ? "\(Int(temp))" : String(format: "%.1f", temp)
+            VoiceControlManager.shared.markSuccess("已将\(prefix)温度调至 \(formatted)°C")
+
+        case .adjustTemperature(let delta):
+            for devId in ids {
+                let currentTemp = model.attributes[devId]?["targetTemperature"]?.doubleValue ?? 26.0
+                var newTemp = currentTemp + delta
+                newTemp = min(max(newTemp, 16.0), 30.0)
+                model.sendAttribute("targetTemperature", value: .double(newTemp), deviceId: devId)
+            }
+            VoiceControlManager.shared.markSuccess("已微调\(prefix)温度")
+
+        case .setMode(let modeName):
+            if let matched = ACModeCode.match(from: modeName) {
+                model.sendAttributeToDevices("operationMode", value: .string(matched.rawValue), deviceIds: ids)
+                VoiceControlManager.shared.markSuccess("已将\(prefix)切换至「\(matched.desc)」模式")
+            } else {
+                VoiceControlManager.shared.markFailed("未能识别「\(modeName)」模式")
+            }
+
+        case .setWindSpeed(let speedName):
+            if let firstId = ids.first,
+               let windAttr = model.attributes[firstId]?["windSpeed"],
+               case .list(let options) = windAttr.valueRange,
+               let match = options.first(where: { $0.desc.contains(speedName) || speedName.contains($0.desc) }) {
+                model.sendAttributeToDevices("windSpeed", value: match.data, deviceIds: ids)
+                VoiceControlManager.shared.markSuccess("已调节\(prefix)风速为「\(match.desc)」")
+            } else {
+                VoiceControlManager.shared.markSuccess("已调节\(prefix)风速")
+            }
+
+        default:
+            VoiceControlManager.shared.markFailed("该操作暂不支持多设备批量执行")
+        }
+
+        scheduleAutoDismiss(delay: 1.8)
     }
 
     private func scheduleAutoDismiss(delay: TimeInterval) {

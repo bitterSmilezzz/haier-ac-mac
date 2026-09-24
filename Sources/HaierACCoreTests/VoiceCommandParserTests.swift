@@ -312,6 +312,50 @@ final class VoiceCommandParserTests: XCTestCase {
         XCTAssertEqual(roomMode?.command, .setMode("制热"))
     }
 
+    // MARK: - 全屋模式与温控协同测试 (v1.9.33)
+
+    func testWholeHousePresetAndTemperature() {
+        // 全屋制冷（默认26°C）
+        let cool1 = VoiceCommandParser.parse("全屋制冷")
+        XCTAssertEqual(cool1?.command, .presetAll(mode: "制冷", temperature: 26.0))
+
+        let cool2 = VoiceCommandParser.parse("所有空调开冷气")
+        XCTAssertEqual(cool2?.command, .presetAll(mode: "制冷", temperature: 26.0))
+
+        let cool3 = VoiceCommandParser.parse("全屋开冷气25度")
+        XCTAssertEqual(cool3?.command, .presetAll(mode: "制冷", temperature: 25.0))
+
+        // 全屋制热（默认20°C，防止误判为开机导致制冷26度倒置）
+        let heat1 = VoiceCommandParser.parse("全屋制热")
+        XCTAssertEqual(heat1?.command, .presetAll(mode: "制热", temperature: 20.0))
+
+        let heat2 = VoiceCommandParser.parse("全屋开暖气")
+        XCTAssertEqual(heat2?.command, .presetAll(mode: "制热", temperature: 20.0))
+
+        let heat3 = VoiceCommandParser.parse("所有空调开暖气")
+        XCTAssertEqual(heat3?.command, .presetAll(mode: "制热", temperature: 20.0))
+
+        let heat4 = VoiceCommandParser.parse("全屋开制热22度")
+        XCTAssertEqual(heat4?.command, .presetAll(mode: "制热", temperature: 22.0))
+
+        // 全屋送风与除湿
+        let fan1 = VoiceCommandParser.parse("全屋送风")
+        XCTAssertEqual(fan1?.command, .presetAll(mode: "送风", temperature: nil))
+
+        let dehum1 = VoiceCommandParser.parse("全屋除湿")
+        XCTAssertEqual(dehum1?.command, .presetAll(mode: "除湿", temperature: nil))
+
+        // 全屋统一调温
+        let temp1 = VoiceCommandParser.parse("全屋调到24度")
+        XCTAssertEqual(temp1?.command, .setTemperatureAll(24.0))
+
+        let temp2 = VoiceCommandParser.parse("所有空调设为25度")
+        XCTAssertEqual(temp2?.command, .setTemperatureAll(25.0))
+
+        let temp3 = VoiceCommandParser.parse("把所有的空调都调到26度")
+        XCTAssertEqual(temp3?.command, .setTemperatureAll(26.0))
+    }
+
     // MARK: - 无效输入测试
 
     func testInvalidCommands() {
