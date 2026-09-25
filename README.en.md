@@ -6,6 +6,19 @@ A native SwiftUI app to control Haier / Leader (统帅) smart air conditioners o
 
 ## Features
 
+- 🏷 **Filter Maintenance Reset & Full-House Batch Reset, Status Bar Quick Reset Matrix & Cooling Mode Latent Heat Dynamics (v1.9.45)**:
+  - 🧼 **Filter Maintenance Reset Voice & Siri Shortcuts End-to-End Loop (`VoiceCommandParser` / `VoiceCapsuleWindowController` / `AppIntents` / `AppModel` / `VoiceCommandParserTests`)**:
+    - Completely resolved the major cognitive defect where users saying "滤网已清洗" (filter cleaned), "滤网洗好了", "洗完滤网了", "重置滤网" (reset filter), "复位滤网", or "滤网换好了" after washing/replacing filters were erroneously intercepted by query logic due to the word "洗", prompting the app to state "filter cleanliness is low, cleaning recommended";
+    - Introduced `VoiceCommand.resetFilterMaintenance` (single/targeted) and `VoiceCommand.resetFilterMaintenanceAll` (whole-house) commands, matching reset intent ahead of queries while reinforcing negation defense (e.g. "别重置滤网" is safely blocked);
+    - Implemented `resetAllFilterMaintenance()` in `AppModel` to zero out wear counters and restore cleanliness to 100% across all unified AC units;
+    - Added `ResetFilterMaintenanceIntent` in macOS Shortcuts, supporting Siri voice execution ("用海尔空调重置滤网", "滤网已清洗").
+  - 🍱 **macOS Native Menu Bar & Filter Care Sheet Batch Reset Matrix (`StatusItemController` / `FilterCareSheet`)**:
+    - Added "🧼 重置滤网计时 (当前 XX%，良好/需拆洗)" directly inside each device's submenu in the AC control matrix;
+    - Upgraded the status bar right-click "滤网保养与自清洁" item into a cascade submenu with "打开滤网保养与自清洁面板..." and "🧼 一键重置全屋滤网计时 (恢复100%)";
+    - Enhanced `FilterCareSheet` with a "全屋重置" button and confirmation dialog for multi-device environments, allowing one-click resets for all AC units.
+  - 💧 **Cooling Mode Ambient Latent Heat Condensation Dynamics & Auto Mode Adaptation (`EnergyAnalyticsEngine` / `AppModel`)**:
+    - In `EnergyAnalyticsEngine.estimateInstantaneousPower` (`.cooling`), added ambient latent heat compensation ($2260\text{ kJ/kg}$ vaporization latent heat): high-humidity environments ($\text{RH} \ge 65\%$) dynamically boost load by up to +66W to account for condensation heat, while dry environments reduce load by up to -20W;
+    - In `AppModel.calculateFilterWearFactor`, refined `.auto` mode to dynamically apply condensation wear (1.25x) during cooling and micro-adhesion (1.05x) during heating based on temperature delta, eliminating static 1.00x oversimplification.
 - 🏷 **Natural Language Quarter/Hour Time Conversion, Filter Health Voice & Shortcuts Loop, Self-Cleaning Stop Symmetry & Dehumidification Thermal Dynamics (v1.9.44)**:
   - ⏱️ **Quarter-Hour & Colloquial Hour Time Conversion & Precise Clock Quarter Alignment (`VoiceCommandParser` / `VoiceCommandParserTests`)**:
     - Completely resolved the major natural language blind spot in `convertChineseNumbers`: previously, phrases like "一刻钟后关机" (turn off after 15 min), "两刻钟后关机" (30 min), "三刻钟后关机" (45 min), and "半个钟头后关机" (30 min) returned `nil` and failed recognition;

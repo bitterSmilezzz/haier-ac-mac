@@ -8,6 +8,19 @@
 
 ## 功能
 
+- 🏷 **闭环滤网保养全链路重置复位穿透、全屋多设备滤网一键清零、状态栏快捷重置矩阵及制冷工况潜热动力学校准 (v1.9.45)**：
+  - 🧼 **滤网保养全链路重置/复位语音口令与 Siri 快捷指令穿透式闭环 (`VoiceCommandParser` / `VoiceCapsuleWindowController` / `AppIntents` / `AppModel` / `VoiceCommandParserTests`)**：
+    - 彻底根除用户在拆洗或更换滤网后发出“滤网已清洗”、“滤网洗好了”、“洗完滤网了”、“重置滤网”、“复位滤网”、“滤网换好了”等完成时态口令时，因包含“洗”被误拦截为查询滤网健康度并反向播报“滤网洁净度较低建议拆洗”的重大交互认知缺陷；
+    - 新增 `VoiceCommand.resetFilterMaintenance`（定向/单机）与 `VoiceCommand.resetFilterMaintenanceAll`（全屋）指令，前置优先匹配重置意图并强化否定动作防御（如“别重置滤网”、“千万不要重置滤网”安全拦截，不被误触发）；
+    - 在 `AppModel` 中提供统一的 `resetAllFilterMaintenance()`，在语音胶囊与多设备协同控制链路中支持单机、定向多房间与全屋滤网一键重置清零，洁净度瞬时恢复 100%；
+    - macOS 快捷指令（Shortcuts）新增 `ResetFilterMaintenanceIntent`，全面支持 Siri 语音唤起（“用海尔空调重置滤网”、“滤网已清洗”）。
+  - 🍱 **macOS 原生状态栏与滤网保养面板多设备批量重置矩阵 (`StatusItemController` / `FilterCareSheet`)**：
+    - 在状态栏右键上下文菜单的“空调设备控制矩阵”各房间级联子菜单中，新增“🧼 重置滤网计时 (当前 XX%，良好/需拆洗)”快捷重置操作项；
+    - 状态栏右键主菜单“滤网保养与自清洁”全面升级为级联子菜单，直观提供“打开滤网保养与自清洁面板...”与“🧼 一键重置全屋滤网计时 (恢复100%)”；
+    - 优化 `FilterCareSheet` 弹窗界面：多设备环境下新增“全屋重置”按钮与防误触确认弹窗，一键清零全屋所有空调运行计时，无需逐台手动切换确认。
+  - 💧 **制冷工况环境湿度潜热冷凝动力学校准与自动模式物理自适应 (`EnergyAnalyticsEngine` / `AppModel`)**：
+    - 在 `EnergyAnalyticsEngine.estimateInstantaneousPower` 的制冷工况（`.cooling`）中引入环境湿度潜热冷凝相变能耗补偿（$2260\text{ kJ/kg}$ 汽化潜热）：高湿重载环境（$\text{RH} \ge 65\%$）冷凝负荷动态补偿最高 +66W，干燥低湿环境动态调减负荷（最低 -20W），消除以往忽视潜热造成的能耗偏低；
+    - 在 `AppModel.calculateFilterWearFactor` 中，对自动模式（`.auto`）根据当前室内温度与设定温差动态切分制冷冷凝结露（1.25x）与制热微附着（1.05x），消除以往自动模式硬编码固定 1.00x 的物理失真。
 - 🏷 **闭环自然语言「刻钟/钟头」时间解析缺陷、滤网全链路语音与快捷指令穿透、自清洁停止对称与除湿热力学双控 (v1.9.44)**：
   - ⏱️ **自然语言「刻钟/钟头」时间解析缺陷与钟点刻数定时对齐 (`VoiceCommandParser` / `VoiceCommandParserTests`)**：
     - 彻底根除中文数字预处理器（`convertChineseNumbers`）缺失“刻钟/半钟头”映射导致的重大口语解析盲区：以往“一刻钟后关机”（15分钟）、“两刻钟后关机”（30分钟）、“三刻钟后关机”（45分钟）、“半个钟头后关机”（30分钟）直接返回 `nil` 无法识别；

@@ -54,6 +54,10 @@ public enum VoiceCommand: Equatable {
     case queryFilterHealth
     /// 查询全屋所有空调滤网健康状态与汇总 (v1.9.44)
     case queryFilterHealthAll
+    /// 重置空调滤网运行时间与保养计时 (v1.9.45)
+    case resetFilterMaintenance
+    /// 重置全屋所有空调滤网运行时间与保养计时 (v1.9.45)
+    case resetFilterMaintenanceAll
 }
 
 /// 语音指令解析结果
@@ -146,7 +150,17 @@ public struct VoiceCommandParser {
             }
         }
 
-        // 5.1 滤网健康度与洁净度查询 (v1.9.44)
+        // 5.1 滤网保养重置与复位 (v1.9.45)
+        // 优先于滤网健康度查询，避免“滤网洗好了/已清洗”因包含“洗”被误判为查询
+        if isResetFilterMaintenance(cleaned) {
+            if isAllDeviceScope(cleaned) {
+                return VoiceParseResult(command: .resetFilterMaintenanceAll, displayText: "重置全屋滤网保养计时")
+            } else {
+                return VoiceParseResult(command: .resetFilterMaintenance, displayText: "重置滤网保养计时")
+            }
+        }
+
+        // 5.2 滤网健康度与洁净度查询 (v1.9.44)
         if cleaned.contains("滤网") || cleaned.contains("过滤网") || cleaned.contains("过滤片") {
             if cleaned.contains("洁净") || cleaned.contains("健康") || cleaned.contains("寿命") ||
                cleaned.contains("状态") || cleaned.contains("洗") || cleaned.contains("查") ||
@@ -227,6 +241,30 @@ public struct VoiceCommandParser {
     }
 
     // MARK: - 辅助解析子函数
+
+    private static func isResetFilterMaintenance(_ text: String) -> Bool {
+        guard !containsNegativeAction(text) else { return false }
+        guard text.contains("滤网") || text.contains("过滤网") || text.contains("过滤片") else {
+            return false
+        }
+
+        let resetKeywords = [
+            "重置", "复位", "清零", "已清洗", "清洗完成", "洗好了", "洗完了", "洗过了", "洗好", "洗完",
+            "已洗", "刚洗", "换好了", "换完了", "已更换", "更换完成", "换新", "换了新", "装了新", "已装好", "恢复100"
+        ]
+
+        if resetKeywords.contains(where: { text.contains($0) }) {
+            return true
+        }
+
+        // 结构化时态匹配：包含“洗/换/擦”且包含“干净了/好了/完了/过了/搞定”
+        if (text.contains("洗") || text.contains("换") || text.contains("擦")) &&
+           (text.contains("干净了") || text.contains("好了") || text.contains("完了") || text.contains("过了") || text.contains("搞定")) {
+            return true
+        }
+
+        return false
+    }
 
     private static func isCancelSchedule(_ text: String) -> Bool {
         let cancelKeywords = ["取消定时", "取消倒计时", "关闭定时", "清除定时", "删除定时", "取消预约", "别定了", "别定时", "不要定时", "不用定时"]
@@ -421,18 +459,19 @@ public struct VoiceCommandParser {
     private static let negativeActionRegex: NSRegularExpression? = {
         // 否定词（别/不要/不用/不必/无需/先别/先不要/暂不/暂不要/千万别/千万不要/不能/不可以/切勿/切莫/不要再/别再/暂时不用/暂时不要）
         // 允许中间插入 0~6 个任意非标点非空白字符（如“给我”、“帮我”、“急着”、“现在”、“太快”、“乱”、“随便”等，彻底杜绝插字绕过漏洞） (v1.9.40)
-        // 动作谓词（关/停/开/启动/运转/打开/关闭/调/设/升/降） (v1.9.39 扩展调温与变频动作否定)
-        let pattern = #"(?:别|不要|不用|不必|无需|先别|先不要|暂不|暂不要|千万别|千万不要|不能|不可以|切勿|切莫|不要再|别再|暂时不用|暂时不要)[^，。！？\s]{0,6}?(?:关|停|开|启动|运转|打开|关闭|调|设|升|降)"#
+        // 动作谓词（关/停/开/启动/运转/打开/关闭/调/设/升/降/重置/复位/清零） (v1.9.39 扩展调温与变频动作否定, v1.9.45 扩展滤网重置否定)
+        let pattern = #"(?:别|不要|不用|不必|无需|先别|先不要|暂不|暂不要|千万别|千万不要|不能|不可以|切勿|切莫|不要再|别再|暂时不用|暂时不要)[^，。！？\s]{0,6}?(?:关|停|开|启动|运转|打开|关闭|调|设|升|降|重置|复位|清零)"#
         return try? NSRegularExpression(pattern: pattern)
     }()
 
-    /// 检测文本中是否包含针对开关机/调温/模式动作的否定意图（如“别关”、“不要开”、“先别急着关”、“别给我关了”、“千万别现在关”、“别开制冷”、“不要调”等，防止误触发） (v1.9.36, v1.9.40)
+    /// 检测文本中是否包含针对开关机/调温/模式动作的否定意图（如“别关”、“不要开”、“先别急着关”、“别给我关了”、“千万别现在关”、“别开制冷”、“不要调”、“别重置”等，防止误触发） (v1.9.36, v1.9.40, v1.9.45)
     private static func containsNegativeAction(_ text: String) -> Bool {
         guard let regex = negativeActionRegex else {
             let fallbackPatterns = [
                 "别关", "不要关", "不用关", "先别关", "先不要关", "暂不关", "不能关", "不可以关", "别停", "不要停", "不用停",
                 "别开", "不要开", "不用开", "先别开", "先不要开", "暂不开", "不能开", "不可以开", "别启动", "不要启动",
                 "别调", "不要调", "不用调", "别设", "不要设", "别升", "不要升", "别降", "不要降",
+                "别重置", "不要重置", "不用重置", "别复位", "不要复位", "别清零",
                 "别给我关", "千万别关", "千万别开"
             ]
             return fallbackPatterns.contains(where: { text.contains($0) })

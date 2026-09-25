@@ -417,6 +417,12 @@ public final class VoiceCapsuleWindowController: NSObject, NSWindowDelegate {
             scheduleAutoDismiss(delay: 1.8)
             return
 
+        case .resetFilterMaintenanceAll:
+            model.resetAllFilterMaintenance()
+            VoiceControlManager.shared.markSuccess("已重置全屋 \(model.allUnifiedDevices.count) 台空调滤网保养计时，洁净度恢复 100%")
+            scheduleAutoDismiss(delay: 2.0)
+            return
+
         default:
             break
         }
@@ -790,6 +796,10 @@ public final class VoiceCapsuleWindowController: NSObject, NSWindowDelegate {
                 VoiceControlManager.shared.markSuccess("「\(targetName)」滤网洁净度 \(pct)%，累计等效运行 \(hoursStr) 小时，状态良好")
             }
 
+        case .resetFilterMaintenance:
+            model.resetFilterMaintenance(for: deviceId)
+            VoiceControlManager.shared.markSuccess("已重置\(prefix)滤网保养计时，洁净度恢复 100%")
+
         case .startSelfCleaning:
             guard ensureControllable() else { return }
             if model.isSelfCleaningActive {
@@ -800,7 +810,7 @@ public final class VoiceCapsuleWindowController: NSObject, NSWindowDelegate {
                 VoiceControlManager.shared.markSuccess("已为\(prefix)启动 56°C 蒸发器高温自清洁")
             }
 
-        case .turnOffAll, .turnOnAll, .stopSelfCleaning, .stopSleepCurve, .presetAll, .setTemperatureAll, .adjustTemperatureAll, .setWindSpeedAll, .cancelSchedulesAll, .queryStatusAll, .queryFilterHealthAll:
+        case .turnOffAll, .turnOnAll, .stopSelfCleaning, .stopSleepCurve, .presetAll, .setTemperatureAll, .adjustTemperatureAll, .setWindSpeedAll, .cancelSchedulesAll, .queryStatusAll, .queryFilterHealthAll, .resetFilterMaintenanceAll:
             break // 已在指令前置流程中由全局调度完成分发
         }
 
@@ -861,6 +871,12 @@ public final class VoiceCapsuleWindowController: NSObject, NSWindowDelegate {
                 summaries.append("「\(dev.name)」\(pct)%（\(status)，\(String(format: "%.1f", hours))小时）")
             }
             VoiceControlManager.shared.markSuccess(summaries.joined(separator: "；"))
+
+        case .resetFilterMaintenance:
+            for dev in targetDevices {
+                model.resetFilterMaintenance(for: dev.id)
+            }
+            VoiceControlManager.shared.markSuccess("已重置\(prefix)滤网保养计时，洁净度恢复 100%")
 
         case .setTemperature(let temp):
             if spokenText.contains("开") {

@@ -479,6 +479,18 @@ final class StatusItemController: NSObject {
                 downItem.isEnabled = isControllable && isPowerOn && curTemp > 16.0
                 devSubmenu.addItem(downItem)
 
+                // 滤网洁净度与快速重置 (v1.9.45)
+                let filterPct = model.filterCleanlinessPercentage(for: devId)
+                let filterStatus = filterPct <= 20 ? "⚠️ 需拆洗" : "良好"
+                let resetFilterItem = NSMenuItem(
+                    title: "🧼 重置滤网计时 (当前 \(filterPct)%，\(filterStatus))",
+                    action: #selector(resetDeviceFilterFromMenu(_:)),
+                    keyEquivalent: ""
+                )
+                resetFilterItem.target = self
+                resetFilterItem.representedObject = devId
+                devSubmenu.addItem(resetFilterItem)
+
                 let statusBadge: String
                 switch reach {
                 case .gatewayReconnecting: statusBadge = "⏳ 重连中"
@@ -558,7 +570,7 @@ final class StatusItemController: NSObject {
         ambientItem.target = self
         menu.addItem(ambientItem)
 
-        // 滤网健康与自清洁快速入口 (v1.9.21, v1.9.37 多设备全屋最低洁净度预警)
+        // 滤网健康与自清洁快速入口 (v1.9.21, v1.9.37 多设备全屋最低洁净度预警, v1.9.45 快捷重置子菜单)
         let filterTitle: String = {
             if model.isSelfCleaningActive {
                 return "56°C 自清洁进行中 (\(model.selfCleaningRemainingSeconds / 60)m\(model.selfCleaningRemainingSeconds % 60)s)..."
@@ -573,9 +585,28 @@ final class StatusItemController: NSObject {
                 return "\(warn)滤网保养与自清洁 (洁净度 \(clean)%)..."
             }
         }()
-        let filterItem = NSMenuItem(title: filterTitle, action: #selector(openFilterCare), keyEquivalent: "")
-        filterItem.target = self
-        menu.addItem(filterItem)
+
+        let filterMenu = NSMenu()
+        filterMenu.autoenablesItems = false
+
+        let openCareItem = NSMenuItem(title: "打开滤网保养与自清洁面板...", action: #selector(openFilterCare), keyEquivalent: "")
+        openCareItem.target = self
+        filterMenu.addItem(openCareItem)
+
+        if allDevices.count > 1 {
+            let resetAllFilterItem = NSMenuItem(title: "🧼 一键重置全屋滤网计时 (恢复100%)", action: #selector(resetAllFiltersFromMenu), keyEquivalent: "")
+            resetAllFilterItem.target = self
+            filterMenu.addItem(resetAllFilterItem)
+        } else if let dev = allDevices.first {
+            let resetItem = NSMenuItem(title: "🧼 重置「\(dev.name)」滤网计时 (恢复100%)", action: #selector(resetPrimaryFilterFromMenu), keyEquivalent: "")
+            resetItem.target = self
+            filterMenu.addItem(resetItem)
+        }
+
+        let filterParentItem = NSMenuItem(title: filterTitle, action: #selector(openFilterCare), keyEquivalent: "")
+        filterParentItem.target = self
+        menu.setSubmenu(filterMenu, for: filterParentItem)
+        menu.addItem(filterParentItem)
 
         menu.addItem(.separator())
 
@@ -788,6 +819,26 @@ final class StatusItemController: NSObject {
     @objc private func openFilterCare() {
         openMainWindow()
         model.showFilterCareSheet = true
+    }
+
+    @objc private func resetDeviceFilterFromMenu(_ sender: NSMenuItem) {
+        guard let devId = sender.representedObject as? String else { return }
+        model.resetFilterMaintenance(for: devId)
+        refreshTemperature()
+    }
+
+    @objc private func resetAllFiltersFromMenu() {
+        model.resetAllFilterMaintenance()
+        refreshTemperature()
+    }
+
+    @objc private func resetPrimaryFilterFromMenu() {
+        if let primaryId = primaryDeviceId {
+            model.resetFilterMaintenance(for: primaryId)
+        } else {
+            model.resetAllFilterMaintenance()
+        }
+        refreshTemperature()
     }
 
     @objc private func toggleLaunchAtLogin() {

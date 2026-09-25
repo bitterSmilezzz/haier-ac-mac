@@ -779,6 +779,65 @@ final class VoiceCommandParserTests: XCTestCase {
         XCTAssertEqual(fa3?.command, .queryFilterHealthAll)
     }
 
+    // MARK: - 滤网保养重置与复位测试 (v1.9.45)
+
+    func testFilterMaintenanceReset() {
+        // 单机/定向口令
+        let r1 = VoiceCommandParser.parse("重置滤网")
+        XCTAssertEqual(r1?.command, .resetFilterMaintenance)
+
+        let r2 = VoiceCommandParser.parse("复位滤网")
+        XCTAssertEqual(r2?.command, .resetFilterMaintenance)
+
+        let r3 = VoiceCommandParser.parse("滤网已清洗")
+        XCTAssertEqual(r3?.command, .resetFilterMaintenance)
+
+        let r4 = VoiceCommandParser.parse("滤网洗好了")
+        XCTAssertEqual(r4?.command, .resetFilterMaintenance)
+
+        let r5 = VoiceCommandParser.parse("洗完滤网了")
+        XCTAssertEqual(r5?.command, .resetFilterMaintenance)
+
+        let r6 = VoiceCommandParser.parse("洗过滤网了")
+        XCTAssertEqual(r6?.command, .resetFilterMaintenance)
+
+        let r7 = VoiceCommandParser.parse("重置滤网计时")
+        XCTAssertEqual(r7?.command, .resetFilterMaintenance)
+
+        let r8 = VoiceCommandParser.parse("滤网换好了")
+        XCTAssertEqual(r8?.command, .resetFilterMaintenance)
+
+        let r9 = VoiceCommandParser.parse("更换滤网完成")
+        XCTAssertEqual(r9?.command, .resetFilterMaintenance)
+
+        let r10 = VoiceCommandParser.parse("过滤网已清洗")
+        XCTAssertEqual(r10?.command, .resetFilterMaintenance)
+
+        // 全屋作用域
+        let ra1 = VoiceCommandParser.parse("全屋滤网已清洗")
+        XCTAssertEqual(ra1?.command, .resetFilterMaintenanceAll)
+
+        let ra2 = VoiceCommandParser.parse("重置全屋滤网")
+        XCTAssertEqual(ra2?.command, .resetFilterMaintenanceAll)
+
+        let ra3 = VoiceCommandParser.parse("所有空调滤网洗好了")
+        XCTAssertEqual(ra3?.command, .resetFilterMaintenanceAll)
+
+        let ra4 = VoiceCommandParser.parse("全部滤网复位")
+        XCTAssertEqual(ra4?.command, .resetFilterMaintenanceAll)
+
+        // 否定防御与语义隔离测试（确保“滤网要洗吗”依然走查询，“别重置滤网”安全拦截）
+        XCTAssertNil(VoiceCommandParser.parse("别重置滤网"))
+        XCTAssertNil(VoiceCommandParser.parse("不要重置滤网"))
+        XCTAssertNil(VoiceCommandParser.parse("千万不要重置滤网"))
+
+        let q1 = VoiceCommandParser.parse("滤网要洗吗")
+        XCTAssertEqual(q1?.command, .queryFilterHealth)
+
+        let q2 = VoiceCommandParser.parse("滤网脏不脏")
+        XCTAssertEqual(q2?.command, .queryFilterHealth)
+    }
+
     // MARK: - 无效输入测试
 
     func testInvalidCommands() {

@@ -678,6 +678,19 @@ final class AppModel: ObservableObject {
         operationNotice = OperationNotice(text: "🧼 \(devName) 滤网运行计时已重置，洁净度恢复 100%", isError: false)
     }
 
+    /// 重置全屋所有空调滤网保养计时 (v1.9.45)
+    func resetAllFilterMaintenance() {
+        for dev in allUnifiedDevices {
+            deviceFilterMinutes[dev.id] = 0
+            deviceFilterCleanedDates[dev.id] = Date()
+            deviceFilterAlertDates[dev.id] = nil
+        }
+        filterAccumulatedMinutes = 0
+        lastFilterCleanedDate = Date()
+        let count = allUnifiedDevices.count
+        operationNotice = OperationNotice(text: "🧼 全屋 \(count) 台空调滤网运行计时已全部重置，洁净度恢复 100%", isError: false)
+    }
+
     /// 计算指定设备当前实时工况的滤网空气动力学负荷系数 (v1.9.37)
     public func calculateCurrentFilterWearFactor(for deviceId: String) -> Double {
         let attrs = attributes[deviceId] ?? [:]
@@ -767,7 +780,17 @@ final class AppModel: ObservableObject {
             case .fan:
                 modeFactor = 0.85
             case .auto:
-                modeFactor = 1.00
+                if let indoor = indoorTemp {
+                    if indoor > targetTemp {
+                        modeFactor = 1.25 // 自动制冷冷凝结露
+                    } else if indoor < targetTemp {
+                        modeFactor = 1.05 // 自动制热微附着
+                    } else {
+                        modeFactor = 1.00 // 稳态平衡
+                    }
+                } else {
+                    modeFactor = 1.00
+                }
             }
         } else {
             modeFactor = 1.00 // 无法识别模式时回归中性基准 1.00，消除虚标高估

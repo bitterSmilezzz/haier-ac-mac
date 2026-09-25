@@ -356,6 +356,32 @@ struct GetFilterHealthIntent: AppIntent {
     }
 }
 
+// MARK: - 重置滤网保养计时 (v1.9.45)
+
+struct ResetFilterMaintenanceIntent: AppIntent {
+    static var title: LocalizedStringResource = "重置滤网保养计时"
+    static var description = IntentDescription("清洗或更换滤网后重置空调滤网运行时间与洁净度", categoryName: "空调控制")
+
+    @Parameter(title: "设备名称", description: "可选；留空使用主设备，填“全部”或“全屋”重置所有设备")
+    var deviceName: String?
+
+    @MainActor
+    func perform() async throws -> some IntentResult & ProvidesDialog {
+        let model = AppModel.shared
+        if let name = deviceName, (name.contains("全") || name.contains("所有")) {
+            model.resetAllFilterMaintenance()
+            let count = model.allUnifiedDevices.count
+            return .result(dialog: "已重置全屋 \(count) 台空调滤网保养计时，洁净度恢复 100%")
+        }
+        guard let deviceId = resolveDeviceId(named: deviceName) else {
+            throw ACIntentError.message("没有可控制的空调设备")
+        }
+        let devName = model.allUnifiedDevices.first(where: { $0.id == deviceId })?.name ?? "海尔空调"
+        model.resetFilterMaintenance(for: deviceId)
+        return .result(dialog: "已重置「\(devName)」滤网保养计时，洁净度恢复 100%")
+    }
+}
+
 // MARK: - 快捷指令库入口
 
 struct ACAppShortcuts: AppShortcutsProvider {
@@ -477,6 +503,17 @@ struct ACAppShortcuts: AppShortcutsProvider {
                     shortTitle: "查询滤网",
                     systemImageName: "sparkles"
                 ),
+                AppShortcut(
+                    intent: ResetFilterMaintenanceIntent(),
+                    phrases: [
+                        "用 \(.applicationName) 重置滤网",
+                        "\(.applicationName) 滤网已清洗",
+                        "\(.applicationName) 滤网洗好了",
+                        "重置空调滤网 \(.applicationName)",
+                    ],
+                    shortTitle: "重置滤网",
+                    systemImageName: "arrow.counterclockwise"
+                ),
             ]
         } else {
             return [
@@ -560,6 +597,14 @@ struct ACAppShortcuts: AppShortcutsProvider {
                     phrases: [
                         "用 \(.applicationName) 查询滤网",
                         "\(.applicationName) 滤网状态",
+                    ]
+                ),
+                AppShortcut(
+                    intent: ResetFilterMaintenanceIntent(),
+                    phrases: [
+                        "用 \(.applicationName) 重置滤网",
+                        "\(.applicationName) 滤网已清洗",
+                        "\(.applicationName) 滤网洗好了",
                     ]
                 ),
             ]

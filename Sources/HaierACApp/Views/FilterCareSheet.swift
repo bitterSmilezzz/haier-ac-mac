@@ -7,6 +7,7 @@ struct FilterCareSheet: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var showResetConfirm = false
+    @State private var showResetAllConfirm = false
     @State private var selectedDeviceId: String? = nil
 
     private var allDeviceList: [(id: String, name: String)] {
@@ -83,6 +84,14 @@ struct FilterCareSheet: View {
             }
         } message: {
             Text("确认您已经完成了「\(targetDeviceName)」滤网的水洗与晾干装回吗？重置后该空调累计运行时间将归零，洁净度恢复为 100%。")
+        }
+        .alert("重置全屋滤网清洗计时", isPresented: $showResetAllConfirm) {
+            Button("取消", role: .cancel) { }
+            Button("确认重置全屋", role: .destructive) {
+                model.resetAllFilterMaintenance()
+            }
+        } message: {
+            Text("确认您已经完成了全屋 \(allDeviceList.count) 台空调滤网的水洗与晾干装回吗？重置后所有空调累计运行时间将全部归零，洁净度恢复为 100%。")
         }
     }
 
@@ -214,21 +223,40 @@ struct FilterCareSheet: View {
 
                 Spacer()
 
-                // 重置按钮
-                Button {
-                    showResetConfirm = true
-                } label: {
-                    VStack(spacing: 4) {
-                        Image(systemName: "arrow.counterclockwise")
-                            .font(.system(size: 13))
-                        Text("已清洗重置")
-                            .font(.system(size: 11, weight: .medium))
+                // 重置按钮组
+                HStack(spacing: 8) {
+                    if allDeviceList.count > 1 {
+                        Button {
+                            showResetAllConfirm = true
+                        } label: {
+                            VStack(spacing: 4) {
+                                Image(systemName: "arrow.counterclockwise.circle")
+                                    .font(.system(size: 13))
+                                Text("全屋重置")
+                                    .font(.system(size: 11, weight: .medium))
+                            }
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 8)
+                        }
+                        .buttonStyle(Theme.secondaryButtonStyle())
+                        .help("一键重置全屋所有空调滤网运行计时，洁净度恢复 100%")
                     }
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 8)
+
+                    Button {
+                        showResetConfirm = true
+                    } label: {
+                        VStack(spacing: 4) {
+                            Image(systemName: "arrow.counterclockwise")
+                                .font(.system(size: 13))
+                            Text(allDeviceList.count > 1 ? "单机已清洗" : "已清洗重置")
+                                .font(.system(size: 11, weight: .medium))
+                        }
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 8)
+                    }
+                    .buttonStyle(Theme.secondaryButtonStyle())
+                    .help("清洗滤网后重置当前空调运行时长与洁净度")
                 }
-                .buttonStyle(Theme.secondaryButtonStyle())
-                .help("清洗滤网后重置运行时长与洁净度")
             }
         }
         .padding(Theme.spaceMD)

@@ -347,17 +347,34 @@ public final class EnergyAnalyticsEngine: ObservableObject {
             return min(max(power, 220.0), 1950.0)
 
         case .cooling:
-            // 制冷模式：变频温差动力学模型 + 恒温平衡区低频维持态阻尼 + 酷暑高温大温差重载动力学校准 (v1.9.36, v1.9.40)
+            // 制冷模式：变频温差动力学模型 + 恒温平衡区低频维持态阻尼 + 环境湿度潜热冷凝补偿 + 酷暑高温大温差重载动力学校准 (v1.9.36, v1.9.40, v1.9.45)
             let indoor = indoorTemp ?? 26.0
             let target = targetTemp ?? 25.0
             let delta = indoor - target
+
+            // 环境湿度潜热冷凝补偿 (v1.9.45)：
+            // 典型变频空调制冷热力学：空气流经蒸发器翅片时发生水汽冷凝相变释放汽化潜热(2260 kJ/kg)，
+            // 在高湿环境(RH >= 65%)下潜热负荷急剧攀升，压缩机需提高转速以维持冷凝析水能力 (最高补偿 +66W)；
+            // 在极干燥环境(RH <= 40%)下水汽析出少，换热以显热为主，动态调减负荷 (-20W ~ 0W)
+            let latentHumComp: Double = {
+                guard let hum = indoorHumidity else { return 0.0 }
+                if hum >= 65.0 {
+                    let excess = min(30.0, hum - 65.0)
+                    return excess * 2.2 // 最高 +66W
+                } else if hum <= 40.0 {
+                    let deficit = min(20.0, 40.0 - hum)
+                    return -(deficit * 1.0) // 最低 -20W
+                }
+                return 0.0
+            }()
+
             let power: Double
             if delta <= 0.0 {
                 // 已达到或低于设定温度：压缩机进入超节能恒温维持态
-                power = 220.0 + (windOffset * 0.6)
+                power = 220.0 + (windOffset * 0.6) + (latentHumComp * 0.4)
             } else if delta < 1.0 {
                 // 接近目标温差 (0 < ΔT < 1.0°C)：平滑过渡至稳态低频
-                power = 220.0 + (delta * 160.0) + (windOffset * 0.8)
+                power = 220.0 + (delta * 160.0) + (windOffset * 0.8) + (latentHumComp * 0.7)
             } else {
                 // 变频重载降温区 (ΔT >= 1.0°C)
                 // 酷暑高温大温差超载动力学补偿：当室内温度偏高（indoor >= 30.0°C）且大温差降温（delta >= 5.0°C）时，
@@ -371,9 +388,9 @@ public final class EnergyAnalyticsEngine: ObservableObject {
                     }
                     return 0.0
                 }()
-                power = 380.0 + ((delta - 1.0) * 95.0) + windOffset + heatBoost
+                power = 380.0 + ((delta - 1.0) * 95.0) + windOffset + heatBoost + latentHumComp
             }
-            return min(max(power, 180.0), 1750.0)
+            return min(max(power, 180.0), 1800.0)
 
         case .auto:
             // 自动模式：根据室内与设定温差智能判别制冷或制热动力曲线，融合环境湿度微调与全气候极端温差超频动力学 (v1.9.36, v1.9.38, v1.9.41 全季节对称)
