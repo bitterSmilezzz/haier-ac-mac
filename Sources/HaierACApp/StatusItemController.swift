@@ -555,7 +555,8 @@ final class StatusItemController: NSObject {
                 devicesMenu.addItem(devItem)
             }
 
-            let devicesParentItem = NSMenuItem(title: "空调设备控制矩阵...", action: nil, keyEquivalent: "")
+            let matrixRunningDesc = !onDevices.isEmpty ? "\(onDevices.count)台运行中" : "全屋待机"
+            let devicesParentItem = NSMenuItem(title: "空调设备控制矩阵 (\(controllableDevices.count)台在线，\(matrixRunningDesc))...", action: nil, keyEquivalent: "")
             menu.setSubmenu(devicesMenu, for: devicesParentItem)
             menu.addItem(devicesParentItem)
         } else if let dev = allDevices.first {

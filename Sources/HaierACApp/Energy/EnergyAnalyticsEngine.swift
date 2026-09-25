@@ -410,27 +410,28 @@ public final class EnergyAnalyticsEngine: ObservableObject {
             return min(max(power, 180.0), 1800.0)
 
         case .auto:
-            // 自动模式：根据室内与设定温差智能判别制冷或制热动力曲线，融合环境湿度微调与全气候极端温差超频动力学 (v1.9.36, v1.9.38, v1.9.41 全季节对称)
+            // 自动模式：根据室内与设定温差智能判别制冷或制热动力曲线，融合环境湿度微调与全气候极端温差超频动力学 (v1.9.36, v1.9.38, v1.9.41, v1.9.47, v1.9.48 全气候双向物理对称)
             let indoor = indoorTemp ?? 25.0
             let target = targetTemp ?? 24.0
-            let humOffset: Double = {
-                guard let hum = indoorHumidity else { return 0.0 }
-                if hum >= 65.0 {
-                    // 高湿环境：增加潜热冷凝除湿负荷 (0 ~ 45W)
-                    return min(45.0, (hum - 65.0) * 1.5)
-                } else if hum <= 45.0 {
-                    // 干燥环境：体感温度稍低，降低部分维持负荷 (-25W ~ 0W)
-                    return max(-25.0, (hum - 45.0) * 1.0)
-                }
-                return 0.0
-            }()
             if indoor >= target {
                 let delta = indoor - target
+                // 制冷分支环境湿度潜热冷凝补偿 (v1.9.48 与制冷独立工况达成 100% 物理对称：高湿潜热相变补偿最高 +66W，干燥空气负荷调减最高 -20W)
+                let latentHumComp: Double = {
+                    guard let hum = indoorHumidity else { return 0.0 }
+                    if hum >= 65.0 {
+                        let excess = min(30.0, hum - 65.0)
+                        return excess * 2.2 // 最高 +66W
+                    } else if hum <= 40.0 {
+                        let deficit = min(20.0, 40.0 - hum)
+                        return -(deficit * 1.0) // 最低 -20W
+                    }
+                    return 0.0
+                }()
                 let power: Double
                 if delta <= 0.0 {
-                    power = 220.0 + (windOffset * 0.6) + (humOffset * 0.5)
+                    power = 220.0 + (windOffset * 0.6) + (latentHumComp * 0.4)
                 } else if delta < 1.0 {
-                    power = 220.0 + (delta * 160.0) + (windOffset * 0.8) + (humOffset * 0.8)
+                    power = 220.0 + (delta * 160.0) + (windOffset * 0.8) + (latentHumComp * 0.7)
                 } else {
                     // 酷暑极端高温与冷凝器恶化超频动力学补偿
                     let heatBoost: Double = {
@@ -441,9 +442,9 @@ public final class EnergyAnalyticsEngine: ObservableObject {
                         }
                         return 0.0
                     }()
-                    power = 380.0 + ((delta - 1.0) * 95.0) + windOffset + humOffset + heatBoost
+                    power = 380.0 + ((delta - 1.0) * 95.0) + windOffset + latentHumComp + heatBoost
                 }
-                return min(max(power, 180.0), 1750.0)
+                return min(max(power, 180.0), 1800.0)
             } else {
                 let delta = target - indoor
                 let power: Double

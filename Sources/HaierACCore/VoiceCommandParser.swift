@@ -282,10 +282,16 @@ public struct VoiceCommandParser {
     private static func parseScheduleOrCountdown(_ text: String) -> VoiceParseResult? {
         let isAll = isAllDeviceScope(text)
 
+        // 判定是否包含明确的具体钟点时间指示词（点/时/:），此时即使包含“定时”与“分”（如“定时在十点五分关机”），也不应误判为倒计时 (v1.9.48)
+        let withoutTiming = text.replacingOccurrences(of: "定时", with: "")
+        let hasClockTime = (withoutTiming.contains("点") || withoutTiming.contains("时") || withoutTiming.contains(":")) &&
+                           !withoutTiming.contains("小时") && !withoutTiming.contains("钟头") &&
+                           !withoutTiming.contains("后") && !withoutTiming.contains("倒计时")
+
         // 先判断是否为倒计时（如包含“后”、“倒计时”、“定时关/开”或“定时X分钟/小时”）
-        if text.contains("后") || text.contains("倒计时") ||
+        if !hasClockTime && (text.contains("后") || text.contains("倒计时") ||
            text.contains("定时关") || text.contains("定时开") ||
-           (text.contains("定时") && (text.contains("分") || text.contains("小时") || text.contains("钟头"))) {
+           (text.contains("定时") && (text.contains("分") || text.contains("小时") || text.contains("钟头")))) {
             if let minutes = parseCountdownMinutes(from: text) {
                 let isPowerOn = text.contains("开") && !text.contains("关")
                 let actionStr = isPowerOn ? "开机" : "关机"
@@ -392,12 +398,12 @@ public struct VoiceCommandParser {
             return nil
         }
 
-        var isPM = false
-        if normalized.contains("下午") || normalized.contains("晚上") || normalized.contains("今晚") ||
-           normalized.contains("明晚") || normalized.contains("夜里") || normalized.contains("傍晚") ||
-           normalized.contains("中午") || normalized.contains("午后") {
-            isPM = true
-        }
+        let isNightMidnight = normalized.contains("晚上") || normalized.contains("今晚") ||
+                              normalized.contains("明晚") || normalized.contains("夜里") ||
+                              normalized.contains("半夜") || normalized.contains("午夜") ||
+                              normalized.contains("凌晨")
+        let isAfternoonPM = normalized.contains("下午") || normalized.contains("傍晚") || normalized.contains("午后")
+        let isNoon = normalized.contains("中午")
 
         var hour: Int?
         var minute: Int = 0
@@ -416,9 +422,42 @@ public struct VoiceCommandParser {
             }
         }
 
-        // 2. X点 / X时
+        // 2. 差分倒算结构 (v1.9.48: 支持“十点差五分”与“差五分十点”等逆序时间计算)
+        // 2.1 Pattern: (\d{1,2})\s*(?:点|时)\s*差\s*(\d{1,2})\s*分? (如 10点差5分 -> 09:55)
         if hour == nil {
-            let pointPattern = #"(\d{1,2})\s*(?:点|时)"#
+            let diffPattern1 = #"(\d{1,2})\s*(?:点|时)\s*差\s*(\d{1,2})\s*分?"#
+            if let regex = try? NSRegularExpression(pattern: diffPattern1) {
+                let ns = normalized as NSString
+                if let match = regex.matches(in: normalized, range: NSRange(location: 0, length: ns.length)).first {
+                    let targetHStr = ns.substring(with: match.range(at: 1))
+                    let diffMStr = ns.substring(with: match.range(at: 2))
+                    if let targetH = Int(targetHStr), let diffM = Int(diffMStr), diffM > 0 && diffM < 60 {
+                        hour = (targetH + 24 - 1) % 24
+                        minute = 60 - diffM
+                    }
+                }
+            }
+        }
+
+        // 2.2 Pattern: 差\s*(\d{1,2})\s*分?\s*(\d{1,2})\s*(?:点|时) (如 差5分10点 -> 09:55)
+        if hour == nil {
+            let diffPattern2 = #"差\s*(\d{1,2})\s*分?\s*(\d{1,2})\s*(?:点|时)"#
+            if let regex = try? NSRegularExpression(pattern: diffPattern2) {
+                let ns = normalized as NSString
+                if let match = regex.matches(in: normalized, range: NSRange(location: 0, length: ns.length)).first {
+                    let diffMStr = ns.substring(with: match.range(at: 1))
+                    let targetHStr = ns.substring(with: match.range(at: 2))
+                    if let targetH = Int(targetHStr), let diffM = Int(diffMStr), diffM > 0 && diffM < 60 {
+                        hour = (targetH + 24 - 1) % 24
+                        minute = 60 - diffM
+                    }
+                }
+            }
+        }
+
+        // 3. X点 / X时 (含零点 / 0点及后接分钟提取)
+        if hour == nil {
+            let pointPattern = #"(\d{1,2})\s*(?:点|时)(?:\s*(?:过|零|0)?\s*(\d{1,2})\s*分?)?"#
             if let regex = try? NSRegularExpression(pattern: pointPattern) {
                 let ns = normalized as NSString
                 if let match = regex.matches(in: normalized, range: NSRange(location: 0, length: ns.length)).first {
@@ -426,15 +465,22 @@ public struct VoiceCommandParser {
                     if let h = Int(hStr) {
                         hour = h
                     }
+                    let minRange = match.range(at: 2)
+                    if minRange.location != NSNotFound {
+                        let mStr = ns.substring(with: minRange)
+                        if let m = Int(mStr) {
+                            minute = m
+                        }
+                    }
                 }
             }
         }
 
         guard var finalHour = hour else { return nil }
 
-        // 判断分钟
+        // 4. 兜底后置分钟（以防复杂修饰语未被第3条捕获）
         if minute == 0 {
-            let minPattern = #"(?:点|时)\s*(\d{1,2})\s*分?"#
+            let minPattern = #"(?:点|时)\s*(?:过|零|0)?\s*(\d{1,2})\s*分"#
             if let regex = try? NSRegularExpression(pattern: minPattern) {
                 let ns = normalized as NSString
                 if let match = regex.matches(in: normalized, range: NSRange(location: 0, length: ns.length)).first {
@@ -446,9 +492,24 @@ public struct VoiceCommandParser {
             }
         }
 
-        if isPM && finalHour < 12 {
-            finalHour += 12
+        // 5. 钟点时段与时态校准 (v1.9.48 彻底根除午夜/零点误为正午及中午11点误为深夜23点缺陷)
+        if finalHour == 12 {
+            if isNightMidnight {
+                // “晚上12点”、“半夜12点”、“午夜12点”、“凌晨12点”均代表午夜 00:00
+                finalHour = 0
+            }
+        } else if finalHour == 0 {
+            // 明确的“零点/0点/0时”，无论前缀如何，恒定为 00:xx，严禁累加 12
+            finalHour = 0
+        } else if finalHour > 0 && finalHour < 12 {
+            if isAfternoonPM || (normalized.contains("晚上") || normalized.contains("今晚") || normalized.contains("明晚") || normalized.contains("夜里") || normalized.contains("傍晚")) {
+                finalHour += 12
+            } else if isNoon && finalHour <= 5 {
+                // 中午 1 点、2 点等午后时段
+                finalHour += 12
+            }
         }
+
         if finalHour >= 24 {
             finalHour = 0
         }
@@ -1030,6 +1091,33 @@ public struct VoiceCommandParser {
         str = str.replacingOccurrences(of: "点三刻", with: "点45分")
         str = str.replacingOccurrences(of: "时三刻", with: "点45分")
         str = str.replacingOccurrences(of: "点3刻", with: "点45分")
+        str = str.replacingOccurrences(of: "时3刻", with: "点45分")
+
+        // “点过”与“差刻”固定搭配 (v1.9.48)
+        str = str.replacingOccurrences(of: "点过一刻", with: "点15分")
+        str = str.replacingOccurrences(of: "时过一刻", with: "点15分")
+        str = str.replacingOccurrences(of: "点过1刻", with: "点15分")
+        str = str.replacingOccurrences(of: "时过1刻", with: "点15分")
+        str = str.replacingOccurrences(of: "点过两刻", with: "点30分")
+        str = str.replacingOccurrences(of: "时过两刻", with: "点30分")
+        str = str.replacingOccurrences(of: "点过二刻", with: "点30分")
+        str = str.replacingOccurrences(of: "时过二刻", with: "点30分")
+        str = str.replacingOccurrences(of: "点过2刻", with: "点30分")
+        str = str.replacingOccurrences(of: "时过2刻", with: "点30分")
+        str = str.replacingOccurrences(of: "点过半", with: "点30分")
+        str = str.replacingOccurrences(of: "时过半", with: "点30分")
+        str = str.replacingOccurrences(of: "点过三刻", with: "点45分")
+        str = str.replacingOccurrences(of: "时过三刻", with: "点45分")
+        str = str.replacingOccurrences(of: "点过3刻", with: "点45分")
+        str = str.replacingOccurrences(of: "时过3刻", with: "点45分")
+
+        str = str.replacingOccurrences(of: "差一刻", with: "差15分")
+        str = str.replacingOccurrences(of: "差1刻", with: "差15分")
+        str = str.replacingOccurrences(of: "差两刻", with: "差30分")
+        str = str.replacingOccurrences(of: "差2刻", with: "差30分")
+        str = str.replacingOccurrences(of: "差二刻", with: "差30分")
+        str = str.replacingOccurrences(of: "差三刻", with: "差45分")
+        str = str.replacingOccurrences(of: "差3刻", with: "差45分")
         str = str.replacingOccurrences(of: "一百", with: "100")
 
         // 温度与时间小数转换：仅匹配紧跟“度/°/小时/个钟头”的小数点五（如“二十六点五度” -> 26.5度，“1点5小时” -> 1.5小时）

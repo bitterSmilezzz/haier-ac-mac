@@ -6,6 +6,19 @@ A native SwiftUI app to control Haier / Leader (统帅) smart air conditioners o
 
 ## Features
 
+- 🏷 **Natural Language Midnight/Noon Clock Calibration, Differential Minute/Quarter Parsing, Auto Mode Latent Heat Dynamics & Status Bar Device Matrix Perception (v1.9.48)**:
+  - ⏱️ **Natural Language Midnight & Noon Clock Calibration, Missing Minutes & Differential "差分/差刻" Time Parsing Defect Eradication (`VoiceCommandParser` / `VoiceCommandParserTests`)**:
+    - Permanently eradicated the severe time-drift flaw for colloquial midnight hours ("晚上12点", "今晚12点", "半夜12点", "午夜12点", "凌晨12点", "今晚零点", "晚上0点"): previously, `isPM` incorrectly added 12 hours, misclassifying midnight as midday 12:00; now strictly normalized to `00:00`;
+    - Standardized morning vs. noon boundaries, fixing "中午11点" being miscalculated as 23:00;
+    - Fixed the missing-minute defect where connector "过" (e.g., "十点过五分", "十点过十分", "十点过一刻", "十点过半", "十点过三刻") blocked minute regex matching and caused accidental truncation to the whole hour (e.g. 10:00);
+    - Comprehensive support for inverse differential time expressions: "十点差五分" / "差五分十点" (precisely calculated as 09:55) and "十点差一刻" / "差一刻十点" (precisely calculated as 09:45);
+    - Completely blocked clock scheduling phrases like "定时在十点五分关机" from being hijacked by countdown regex (`定时` + `分`) into a 5-minute countdown.
+  - ❄️ **Auto Mode Cooling Branch Full-Climate Latent Heat Dynamics Symmetry (`EnergyAnalyticsEngine`)**:
+    - In `EnergyAnalyticsEngine.estimateInstantaneousPower` (`.auto` cooling branch `indoor >= target`), integrated evaporator latent heat of condensation compensation: high-humidity heavy load ($\text{RH} \ge 65\%$, up to +66W boost) and dry low-humidity reduction (down to -20W), with steady-state dampening ($0.4\times$) and unified 1800W ceiling;
+    - Delivers 100% strict thermodynamic physical symmetry between intelligent auto cooling and standalone `.cooling` modes.
+  - 🍱 **macOS Native Status Bar Device Matrix Real-Time Perception (`StatusItemController`)**:
+    - The right-click status bar context menu entry "空调设备控制矩阵" now dynamically displays active online and running unit counts (e.g. `空调设备控制矩阵 (3台在线，2台运行中)...`);
+    - Users can instantly perceive overall network and operational states at a single glance without opening submenus.
 - 🏷 **Natural Language Half-Past Time Downgrade Protection, Full Wind Speed & Gear Mapping, Auto Mode Heating Humidity Dynamics & Status Bar Visual Perception (v1.9.47)**:
   - ⏱️ **Natural Language Clock Time "点五" Protection Against Accidental Countdown Downgrades (`VoiceCommandParser` / `VoiceCommandParserTests`)**:
     - Permanently eradicated the critical parsing defect caused by global unconditional replacement `str.replacingOccurrences(of: "点五", with: ".5")` in `convertChineseNumbers`: previously, everyday clock scheduling phrases like "十点五分关机/开机" (turn off/on at 10:05), "晚上8点5分关机", and "十点五十分关机" were corrupted into "10.5分关机" or "10.5十分关机", stripping the clock indicator "点" and causing `parseScheduleTime` to return `nil`, which was then seized by `parseCountdownMinutes` and misclassified as a 5-minute countdown (`.countdownPower(minutes: 5)`);

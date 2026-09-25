@@ -974,6 +974,110 @@ final class VoiceCommandParserTests: XCTestCase {
         XCTAssertEqual(gw3?.command, .setWindSpeedAll("微风"))
     }
 
+    // MARK: - 午夜/正午及差刻逆序时间解析测试 (v1.9.48)
+
+    func testScheduleTimeMidnightAndNoonAccuracy() {
+        // 彻底根除午夜/零点被误映射为正午 12:00 的严重时序缺陷 (v1.9.48)
+        let m1 = VoiceCommandParser.parse("晚上12点关机")
+        XCTAssertEqual(m1?.command, .schedulePower(hour: 0, minute: 0, power: false))
+
+        let m2 = VoiceCommandParser.parse("今晚12点关空调")
+        XCTAssertEqual(m2?.command, .schedulePower(hour: 0, minute: 0, power: false))
+
+        let m3 = VoiceCommandParser.parse("半夜12点关机")
+        XCTAssertEqual(m3?.command, .schedulePower(hour: 0, minute: 0, power: false))
+
+        let m4 = VoiceCommandParser.parse("午夜12点关机")
+        XCTAssertEqual(m4?.command, .schedulePower(hour: 0, minute: 0, power: false))
+
+        let m5 = VoiceCommandParser.parse("凌晨12点关机")
+        XCTAssertEqual(m5?.command, .schedulePower(hour: 0, minute: 0, power: false))
+
+        let m6 = VoiceCommandParser.parse("今晚零点关机")
+        XCTAssertEqual(m6?.command, .schedulePower(hour: 0, minute: 0, power: false))
+
+        let m7 = VoiceCommandParser.parse("晚上0点关机")
+        XCTAssertEqual(m7?.command, .schedulePower(hour: 0, minute: 0, power: false))
+
+        let m8 = VoiceCommandParser.parse("半夜零点开空调")
+        XCTAssertEqual(m8?.command, .schedulePower(hour: 0, minute: 0, power: true))
+
+        // 保持中午 11 点与 12 点日间时序正确性
+        let n1 = VoiceCommandParser.parse("中午12点关机")
+        XCTAssertEqual(n1?.command, .schedulePower(hour: 12, minute: 0, power: false))
+
+        let n2 = VoiceCommandParser.parse("中午12点半关机")
+        XCTAssertEqual(n2?.command, .schedulePower(hour: 12, minute: 30, power: false))
+
+        let n3 = VoiceCommandParser.parse("中午11点关机")
+        XCTAssertEqual(n3?.command, .schedulePower(hour: 11, minute: 0, power: false))
+
+        let n4 = VoiceCommandParser.parse("中午1点关机")
+        XCTAssertEqual(n4?.command, .schedulePower(hour: 13, minute: 0, power: false))
+
+        let n5 = VoiceCommandParser.parse("中午一点半关机")
+        XCTAssertEqual(n5?.command, .schedulePower(hour: 13, minute: 30, power: false))
+    }
+
+    func testScheduleTimePastAndDifferentialMinutes() {
+        // “点过”分钟与刻度口语解析 (v1.9.48 彻底杜绝分钟丢失降级为整点)
+        let p1 = VoiceCommandParser.parse("十点过五分关机")
+        XCTAssertEqual(p1?.command, .schedulePower(hour: 10, minute: 5, power: false))
+
+        let p2 = VoiceCommandParser.parse("十点过十分关机")
+        XCTAssertEqual(p2?.command, .schedulePower(hour: 10, minute: 10, power: false))
+
+        let p3 = VoiceCommandParser.parse("8点过10分关机")
+        XCTAssertEqual(p3?.command, .schedulePower(hour: 8, minute: 10, power: false))
+
+        let p4 = VoiceCommandParser.parse("十点过一刻关机")
+        XCTAssertEqual(p4?.command, .schedulePower(hour: 10, minute: 15, power: false))
+
+        let p5 = VoiceCommandParser.parse("十点过半关机")
+        XCTAssertEqual(p5?.command, .schedulePower(hour: 10, minute: 30, power: false))
+
+        let p6 = VoiceCommandParser.parse("十点过三刻关机")
+        XCTAssertEqual(p6?.command, .schedulePower(hour: 10, minute: 45, power: false))
+
+        // “差分”与“差刻”逆序倒算时间解析 (v1.9.48)
+        let d1 = VoiceCommandParser.parse("十点差五分关机")
+        XCTAssertEqual(d1?.command, .schedulePower(hour: 9, minute: 55, power: false))
+
+        let d2 = VoiceCommandParser.parse("差五分十点关机")
+        XCTAssertEqual(d2?.command, .schedulePower(hour: 9, minute: 55, power: false))
+
+        let d3 = VoiceCommandParser.parse("十点差一刻关机")
+        XCTAssertEqual(d3?.command, .schedulePower(hour: 9, minute: 45, power: false))
+
+        let d4 = VoiceCommandParser.parse("差一刻十点关机")
+        XCTAssertEqual(d4?.command, .schedulePower(hour: 9, minute: 45, power: false))
+
+        let d5 = VoiceCommandParser.parse("8点差十分关空调")
+        XCTAssertEqual(d5?.command, .schedulePower(hour: 7, minute: 50, power: false))
+
+        let d6 = VoiceCommandParser.parse("差十分8点关机")
+        XCTAssertEqual(d6?.command, .schedulePower(hour: 7, minute: 50, power: false))
+
+        let d7 = VoiceCommandParser.parse("晚上10点差五分关机")
+        XCTAssertEqual(d7?.command, .schedulePower(hour: 21, minute: 55, power: false))
+
+        let d8 = VoiceCommandParser.parse("明早8点差一刻开机")
+        XCTAssertEqual(d8?.command, .schedulePower(hour: 7, minute: 45, power: true))
+
+        // “定时在具体时间”防误判为倒计时防护 (v1.9.48)
+        let sc1 = VoiceCommandParser.parse("定时在十点五分关机")
+        XCTAssertEqual(sc1?.command, .schedulePower(hour: 10, minute: 5, power: false))
+
+        let sc2 = VoiceCommandParser.parse("定时在10点5分关机")
+        XCTAssertEqual(sc2?.command, .schedulePower(hour: 10, minute: 5, power: false))
+
+        let sc3 = VoiceCommandParser.parse("定时在十点关机")
+        XCTAssertEqual(sc3?.command, .schedulePower(hour: 10, minute: 0, power: false))
+
+        let sc4 = VoiceCommandParser.parse("定时10点半关机")
+        XCTAssertEqual(sc4?.command, .schedulePower(hour: 10, minute: 30, power: false))
+    }
+
     // MARK: - 无效输入测试
 
     func testInvalidCommands() {
