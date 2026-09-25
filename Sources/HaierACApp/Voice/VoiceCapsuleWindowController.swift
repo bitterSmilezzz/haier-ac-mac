@@ -389,6 +389,24 @@ public final class VoiceCapsuleWindowController: NSObject, NSWindowDelegate {
             scheduleAutoDismiss(delay: 2.5)
             return
 
+        case .queryFilterHealthAll:
+            let all = model.allUnifiedDevices
+            guard !all.isEmpty else {
+                VoiceControlManager.shared.markFailed("未检测到已绑定的空调设备")
+                scheduleAutoDismiss(delay: 2.0)
+                return
+            }
+            let summaries = all.map { dev -> String in
+                let pct = model.filterCleanlinessPercentage(for: dev.id)
+                let status = pct <= 20 ? "需拆洗" : "良好"
+                return "\(dev.name) \(pct)%（\(status)）"
+            }
+            let minPct = all.map { model.filterCleanlinessPercentage(for: $0.id) }.min() ?? 100
+            let advice = minPct <= 20 ? "，建议及时拆洗保养" : "，状态均良好"
+            VoiceControlManager.shared.markSuccess("全屋滤网：" + summaries.joined(separator: "，") + advice)
+            scheduleAutoDismiss(delay: 2.8)
+            return
+
         case .cancelSchedulesAll:
             let count = model.cancelAllSchedules()
             if count > 0 {
@@ -762,6 +780,16 @@ public final class VoiceCapsuleWindowController: NSObject, NSWindowDelegate {
                 VoiceControlManager.shared.markSuccess("暂无睡眠调温记录")
             }
 
+        case .queryFilterHealth:
+            let pct = model.filterCleanlinessPercentage(for: deviceId)
+            let hours = Double(model.filterAccumulatedMinutes(for: deviceId)) / 60.0
+            let hoursStr = String(format: "%.1f", hours)
+            if pct <= 20 {
+                VoiceControlManager.shared.markSuccess("「\(targetName)」滤网洁净度仅剩 \(pct)%，已等效运行 \(hoursStr) 小时，建议及时拆洗保养")
+            } else {
+                VoiceControlManager.shared.markSuccess("「\(targetName)」滤网洁净度 \(pct)%，累计等效运行 \(hoursStr) 小时，状态良好")
+            }
+
         case .startSelfCleaning:
             guard ensureControllable() else { return }
             if model.isSelfCleaningActive {
@@ -772,7 +800,7 @@ public final class VoiceCapsuleWindowController: NSObject, NSWindowDelegate {
                 VoiceControlManager.shared.markSuccess("已为\(prefix)启动 56°C 蒸发器高温自清洁")
             }
 
-        case .turnOffAll, .turnOnAll, .stopSelfCleaning, .stopSleepCurve, .presetAll, .setTemperatureAll, .adjustTemperatureAll, .setWindSpeedAll, .cancelSchedulesAll, .queryStatusAll:
+        case .turnOffAll, .turnOnAll, .stopSelfCleaning, .stopSleepCurve, .presetAll, .setTemperatureAll, .adjustTemperatureAll, .setWindSpeedAll, .cancelSchedulesAll, .queryStatusAll, .queryFilterHealthAll:
             break // 已在指令前置流程中由全局调度完成分发
         }
 
@@ -820,6 +848,17 @@ public final class VoiceCapsuleWindowController: NSObject, NSWindowDelegate {
                 } else {
                     summaries.append("「\(dev.name)」\(powerDesc)，设定 \(Int(targetTemp))°C")
                 }
+            }
+            VoiceControlManager.shared.markSuccess(summaries.joined(separator: "；"))
+
+        case .queryFilterHealth:
+            var summaries: [String] = []
+            for dev in targetDevices {
+                let devId = dev.id
+                let pct = model.filterCleanlinessPercentage(for: devId)
+                let hours = Double(model.filterAccumulatedMinutes(for: devId)) / 60.0
+                let status = pct <= 20 ? "需拆洗" : "良好"
+                summaries.append("「\(dev.name)」\(pct)%（\(status)，\(String(format: "%.1f", hours))小时）")
             }
             VoiceControlManager.shared.markSuccess(summaries.joined(separator: "；"))
 

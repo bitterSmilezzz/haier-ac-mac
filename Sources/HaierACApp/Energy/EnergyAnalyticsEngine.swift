@@ -278,12 +278,15 @@ public final class EnergyAnalyticsEngine: ObservableObject {
             return min(max(power, 14.0), 75.0)
 
         case .dehumidify:
-            // 除湿模式：多维环境湿度自适应变频能耗动力学模型 (v1.9.37)
+            // 除湿模式：多维环境湿度自适应变频能耗动力学模型 + 室内温度显热负荷与防结霜降频动态补偿 (v1.9.37, v1.9.44)
             // 典型变频空调除湿机制：
             // 1. 高湿重载区 (RH >= 70%)：蒸发器深度过冷持续冷凝凝结，压缩机高频运转 (520W 基准)
             // 2. 中湿过渡区 (55% <= RH < 70%)：温湿度平衡变频除湿，维持舒适体感 (380W ~ 500W)
             // 3. 舒适/低湿微载区 (RH < 55%)：防过冷与防过度干燥，压缩机平滑降频至超低频稳态 (240W ~ 320W)
             // 4. 无湿度传感器兜底：回归标准基准 420W
+            // 5. 室内温度热力学动态补偿 (v1.9.44)：
+            //    - 高温显热补偿：当 indoor >= 28°C 时，湿空气显热负荷增加，压缩机负荷上升 (0W ~ 80W)；
+            //    - 低温防霜降频：当 indoor <= 18°C 时，蒸发器面临结霜风险，变频压缩机自动阶梯降频保护 (-60W ~ 0W)。
             let basePower: Double
             if let hum = indoorHumidity {
                 if hum >= 70.0 {
@@ -299,8 +302,21 @@ public final class EnergyAnalyticsEngine: ObservableObject {
             } else {
                 basePower = 420.0
             }
-            let power = basePower + (windOffset * 0.5)
-            return min(max(power, 220.0), 650.0)
+
+            let tempComp: Double = {
+                guard let indoor = indoorTemp else { return 0.0 }
+                if indoor >= 28.0 {
+                    let excess = min(8.0, indoor - 28.0)
+                    return excess * 10.0 // 最高 +80W
+                } else if indoor <= 18.0 {
+                    let deficit = min(8.0, 18.0 - indoor)
+                    return -(deficit * 7.5) // 最低 -60W 防结霜降频
+                }
+                return 0.0
+            }()
+
+            let power = basePower + (windOffset * 0.5) + tempComp
+            return min(max(power, 200.0), 730.0)
 
         case .heating:
             // 制热模式：变频温差动力学模型 + 恒温平衡区低频维持态阻尼 + 低温速热 PTC 辅助电热动力学 (v1.9.36, v1.9.39)

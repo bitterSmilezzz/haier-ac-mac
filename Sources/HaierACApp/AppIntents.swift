@@ -313,6 +313,49 @@ struct StartSelfCleaningIntent: AppIntent {
     }
 }
 
+// MARK: - 停止自清洁 (v1.9.44 对称补全)
+
+struct StopSelfCleaningIntent: AppIntent {
+    static var title: LocalizedStringResource = "停止自清洁"
+    static var description = IntentDescription("停止 56°C 蒸发器高温除菌自清洁程序", categoryName: "空调控制")
+
+    @MainActor
+    func perform() async throws -> some IntentResult & ProvidesDialog {
+        let model = AppModel.shared
+        guard model.isSelfCleaningActive else {
+            return .result(dialog: "当前没有正在运行的蒸发器自清洁程序")
+        }
+        model.stopSelfCleaning()
+        return .result(dialog: "已停止 56°C 蒸发器自清洁")
+    }
+}
+
+// MARK: - 查询滤网健康度 (v1.9.44)
+
+struct GetFilterHealthIntent: AppIntent {
+    static var title: LocalizedStringResource = "查询滤网健康度"
+    static var description = IntentDescription("查询空调滤网洁净度与保养健康状态", categoryName: "空调控制")
+
+    @Parameter(title: "设备名称", description: "可选；留空使用当前主设备或第一台设备")
+    var deviceName: String?
+
+    @MainActor
+    func perform() async throws -> some IntentResult & ProvidesDialog {
+        let model = AppModel.shared
+        guard let deviceId = resolveDeviceId(named: deviceName) else {
+            throw ACIntentError.message("没有可控制的空调设备")
+        }
+        let devName = model.allUnifiedDevices.first(where: { $0.id == deviceId })?.name ?? "海尔空调"
+        let pct = model.filterCleanlinessPercentage(for: deviceId)
+        let hours = Double(model.filterAccumulatedMinutes(for: deviceId)) / 60.0
+        let hoursStr = String(format: "%.1f", hours)
+        let dialog = pct <= 20
+            ? "「\(devName)」滤网洁净度仅剩 \(pct)%，已等效运行 \(hoursStr) 小时，建议及时拆洗保养"
+            : "「\(devName)」滤网洁净度 \(pct)%，累计等效运行 \(hoursStr) 小时，状态良好"
+        return .result(dialog: IntentDialog(stringLiteral: dialog))
+    }
+}
+
 // MARK: - 快捷指令库入口
 
 struct ACAppShortcuts: AppShortcutsProvider {
@@ -413,6 +456,27 @@ struct ACAppShortcuts: AppShortcutsProvider {
                     shortTitle: "停止睡眠模式",
                     systemImageName: "moon.zzz"
                 ),
+                AppShortcut(
+                    intent: StopSelfCleaningIntent(),
+                    phrases: [
+                        "用 \(.applicationName) 停止自清洁",
+                        "用 \(.applicationName) 关闭自清洁",
+                        "停止蒸发器自清洁 \(.applicationName)",
+                    ],
+                    shortTitle: "停止自清洁",
+                    systemImageName: "xmark.circle.fill"
+                ),
+                AppShortcut(
+                    intent: GetFilterHealthIntent(),
+                    phrases: [
+                        "用 \(.applicationName) 查询滤网",
+                        "\(.applicationName) 滤网怎么样",
+                        "\(.applicationName) 滤网状态",
+                        "查询空调滤网 \(.applicationName)",
+                    ],
+                    shortTitle: "查询滤网",
+                    systemImageName: "sparkles"
+                ),
             ]
         } else {
             return [
@@ -482,6 +546,20 @@ struct ACAppShortcuts: AppShortcutsProvider {
                         "用 \(.applicationName) 停止睡眠模式",
                         "用 \(.applicationName) 关闭睡眠模式",
                         "用 \(.applicationName) 退出睡眠模式",
+                    ]
+                ),
+                AppShortcut(
+                    intent: StopSelfCleaningIntent(),
+                    phrases: [
+                        "用 \(.applicationName) 停止自清洁",
+                        "用 \(.applicationName) 关闭自清洁",
+                    ]
+                ),
+                AppShortcut(
+                    intent: GetFilterHealthIntent(),
+                    phrases: [
+                        "用 \(.applicationName) 查询滤网",
+                        "\(.applicationName) 滤网状态",
                     ]
                 ),
             ]

@@ -81,7 +81,7 @@ final class StatusItemController: NSObject {
                 button.title = ""
             }
         } else {
-            let targetId = model.menuBarDeviceId ?? model.allUnifiedDevices.first?.id
+            let targetId = model.primaryDeviceId
             let isPowerOn: Bool = {
                 guard let targetId else { return false }
                 return model.reachability(for: targetId) == .available && (model.attribute("onOffStatus", deviceId: targetId)?.boolValue ?? false)
@@ -128,7 +128,7 @@ final class StatusItemController: NSObject {
                 tooltipParts.append("🏠 全屋 \(allDevices.count) 台空调当前均处于待机状态")
             }
         }
-        let primaryTargetId = model.menuBarDeviceId ?? allDevices.first?.id
+        let primaryTargetId = model.primaryDeviceId
         if !allDevices.isEmpty {
             for dev in allDevices {
                 let devId = dev.id

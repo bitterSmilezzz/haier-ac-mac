@@ -6,6 +6,20 @@ A native SwiftUI app to control Haier / Leader (统帅) smart air conditioners o
 
 ## Features
 
+- 🏷 **Natural Language Quarter/Hour Time Conversion, Filter Health Voice & Shortcuts Loop, Self-Cleaning Stop Symmetry & Dehumidification Thermal Dynamics (v1.9.44)**:
+  - ⏱️ **Quarter-Hour & Colloquial Hour Time Conversion & Precise Clock Quarter Alignment (`VoiceCommandParser` / `VoiceCommandParserTests`)**:
+    - Completely resolved the major natural language blind spot in `convertChineseNumbers`: previously, phrases like "一刻钟后关机" (turn off after 15 min), "两刻钟后关机" (30 min), "三刻钟后关机" (45 min), and "半个钟头后关机" (30 min) returned `nil` and failed recognition;
+    - Fixed the broken compound expression "两个半钟头后关机" where missing "个半钟头" prevented conversion to 2.5 hours (150 minutes);
+    - Permanently eradicated the hidden flaw in clock scheduling where "一刻/三刻" were simplistically replaced with digits "1/3", causing "十点一刻关机" to be miscalculated as `10:01` (14-minute error) and "十点三刻开机" as `10:03` (42-minute error); established 100% accurate time mapping for "十点一刻" (10:15), "十点三刻" (10:45), "晚上八点一刻" (20:15), and "明早七点三刻" (07:45).
+  - 🌿 **Filter Cleanliness End-to-End Voice & Siri Shortcuts Integration (`VoiceCommandParser` / `VoiceCapsuleWindowController` / `AppIntents` / `VoiceCommandParserTests`)**:
+    - Introduced `VoiceCommand.queryFilterHealth` and `VoiceCommand.queryFilterHealthAll` voice commands, supporting spontaneous queries like "查询滤网", "滤网状态", "滤网洁净度", "滤网要洗吗", and "全屋滤网状态";
+    - Voice capsule and multi-device pipelines leverage the aerodynamic equivalent wear model to provide clear cleanliness percentages, runtime hours, and maintenance advice;
+    - Added `GetFilterHealthIntent` in macOS Shortcuts framework, allowing Siri and native macOS Automations to inspect filter health status on demand.
+  - 🧼 **Self-Cleaning Stop Symmetry in Shortcuts & Single Source of Truth Primary Device Routing (`AppIntents` / `FilterCareSheet` / `StatusItemController`)**:
+    - Added `StopSelfCleaningIntent` to AppIntents and registered it in the system shortcut provider, establishing complete symmetry with `StartSelfCleaningIntent` so users can abort 56°C evaporator self-cleaning anytime via Siri or Shortcuts;
+    - Aligned initial device selection in `FilterCareSheet` to `model.primaryDeviceId`; refactored `StatusItemController` icon and tooltip primary device resolution directly to `model.primaryDeviceId`, preventing state drift in multi-device setups.
+  - 💧 **Dehumidification Temperature-Humidity Coupled Thermodynamic Dynamics (`EnergyAnalyticsEngine`)**:
+    - In `EnergyAnalyticsEngine.estimateInstantaneousPower` (`.dehumidify`), added indoor temperature thermodynamic compensation: adjusts for sensible heat load during high temperatures ($\ge 28^\circ\text{C}$, up to +80W) and simulates anti-frost inverter throttling during low temperatures ($\le 18^\circ\text{C}$, down to -60W).
 - 🏷 **Natural Language Half-Hour Compound Conversion, Multi-Room Scope Hardening, Scene Preset Route Convergence & Menu Bar Control Center Alignment (v1.9.43)**:
   - ⏱️ **Natural Language Compound Half-Hour Countdown & Noon PM Timer Defect Remediation (`VoiceCommandParser` / `VoiceCommandParserTests`)**:
     - Completely resolved the major parsing bug where `convertChineseNumbers` previously replaced "半小时" unconditionally with "30分钟", causing colloquial phrases like "两个半小时后关机" (turn off after 2.5 hours) to become "两个30分钟", which collapsed into `30 minutes` (a severe 120-minute truncation); introduced structural regex matching (`([一二两三四五六七八九]|\d+)(?:个半小时|个钟头半|小时半|个小时半)`) to accurately translate "两个半小时" / "2个半小时" / "两小时半" to 2.5 hours (150 minutes) and "三个半小时" to 3.5 hours (210 minutes);

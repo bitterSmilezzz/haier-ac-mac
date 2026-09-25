@@ -14,7 +14,7 @@ struct FilterCareSheet: View {
     }
 
     private var currentDeviceId: String {
-        selectedDeviceId ?? allDeviceList.first?.id ?? ""
+        selectedDeviceId ?? model.primaryDeviceId ?? allDeviceList.first?.id ?? ""
     }
 
     private var targetDeviceName: String {

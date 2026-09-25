@@ -50,6 +50,10 @@ public enum VoiceCommand: Equatable {
     case startSelfCleaning
     /// 停止蒸发器自清洁 (v1.9.30)
     case stopSelfCleaning
+    /// 查询空调滤网洁净度与保养健康状态 (v1.9.44)
+    case queryFilterHealth
+    /// 查询全屋所有空调滤网健康状态与汇总 (v1.9.44)
+    case queryFilterHealthAll
 }
 
 /// 语音指令解析结果
@@ -139,6 +143,20 @@ public struct VoiceCommandParser {
                 return VoiceParseResult(command: .stopSelfCleaning, displayText: "停止蒸发器自清洁")
             } else {
                 return VoiceParseResult(command: .startSelfCleaning, displayText: "启动 56°C 蒸发器高温自清洁")
+            }
+        }
+
+        // 5.1 滤网健康度与洁净度查询 (v1.9.44)
+        if cleaned.contains("滤网") || cleaned.contains("过滤网") || cleaned.contains("过滤片") {
+            if cleaned.contains("洁净") || cleaned.contains("健康") || cleaned.contains("寿命") ||
+               cleaned.contains("状态") || cleaned.contains("洗") || cleaned.contains("查") ||
+               cleaned.contains("脏") || cleaned.contains("怎么样") || cleaned.contains("换") ||
+               cleaned.contains("看") || cleaned.contains("报告") {
+                if isAllDeviceScope(cleaned) {
+                    return VoiceParseResult(command: .queryFilterHealthAll, displayText: "查询全屋滤网健康度")
+                } else {
+                    return VoiceParseResult(command: .queryFilterHealth, displayText: "查询滤网健康度")
+                }
             }
         }
 
@@ -898,9 +916,9 @@ public struct VoiceCommandParser {
             "四": 4, "五": 5, "六": 6, "七": 7, "八": 8, "九": 9
         ]
 
-        // 复合半小时结构（如：两个半小时 -> 2.5小时，三个半小时 -> 3.5小时，两小时半 -> 2.5小时，一个半小时 -> 1.5小时）
-        // 彻底根除“两个半小时后关机”被“半小时”粗暴替换为“30分钟”导致严重缩水120分钟的重大缺陷 (v1.9.43)
-        let halfHourPattern = #"([一二两三四五六七八九]|\d+)(?:个半小时|个钟头半|小时半|个小时半)"#
+        // 复合半小时与半钟头结构（如：两个半小时 -> 2.5小时，三个半小时 -> 3.5小时，两小时半 -> 2.5小时，一个半小时 -> 1.5小时，两个半钟头 -> 2.5小时）
+        // 彻底根除“两个半小时后关机”被“半小时”粗暴替换为“30分钟”导致严重缩水120分钟的重大缺陷 (v1.9.43, v1.9.44 覆盖“两个半钟头/两钟头半”)
+        let halfHourPattern = #"([一二两三四五六七八九]|\d+)(?:个半小时|个钟头半|小时半|个小时半|个半钟头|钟头半)"#
         if let regex = try? NSRegularExpression(pattern: halfHourPattern) {
             let ns = str as NSString
             let matches = regex.matches(in: str, range: NSRange(location: 0, length: ns.length)).reversed()
@@ -915,12 +933,30 @@ public struct VoiceCommandParser {
             }
         }
 
-        // 单独的固定搭配
+        // 单独的固定搭配与刻度归一 (v1.9.44 彻底根治“一刻钟后关机”无法识别与“十点一刻关机”被误判为 10:01 的口语缺陷)
         str = str.replacingOccurrences(of: "一个半小时", with: "1.5小时")
         str = str.replacingOccurrences(of: "1个半小时", with: "1.5小时")
+        str = str.replacingOccurrences(of: "一个半钟头", with: "1.5小时")
+        str = str.replacingOccurrences(of: "1个半钟头", with: "1.5小时")
+        str = str.replacingOccurrences(of: "半个钟头", with: "30分钟")
+        str = str.replacingOccurrences(of: "半钟头", with: "30分钟")
         str = str.replacingOccurrences(of: "半小时", with: "30分钟")
         str = str.replacingOccurrences(of: "点半", with: "点30分")
         str = str.replacingOccurrences(of: "时半", with: "点30分")
+        str = str.replacingOccurrences(of: "一刻钟", with: "15分钟")
+        str = str.replacingOccurrences(of: "1刻钟", with: "15分钟")
+        str = str.replacingOccurrences(of: "两刻钟", with: "30分钟")
+        str = str.replacingOccurrences(of: "2刻钟", with: "30分钟")
+        str = str.replacingOccurrences(of: "三刻钟", with: "45分钟")
+        str = str.replacingOccurrences(of: "3刻钟", with: "45分钟")
+        str = str.replacingOccurrences(of: "点一刻", with: "点15分")
+        str = str.replacingOccurrences(of: "时一刻", with: "点15分")
+        str = str.replacingOccurrences(of: "点1刻", with: "点15分")
+        str = str.replacingOccurrences(of: "时1刻", with: "点15分")
+        str = str.replacingOccurrences(of: "点三刻", with: "点45分")
+        str = str.replacingOccurrences(of: "时三刻", with: "点45分")
+        str = str.replacingOccurrences(of: "点3刻", with: "点45分")
+        str = str.replacingOccurrences(of: "时3刻", with: "点45分")
         str = str.replacingOccurrences(of: "一百", with: "100")
         str = str.replacingOccurrences(of: "点五", with: ".5")
 

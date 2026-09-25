@@ -686,6 +686,99 @@ final class VoiceCommandParserTests: XCTestCase {
         XCTAssertEqual(sched2?.command, .cancelSchedules)
     }
 
+    // MARK: - 刻钟与钟头时间解析测试 (v1.9.44)
+
+    func testQuarterHourAndHourCountdown() {
+        // 刻钟倒计时
+        let c1 = VoiceCommandParser.parse("一刻钟后关机")
+        XCTAssertEqual(c1?.command, .countdownPower(minutes: 15, power: false))
+
+        let c2 = VoiceCommandParser.parse("两刻钟后关机")
+        XCTAssertEqual(c2?.command, .countdownPower(minutes: 30, power: false))
+
+        let c3 = VoiceCommandParser.parse("三刻钟后关机")
+        XCTAssertEqual(c3?.command, .countdownPower(minutes: 45, power: false))
+
+        let c4 = VoiceCommandParser.parse("1刻钟后开机")
+        XCTAssertEqual(c4?.command, .countdownPower(minutes: 15, power: true))
+
+        let c5 = VoiceCommandParser.parse("3刻钟后开机")
+        XCTAssertEqual(c5?.command, .countdownPower(minutes: 45, power: true))
+
+        // 钟头与半钟头倒计时
+        let h1 = VoiceCommandParser.parse("半个钟头后关机")
+        XCTAssertEqual(h1?.command, .countdownPower(minutes: 30, power: false))
+
+        let h2 = VoiceCommandParser.parse("半个钟头后开机")
+        XCTAssertEqual(h2?.command, .countdownPower(minutes: 30, power: true))
+
+        let h3 = VoiceCommandParser.parse("半钟头后关空调")
+        XCTAssertEqual(h3?.command, .countdownPower(minutes: 30, power: false))
+
+        let h4 = VoiceCommandParser.parse("两个半钟头后关机")
+        XCTAssertEqual(h4?.command, .countdownPower(minutes: 150, power: false))
+
+        let h5 = VoiceCommandParser.parse("2个半钟头后关机")
+        XCTAssertEqual(h5?.command, .countdownPower(minutes: 150, power: false))
+
+        let h6 = VoiceCommandParser.parse("一个半钟头后开机")
+        XCTAssertEqual(h6?.command, .countdownPower(minutes: 90, power: true))
+
+        let h7 = VoiceCommandParser.parse("1个半钟头后关机")
+        XCTAssertEqual(h7?.command, .countdownPower(minutes: 90, power: false))
+
+        // 钟点刻数定时 (闭环 10:01 / 10:03 误判缺陷)
+        let s1 = VoiceCommandParser.parse("十点一刻关机")
+        XCTAssertEqual(s1?.command, .schedulePower(hour: 10, minute: 15, power: false))
+
+        let s2 = VoiceCommandParser.parse("十点三刻开机")
+        XCTAssertEqual(s2?.command, .schedulePower(hour: 10, minute: 45, power: true))
+
+        let s3 = VoiceCommandParser.parse("晚上八点一刻关机")
+        XCTAssertEqual(s3?.command, .schedulePower(hour: 20, minute: 15, power: false))
+
+        let s4 = VoiceCommandParser.parse("明早七点三刻开机")
+        XCTAssertEqual(s4?.command, .schedulePower(hour: 7, minute: 45, power: true))
+
+        let s5 = VoiceCommandParser.parse("下午三点一刻关空调")
+        XCTAssertEqual(s5?.command, .schedulePower(hour: 15, minute: 15, power: false))
+    }
+
+    // MARK: - 滤网健康度查询测试 (v1.9.44)
+
+    func testFilterHealthQuery() {
+        let f1 = VoiceCommandParser.parse("查询滤网")
+        XCTAssertEqual(f1?.command, .queryFilterHealth)
+
+        let f2 = VoiceCommandParser.parse("滤网状态")
+        XCTAssertEqual(f2?.command, .queryFilterHealth)
+
+        let f3 = VoiceCommandParser.parse("滤网洁净度")
+        XCTAssertEqual(f3?.command, .queryFilterHealth)
+
+        let f4 = VoiceCommandParser.parse("滤网健康度")
+        XCTAssertEqual(f4?.command, .queryFilterHealth)
+
+        let f5 = VoiceCommandParser.parse("滤网要洗吗")
+        XCTAssertEqual(f5?.command, .queryFilterHealth)
+
+        let f6 = VoiceCommandParser.parse("空调滤网脏不脏")
+        XCTAssertEqual(f6?.command, .queryFilterHealth)
+
+        let f7 = VoiceCommandParser.parse("查看过滤网寿命")
+        XCTAssertEqual(f7?.command, .queryFilterHealth)
+
+        // 全屋作用域
+        let fa1 = VoiceCommandParser.parse("全屋滤网状态")
+        XCTAssertEqual(fa1?.command, .queryFilterHealthAll)
+
+        let fa2 = VoiceCommandParser.parse("查询所有空调滤网")
+        XCTAssertEqual(fa2?.command, .queryFilterHealthAll)
+
+        let fa3 = VoiceCommandParser.parse("全部空调滤网洁净度")
+        XCTAssertEqual(fa3?.command, .queryFilterHealthAll)
+    }
+
     // MARK: - 无效输入测试
 
     func testInvalidCommands() {

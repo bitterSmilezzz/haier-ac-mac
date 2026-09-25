@@ -8,6 +8,20 @@
 
 ## 功能
 
+- 🏷 **闭环自然语言「刻钟/钟头」时间解析缺陷、滤网全链路语音与快捷指令穿透、自清洁停止对称与除湿热力学双控 (v1.9.44)**：
+  - ⏱️ **自然语言「刻钟/钟头」时间解析缺陷与钟点刻数定时对齐 (`VoiceCommandParser` / `VoiceCommandParserTests`)**：
+    - 彻底根除中文数字预处理器（`convertChineseNumbers`）缺失“刻钟/半钟头”映射导致的重大口语解析盲区：以往“一刻钟后关机”（15分钟）、“两刻钟后关机”（30分钟）、“三刻钟后关机”（45分钟）、“半个钟头后关机”（30分钟）直接返回 `nil` 无法识别；
+    - 修复此前口语“两个半钟头后关机”因正则缺少“个半钟头”未能折算为 2.5 小时（150分钟）的断裂缺陷；
+    - 彻底根治钟点定时中因“一刻/三刻”被简单替换为数字“1/3”导致“十点一刻关机”被严重误判为 `10:01`（误差14分钟）、“十点三刻开机”被误判为 `10:03`（误差42分钟）的隐蔽缺陷；全面支持“十点一刻”（10:15）、“十点三刻”（10:45）、“晚上八点一刻”（20:15）与“明早七点三刻”（07:45），实现钟点刻数 100% 精准映射。
+  - 🌿 **滤网健康度全链路语音与快捷指令（Shortcuts/Siri）穿透式闭环 (`VoiceCommandParser` / `VoiceCapsuleWindowController` / `AppIntents` / `VoiceCommandParserTests`)**：
+    - 新增 `VoiceCommand.queryFilterHealth` 与 `VoiceCommand.queryFilterHealthAll` 语音指令，支持“查询滤网”、“滤网状态”、“滤网洁净度”、“滤网要洗吗”、“全屋滤网状态”等口语即时查询；
+    - 语音胶囊与多设备协同链路结合空气动力学等效工时模型，精准反馈洁净度百分比、等效运行机时及清洗保养建议；
+    - macOS 快捷指令（Shortcuts）新增 `GetFilterHealthIntent`，支持通过 Siri 或自动化捷径随时查询指定空调或主显设备的滤网健康状况。
+  - 🧼 **自清洁快捷指令（StopSelfCleaningIntent）对称补全与全仓主显单源路由收敛 (`AppIntents` / `FilterCareSheet` / `StatusItemController`)**：
+    - 在 AppIntents 中新增 `StopSelfCleaningIntent` 并注册至系统快捷指令库，与 `StartSelfCleaningIntent` 形成完整对称闭环，支持随时通过 Siri / 自动化捷径中止 56°C 蒸发器自清洁；
+    - `FilterCareSheet` 弹窗初始选中设备收敛至 `model.primaryDeviceId` 单一真实可信数据源；`StatusItemController` 状态栏图标与 Tooltip 主显设备计算全面对齐 `model.primaryDeviceId`，消除多设备环境下硬编码默认设备的状态漂移。
+  - 💧 **除湿工况温湿双控热力学动力学校准 (`EnergyAnalyticsEngine`)**：
+    - 在 `EnergyAnalyticsEngine.estimateInstantaneousPower` 的除湿工况（`.dehumidify`）中，引入室内温度热力学动态补偿：当室内温度偏高（$\ge 28^\circ\text{C}$）时动态补偿湿空气显热负荷（最高 +80W），当室内温度偏低（$\le 18^\circ\text{C}$）时拟真变频压缩机防结霜阶梯降频保护（最低 -60W），实现多维温湿度耦合仿真。
 - 🏷 **闭环自然语言复合半小时缩水缺陷、多房间定向含全部/全都不越权、情景模式全链路路由及菜单栏主显统一同步 (v1.9.43)**：
   - ⏱️ **自然语言复合半小时倒计时折算与中午钟点定时缺陷根治 (`VoiceCommandParser` / `VoiceCommandParserTests`)**：
     - 彻底根除 `convertChineseNumbers` 中粗暴将“半小时”替换为“30分钟”导致“两个半小时后关机”变成“两个30分钟”进而严重缩水为 `30分钟`（误差高达 120 分钟）的重大口语解析缺陷；引入基于自然语法的复合半小时正则匹配（`([一二两三四五六七八九]|\d+)(?:个半小时|个钟头半|小时半|个小时半)`），精准将“两个半小时”、“2个半小时”、“两小时半”转译为 2.5 小时（150 分钟），“三个半小时”转译为 3.5 小时（210 分钟），保证倒计时时间分秒不差；
