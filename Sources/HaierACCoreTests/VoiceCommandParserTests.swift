@@ -727,7 +727,7 @@ final class VoiceCommandParserTests: XCTestCase {
         let h7 = VoiceCommandParser.parse("1个半钟头后关机")
         XCTAssertEqual(h7?.command, .countdownPower(minutes: 90, power: false))
 
-        // 钟点刻数定时 (闭环 10:01 / 10:03 误判缺陷)
+        // 钟点刻数定时 (闭环 10:01 / 10:03 误判缺陷, v1.9.46 闭环 10:02 两刻/二刻误判缺陷)
         let s1 = VoiceCommandParser.parse("十点一刻关机")
         XCTAssertEqual(s1?.command, .schedulePower(hour: 10, minute: 15, power: false))
 
@@ -742,6 +742,68 @@ final class VoiceCommandParserTests: XCTestCase {
 
         let s5 = VoiceCommandParser.parse("下午三点一刻关空调")
         XCTAssertEqual(s5?.command, .schedulePower(hour: 15, minute: 15, power: false))
+
+        let s6 = VoiceCommandParser.parse("十点两刻关机")
+        XCTAssertEqual(s6?.command, .schedulePower(hour: 10, minute: 30, power: false))
+
+        let s7 = VoiceCommandParser.parse("十点二刻开机")
+        XCTAssertEqual(s7?.command, .schedulePower(hour: 10, minute: 30, power: true))
+
+        let s8 = VoiceCommandParser.parse("十点2刻关机")
+        XCTAssertEqual(s8?.command, .schedulePower(hour: 10, minute: 30, power: false))
+
+        // 小时与半小时口语测试 (v1.9.46 根除包含“个”字口语失效盲区)
+        let cd1 = VoiceCommandParser.parse("半个小时后关机")
+        XCTAssertEqual(cd1?.command, .countdownPower(minutes: 30, power: false))
+
+        let cd2 = VoiceCommandParser.parse("半个小时后开机")
+        XCTAssertEqual(cd2?.command, .countdownPower(minutes: 30, power: true))
+
+        let cd3 = VoiceCommandParser.parse("一个小时后关机")
+        XCTAssertEqual(cd3?.command, .countdownPower(minutes: 60, power: false))
+
+        let cd4 = VoiceCommandParser.parse("1个小时后关机")
+        XCTAssertEqual(cd4?.command, .countdownPower(minutes: 60, power: false))
+
+        let cd5 = VoiceCommandParser.parse("两个小时后关机")
+        XCTAssertEqual(cd5?.command, .countdownPower(minutes: 120, power: false))
+
+        let cd6 = VoiceCommandParser.parse("2个小时后关机")
+        XCTAssertEqual(cd6?.command, .countdownPower(minutes: 120, power: false))
+
+        let cd7 = VoiceCommandParser.parse("三个小时后关机")
+        XCTAssertEqual(cd7?.command, .countdownPower(minutes: 180, power: false))
+
+        let cd8 = VoiceCommandParser.parse("3个小时后关机")
+        XCTAssertEqual(cd8?.command, .countdownPower(minutes: 180, power: false))
+
+        let cd9 = VoiceCommandParser.parse("二刻钟后关机")
+        XCTAssertEqual(cd9?.command, .countdownPower(minutes: 30, power: false))
+
+        let cd10 = VoiceCommandParser.parse("一刻后关机")
+        XCTAssertEqual(cd10?.command, .countdownPower(minutes: 15, power: false))
+
+        let cd11 = VoiceCommandParser.parse("两刻后关机")
+        XCTAssertEqual(cd11?.command, .countdownPower(minutes: 30, power: false))
+
+        let cd12 = VoiceCommandParser.parse("二刻后关机")
+        XCTAssertEqual(cd12?.command, .countdownPower(minutes: 30, power: false))
+
+        let cd13 = VoiceCommandParser.parse("三刻后关机")
+        XCTAssertEqual(cd13?.command, .countdownPower(minutes: 45, power: false))
+
+        // 全关 / 全开 扩展测试 (v1.9.46)
+        let po1 = VoiceCommandParser.parse("全关")
+        XCTAssertEqual(po1?.command, .turnOffAll)
+
+        let po2 = VoiceCommandParser.parse("全开")
+        XCTAssertEqual(po2?.command, .turnOnAll)
+
+        let po3 = VoiceCommandParser.parse("全部关")
+        XCTAssertEqual(po3?.command, .turnOffAll)
+
+        let po4 = VoiceCommandParser.parse("全部开")
+        XCTAssertEqual(po4?.command, .turnOnAll)
     }
 
     // MARK: - 滤网健康度查询测试 (v1.9.44)

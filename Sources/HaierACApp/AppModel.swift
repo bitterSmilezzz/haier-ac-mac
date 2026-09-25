@@ -722,9 +722,10 @@ final class AppModel: ObservableObject {
         let dailyMinutes: Double
         let isHistorical: Bool
         if activeRecords.count >= 3 {
-            let avgTotalMins = Double(activeRecords.map { $0.totalMinutes }.reduce(0, +)) / Double(activeRecords.count)
+            // 优先采用真实设备机时 totalDeviceMinutes 计算多设备日均负载，消除以墙钟时间估算的系统性偏差 (v1.9.46)
+            let avgDeviceMins = Double(activeRecords.map { $0.totalDeviceMinutes > 0 ? $0.totalDeviceMinutes : $0.totalMinutes }.reduce(0, +)) / Double(activeRecords.count)
             let devCount = max(1, allUnifiedDevices.count)
-            dailyMinutes = max(30.0, avgTotalMins / Double(devCount))
+            dailyMinutes = max(30.0, avgDeviceMins / Double(devCount))
             isHistorical = true
         } else {
             dailyMinutes = 6.0 * 60.0 // 标准默认 6 小时/天

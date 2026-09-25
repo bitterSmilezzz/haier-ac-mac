@@ -6,6 +6,20 @@ A native SwiftUI app to control Haier / Leader (统帅) smart air conditioners o
 
 ## Features
 
+- 🏷 **Natural Language Colloquial Hours & Two-Quarter Alignment, All-Season Heating Humidity Dynamics, Status Bar Wind Speed Matrix & Siri Wind Speed Intent (v1.9.46)**:
+  - ⏱️ **Natural Language Colloquial Hours ("X个小时/半个小时") & Two-Quarter Clock Defect Eradication (`VoiceCommandParser` / `VoiceCommandParserTests`)**:
+    - Completely eliminated the widespread failure for colloquial hour countdowns containing classifier "个": restructured `hourPattern` to `(?:个?小时|个钟头)`, fixing recognition failure for "一个小时后关机", "两个小时后关机", "2个小时后关机", and "三个小时后关机"; added mapping for "半个小时后开机/关机" (30 min);
+    - Resolved the severe time drift where "十点两刻关机", "十点二刻关机", and "十点2刻关机" were miscalculated as `10:02` (error of 28 minutes), precisely mapping them to 10:30;
+    - Added "二刻钟" -> 30 min, and colloquial quarter-hour countdowns without "钟" ("一刻后" -> 15 min, "两刻后/二刻后" -> 30 min, "三刻后" -> 45 min);
+    - Expanded whole-house quick power commands to seamlessly handle "全关/全部关/全都关" and "全开/全部开/全都开".
+  - ❄️ **Heating Mode Environmental Humidity Thermodynamics & Filter Lifetime Dimension Alignment (`EnergyAnalyticsEngine` / `AppModel`)**:
+    - Integrated environmental humidity compensation into `EnergyAnalyticsEngine.estimateInstantaneousPower` (`.heating`): high-humidity winter environments ($\text{RH} \ge 65\%$) account for outdoor coil frosting and high-pressure defrosting cycles (+75W peak boost), while dry environments ($\text{RH} \le 40\%$) compensate for thermal convection enthalpy (+30W peak boost), achieving 100% thermodynamic symmetry with cooling and auto modes;
+    - Enhanced `AppModel.estimatedFilterRemainingDays` to prefer true accumulated machine runtime `totalDeviceMinutes` across all units rather than wall-clock duration, eliminating multi-device workload distortion.
+  - 🍃 **macOS Native Menu Bar Full-House & Per-Device Wind Speed Control Matrix (`StatusItemController`)**:
+    - Added a cascading "🍃 全屋风速协同" submenu to status bar right-click context menu, supporting synchronized Quiet (微风), Medium (中风), Turbo (强劲), and Auto (自动) speed control;
+    - Added a "🍃 调节风速 (当前: XX)" submenu in each room's cascading menu within the AC control matrix; single-device mode also features the quick wind speed submenu.
+  - 🎙️ **Siri / Shortcuts Wind Speed Intent (`AppIntents`)**:
+    - Implemented `SetACWindSpeedIntent`, supporting Siri voice commands and Shortcuts workflows to set AC wind speeds ("用海尔空调设置风速为微风", "全屋调节风速为强劲"), finalizing system automation across all four foundational AC control axes.
 - 🏷 **Filter Maintenance Reset & Full-House Batch Reset, Status Bar Quick Reset Matrix & Cooling Mode Latent Heat Dynamics (v1.9.45)**:
   - 🧼 **Filter Maintenance Reset Voice & Siri Shortcuts End-to-End Loop (`VoiceCommandParser` / `VoiceCapsuleWindowController` / `AppIntents` / `AppModel` / `VoiceCommandParserTests`)**:
     - Completely resolved the major cognitive defect where users saying "滤网已清洗" (filter cleaned), "滤网洗好了", "洗完滤网了", "重置滤网" (reset filter), "复位滤网", or "滤网换好了" after washing/replacing filters were erroneously intercepted by query logic due to the word "洗", prompting the app to state "filter cleanliness is low, cleaning recommended";

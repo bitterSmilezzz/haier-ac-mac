@@ -319,17 +319,34 @@ public final class EnergyAnalyticsEngine: ObservableObject {
             return min(max(power, 200.0), 730.0)
 
         case .heating:
-            // 制热模式：变频温差动力学模型 + 恒温平衡区低频维持态阻尼 + 低温速热 PTC 辅助电热动力学 (v1.9.36, v1.9.39)
+            // 制热模式：变频温差动力学模型 + 恒温平衡区低频维持态阻尼 + 环境湿度结霜化霜/干燥热焓补偿 + 低温速热 PTC 辅助电热动力学 (v1.9.36, v1.9.39, v1.9.46)
             let indoor = indoorTemp ?? 18.0
             let target = targetTemp ?? 20.0
             let delta = target - indoor
+
+            // 环境湿度热力学动力学校准 (v1.9.46)：
+            // 典型变频空调制热热力学：
+            // 1. 高湿阴冷工况 (RH >= 65%)：室外换热器表面极易析霜结冰导致吸热阻抗剧增，变频系统提高排气温度压比并触发化霜热负荷补偿 (最高 +75W)；
+            // 2. 干燥低湿工况 (RH <= 40%)：干燥空气定压比热容偏低且人体蒸发散热加快，系统增强热风对流维持热焓 (最高 +30W)
+            let heatHumComp: Double = {
+                guard let hum = indoorHumidity else { return 0.0 }
+                if hum >= 65.0 {
+                    let excess = min(30.0, hum - 65.0)
+                    return excess * 2.5 // 最高 +75W 结霜化霜与高压补偿
+                } else if hum <= 40.0 {
+                    let deficit = min(20.0, 40.0 - hum)
+                    return deficit * 1.5 // 最高 +30W 干燥空气热焓维持补偿
+                }
+                return 0.0
+            }()
+
             let power: Double
             if delta <= 0.0 {
                 // 已达到或高于设定温度：压缩机进入超节能恒温维持态
-                power = 300.0 + (windOffset * 0.6)
+                power = 300.0 + (windOffset * 0.6) + (heatHumComp * 0.4)
             } else if delta < 1.0 {
                 // 接近目标温差 (0 < ΔT < 1.0°C)：平滑过渡至稳态低频
-                power = 300.0 + (delta * 250.0) + (windOffset * 0.8)
+                power = 300.0 + (delta * 250.0) + (windOffset * 0.8) + (heatHumComp * 0.7)
             } else {
                 // 变频重载升温区 (ΔT >= 1.0°C)
                 // 严寒低温速热热力补偿：当室内温度偏低（indoor <= 15°C）且大温差升温（delta >= 5.0°C）时，
@@ -342,7 +359,7 @@ public final class EnergyAnalyticsEngine: ObservableObject {
                     }
                     return 0.0
                 }()
-                power = 550.0 + ((delta - 1.0) * 110.0) + windOffset + coldBoost
+                power = 550.0 + ((delta - 1.0) * 110.0) + windOffset + coldBoost + heatHumComp
             }
             return min(max(power, 220.0), 1950.0)
 

@@ -334,8 +334,8 @@ public struct VoiceCommandParser {
         var totalMinutes = 0
         var found = false
 
-        // 匹配 X小时 或 X个钟头
-        let hourPattern = #"(\d+(?:\.\d+)?)\s*(?:小时|个钟头)"#
+        // 匹配 X小时 或 X个小时 或 X个钟头 (v1.9.46 覆盖日常高频“一个小时/两个小时/2个小时”等)
+        let hourPattern = #"(\d+(?:\.\d+)?)\s*(?:个?小时|个钟头)"#
         if let regex = try? NSRegularExpression(pattern: hourPattern) {
             let ns = normalized as NSString
             if let match = regex.matches(in: normalized, range: NSRange(location: 0, length: ns.length)).first {
@@ -503,6 +503,7 @@ public struct VoiceCommandParser {
             "关闭所有空调", "关掉所有空调", "关闭全部空调", "关掉全部空调",
             "关所有空调", "关全部空调", "全屋关机", "全部关机", "全关了", "都关了", "全都关了",
             "关闭全屋空调", "关掉全屋空调", "全屋关空调", "所有空调关机", "全屋关",
+            "全关", "全部关", "全都关", "通通关了", "统统关了",
             "把所有的空调都关了", "把所有空调都关了", "把空调都关了", "把空调全都关了",
             "把所有的空调都关掉", "把所有空调都关掉", "把空调都关掉", "把空调全都关掉",
             "把全部空调关了", "把全部空调关掉", "所有空调都关了", "全部空调都关了",
@@ -654,6 +655,7 @@ public struct VoiceCommandParser {
             "打开所有空调", "开启所有空调", "打开全部空调", "开启全部空调",
             "开所有空调", "开全部空调", "全屋开机", "全部开机", "全开了", "都开了", "全都开了",
             "开启全屋空调", "打开全屋空调", "全屋开空调", "所有空调开机", "全屋开",
+            "全开", "全部开", "全都开", "通通开了", "统统开了",
             "把所有的空调都开了", "把所有空调都开了", "把空调都打开", "把空调全都打开",
             "把所有的空调都打开", "把所有空调都打开", "把全部空调打开", "把全部空调开了",
             "所有空调都开了", "全部空调都开了", "所有空调打开", "全部空调打开",
@@ -972,11 +974,12 @@ public struct VoiceCommandParser {
             }
         }
 
-        // 单独的固定搭配与刻度归一 (v1.9.44 彻底根治“一刻钟后关机”无法识别与“十点一刻关机”被误判为 10:01 的口语缺陷)
+        // 单独的固定搭配与刻度归一 (v1.9.44 解决“一刻钟后关机”与“十点一刻关机”缺陷, v1.9.46 根除“半个小时”、“二刻钟”、“两刻/二刻后”、“十点两刻/十点二刻”等映射缺失与误判为 10:02 的严重缺陷)
         str = str.replacingOccurrences(of: "一个半小时", with: "1.5小时")
         str = str.replacingOccurrences(of: "1个半小时", with: "1.5小时")
         str = str.replacingOccurrences(of: "一个半钟头", with: "1.5小时")
         str = str.replacingOccurrences(of: "1个半钟头", with: "1.5小时")
+        str = str.replacingOccurrences(of: "半个小时", with: "30分钟")
         str = str.replacingOccurrences(of: "半个钟头", with: "30分钟")
         str = str.replacingOccurrences(of: "半钟头", with: "30分钟")
         str = str.replacingOccurrences(of: "半小时", with: "30分钟")
@@ -986,12 +989,26 @@ public struct VoiceCommandParser {
         str = str.replacingOccurrences(of: "1刻钟", with: "15分钟")
         str = str.replacingOccurrences(of: "两刻钟", with: "30分钟")
         str = str.replacingOccurrences(of: "2刻钟", with: "30分钟")
+        str = str.replacingOccurrences(of: "二刻钟", with: "30分钟")
         str = str.replacingOccurrences(of: "三刻钟", with: "45分钟")
         str = str.replacingOccurrences(of: "3刻钟", with: "45分钟")
+        str = str.replacingOccurrences(of: "一刻后", with: "15分钟后")
+        str = str.replacingOccurrences(of: "1刻后", with: "15分钟后")
+        str = str.replacingOccurrences(of: "两刻后", with: "30分钟后")
+        str = str.replacingOccurrences(of: "2刻后", with: "30分钟后")
+        str = str.replacingOccurrences(of: "二刻后", with: "30分钟后")
+        str = str.replacingOccurrences(of: "三刻后", with: "45分钟后")
+        str = str.replacingOccurrences(of: "3刻后", with: "45分钟后")
         str = str.replacingOccurrences(of: "点一刻", with: "点15分")
         str = str.replacingOccurrences(of: "时一刻", with: "点15分")
         str = str.replacingOccurrences(of: "点1刻", with: "点15分")
         str = str.replacingOccurrences(of: "时1刻", with: "点15分")
+        str = str.replacingOccurrences(of: "点两刻", with: "点30分")
+        str = str.replacingOccurrences(of: "时两刻", with: "点30分")
+        str = str.replacingOccurrences(of: "点二刻", with: "点30分")
+        str = str.replacingOccurrences(of: "时二刻", with: "点30分")
+        str = str.replacingOccurrences(of: "点2刻", with: "点30分")
+        str = str.replacingOccurrences(of: "时2刻", with: "点30分")
         str = str.replacingOccurrences(of: "点三刻", with: "点45分")
         str = str.replacingOccurrences(of: "时三刻", with: "点45分")
         str = str.replacingOccurrences(of: "点3刻", with: "点45分")

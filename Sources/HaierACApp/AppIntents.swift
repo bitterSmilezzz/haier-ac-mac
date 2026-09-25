@@ -131,6 +131,50 @@ struct SetACModeIntent: AppIntent {
     }
 }
 
+// MARK: - 调节风速 (v1.9.46)
+
+struct SetACWindSpeedIntent: AppIntent {
+    static var title: LocalizedStringResource = "设置空调风速"
+    static var description = IntentDescription("设置海尔空调的风速（微风/中风/强劲/自动）", categoryName: "空调控制")
+
+    @Parameter(title: "风速", description: "如：微风、中风、强劲、自动")
+    var windSpeed: String
+
+    @Parameter(title: "设备名称", description: "可选；留空使用主设备，填“全屋”或“全部”统一调节所有设备")
+    var deviceName: String?
+
+    @MainActor
+    func perform() async throws -> some IntentResult & ProvidesDialog {
+        let model = AppModel.shared
+        guard model.gatewayConnected else {
+            throw ACIntentError.message("空调连接中断，请稍后重试")
+        }
+
+        if let name = deviceName, (name.contains("全") || name.contains("所有")) {
+            let count = model.setWindSpeedAll(speedName: windSpeed, autoPowerOn: false)
+            guard count > 0 else {
+                throw ACIntentError.message("未能完成全屋风速调节，当前无可用在线空调")
+            }
+            return .result(dialog: "已将全屋 \(count) 台空调风速统一设为「\(windSpeed)」")
+        }
+
+        guard let deviceId = resolveDeviceId(named: deviceName) else {
+            throw ACIntentError.message("没有可控制的空调设备")
+        }
+        let reach = model.reachability(for: deviceId)
+        guard reach.isControllable else {
+            let devName = model.allUnifiedDevices.first(where: { $0.id == deviceId })?.name ?? "目标空调"
+            throw ACIntentError.message("\(devName)当前离线或不可控")
+        }
+        let count = model.setWindSpeed(deviceIds: [deviceId], speedName: windSpeed, autoPowerOn: false)
+        guard count > 0 else {
+            throw ACIntentError.message("风速「\(windSpeed)」设置失败")
+        }
+        let devName = model.allUnifiedDevices.first(where: { $0.id == deviceId })?.name ?? "空调"
+        return .result(dialog: "已将「\(devName)」风速设为「\(windSpeed)」")
+    }
+}
+
 // MARK: - 应用情景
 
 struct ApplyACSceneIntent: AppIntent {
@@ -514,6 +558,16 @@ struct ACAppShortcuts: AppShortcutsProvider {
                     shortTitle: "重置滤网",
                     systemImageName: "arrow.counterclockwise"
                 ),
+                AppShortcut(
+                    intent: SetACWindSpeedIntent(),
+                    phrases: [
+                        "用 \(.applicationName) 调节风速",
+                        "用 \(.applicationName) 设置风速",
+                        "\(.applicationName) 调整风速",
+                    ],
+                    shortTitle: "调节风速",
+                    systemImageName: "wind"
+                ),
             ]
         } else {
             return [
@@ -605,6 +659,13 @@ struct ACAppShortcuts: AppShortcutsProvider {
                         "用 \(.applicationName) 重置滤网",
                         "\(.applicationName) 滤网已清洗",
                         "\(.applicationName) 滤网洗好了",
+                    ]
+                ),
+                AppShortcut(
+                    intent: SetACWindSpeedIntent(),
+                    phrases: [
+                        "用 \(.applicationName) 调节风速",
+                        "用 \(.applicationName) 设置风速",
                     ]
                 ),
             ]

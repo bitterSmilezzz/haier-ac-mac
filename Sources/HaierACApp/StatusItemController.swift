@@ -350,6 +350,26 @@ final class StatusItemController: NSObject {
             stepDownAllItem.isEnabled = canStepDownAll
             menu.addItem(stepDownAllItem)
 
+            // 全屋统一风速协同 (v1.9.46)
+            let windMenu = NSMenu()
+            windMenu.autoenablesItems = false
+            let windLevels: [(val: String, title: String)] = [
+                ("微风", "🍃 微风 (静音舒适)"),
+                ("中风", "🍃 中风 (适中循环)"),
+                ("强劲", "🍃 强劲 (极速对流)"),
+                ("自动", "🔄 自动风速")
+            ]
+            for itemDef in windLevels {
+                let item = NSMenuItem(title: itemDef.title, action: #selector(setAllWindSpeedFromMenu(_:)), keyEquivalent: "")
+                item.target = self
+                item.representedObject = itemDef.val
+                item.isEnabled = hasControllable
+                windMenu.addItem(item)
+            }
+            let windParentItem = NSMenuItem(title: "🍃 全屋风速协同\(countDesc)...", action: nil, keyEquivalent: "")
+            menu.setSubmenu(windMenu, for: windParentItem)
+            menu.addItem(windParentItem)
+
             if !offDevices.isEmpty {
                 let turnOnAllItem = NSMenuItem(title: "⏻ 开启全屋空调 (\(offDevices.count) 台待机)", action: #selector(turnOnAllDevices), keyEquivalent: "")
                 turnOnAllItem.target = self
@@ -479,6 +499,23 @@ final class StatusItemController: NSObject {
                 downItem.isEnabled = isControllable && isPowerOn && curTemp > 16.0
                 devSubmenu.addItem(downItem)
 
+                // 调节风速 (v1.9.46)
+                let curWind = model.attribute("windSpeed", deviceId: devId)?.stringValue ?? "微风"
+                let devWindMenu = NSMenu()
+                devWindMenu.autoenablesItems = false
+                for itemDef in windLevels {
+                    let isSelected = curWind.contains(itemDef.val) || (itemDef.val == "强劲" && (curWind.contains("强") || curWind.contains("高")))
+                    let check = isSelected ? "✓ " : ""
+                    let item = NSMenuItem(title: "\(check)\(itemDef.title)", action: #selector(setDeviceWindSpeedFromMenu(_:)), keyEquivalent: "")
+                    item.target = self
+                    item.representedObject = ["deviceId": devId, "speed": itemDef.val]
+                    item.isEnabled = isControllable
+                    devWindMenu.addItem(item)
+                }
+                let devWindParentItem = NSMenuItem(title: "🍃 调节风速 (当前: \(curWind))", action: nil, keyEquivalent: "")
+                devSubmenu.setSubmenu(devWindMenu, for: devWindParentItem)
+                devSubmenu.addItem(devWindParentItem)
+
                 // 滤网洁净度与快速重置 (v1.9.45)
                 let filterPct = model.filterCleanlinessPercentage(for: devId)
                 let filterStatus = filterPct <= 20 ? "⚠️ 需拆洗" : "良好"
@@ -554,6 +591,29 @@ final class StatusItemController: NSObject {
             stepDownItem.target = self
             stepDownItem.isEnabled = isControllable && isPowerOn && curTemp > 16.0
             menu.addItem(stepDownItem)
+
+            // 调节风速 (v1.9.46)
+            let curWind = model.attribute("windSpeed", deviceId: dev.id)?.stringValue ?? "微风"
+            let singleWindLevels: [(val: String, title: String)] = [
+                ("微风", "🍃 微风 (静音舒适)"),
+                ("中风", "🍃 中风 (适中循环)"),
+                ("强劲", "🍃 强劲 (极速对流)"),
+                ("自动", "🔄 自动风速")
+            ]
+            let singleWindMenu = NSMenu()
+            singleWindMenu.autoenablesItems = false
+            for itemDef in singleWindLevels {
+                let isSelected = curWind.contains(itemDef.val) || (itemDef.val == "强劲" && (curWind.contains("强") || curWind.contains("高")))
+                let check = isSelected ? "✓ " : ""
+                let item = NSMenuItem(title: "\(check)\(itemDef.title)", action: #selector(setPrimaryWindSpeedFromMenu(_:)), keyEquivalent: "")
+                item.target = self
+                item.representedObject = itemDef.val
+                item.isEnabled = isControllable
+                singleWindMenu.addItem(item)
+            }
+            let singleWindItem = NSMenuItem(title: "🍃 调节风速 (当前: \(curWind))", action: nil, keyEquivalent: "")
+            menu.setSubmenu(singleWindMenu, for: singleWindItem)
+            menu.addItem(singleWindItem)
         }
 
         let openItem = NSMenuItem(title: "打开主窗口", action: #selector(openMainWindow), keyEquivalent: "")
@@ -837,6 +897,30 @@ final class StatusItemController: NSObject {
             model.resetFilterMaintenance(for: primaryId)
         } else {
             model.resetAllFilterMaintenance()
+        }
+        refreshTemperature()
+    }
+
+    @objc private func setAllWindSpeedFromMenu(_ sender: NSMenuItem) {
+        guard let speed = sender.representedObject as? String else { return }
+        _ = model.setWindSpeedAll(speedName: speed, autoPowerOn: false)
+        refreshTemperature()
+    }
+
+    @objc private func setDeviceWindSpeedFromMenu(_ sender: NSMenuItem) {
+        guard let dict = sender.representedObject as? [String: String],
+              let devId = dict["deviceId"],
+              let speed = dict["speed"] else { return }
+        _ = model.setWindSpeed(deviceIds: [devId], speedName: speed, autoPowerOn: false)
+        refreshTemperature()
+    }
+
+    @objc private func setPrimaryWindSpeedFromMenu(_ sender: NSMenuItem) {
+        guard let speed = sender.representedObject as? String else { return }
+        if let primaryId = primaryDeviceId {
+            _ = model.setWindSpeed(deviceIds: [primaryId], speedName: speed, autoPowerOn: false)
+        } else {
+            _ = model.setWindSpeedAll(speedName: speed, autoPowerOn: false)
         }
         refreshTemperature()
     }
