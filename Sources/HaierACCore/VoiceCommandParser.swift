@@ -865,20 +865,38 @@ public struct VoiceCommandParser {
         }
         let isAll = isAllDeviceScope(text)
         let matched: (speed: String, desc: String)? = {
-            if text.contains("自动风") || text.contains("风速自动") || text.contains("自动风速") {
+            // 1. 自动风档位 (v1.9.47 支持 4档/四档/智能风等别名)
+            if text.contains("自动风") || text.contains("风速自动") || text.contains("自动风速") ||
+               text.contains("四档") || text.contains("4档") || text.contains("第4档") || text.contains("第四档") ||
+               text.contains("风速4") || text.contains("风速四") || text.contains("智能风") {
                 return ("自动", "自动风速")
             }
+            // 2. 强劲 / 高风 / 3档 / 开大风 (v1.9.47 覆盖动词间隔与档位口语，如“把风开大/风调大点/三档风”)
             if text.contains("大风") || text.contains("风大") || text.contains("强劲") || text.contains("高风") ||
                text.contains("最大风") || text.contains("最大") || text.contains("调大风") || text.contains("风速大") ||
-               text.contains("高速风") || text.contains("开到最大") {
+               text.contains("高速风") || text.contains("开到最大") || text.contains("强风") || text.contains("极速") ||
+               text.contains("三档") || text.contains("3档") || text.contains("第3档") || text.contains("第三档") ||
+               text.contains("风速3") || text.contains("风速三") || text.contains("高档") || text.contains("风速调大") ||
+               text.contains("风开大") || text.contains("把风开大") || text.contains("风调大") || text.contains("风大点") ||
+               text.contains("调大风速") || text.contains("开大风速") || text.contains("吹大风") {
                 return ("强劲", "强劲风速")
             }
+            // 3. 微风 / 柔风 / 1档 / 静音 / 开小风 (v1.9.47 覆盖动词间隔与档位口语，如“把风开小/风调小点/一档风”)
             if text.contains("小风") || text.contains("风小") || text.contains("微风") || text.contains("低风") ||
                text.contains("静音") || text.contains("柔风") || text.contains("最小风") || text.contains("调小风") ||
-               text.contains("风速小") || text.contains("低速风") || text.contains("开到最小") {
+               text.contains("风速小") || text.contains("低速风") || text.contains("开到最小") || text.contains("弱风") ||
+               text.contains("一档") || text.contains("1档") || text.contains("第1档") || text.contains("第一档") ||
+               text.contains("风速1") || text.contains("风速一") || text.contains("低档") || text.contains("慢速") ||
+               text.contains("风速调小") || text.contains("风开小") || text.contains("把风开小") || text.contains("风调小") ||
+               text.contains("风小点") || text.contains("调小风速") || text.contains("开小风速") || text.contains("吹微风") ||
+               text.contains("吹小风") {
                 return ("微风", "微风模式")
             }
-            if text.contains("中风") || text.contains("适中") || text.contains("风速中") || text.contains("中速风") {
+            // 4. 中风 / 适中 / 2档 (v1.9.47 支持 2档/二档/两档/中档等别名)
+            if text.contains("中风") || text.contains("适中") || text.contains("风速中") || text.contains("中速风") ||
+               text.contains("二档") || text.contains("2档") || text.contains("两档") || text.contains("第2档") ||
+               text.contains("第二档") || text.contains("风速2") || text.contains("风速二") || text.contains("中档") ||
+               text.contains("中速") || text.contains("标准风") || text.contains("吹中风") {
                 return ("中风", "中档风速")
             }
             return nil
@@ -1012,11 +1030,20 @@ public struct VoiceCommandParser {
         str = str.replacingOccurrences(of: "点三刻", with: "点45分")
         str = str.replacingOccurrences(of: "时三刻", with: "点45分")
         str = str.replacingOccurrences(of: "点3刻", with: "点45分")
-        str = str.replacingOccurrences(of: "时3刻", with: "点45分")
         str = str.replacingOccurrences(of: "一百", with: "100")
-        str = str.replacingOccurrences(of: "点五", with: ".5")
 
-        // 匹配 [一二两三四五六七八九]?十[一二三四五六七八九]? 复合中文数字（如：四十五 -> 45，四十 -> 40，十五 -> 15，十 -> 10）
+        // 温度与时间小数转换：仅匹配紧跟“度/°/小时/个钟头”的小数点五（如“二十六点五度” -> 26.5度，“1点5小时” -> 1.5小时）
+        // 彻底杜绝无上下文粗暴替换“点五”导致“十点五分/八点五分/十点五十分”被破坏为“10.5分”进而被误判为5分钟倒计时的灾难性缺陷 (v1.9.47)
+        let decimalPointPattern = #"([一二两三四五六七八九\d]+)点五(?=度|°|个?小时|个钟头)"#
+        if let regex = try? NSRegularExpression(pattern: decimalPointPattern) {
+            let ns = str as NSString
+            let matches = regex.matches(in: str, range: NSRange(location: 0, length: ns.length)).reversed()
+            for m in matches {
+                let prefix = ns.substring(with: m.range(at: 1))
+                let range = Range(m.range, in: str)!
+                str.replaceSubrange(range, with: "\(prefix).5")
+            }
+        }
         let compoundPattern = #"([一二两三四五六七八九])?十([一二三四五六七八九])?"#
         if let regex = try? NSRegularExpression(pattern: compoundPattern) {
             let ns = str as NSString

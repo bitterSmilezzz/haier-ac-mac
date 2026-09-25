@@ -350,7 +350,7 @@ final class StatusItemController: NSObject {
             stepDownAllItem.isEnabled = canStepDownAll
             menu.addItem(stepDownAllItem)
 
-            // 全屋统一风速协同 (v1.9.46)
+            // 全屋统一风速协同 (v1.9.46, v1.9.47 增加运行台数动态感知与全屋协同一致性勾选反馈)
             let windMenu = NSMenu()
             windMenu.autoenablesItems = false
             let windLevels: [(val: String, title: String)] = [
@@ -359,14 +359,28 @@ final class StatusItemController: NSObject {
                 ("强劲", "🍃 强劲 (极速对流)"),
                 ("自动", "🔄 自动风速")
             ]
+            let allOnSameSpeed: String? = {
+                guard !onDevices.isEmpty else { return nil }
+                let speeds = Set(onDevices.map { dev -> String in
+                    let raw = model.attribute("windSpeed", deviceId: dev.id)?.stringValue ?? "微风"
+                    if raw.contains("微") || raw.contains("低") || raw.contains("静") || raw.contains("1") { return "微风" }
+                    if raw.contains("中") || raw.contains("2") { return "中风" }
+                    if raw.contains("强") || raw.contains("高") || raw.contains("大") || raw.contains("3") { return "强劲" }
+                    return "自动"
+                })
+                return speeds.count == 1 ? speeds.first : nil
+            }()
+
             for itemDef in windLevels {
-                let item = NSMenuItem(title: itemDef.title, action: #selector(setAllWindSpeedFromMenu(_:)), keyEquivalent: "")
+                let isSelected = (allOnSameSpeed == itemDef.val)
+                let check = isSelected ? "✓ " : ""
+                let item = NSMenuItem(title: "\(check)\(itemDef.title)", action: #selector(setAllWindSpeedFromMenu(_:)), keyEquivalent: "")
                 item.target = self
                 item.representedObject = itemDef.val
                 item.isEnabled = hasControllable
                 windMenu.addItem(item)
             }
-            let windParentItem = NSMenuItem(title: "🍃 全屋风速协同\(countDesc)...", action: nil, keyEquivalent: "")
+            let windParentItem = NSMenuItem(title: "🍃 全屋风速协同\(runningCountDesc)...", action: nil, keyEquivalent: "")
             menu.setSubmenu(windMenu, for: windParentItem)
             menu.addItem(windParentItem)
 

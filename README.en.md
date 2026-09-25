@@ -6,6 +6,21 @@ A native SwiftUI app to control Haier / Leader (统帅) smart air conditioners o
 
 ## Features
 
+- 🏷 **Natural Language Half-Past Time Downgrade Protection, Full Wind Speed & Gear Mapping, Auto Mode Heating Humidity Dynamics & Status Bar Visual Perception (v1.9.47)**:
+  - ⏱️ **Natural Language Clock Time "点五" Protection Against Accidental Countdown Downgrades (`VoiceCommandParser` / `VoiceCommandParserTests`)**:
+    - Permanently eradicated the critical parsing defect caused by global unconditional replacement `str.replacingOccurrences(of: "点五", with: ".5")` in `convertChineseNumbers`: previously, everyday clock scheduling phrases like "十点五分关机/开机" (turn off/on at 10:05), "晚上8点5分关机", and "十点五十分关机" were corrupted into "10.5分关机" or "10.5十分关机", stripping the clock indicator "点" and causing `parseScheduleTime` to return `nil`, which was then seized by `parseCountdownMinutes` and misclassified as a 5-minute countdown (`.countdownPower(minutes: 5)`);
+    - Replaced with strict contextual regex matching (`([一二两三四五六七八九\d]+)点五(?=度|°|个?小时|个钟头)`), ensuring decimal conversion occurs exclusively before temperature or hour units, completely preserving minutes in clock times;
+    - Added comprehensive regression tests for "十点五分关机/开机", "十点零五分", "10点5分", "十点五十分", and "全屋晚上8点5分关空调".
+  - 🍃 **Natural Language Wind Speed Colloquial Blind Spots & Gear Mapping Loop (`VoiceCommandParser` / `AppModel` / `VoiceCommandParserTests`)**:
+    - Completely resolved the recognition failure for colloquial verb-separated wind speed phrases ("把风开大/风调大点/风开大点/把风开小/风调小点/风开小点/调大风速/调小风速/风大点/风小点");
+    - Added full mapping for numerical and ordinal gears (1~4档, 一至四档, 低中高档, 极速风, 慢速, 柔风, 静音) mapping accurately to Quiet (微风), Medium (中风), Turbo (强劲), and Auto (自动);
+    - Integrated multi-level normalization engine in `AppModel.setWindSpeed` to eliminate the regression where gear aliases fell back to "0" (Auto), ensuring 100% accurate dispatch across Voice, Siri Shortcuts, and Status Bar.
+  - ❄️ **Auto Mode Heating Branch Full-Climate Environmental Humidity Thermodynamics Alignment (`EnergyAnalyticsEngine`)**:
+    - In `EnergyAnalyticsEngine.estimateInstantaneousPower` (`.auto` heating branch `indoor < target`), aligned environmental humidity compensation with the standalone `.heating` mode: high-humidity frost/defrost cycles ($\text{RH} \ge 65\%$, up to +75W) and dry enthalpy compensation ($\text{RH} \le 40\%$, up to +30W), plus steady-state dampening;
+    - Achieves 100% strict thermodynamic physical symmetry between intelligent auto mode and standalone heating/cooling modes.
+  - 🍱 **macOS Native Status Bar Whole-House Wind Speed Visual Perception & Running Count Alignment (`StatusItemController`)**:
+    - The right-click "🍃 全屋风速协同" submenu title now dynamically reflects active running units (e.g. `(2台运行中)` or `(当前均未开机)`);
+    - Added synchronized consistency checkmark (`✓`): when all active running units share the same wind speed, a checkmark is displayed next to that speed, making whole-house ventilation status immediately transparent.
 - 🏷 **Natural Language Colloquial Hours & Two-Quarter Alignment, All-Season Heating Humidity Dynamics, Status Bar Wind Speed Matrix & Siri Wind Speed Intent (v1.9.46)**:
   - ⏱️ **Natural Language Colloquial Hours ("X个小时/半个小时") & Two-Quarter Clock Defect Eradication (`VoiceCommandParser` / `VoiceCommandParserTests`)**:
     - Completely eliminated the widespread failure for colloquial hour countdowns containing classifier "个": restructured `hourPattern` to `(?:个?小时|个钟头)`, fixing recognition failure for "一个小时后关机", "两个小时后关机", "2个小时后关机", and "三个小时后关机"; added mapping for "半个小时后开机/关机" (30 min);

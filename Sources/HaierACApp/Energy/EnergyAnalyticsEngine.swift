@@ -447,17 +447,22 @@ public final class EnergyAnalyticsEngine: ObservableObject {
             } else {
                 let delta = target - indoor
                 let power: Double
+                // 全气候环境湿度热力学动力学校准 (v1.9.47 与制热独立工况达成 100% 物理对称：冬季高湿结霜化霜补偿最高 +75W，干燥热焓补偿最高 +30W)
                 let heatHumOffset: Double = {
                     guard let hum = indoorHumidity else { return 0.0 }
-                    if hum <= 40.0 {
-                        return min(30.0, (40.0 - hum) * 1.0)
+                    if hum >= 65.0 {
+                        let excess = min(30.0, hum - 65.0)
+                        return excess * 2.5 // 最高 +75W 结霜化霜与高压补偿
+                    } else if hum <= 40.0 {
+                        let deficit = min(20.0, 40.0 - hum)
+                        return deficit * 1.5 // 最高 +30W 干燥空气热焓维持补偿
                     }
                     return 0.0
                 }()
                 if delta <= 0.0 {
-                    power = 300.0 + (windOffset * 0.6)
+                    power = 300.0 + (windOffset * 0.6) + (heatHumOffset * 0.4)
                 } else if delta < 1.0 {
-                    power = 300.0 + (delta * 250.0) + (windOffset * 0.8) + (heatHumOffset * 0.5)
+                    power = 300.0 + (delta * 250.0) + (windOffset * 0.8) + (heatHumOffset * 0.7)
                 } else {
                     // 严寒低温大温差 PTC 电辅热与大压比高频超载运转补偿
                     let coldBoost: Double = {

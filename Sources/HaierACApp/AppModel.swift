@@ -3012,25 +3012,46 @@ final class AppModel: ObservableObject {
             }
         }
 
+        // 归一化风速标准名称 (v1.9.47 支持一至四档/1~4档/低中高极速/静音等全量别名)
+        let normalizedSpeed: String = {
+            if speedName.contains("微") || speedName.contains("低") || speedName.contains("静") ||
+               speedName.contains("柔") || speedName.contains("小") || speedName.contains("1") || speedName.contains("一") {
+                return "微风"
+            }
+            if speedName.contains("中") || speedName.contains("2") || speedName.contains("二") || speedName.contains("两") {
+                return "中风"
+            }
+            if speedName.contains("强") || speedName.contains("高") || speedName.contains("大") ||
+               speedName.contains("极") || speedName.contains("3") || speedName.contains("三") {
+                return "强劲"
+            }
+            return "自动"
+        }()
+
         for devId in controllableIds {
             if let windAttr = attributes[devId]?["windSpeed"],
                case .list(let options) = windAttr.valueRange,
-               let match = options.first(where: { $0.desc.contains(speedName) || speedName.contains($0.desc) }) {
+               let match = options.first(where: {
+                   $0.desc.contains(speedName) || speedName.contains($0.desc) ||
+                   $0.desc.contains(normalizedSpeed) || normalizedSpeed.contains($0.desc)
+               }) {
                 sendAttribute("windSpeed", value: match.data, deviceId: devId)
             } else {
                 let val: String = {
-                    if speedName.contains("微") || speedName.contains("低") || speedName.contains("静") { return "1" }
-                    if speedName.contains("中") { return "2" }
-                    if speedName.contains("强") || speedName.contains("高") || speedName.contains("大") { return "3" }
-                    return "0"
+                    switch normalizedSpeed {
+                    case "微风": return "1"
+                    case "中风": return "2"
+                    case "强劲": return "3"
+                    default: return "0"
+                    }
                 }()
                 sendAttribute("windSpeed", value: .string(val), deviceId: devId)
             }
         }
 
         let desc = isAll
-            ? "✅ 已将全屋 \(controllableIds.count) 台空调风速统一设为「\(speedName)」"
-            : "✅ 已将所选 \(controllableIds.count) 台空调风速统一设为「\(speedName)」"
+            ? "✅ 已将全屋 \(controllableIds.count) 台空调风速统一设为「\(normalizedSpeed)」"
+            : "✅ 已将所选 \(controllableIds.count) 台空调风速统一设为「\(normalizedSpeed)」"
         operationNotice = OperationNotice(text: desc, isError: false)
         return controllableIds.count
     }
@@ -3065,7 +3086,7 @@ final class AppModel: ObservableObject {
         guard let url = URL(string: "https://api.github.com/repos/bitterSmilezzz/haier-ac-mac/releases/latest") else { return }
         var request = URLRequest(url: url)
         request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
-        let appVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.9.43"
+        let appVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.9.47"
         request.setValue("HaierAC-Mac/\(appVersion)", forHTTPHeaderField: "User-Agent")
         guard let (data, _) = try? await URLSession.shared.data(for: request),
               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],

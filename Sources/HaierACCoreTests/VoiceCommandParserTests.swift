@@ -900,6 +900,80 @@ final class VoiceCommandParserTests: XCTestCase {
         XCTAssertEqual(q2?.command, .queryFilterHealth)
     }
 
+    // MARK: - v1.9.47: 钟点时间“点五”防误降级为倒计时与动词间隔/档位风速测试
+
+    func testScheduleTimePointFiveProtection() {
+        // 彻底杜绝“十点五分/八点五分/十点五十分”被“点五”无上下文粗暴替换误判为 5 分钟倒计时 (v1.9.47)
+        let s1 = VoiceCommandParser.parse("十点五分关机")
+        XCTAssertEqual(s1?.command, .schedulePower(hour: 10, minute: 5, power: false))
+
+        let s2 = VoiceCommandParser.parse("10点5分关机")
+        XCTAssertEqual(s2?.command, .schedulePower(hour: 10, minute: 5, power: false))
+
+        let s3 = VoiceCommandParser.parse("十点零五分开机")
+        XCTAssertEqual(s3?.command, .schedulePower(hour: 10, minute: 5, power: true))
+
+        let s4 = VoiceCommandParser.parse("晚上8点5分关机")
+        XCTAssertEqual(s4?.command, .schedulePower(hour: 20, minute: 5, power: false))
+
+        let s5 = VoiceCommandParser.parse("十点五十分关机")
+        XCTAssertEqual(s5?.command, .schedulePower(hour: 10, minute: 50, power: false))
+
+        let s6 = VoiceCommandParser.parse("全屋晚上8点5分关空调")
+        XCTAssertEqual(s6?.command, .schedulePower(hour: 20, minute: 5, power: false))
+
+        // 保持温度与小时小数转换不受影响
+        let t1 = VoiceCommandParser.parse("二十六点五度")
+        XCTAssertEqual(t1?.command, .setTemperature(26.5))
+
+        let cd1 = VoiceCommandParser.parse("1点5小时后关机")
+        XCTAssertEqual(cd1?.command, .countdownPower(minutes: 90, power: false))
+    }
+
+    func testVerbSpacedAndGearWindSpeed() {
+        // 动词间隔风速口语测试 (v1.9.47)
+        let w1 = VoiceCommandParser.parse("把风开大点")
+        XCTAssertEqual(w1?.command, .setWindSpeed("强劲"))
+
+        let w2 = VoiceCommandParser.parse("风调大点")
+        XCTAssertEqual(w2?.command, .setWindSpeed("强劲"))
+
+        let w3 = VoiceCommandParser.parse("调大风速")
+        XCTAssertEqual(w3?.command, .setWindSpeed("强劲"))
+
+        let w4 = VoiceCommandParser.parse("把风开小点")
+        XCTAssertEqual(w4?.command, .setWindSpeed("微风"))
+
+        let w5 = VoiceCommandParser.parse("风开小")
+        XCTAssertEqual(w5?.command, .setWindSpeed("微风"))
+
+        let w6 = VoiceCommandParser.parse("风调小点")
+        XCTAssertEqual(w6?.command, .setWindSpeed("微风"))
+
+        // 档位口语测试 (v1.9.47)
+        let g1 = VoiceCommandParser.parse("一档风")
+        XCTAssertEqual(g1?.command, .setWindSpeed("微风"))
+
+        let g2 = VoiceCommandParser.parse("风速2档")
+        XCTAssertEqual(g2?.command, .setWindSpeed("中风"))
+
+        let g3 = VoiceCommandParser.parse("开三档风")
+        XCTAssertEqual(g3?.command, .setWindSpeed("强劲"))
+
+        let g4 = VoiceCommandParser.parse("风速调到四档")
+        XCTAssertEqual(g4?.command, .setWindSpeed("自动"))
+
+        // 全屋档位与动词间隔协同 (v1.9.47)
+        let gw1 = VoiceCommandParser.parse("全屋把风开大")
+        XCTAssertEqual(gw1?.command, .setWindSpeedAll("强劲"))
+
+        let gw2 = VoiceCommandParser.parse("所有空调三档风")
+        XCTAssertEqual(gw2?.command, .setWindSpeedAll("强劲"))
+
+        let gw3 = VoiceCommandParser.parse("全屋一档风")
+        XCTAssertEqual(gw3?.command, .setWindSpeedAll("微风"))
+    }
+
     // MARK: - 无效输入测试
 
     func testInvalidCommands() {
