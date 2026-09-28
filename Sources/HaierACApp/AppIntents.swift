@@ -537,6 +537,9 @@ struct ScheduleACPowerIntent: AppIntent {
     @Parameter(title: "每天重复", default: false)
     var repeatsDaily: Bool
 
+    @Parameter(title: "周期重复（工作日/周末/每天/每周一等）", description: "可选；填写“工作日”、“周末”、“每天”、“每周一”等")
+    var repeatSchedule: String?
+
     @Parameter(title: "设备名称", description: "可选；留空控制全屋或默认设备")
     var deviceName: String?
 
@@ -599,7 +602,7 @@ struct ScheduleACPowerIntent: AppIntent {
             return .result(dialog: "已为\(scopeName)设定 \(timeDesc) 后\(actionDesc)")
         }
 
-        // 2. 指定时间或每天重复定时任务分支
+        // 2. 指定时间或周期重复定时任务分支 (v1.9.57)
         let calendar = Calendar.current
         let (hour, minute): (Int, Int) = {
             if let tStr = timeString {
@@ -612,9 +615,37 @@ struct ScheduleACPowerIntent: AppIntent {
             return (22, 0)
         }()
 
-        let fireDate = AppModel.initialFireDate(forHour: hour, minute: minute, weekdays: repeatsDaily ? [] : [], calendar: calendar)
+        let (targetWeekdays, isDaily, repeatLabel): ([Int], Bool, String) = {
+            let sched = repeatSchedule ?? ""
+            if sched.contains("工作日") || sched.contains("平时") || sched.contains("周一到周五") || sched.contains("周一至周五") {
+                return ([2, 3, 4, 5, 6], false, "工作日")
+            } else if sched.contains("周一到周六") || sched.contains("周一至周六") {
+                return ([2, 3, 4, 5, 6, 7], false, "周一至周六")
+            } else if sched.contains("周末") || sched.contains("双休") || sched.contains("周六周日") || sched.contains("周六和周日") {
+                return ([1, 7], false, "周末")
+            } else if sched.contains("周一") || sched.contains("星期一") {
+                return ([2], false, "每周一")
+            } else if sched.contains("周二") || sched.contains("星期二") {
+                return ([3], false, "每周二")
+            } else if sched.contains("周三") || sched.contains("星期三") {
+                return ([4], false, "每周三")
+            } else if sched.contains("周四") || sched.contains("星期四") {
+                return ([5], false, "每周四")
+            } else if sched.contains("周五") || sched.contains("星期五") {
+                return ([6], false, "每周五")
+            } else if sched.contains("周六") || sched.contains("星期六") {
+                return ([7], false, "每周六")
+            } else if sched.contains("周日") || sched.contains("周天") || sched.contains("星期天") || sched.contains("星期日") {
+                return ([1], false, "每周日")
+            } else if repeatsDaily || sched.contains("每天") || sched.contains("天天") || sched.contains("每日") || sched.contains("每晚") || sched.contains("每早") {
+                return ([], true, "每天")
+            }
+            return ([], false, "")
+        }()
+
+        let fireDate = AppModel.initialFireDate(forHour: hour, minute: minute, weekdays: targetWeekdays, calendar: calendar)
         let timeStr = String(format: "%02d:%02d", hour, minute)
-        let repeatPrefix = repeatsDaily ? "每天 " : ""
+        let repeatPrefix = repeatLabel.isEmpty ? "" : "\(repeatLabel) "
         let actionName = "\(repeatPrefix)\(timeStr) \(actionDesc)"
 
         for devId in targetDeviceIds {
@@ -626,8 +657,8 @@ struct ScheduleACPowerIntent: AppIntent {
                 attrDesc: "开关",
                 attrValueJSON: valJSON,
                 fireDate: fireDate,
-                repeatsDaily: repeatsDaily,
-                repeatWeekdays: [],
+                repeatsDaily: isDaily,
+                repeatWeekdays: targetWeekdays,
                 enabled: true
             )
             model.addScheduledAction(action)
@@ -814,9 +845,19 @@ struct ACAppShortcuts: AppShortcutsProvider {
                         "用 \(.applicationName) 定时关机",
                         "用 \(.applicationName) 倒计时关机",
                         "用 \(.applicationName) 每天定时关机",
+                        "用 \(.applicationName) 每天定时开机",
+                        "用 \(.applicationName) 工作日定时关机",
+                        "用 \(.applicationName) 工作日定时开机",
+                        "用 \(.applicationName) 周末定时关机",
+                        "用 \(.applicationName) 周末定时开机",
                         "\(.applicationName) 定时关机",
                         "\(.applicationName) 倒计时关机",
                         "\(.applicationName) 每天定时关机",
+                        "\(.applicationName) 每天定时开机",
+                        "\(.applicationName) 工作日定时关机",
+                        "\(.applicationName) 工作日定时开机",
+                        "\(.applicationName) 周末定时关机",
+                        "\(.applicationName) 周末定时开机",
                     ],
                     shortTitle: "设置定时",
                     systemImageName: "clock.badge.checkmark"
@@ -946,6 +987,9 @@ struct ACAppShortcuts: AppShortcutsProvider {
                         "用 \(.applicationName) 定时关机",
                         "用 \(.applicationName) 倒计时关机",
                         "用 \(.applicationName) 每天定时关机",
+                        "用 \(.applicationName) 每天定时开机",
+                        "用 \(.applicationName) 工作日定时关机",
+                        "用 \(.applicationName) 周末定时关机",
                     ]
                 ),
             ]

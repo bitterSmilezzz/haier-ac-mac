@@ -6,6 +6,24 @@ A native SwiftUI app to control Haier / Leader (统帅) smart air conditioners o
 
 ## Features
 
+- 🏷 **Natural Language Single Weekday & Extended Repeating Schedule Cycles, Scheduler Clock Drift Elimination, macOS Status Bar Per-Device Countdown Matrix & Siri Repeat Shortcuts (v1.9.57)**:
+  - ⏱️ **Natural Language "每周一至周日/逢周一/周一到周六" Single Weekday & Extended Repeating Cycle Scheduling Closure (`VoiceCommandParser` / `VoiceCapsuleWindowController` / `VoiceCommandParserTests`)**:
+    - **Eradication of Single Weekday & Extended Cycle Requests Falling Back to One-Time Tasks & Deleted Upon First Execution**: Permanently fixed the critical defect where spoken recurring commands for specific weekdays (e.g. "每周一早上8点开空调", "每周五晚上10点关机", "每周日晚上11点关空调", "每个星期一早上7点开空调", "逢周一早上8点开机", "周一到周六早上7点开机") previously lacked weekday matching and fell back to single-shot `.schedulePower`, causing recurring schedules to be permanently deleted after firing once;
+    - **Introduced Full Single Weekday (Mon~Sun) & Multi-Day Weekday Matrices**: Accurately recognizes "每周一" through "每周日" (`[2]`~`[7]`, `[1]`) as well as "周一到周六/周一至周六" (`[2,3,4,5,6,7]`); initial trigger timestamps (`initialFireDate`) are harmonized across single-device, whole-house, and multi-device dispatching, ensuring perpetual seamless cycle recurrence;
+    - **Long Compound Negation Defense Extension**: Expanded the non-punctuation insertion span between negation and action verbs from 6 to 10 characters, robustly shielding against conversational phrases ("千万别每周一开机", "不要每个星期五开空调", "别周一到周六定时开机").
+  - ⏱️ **Scheduler Clock Drift & System Sleep/Wake Timestamp Corruption Eradication (`AppModel.nextFireDate` / `AppModel.fireDueActions` / `ScheduledAction`)**:
+    - **Eliminated Weekday Cycle Clock Drift & Wake Time Pollution**: Overhauled `nextFireDate` to strictly accept `originalFireDate` and preserve the exact original hour, minute, and second across future occurrences, permanently resolving the severe defect where passing `now` accumulated execution latency drifts and caused system sleep/wake events to corrupt recurring schedule fire times to the computer's wake-up moment;
+    - **Fixed `repeatLabel` Redundant Prefix Bug**: Fixed awkward display strings where `[2]` became "每周周一" and `[2,3,4,5,6]` became "每周周一周二周三周四周五", formalizing natural Chinese descriptors: "每周一", "工作日", "周末", "周一至周六", and "每周一、三、五".
+  - 🍱 **macOS Native Status Bar Per-Device Dedicated Countdown Matrix & Pre-Cooling/Pre-Heating Expansion (`StatusItemController`)**:
+    - **Dedicated Per-Device Countdown Submenu**: Added a dedicated "⏱ 快捷倒计时..." submenu in the multi-device control matrix (`devSubmenu`) for each individual room/device (30 min / 1 hr / 2 hr off, plus 30 min / 1 hr pre-cooling/pre-heating on), resolving the restriction where users previously could only set countdowns for the primary device from the status bar;
+    - **Top-Level Schedule Matrix Upgrade**: Added quick pre-cooling/pre-heating countdowns ("❄️ 快捷开机预冷/预热倒计时") and whole-house unified shutdown countdowns ("🏠 全屋统一关机倒计时"), with rich dynamic toast feedback.
+  - 🎙️ **Siri Shortcuts & AppIntents Schedule Flexibility Enhancement (`AppIntents.swift`)**:
+    - Added `repeatSchedule` parameter to `ScheduleACPowerIntent` (supporting "工作日", "周末", "每天", "每周一" ~ "每周日", "周一至周六"), removing the legacy constraint of daily repeats only;
+    - Registered intuitive phrases in `ACAppShortcuts` ("用海尔空调工作日定时关机", "用海尔空调周末定时开机", "用海尔空调每天定时开机").
+  - 🍃 **Aerodynamic Filter Wear Velocity Shearing Calibration for Fan Mode (`AppModel.calculateFilterWearFactor`)**:
+    - In `calculateFilterWearFactor`, refined the `.fan` mode aerodynamics: under high/turbo wind velocities (`windFactor >= 1.35`), aerodynamic shear forces stir up and capture floating dry particulate matter at an accelerated rate, dynamically calibrating the mode factor to `0.95` (while keeping low/mid speed at `0.85`).
+
+
 - 🏷 **Natural Language Repeating Cycle Scheduling (Daily/Weekdays/Weekend), Siri Shortcuts Scheduling Closure, macOS Status Bar Quick Shutdown Countdown & Auto-Mode Thermodynamic Symmetry (v1.9.56)**:
   - ⏱️ **Natural Language "每天/天天/工作日/周末/按星期" Repeating Cycle Scheduling Full-Stack Closure (`VoiceCommandParser` / `VoiceCapsuleWindowController` / `VoiceCommandParserTests`)**:
     - **Eradication of Repeating Schedules Being Handled as One-Time Tasks & Deleted Upon First Execution**: Permanently resolved the critical defect where spoken recurring schedules (e.g. "每天晚上10点关机", "天天早上8点开空调", "工作日早上7点开机", "周末上午9点开空调", "周一到周五早上7点开机", "周六周日晚上11点关空调") were previously parsed only as single-shot `.schedulePower`, with `repeatsDaily` and `repeatWeekdays` hardcoded to `false` and `[]`, causing recurring requests to be permanently deleted after firing once;

@@ -304,13 +304,29 @@ public struct VoiceCommandParser {
             let actionStr = isPowerOn ? "开机" : "关机"
             let timeStr = String(format: "%02d:%02d", time.hour, time.minute)
 
-            // 循环周期判定 (v1.9.56 支持每天/工作日/周末/按星期重复定时)
+            // 循环周期判定 (v1.9.56 支持每天/工作日/周末/按星期重复定时, v1.9.57 补齐单星期与扩展周期重复定时)
             let repeatInfo: (weekdays: [Int], label: String)? = {
                 if text.contains("工作日") || text.contains("平时") || text.contains("周一到周五") || text.contains("周一至周五") || text.contains("星期一到星期五") || text.contains("星期一至星期五") {
                     return ([2, 3, 4, 5, 6], "工作日")
+                } else if text.contains("周一到周六") || text.contains("周一至周六") || text.contains("星期一到星期六") || text.contains("星期一至星期六") {
+                    return ([2, 3, 4, 5, 6, 7], "周一至周六")
                 } else if text.contains("周末") || text.contains("双休") || text.contains("周六周日") || text.contains("周六和周日") || text.contains("星期六星期天") || text.contains("星期六和星期天") || text.contains("周六周天") {
                     return ([1, 7], "周末")
-                } else if text.contains("每天") || text.contains("天天") || text.contains("每日") || text.contains("每晚") || text.contains("每早") || text.contains("每晨") {
+                } else if text.contains("每周一") || text.contains("每个周一") || text.contains("每个星期一") || text.contains("每周星期一") || text.contains("逢周一") || text.contains("每逢周一") || text.contains("每逢星期一") {
+                    return ([2], "每周一")
+                } else if text.contains("每周二") || text.contains("每个周二") || text.contains("每个星期二") || text.contains("每周星期二") || text.contains("逢周二") || text.contains("每逢周二") || text.contains("每逢星期二") {
+                    return ([3], "每周二")
+                } else if text.contains("每周三") || text.contains("每个周三") || text.contains("每个星期三") || text.contains("每周星期三") || text.contains("逢周三") || text.contains("每逢周三") || text.contains("每逢星期三") {
+                    return ([4], "每周三")
+                } else if text.contains("每周四") || text.contains("每个周四") || text.contains("每个星期四") || text.contains("每周星期四") || text.contains("逢周四") || text.contains("每逢周四") || text.contains("每逢星期四") {
+                    return ([5], "每周四")
+                } else if text.contains("每周五") || text.contains("每个周五") || text.contains("每个星期五") || text.contains("每周星期五") || text.contains("逢周五") || text.contains("每逢周五") || text.contains("每逢星期五") {
+                    return ([6], "每周五")
+                } else if text.contains("每周六") || text.contains("每个周六") || text.contains("每个星期六") || text.contains("每周星期六") || text.contains("逢周六") || text.contains("每逢周六") || text.contains("每逢星期六") {
+                    return ([7], "每周六")
+                } else if text.contains("每周日") || text.contains("每周天") || text.contains("每个周日") || text.contains("每个周天") || text.contains("每个星期天") || text.contains("每个星期日") || text.contains("每周星期天") || text.contains("每周星期日") || text.contains("逢周日") || text.contains("每逢周日") || text.contains("每逢星期天") || text.contains("每逢星期日") {
+                    return ([1], "每周日")
+                } else if text.contains("每天") || text.contains("天天") || text.contains("每日") || text.contains("每晚") || text.contains("每早") || text.contains("每晨") || text.contains("每夜") || text.contains("日日") {
                     return ([], "每天")
                 }
                 return nil
@@ -577,9 +593,9 @@ public struct VoiceCommandParser {
 
     private static let negativeActionRegex: NSRegularExpression? = {
         // 否定词（别/不要/不用/不必/无需/先别/先不要/暂不/暂不要/千万别/千万不要/不能/不可以/切勿/切莫/不要再/别再/暂时不用/暂时不要）
-        // 允许中间插入 0~6 个任意非标点非空白字符（如“给我”、“帮我”、“急着”、“现在”、“太快”、“乱”、“随便”等，彻底杜绝插字绕过漏洞） (v1.9.40)
+        // 允许中间插入 0~10 个任意非标点非空白字符（如“周一到周六定时”、“星期一到星期五”、“给我”、“帮我”、“急着”、“现在”等，彻底杜绝插字绕过漏洞） (v1.9.40, v1.9.57)
         // 动作谓词（关/停/开/启动/运转/打开/关闭/调/设/升/降/重置/复位/清零/吹/送/抽/除） (v1.9.39 扩展调温与变频动作否定, v1.9.45 扩展滤网重置否定, v1.9.50 扩展吹风除湿动作否定)
-        let pattern = #"(?:别|不要|不用|不必|无需|先别|先不要|暂不|暂不要|千万别|千万不要|不能|不可以|切勿|切莫|不要再|别再|暂时不用|暂时不要)[^，。！？\s]{0,6}?(?:关|停|开|启动|运转|打开|关闭|调|设|升|降|重置|复位|清零|吹|送|抽|除)"#
+        let pattern = #"(?:别|不要|不用|不必|无需|先别|先不要|暂不|暂不要|千万别|千万不要|不能|不可以|切勿|切莫|不要再|别再|暂时不用|暂时不要)[^，。！？\s]{0,10}?(?:关|停|开|启动|运转|打开|关闭|调|设|升|降|重置|复位|清零|吹|送|抽|除)"#
         return try? NSRegularExpression(pattern: pattern)
     }()
 
@@ -612,12 +628,13 @@ public struct VoiceCommandParser {
         targetRoomKeywords.contains(where: { text.contains($0) })
     }
 
-    /// 判断口令是否包含定时、倒计时或延迟执行时间语义，杜绝误触发即时开关机 (v1.9.50, v1.9.56)
+    /// 判断口令是否包含定时、倒计时或延迟执行时间语义，杜绝误触发即时开关机 (v1.9.50, v1.9.56, v1.9.57)
     private static func hasTimingOrCountdownIntent(_ text: String) -> Bool {
         if text.contains("后") || text.contains("倒计时") || text.contains("定时") || text.contains("预约") ||
            text.contains("延迟") || text.contains("延后") || text.contains("稍后") ||
-           text.contains("每天") || text.contains("天天") || text.contains("每日") || text.contains("每晚") || text.contains("每早") ||
-           text.contains("工作日") || text.contains("周末") || text.contains("双休") {
+           text.contains("每天") || text.contains("天天") || text.contains("每日") || text.contains("每晚") || text.contains("每早") || text.contains("每夜") ||
+           text.contains("工作日") || text.contains("周末") || text.contains("双休") ||
+           text.contains("每周") || text.contains("每逢") || text.contains("逢周") || text.contains("每个周") || text.contains("每个星期") {
             return true
         }
         if text.contains("过") && (text.contains("分") || text.contains("小时") || text.contains("钟头") || text.contains("半") || text.contains("刻")) {

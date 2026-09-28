@@ -684,6 +684,28 @@ final class StatusItemController: NSObject {
                 resetFilterItem.representedObject = devId
                 devSubmenu.addItem(resetFilterItem)
 
+                // 单设备快捷倒计时调度 (v1.9.57)
+                let devCountdownMenu = NSMenu()
+                devCountdownMenu.autoenablesItems = false
+                let devCountdownPresets: [(title: String, mins: Int, powerOn: Bool)] = [
+                    ("⏱ 30 分钟后关机", 30, false),
+                    ("⏱ 1 小时后关机", 60, false),
+                    ("⏱ 2 小时后关机", 120, false),
+                    ("⏱ 晨间过渡关机 (45分钟)", 45, false),
+                    ("❄️ 30 分钟后开机预冷/预热", 30, true),
+                    ("❄️ 1 小时后开机预冷/预热", 60, true)
+                ]
+                for p in devCountdownPresets {
+                    let pItem = NSMenuItem(title: p.title, action: #selector(quickCountdownFromMenu(_:)), keyEquivalent: "")
+                    pItem.target = self
+                    pItem.representedObject = ["deviceId": devId, "minutes": p.mins, "powerOn": p.powerOn] as [String: Any]
+                    pItem.isEnabled = isControllable
+                    devCountdownMenu.addItem(pItem)
+                }
+                let devCountdownParent = NSMenuItem(title: "⏱ 快捷倒计时...", action: nil, keyEquivalent: "")
+                devSubmenu.setSubmenu(devCountdownMenu, for: devCountdownParent)
+                devSubmenu.addItem(devCountdownParent)
+
                 let statusBadge: String
                 switch reach {
                 case .gatewayReconnecting: statusBadge = "⏳ 重连中"
@@ -907,22 +929,38 @@ final class StatusItemController: NSObject {
         let scheduleMenu = NSMenu()
         scheduleMenu.autoenablesItems = false
 
-        // 快捷关机倒计时独立子菜单
+        // 快捷倒计时独立子菜单 (v1.9.56, v1.9.57 增加全屋统一倒计时与开机预冷/预热倒计时)
         let quickCountdownMenu = NSMenu()
         quickCountdownMenu.autoenablesItems = false
-        let countdownPresets: [(title: String, mins: Int)] = [
-            ("⏱ 30 分钟后关机", 30),
-            ("⏱ 1 小时后关机", 60),
-            ("⏱ 2 小时后关机", 120),
-            ("⏱ 晨间过渡关机 (45分钟)", 45)
+        let countdownPresets: [(title: String, mins: Int, powerOn: Bool)] = [
+            ("⏱ 30 分钟后关机", 30, false),
+            ("⏱ 1 小时后关机", 60, false),
+            ("⏱ 2 小时后关机", 120, false),
+            ("⏱ 晨间过渡关机 (45分钟)", 45, false),
+            ("❄️ 30 分钟后开机预冷/预热", 30, true),
+            ("❄️ 1 小时后开机预冷/预热", 60, true)
         ]
         for preset in countdownPresets {
             let pItem = NSMenuItem(title: preset.title, action: #selector(quickCountdownFromMenu(_:)), keyEquivalent: "")
             pItem.target = self
-            pItem.representedObject = preset.mins
+            pItem.representedObject = ["minutes": preset.mins, "powerOn": preset.powerOn] as [String: Any]
             quickCountdownMenu.addItem(pItem)
         }
-        let quickCountdownParent = NSMenuItem(title: "⚡️ 快捷关机倒计时...", action: nil, keyEquivalent: "")
+        if allDevices.count > 1 {
+            quickCountdownMenu.addItem(.separator())
+            let allOffPresets: [(title: String, mins: Int)] = [
+                ("🏠 全屋 30 分钟后关机", 30),
+                ("🏠 全屋 1 小时后关机", 60),
+                ("🏠 全屋 2 小时后关机", 120)
+            ]
+            for p in allOffPresets {
+                let pItem = NSMenuItem(title: p.title, action: #selector(quickCountdownFromMenu(_:)), keyEquivalent: "")
+                pItem.target = self
+                pItem.representedObject = ["minutes": p.mins, "powerOn": false, "all": true] as [String: Any]
+                quickCountdownMenu.addItem(pItem)
+            }
+        }
+        let quickCountdownParent = NSMenuItem(title: "⚡️ 快捷倒计时调度...", action: nil, keyEquivalent: "")
         scheduleMenu.setSubmenu(quickCountdownMenu, for: quickCountdownParent)
         scheduleMenu.addItem(quickCountdownParent)
         scheduleMenu.addItem(.separator())
@@ -1271,8 +1309,28 @@ final class StatusItemController: NSObject {
     }
 
     @objc private func quickCountdownFromMenu(_ sender: NSMenuItem) {
-        guard let minutes = sender.representedObject as? Int, minutes > 0 else { return }
+        let (minutes, powerOn, specificDeviceId, forceAll): (Int, Bool, String?, Bool) = {
+            if let mins = sender.representedObject as? Int {
+                return (mins, false, nil, false)
+            }
+            if let dict = sender.representedObject as? [String: Any] {
+                let mins = dict["minutes"] as? Int ?? 30
+                let on = dict["powerOn"] as? Bool ?? false
+                let devId = dict["deviceId"] as? String
+                let all = dict["all"] as? Bool ?? false
+                return (mins, on, devId, all)
+            }
+            return (0, false, nil, false)
+        }()
+        guard minutes > 0 else { return }
+
         let targetDevices: [AppModel.UnifiedDevice] = {
+            if forceAll {
+                return model.allUnifiedDevices.filter { model.reachability(for: $0.id).isControllable }
+            }
+            if let devId = specificDeviceId, let dev = model.allUnifiedDevices.first(where: { $0.id == devId }) {
+                return [dev]
+            }
             if let primaryId = primaryDeviceId, let dev = model.allUnifiedDevices.first(where: { $0.id == primaryId }) {
                 return [dev]
             }
@@ -1284,11 +1342,12 @@ final class StatusItemController: NSObject {
         }
         let fireDate = Date().addingTimeInterval(TimeInterval(minutes * 60))
         let timeDesc = (minutes >= 60 && minutes % 60 == 0) ? "\(minutes / 60) 小时" : "\(minutes) 分钟"
-        guard let valJSON = ScheduledAction.valueJSON(.bool(false)) else { return }
+        let actionDesc = powerOn ? "开机" : "关机"
+        guard let valJSON = ScheduledAction.valueJSON(.bool(powerOn)) else { return }
 
         for dev in targetDevices {
             let action = ScheduledAction(
-                name: "「\(dev.name)」\(timeDesc)后关机",
+                name: "「\(dev.name)」\(timeDesc)后\(actionDesc)",
                 deviceId: dev.id,
                 attrName: "onOffStatus",
                 attrDesc: "开关",
@@ -1301,7 +1360,8 @@ final class StatusItemController: NSObject {
             model.addScheduledAction(action)
         }
         let scope = targetDevices.count > 1 ? "全屋 \(targetDevices.count) 台空调" : "「\(targetDevices[0].name)」"
-        model.operationNotice = AppModel.OperationNotice(text: "⏱ 已为\(scope)设定 \(timeDesc) 后自动关机", isError: false)
+        let glyph = powerOn ? "❄️" : "⏱"
+        model.operationNotice = AppModel.OperationNotice(text: "\(glyph) 已为\(scope)设定 \(timeDesc) 后自动\(actionDesc)", isError: false)
         refreshTemperature()
     }
 

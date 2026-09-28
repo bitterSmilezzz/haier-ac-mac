@@ -44,13 +44,17 @@ struct ScheduledAction: Identifiable, Codable, Hashable {
         AttrValueCodec.encode(value)
     }
 
-    /// 重复规则的中文描述（如「每天」「每周一三五」），一次性返回 nil
+    /// 重复规则的中文描述（如「每天」「工作日」「周末」「每周一」），一次性返回 nil (v1.9.57)
     var repeatLabel: String? {
         if !repeatWeekdays.isEmpty {
-            let names = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"]
-            let days = repeatWeekdays.sorted().map { names[max(0, min($0 - 1, 6))] }
-            if days.count == 7 { return "每天" }
-            return "每周" + days.joined()
+            let sorted = repeatWeekdays.sorted()
+            if sorted.count == 7 { return "每天" }
+            if sorted == [2, 3, 4, 5, 6] { return "工作日" }
+            if sorted == [1, 7] { return "周末" }
+            if sorted == [2, 3, 4, 5, 6, 7] { return "周一至周六" }
+            let dayChars = ["日", "一", "二", "三", "四", "五", "六"]
+            let dayNames = sorted.map { dayChars[max(0, min($0 - 1, 6))] }
+            return "每周" + dayNames.joined(separator: "、")
         }
         if repeatsDaily { return "每天" }
         return nil
@@ -822,7 +826,8 @@ final class AppModel: ObservableObject {
                     modeFactor = 1.15 // 无室温传感器基准升温工况 (v1.9.55)
                 }
             case .fan:
-                modeFactor = 0.85
+                // 送风模式：无冷凝水吸附，主要为干性浮尘截留；当室内风速处于高风/强劲时（windFactor >= 1.35），高速风切力扬起微尘导致空气对流过滤负荷上升 (0.95)，低中风速维持 0.85 (v1.9.57)
+                modeFactor = windFactor >= 1.35 ? 0.95 : 0.85
             case .auto:
                 // 自动模式：全气候双向热力与气动力学对称 (v1.9.54)
                 if let indoor = indoorTemp {
@@ -1306,8 +1311,8 @@ final class AppModel: ObservableObject {
             guard let idx = scheduledActions.firstIndex(where: { $0.id == action.id }) else { continue }
 
             if !action.repeatWeekdays.isEmpty {
-                // 按星期重复：保留原时刻的时:分，顺延到下一个匹配的星期
-                let next = Self.nextFireDate(after: now, weekdays: action.repeatWeekdays, calendar: calendar)
+                // 按星期重复：严格保留原时刻的时:分:秒，顺延到下一个匹配的星期，彻底杜绝时钟漂移与系统睡眠唤醒后的时间篡改 (v1.9.57)
+                let next = Self.nextFireDate(after: now, originalFireDate: action.fireDate, weekdays: action.repeatWeekdays, calendar: calendar)
                 scheduledActions[idx].fireDate = next
             } else if action.repeatsDaily {
                 // 每天重复：顺延 24h；积压多个周期时只推进到最近未来（补发一次）
@@ -1323,10 +1328,25 @@ final class AppModel: ObservableObject {
         wakeScheduler()  // 顺延/删除后重新计算休眠时间
     }
 
-    /// 计算 after 之后（不含 after）第一个匹配 weekdays 的时刻，保留原 fireDate 的时:分
-    static func nextFireDate(after date: Date, weekdays: [Int], calendar: Calendar) -> Date {
-        let fire = date
-        var candidate = calendar.date(byAdding: .day, value: 1, to: fire) ?? fire.addingTimeInterval(86400)
+    /// 计算 after 之后（不含 after）第一个匹配 weekdays 的时刻，严格保留 originalFireDate 的时:分:秒，彻底杜绝时钟漂移与跨周期时间偏移 (v1.9.57)
+    static func nextFireDate(after now: Date, originalFireDate: Date, weekdays: [Int], calendar: Calendar = .current) -> Date {
+        let hour = calendar.component(.hour, from: originalFireDate)
+        let minute = calendar.component(.minute, from: originalFireDate)
+        let second = calendar.component(.second, from: originalFireDate)
+
+        var components = calendar.dateComponents([.year, .month, .day], from: now)
+        components.hour = hour
+        components.minute = minute
+        components.second = second
+
+        guard var candidate = calendar.date(from: components) else {
+            return now.addingTimeInterval(86400)
+        }
+
+        if candidate <= now {
+            candidate = calendar.date(byAdding: .day, value: 1, to: candidate) ?? candidate.addingTimeInterval(86400)
+        }
+
         let maxAttempts = 14  // 星期集合最多覆盖 7 天，14 次必然命中
         for _ in 0..<maxAttempts {
             let weekday = calendar.component(.weekday, from: candidate)
@@ -1336,6 +1356,11 @@ final class AppModel: ObservableObject {
             candidate = calendar.date(byAdding: .day, value: 1, to: candidate) ?? candidate.addingTimeInterval(86400)
         }
         return candidate
+    }
+
+    /// 兼容重载：保留原 fireDate 的时:分
+    static func nextFireDate(after date: Date, weekdays: [Int], calendar: Calendar = .current) -> Date {
+        nextFireDate(after: date, originalFireDate: date, weekdays: weekdays, calendar: calendar)
     }
 
     /// 计算指定钟点与星期周期的初始触发时刻 (v1.9.56)

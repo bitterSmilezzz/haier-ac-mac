@@ -1711,6 +1711,66 @@ final class VoiceCommandParserTests: XCTestCase {
         XCTAssertNil(VoiceCommandParser.parse("别天天定时开"))
     }
 
+    // MARK: - 单星期与扩展周期重复定时调度测试 (v1.9.57)
+
+    func testSingleWeekdayAndExtendedRepeatingScheduleParsing() {
+        // 1. 每周一 ~ 每周日 单星期周期定时
+        let m1 = VoiceCommandParser.parse("每周一早上8点开空调")
+        XCTAssertEqual(m1?.command, .scheduleRepeatPower(hour: 8, minute: 0, power: true, repeatWeekdays: [2], repeatLabel: "每周一"))
+        XCTAssertEqual(m1?.displayText, "定时在 每周一 08:00 开机")
+
+        let m2 = VoiceCommandParser.parse("每周二下午3点关机")
+        XCTAssertEqual(m2?.command, .scheduleRepeatPower(hour: 15, minute: 0, power: false, repeatWeekdays: [3], repeatLabel: "每周二"))
+        XCTAssertEqual(m2?.displayText, "定时在 每周二 15:00 关机")
+
+        let m3 = VoiceCommandParser.parse("每周三上午10点开机")
+        XCTAssertEqual(m3?.command, .scheduleRepeatPower(hour: 10, minute: 0, power: true, repeatWeekdays: [4], repeatLabel: "每周三"))
+        XCTAssertEqual(m3?.displayText, "定时在 每周三 10:00 开机")
+
+        let m4 = VoiceCommandParser.parse("每周四下午4点关空调")
+        XCTAssertEqual(m4?.command, .scheduleRepeatPower(hour: 16, minute: 0, power: false, repeatWeekdays: [5], repeatLabel: "每周四"))
+        XCTAssertEqual(m4?.displayText, "定时在 每周四 16:00 关机")
+
+        let m5 = VoiceCommandParser.parse("每周五晚上10点关机")
+        XCTAssertEqual(m5?.command, .scheduleRepeatPower(hour: 22, minute: 0, power: false, repeatWeekdays: [6], repeatLabel: "每周五"))
+        XCTAssertEqual(m5?.displayText, "定时在 每周五 22:00 关机")
+
+        let m6 = VoiceCommandParser.parse("每周六上午9点开机")
+        XCTAssertEqual(m6?.command, .scheduleRepeatPower(hour: 9, minute: 0, power: true, repeatWeekdays: [7], repeatLabel: "每周六"))
+        XCTAssertEqual(m6?.displayText, "定时在 每周六 09:00 开机")
+
+        let m7 = VoiceCommandParser.parse("每周日晚上11点关空调")
+        XCTAssertEqual(m7?.command, .scheduleRepeatPower(hour: 23, minute: 0, power: false, repeatWeekdays: [1], repeatLabel: "每周日"))
+        XCTAssertEqual(m7?.displayText, "定时在 每周日 23:00 关机")
+
+        // 2. 口语别名（每个星期一/逢周一/周一至周六）
+        let a1 = VoiceCommandParser.parse("每个星期一早上7点开空调")
+        XCTAssertEqual(a1?.command, .scheduleRepeatPower(hour: 7, minute: 0, power: true, repeatWeekdays: [2], repeatLabel: "每周一"))
+        XCTAssertEqual(a1?.displayText, "定时在 每周一 07:00 开机")
+
+        let a2 = VoiceCommandParser.parse("逢周一早上8点开机")
+        XCTAssertEqual(a2?.command, .scheduleRepeatPower(hour: 8, minute: 0, power: true, repeatWeekdays: [2], repeatLabel: "每周一"))
+        XCTAssertEqual(a2?.displayText, "定时在 每周一 08:00 开机")
+
+        let s1 = VoiceCommandParser.parse("周一到周六早上7点开机")
+        XCTAssertEqual(s1?.command, .scheduleRepeatPower(hour: 7, minute: 0, power: true, repeatWeekdays: [2, 3, 4, 5, 6, 7], repeatLabel: "周一至周六"))
+        XCTAssertEqual(s1?.displayText, "定时在 周一至周六 07:00 开机")
+
+        // 3. 全屋作用域扩展周期定时
+        let all1 = VoiceCommandParser.parse("全屋每周一早上8点开空调")
+        XCTAssertEqual(all1?.command, .scheduleRepeatPower(hour: 8, minute: 0, power: true, repeatWeekdays: [2], repeatLabel: "每周一"))
+        XCTAssertEqual(all1?.displayText, "定时全屋在 每周一 08:00 开机")
+
+        let all2 = VoiceCommandParser.parse("全屋周一至周六早上7点开机")
+        XCTAssertEqual(all2?.command, .scheduleRepeatPower(hour: 7, minute: 0, power: true, repeatWeekdays: [2, 3, 4, 5, 6, 7], repeatLabel: "周一至周六"))
+        XCTAssertEqual(all2?.displayText, "定时全屋在 周一至周六 07:00 开机")
+
+        // 4. 否定意图防误触
+        XCTAssertNil(VoiceCommandParser.parse("千万别每周一开机"))
+        XCTAssertNil(VoiceCommandParser.parse("不要每个星期五开空调"))
+        XCTAssertNil(VoiceCommandParser.parse("别周一到周六定时开机"))
+    }
+
     // MARK: - 无效输入测试
 
     func testInvalidCommands() {
