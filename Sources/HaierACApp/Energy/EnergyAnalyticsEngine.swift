@@ -238,18 +238,18 @@ public final class EnergyAnalyticsEngine: ObservableObject {
         let windOffset: Double = {
             guard let wind = windSpeed?.lowercased() else { return 40.0 }
             if wind.contains("强") || wind.contains("turbo") || wind.contains("超强") || wind.contains("最大") ||
-               wind.contains("3档") || wind.contains("三档") || wind == "3" {
+               wind.contains("3档") || wind.contains("三档") || wind == "3" || wind.contains("极速") || wind.contains("高速") {
                 return 180.0
             }
             if wind.contains("高") || wind.contains("high") || wind.contains("大风") || wind.contains("大") {
                 return 110.0
             }
             if wind.contains("中") || wind.contains("medium") || wind.contains("mid") ||
-               wind.contains("2档") || wind.contains("二档") || wind.contains("两档") || wind == "2" {
+               wind.contains("2档") || wind.contains("二档") || wind.contains("两档") || wind == "2" || wind.contains("中速") {
                 return 65.0
             }
             if wind.contains("低") || wind.contains("low") ||
-               wind.contains("1档") || wind.contains("一档") || wind == "1" || wind.contains("小风") {
+               wind.contains("1档") || wind.contains("一档") || wind == "1" || wind.contains("小风") || wind.contains("低速") {
                 return 35.0
             }
             if wind.contains("微") || wind.contains("静") || wind.contains("quiet") || wind.contains("mute") || wind.contains("micro") || wind.contains("柔") {

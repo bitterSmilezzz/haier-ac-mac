@@ -363,27 +363,33 @@ public final class VoiceCapsuleWindowController: NSObject, NSWindowDelegate {
             let offList = controllable.filter { model.attribute("onOffStatus", deviceId: $0.id)?.boolValue != true }
 
             var temps: [Double] = []
+            var hums: [Double] = []
             for dev in all {
                 if let t = model.currentIndoorTemperature(for: dev.id) {
                     temps.append(t)
                 }
+                if let h = model.currentIndoorHumidity(for: dev.id) {
+                    hums.append(h)
+                }
             }
 
-            let tempSummary: String
+            var envSummary = ""
             if !temps.isEmpty {
                 let avg = temps.reduce(0.0, +) / Double(temps.count)
-                tempSummary = String(format: "，平均室温 %.1f°C", avg)
-            } else {
-                tempSummary = ""
+                envSummary += String(format: "，平均室温 %.1f°C", avg)
+            }
+            if !hums.isEmpty {
+                let avgHum = hums.reduce(0.0, +) / Double(hums.count)
+                envSummary += String(format: "，平均湿度 %.0f%%", avgHum)
             }
 
             let statusText: String
             if onList.isEmpty {
-                statusText = "全屋 \(all.count) 台空调均处于待机状态\(tempSummary)"
+                statusText = "全屋 \(all.count) 台空调均处于待机状态\(envSummary)"
             } else if onList.count == all.count {
-                statusText = "全屋 \(all.count) 台空调均在运行中\(tempSummary)"
+                statusText = "全屋 \(all.count) 台空调均在运行中\(envSummary)"
             } else {
-                statusText = "全屋 \(all.count) 台空调中 \(onList.count) 台运行、\(offList.count) 台待机\(tempSummary)"
+                statusText = "全屋 \(all.count) 台空调中 \(onList.count) 台运行、\(offList.count) 台待机\(envSummary)"
             }
             VoiceControlManager.shared.markSuccess(statusText)
             scheduleAutoDismiss(delay: 2.5)
@@ -665,10 +671,12 @@ public final class VoiceCapsuleWindowController: NSObject, NSWindowDelegate {
             let isPower = model.attributes[deviceId]?["onOffStatus"]?.boolValue ?? false
             let powerDesc = isPower ? "正在运行" : "关机待机"
             let targetTemp = model.attributes[deviceId]?["targetTemperature"]?.doubleValue ?? 26.0
+            let indoorHum = model.currentIndoorHumidity(for: deviceId)
+            let humDesc = (indoorHum != nil) ? "，湿度 \(Int(round(indoorHum!)))%" : ""
             if let indoor = model.currentIndoorTemperature(for: deviceId) {
-                VoiceControlManager.shared.markSuccess("「\(targetName)」\(powerDesc)，室内温度 \(String(format: "%.1f", indoor))°C，设定 \(Int(targetTemp))°C")
+                VoiceControlManager.shared.markSuccess("「\(targetName)」\(powerDesc)，室内温度 \(String(format: "%.1f", indoor))°C\(humDesc)，设定 \(Int(targetTemp))°C")
             } else {
-                VoiceControlManager.shared.markSuccess("「\(targetName)」\(powerDesc)，当前设定为 \(Int(targetTemp))°C")
+                VoiceControlManager.shared.markSuccess("「\(targetName)」\(powerDesc)\(humDesc)，当前设定为 \(Int(targetTemp))°C")
             }
 
         case .applyScene(let sceneName):
@@ -852,11 +860,13 @@ public final class VoiceCapsuleWindowController: NSObject, NSWindowDelegate {
                 let isPower = model.attribute("onOffStatus", deviceId: devId)?.boolValue ?? false
                 let powerDesc = isPower ? "运行中" : "待机"
                 let targetTemp = model.attribute("targetTemperature", deviceId: devId)?.doubleValue ?? 26.0
+                let indoorHum = model.currentIndoorHumidity(for: devId)
+                let humStr = (indoorHum != nil) ? " · 湿度 \(Int(round(indoorHum!)))%" : ""
                 if let indoor = model.currentIndoorTemperature(for: devId) {
                     let tempStr = isPower ? "，设定 \(Int(targetTemp))°C" : ""
-                    summaries.append("「\(dev.name)」\(powerDesc)，室温 \(String(format: "%.1f°C", indoor))\(tempStr)")
+                    summaries.append("「\(dev.name)」\(powerDesc)，室温 \(String(format: "%.1f°C", indoor))\(humStr)\(tempStr)")
                 } else {
-                    summaries.append("「\(dev.name)」\(powerDesc)，设定 \(Int(targetTemp))°C")
+                    summaries.append("「\(dev.name)」\(powerDesc)\(humStr)，设定 \(Int(targetTemp))°C")
                 }
             }
             VoiceControlManager.shared.markSuccess(summaries.joined(separator: "；"))

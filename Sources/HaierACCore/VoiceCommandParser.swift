@@ -86,14 +86,19 @@ public struct VoiceCommandParser {
 
         guard !cleaned.isEmpty else { return nil }
 
-        // 1. 查询类（支持全屋空调状态汇总与室内温度查询） (v1.9.38)
+        // 1. 查询类（支持全屋空调状态汇总、温湿度感知与启闭状态查询） (v1.9.38, v1.9.51)
         if cleaned.contains("多少度") || cleaned.contains("当前温度") || cleaned.contains("室内温度") ||
            cleaned.contains("现在温度") || cleaned.contains("查温度") || cleaned.contains("室温") ||
-           cleaned.contains("查状态") || cleaned.contains("空调状态") || cleaned.contains("运行状态") {
+           cleaned.contains("查状态") || cleaned.contains("查询状态") || cleaned.contains("空调状态") || cleaned.contains("运行状态") ||
+           cleaned.contains("空调开着吗") || cleaned.contains("空调开了吗") || cleaned.contains("空调关了吗") ||
+           cleaned.contains("空调开着没") || cleaned.contains("空调开了没") || cleaned.contains("空调关了没") ||
+           cleaned.contains("开着没") || cleaned.contains("开着吗") || cleaned.contains("关着吗") || cleaned.contains("关了没") ||
+           cleaned.contains("查湿度") || cleaned.contains("查询湿度") || cleaned.contains("室内湿度") ||
+           cleaned.contains("当前湿度") || cleaned.contains("现在湿度") || cleaned.contains("湿度多少") {
             if isAllDeviceScope(cleaned) {
                 return VoiceParseResult(command: .queryStatusAll, displayText: "查询全屋空调状态")
             } else {
-                return VoiceParseResult(command: .queryStatus, displayText: "查询室内温度")
+                return VoiceParseResult(command: .queryStatus, displayText: "查询室内温度与工况")
             }
         }
 
@@ -594,7 +599,9 @@ public struct VoiceCommandParser {
             "把所有的空调都关了", "把所有空调都关了", "把空调都关了", "把空调全都关了",
             "把所有的空调都关掉", "把所有空调都关掉", "把空调都关掉", "把空调全都关掉",
             "把全部空调关了", "把全部空调关掉", "所有空调都关了", "全部空调都关了",
-            "所有空调关掉", "全部空调关掉", "空调全关了", "空调都关了", "全关掉"
+            "所有空调关掉", "全部空调关掉", "空调全关了", "空调都关了", "全关掉",
+            "停止所有空调", "停止全部空调", "所有空调停止", "全部空调停止", "全屋停止",
+            "所有空调都停了", "全部空调都停了", "全屋停机", "全部停机", "全屋都关了", "全屋都停了"
         ]
         if allOffKeywords.contains(where: { text.contains($0) }) {
             return true
@@ -776,14 +783,16 @@ public struct VoiceCommandParser {
         }
         let offKeywords = [
             "关空调", "关闭空调", "关掉空调", "关机", "别吹了", "停机", "关闭", "关掉",
-            "关了", "关上", "关一下", "关停", "关掉它", "断电"
+            "关了", "关上", "关一下", "关停", "关掉它", "断电",
+            "停止运行", "停止运转", "停止工作", "停掉空调", "停掉", "停一下", "停止"
         ]
         if offKeywords.contains(where: { text.contains($0) }) {
             return true
         }
-        // 典型把字句与口语结构：包含“关了”、“关掉”、“关上”或以“关”开头/结尾
-        if (text.contains("把") && (text.contains("关了") || text.contains("关掉") || text.contains("关上"))) ||
-           text.hasPrefix("关") || text.hasSuffix("关") || text.hasSuffix("关了") || text.hasSuffix("关机") || text.hasSuffix("关一下") {
+        // 典型把字句与口语结构：包含“关了”、“关掉”、“关上”、“停了”、“停掉”或以“关/停”开头/结尾
+        if (text.contains("把") && (text.contains("关了") || text.contains("关掉") || text.contains("关上") || text.contains("停了") || text.contains("停掉"))) ||
+           text.hasPrefix("关") || text.hasSuffix("关") || text.hasSuffix("关了") || text.hasSuffix("关机") || text.hasSuffix("关一下") ||
+           text.hasPrefix("停") || text.hasSuffix("停了") || text.hasSuffix("停机") || text.hasSuffix("停一下") || text.hasSuffix("停止") {
             return true
         }
         return false
@@ -1179,9 +1188,9 @@ public struct VoiceCommandParser {
             }
         }
 
-        // 温度“X度半”与“半度”精确解析 (v1.9.49 闭环“二十六度半/26度半/开到25度半/一度半/两度半”及“升温半度/降半度/调低半度/全屋升高半度”)
-        let degreeHalfPattern = #"([一二两三四五六七八九\d]+)度半"#
-        if let regex = try? NSRegularExpression(pattern: degreeHalfPattern) {
+        // 温度“X度半/X度五/X度5”与“半度”精确解析 (v1.9.49 闭环“二十六度半/26度半/开到25度半/一度半/两度半”及“升温半度/降半度/调低半度/全屋升高半度”, v1.9.51 闭环“二十六度五/26度5/开到25度5/制冷26度5/全屋26度5/调高一度五/升温1度5/降温一度五”)
+        let degreeHalfOrFivePattern = #"([一二两三四五六七八九\d]+)度(?:半|五|5)"#
+        if let regex = try? NSRegularExpression(pattern: degreeHalfOrFivePattern) {
             let ns = str as NSString
             let matches = regex.matches(in: str, range: NSRange(location: 0, length: ns.length)).reversed()
             for m in matches {
@@ -1195,6 +1204,7 @@ public struct VoiceCommandParser {
             }
         }
         str = str.replacingOccurrences(of: "半度", with: "0.5度")
+        str = str.replacingOccurrences(of: "五分度", with: "0.5度")
 
         for (cn, val) in digitMap {
             str = str.replacingOccurrences(of: String(cn), with: "\(val)")

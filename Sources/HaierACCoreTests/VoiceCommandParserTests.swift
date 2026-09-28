@@ -1274,6 +1274,86 @@ final class VoiceCommandParserTests: XCTestCase {
         XCTAssertEqual(off?.command, .setPower(false))
     }
 
+    // MARK: - 口语“X度五/X度5”精确解析、停止关机与温湿度工况查询测试 (v1.9.51)
+
+    func testOralDegreeFiveAndStoppingAndStatusQueries() {
+        // 1. “X度五”与“X度5”绝对温度解析
+        let t1 = VoiceCommandParser.parse("二十六度五")
+        XCTAssertEqual(t1?.command, .setTemperature(26.5))
+        XCTAssertEqual(t1?.displayText, "设置温度为 26.5°C")
+
+        let t2 = VoiceCommandParser.parse("26度5")
+        XCTAssertEqual(t2?.command, .setTemperature(26.5))
+
+        let t3 = VoiceCommandParser.parse("开到25度5")
+        XCTAssertEqual(t3?.command, .setTemperature(25.5))
+
+        let t4 = VoiceCommandParser.parse("制冷二十六度五")
+        XCTAssertEqual(t4?.command, .setModeAndTemperature(mode: "制冷", temperature: 26.5))
+
+        let t5 = VoiceCommandParser.parse("制冷26度5")
+        XCTAssertEqual(t5?.command, .setModeAndTemperature(mode: "制冷", temperature: 26.5))
+
+        let t6 = VoiceCommandParser.parse("全屋二十六度五")
+        XCTAssertEqual(t6?.command, .setTemperatureAll(26.5))
+
+        let t7 = VoiceCommandParser.parse("全屋开到26度5")
+        XCTAssertEqual(t7?.command, .setTemperatureAll(26.5))
+
+        // 2. 口语“一度五/1度5”相对调温微调
+        let r1 = VoiceCommandParser.parse("调高一度五")
+        XCTAssertEqual(r1?.command, .adjustTemperature(delta: 1.5))
+        XCTAssertEqual(r1?.displayText, "升温 1.5°C")
+
+        let r2 = VoiceCommandParser.parse("升温1度5")
+        XCTAssertEqual(r2?.command, .adjustTemperature(delta: 1.5))
+
+        let r3 = VoiceCommandParser.parse("降温一度五")
+        XCTAssertEqual(r3?.command, .adjustTemperature(delta: -1.5))
+        XCTAssertEqual(r3?.displayText, "降温 1.5°C")
+
+        let r4 = VoiceCommandParser.parse("调低1度5")
+        XCTAssertEqual(r4?.command, .adjustTemperature(delta: -1.5))
+
+        let r5 = VoiceCommandParser.parse("全屋升温一度五")
+        XCTAssertEqual(r5?.command, .adjustTemperatureAll(delta: 1.5))
+
+        let r6 = VoiceCommandParser.parse("全屋降温1度5")
+        XCTAssertEqual(r6?.command, .adjustTemperatureAll(delta: -1.5))
+
+        // 3. 停止运行关机意图
+        let off1 = VoiceCommandParser.parse("把空调停了")
+        XCTAssertEqual(off1?.command, .setPower(false))
+
+        let off2 = VoiceCommandParser.parse("停止运行")
+        XCTAssertEqual(off2?.command, .setPower(false))
+
+        let off3 = VoiceCommandParser.parse("全屋空调停止运行")
+        XCTAssertEqual(off3?.command, .turnOffAll)
+
+        let off4 = VoiceCommandParser.parse("所有空调停止运行")
+        XCTAssertEqual(off4?.command, .turnOffAll)
+
+        // 4. 状态与温湿度口语查询
+        let q1 = VoiceCommandParser.parse("查询状态")
+        XCTAssertEqual(q1?.command, .queryStatus)
+
+        let q2 = VoiceCommandParser.parse("空调开着吗")
+        XCTAssertEqual(q2?.command, .queryStatus)
+
+        let q3 = VoiceCommandParser.parse("室内湿度多少")
+        XCTAssertEqual(q3?.command, .queryStatus)
+
+        let q4 = VoiceCommandParser.parse("全屋空调开着吗")
+        XCTAssertEqual(q4?.command, .queryStatusAll)
+
+        // 5. 否定安全防线
+        XCTAssertNil(VoiceCommandParser.parse("千万别把空调停了"))
+        XCTAssertNil(VoiceCommandParser.parse("不要停止运行"))
+        XCTAssertNil(VoiceCommandParser.parse("别停空调"))
+        XCTAssertNil(VoiceCommandParser.parse("先不要停"))
+    }
+
     // MARK: - 无效输入测试
 
     func testInvalidCommands() {

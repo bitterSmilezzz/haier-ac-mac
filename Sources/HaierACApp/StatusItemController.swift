@@ -170,20 +170,34 @@ final class StatusItemController: NSObject {
                         let rawWind = attrs["windSpeed"]?.value?.stringValue
                         let windStr = formatDisplayWindSpeed(rawWind)
                         var line = "\(starPrefix) \(devName): \(modeGlyph) \(targetTempStr) [\(windStr)]"
+                        let devHum = model.currentIndoorHumidity(for: devId)
                         if let indoor = indoorTemp {
                             let indoorStr = (indoor.truncatingRemainder(dividingBy: 1.0) == 0)
                                 ? "\(Int(indoor))°C"
                                 : String(format: "%.1f°C", indoor)
-                            line += " (室内 \(indoorStr))"
+                            if let h = devHum {
+                                line += " (室内 \(indoorStr) · \(Int(round(h)))% RH)"
+                            } else {
+                                line += " (室内 \(indoorStr))"
+                            }
+                        } else if let h = devHum {
+                            line += " (室内 \(Int(round(h)))% RH)"
                         }
                         tooltipParts.append(line)
                     } else {
                         var line = "\(starPrefix) \(devName): ⚪️ 待机"
+                        let devHum = model.currentIndoorHumidity(for: devId)
                         if let indoor = indoorTemp {
                             let indoorStr = (indoor.truncatingRemainder(dividingBy: 1.0) == 0)
                                 ? "\(Int(indoor))°C"
                                 : String(format: "%.1f°C", indoor)
-                            line += " (室内 \(indoorStr))"
+                            if let h = devHum {
+                                line += " (室内 \(indoorStr) · \(Int(round(h)))% RH)"
+                            } else {
+                                line += " (室内 \(indoorStr))"
+                            }
+                        } else if let h = devHum {
+                            line += " (室内 \(Int(round(h)))% RH)"
                         }
                         tooltipParts.append(line)
                     }
@@ -438,6 +452,51 @@ final class StatusItemController: NSObject {
                 let devSubmenu = NSMenu()
                 devSubmenu.autoenablesItems = false
 
+                // 实时运行工况与温湿度感知信息标头 (v1.9.51 达成多设备矩阵与单设备上下文菜单严格对称)
+                let devIndoorTemp = model.currentIndoorTemperature(for: devId)
+                let devIndoorHum = model.currentIndoorHumidity(for: devId)
+                let devRawWind = model.attribute("windSpeed", deviceId: devId)?.stringValue
+                let devWindStr = formatDisplayWindSpeed(devRawWind)
+                let devConditionTitle: String = {
+                    let envStr: String = {
+                        if let t = devIndoorTemp {
+                            let tStr = t.truncatingRemainder(dividingBy: 1.0) == 0 ? "\(Int(t))°C" : String(format: "%.1f°C", t)
+                            if let h = devIndoorHum {
+                                return " (室内 \(tStr) · \(Int(round(h)))% RH)"
+                            } else {
+                                return " (室内 \(tStr))"
+                            }
+                        } else if let h = devIndoorHum {
+                            return " (室内 \(Int(round(h)))% RH)"
+                        }
+                        return ""
+                    }()
+                    if !isControllable {
+                        return "⚡️ \(dev.name): 离线\(envStr)"
+                    }
+                    if isPowerOn {
+                        let modeStr: String = {
+                            if let modeCode = modeCode {
+                                switch modeCode {
+                                case .cooling: return "❄️ 制冷"
+                                case .heating: return "🔥 制热"
+                                case .fan: return "🍃 送风"
+                                case .dehumidify: return "💧 除湿"
+                                case .auto: return "🔄 自动"
+                                }
+                            }
+                            return "⚙️ 运行中"
+                        }()
+                        return "🟢 \(dev.name): \(modeStr) \(curTempStr)°C [\(devWindStr)]\(envStr)"
+                    } else {
+                        return "⚪️ \(dev.name): 待机\(envStr)"
+                    }
+                }()
+                let headerItem = NSMenuItem(title: devConditionTitle, action: nil, keyEquivalent: "")
+                headerItem.isEnabled = false
+                devSubmenu.addItem(headerItem)
+                devSubmenu.addItem(.separator())
+
                 // 设为菜单栏主显设备 (v1.9.39)
                 let isPrimary = (devId == primaryDeviceId)
                 let pinTitle = isPrimary ? "✓ 菜单栏常驻主显中" : "★ 设为菜单栏主显设备"
@@ -618,14 +677,23 @@ final class StatusItemController: NSObject {
             let rawWind = model.attribute("windSpeed", deviceId: dev.id)?.stringValue
             let windStr = formatDisplayWindSpeed(rawWind)
 
+            let indoorHum = model.currentIndoorHumidity(for: dev.id)
             let conditionTitle: String = {
-                let indoorStr: String = {
-                    guard let indoor = indoorTemp else { return "" }
-                    let s = indoor.truncatingRemainder(dividingBy: 1.0) == 0 ? "\(Int(indoor))°C" : String(format: "%.1f°C", indoor)
-                    return " (室内 \(s))"
+                let envStr: String = {
+                    if let indoor = indoorTemp {
+                        let s = indoor.truncatingRemainder(dividingBy: 1.0) == 0 ? "\(Int(indoor))°C" : String(format: "%.1f°C", indoor)
+                        if let h = indoorHum {
+                            return " (室内 \(s) · \(Int(round(h)))% RH)"
+                        } else {
+                            return " (室内 \(s))"
+                        }
+                    } else if let h = indoorHum {
+                        return " (室内 \(Int(round(h)))% RH)"
+                    }
+                    return ""
                 }()
                 if !isControllable {
-                    return "⚡️ \(dev.name): 离线\(indoorStr)"
+                    return "⚡️ \(dev.name): 离线\(envStr)"
                 }
                 if isPowerOn {
                     let modeStr: String = {
@@ -640,9 +708,9 @@ final class StatusItemController: NSObject {
                         }
                         return "⚙️ 运行中"
                     }()
-                    return "🟢 \(dev.name): \(modeStr) \(curTempStr)°C [\(windStr)]\(indoorStr)"
+                    return "🟢 \(dev.name): \(modeStr) \(curTempStr)°C [\(windStr)]\(envStr)"
                 } else {
-                    return "⚪️ \(dev.name): 待机\(indoorStr)"
+                    return "⚪️ \(dev.name): 待机\(envStr)"
                 }
             }()
             let headerItem = NSMenuItem(title: conditionTitle, action: nil, keyEquivalent: "")

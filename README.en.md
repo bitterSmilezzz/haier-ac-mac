@@ -6,6 +6,20 @@ A native SwiftUI app to control Haier / Leader (统帅) smart air conditioners o
 
 ## Features
 
+- 🏷 **Colloquial "X-Point-5" Degree Parsing, Stopping Power-Off Semantics, Airflow Dynamics Alignment & Status Bar Matrix Climate Perception (v1.9.51)**:
+  - ⏱️ **Natural Language "X度五 / X度5" Temperature & Relative Stepping Precision (`VoiceCommandParser` / `VoiceCommandParserTests`)**:
+    - **"X度五 / X度5" Absolute Temperature Extraction**: Thoroughly resolved the precision truncation flaw where high-frequency spoken commands like "二十六度五", "26度5", "开到25度5", "制冷二十六度五", "制冷26度5", "全屋二十六度五", and "全屋开到26度5" previously missed decimal conversion because the regex only checked "度半", resulting in severe 0.5°C truncation to integer values (26°C / 25°C); introduced `([一二两三四五六七八九\d]+)度(?:半|五|5)` to losslessly normalize spoken values to target decimal temperatures (26.5°C, 25.5°C);
+    - **Spoken "一度五 / 1度5" Relative Stepping Micro-Tuning**: Resolved the issue where relative adjustments like "调高一度五", "升温1度5", "降温一度五", "调低1度5", "全屋升温一度五", and "全屋降温1度5" defaulted to 1.0°C; now accurately extracts and applies $\pm 1.5^\circ\text{C}$ adjustments;
+    - **Stopping Verbal Shutdown Intent & Negative Safeguard**: Expanded power shutdown keyword matching to cover natural stop phrases ("把空调停了", "停止运行", "停止运转", "停止工作", "停掉空调", "全屋空调停止运行", "所有空调停止运行", "所有空调都停了"), routing correctly to `.setPower(false)` / `.turnOffAll` while preserving robust structured negation protection ("千万别把空调停了", "不要停止运行");
+    - **Status & Humidity Query Expansion**: Full native recognition for colloquial climate queries ("查询状态", "空调开着吗", "空调开了吗", "空调关了吗", "空调开着没", "空调关了没", "室内湿度多少", "查询湿度"), dispatching to `.queryStatus` / `.queryStatusAll`.
+  - 🍃 **Aerodynamic Airflow Gear Expansion & Humidity Dual-Control Convergence (`EnergyAnalyticsEngine` / `AppModel` / `VoiceCapsuleWindowController`)**:
+    - Expanded airflow alias mappings in `EnergyAnalyticsEngine.estimateInstantaneousPower` and `AppModel.calculateFilterWearFactor` to include "极速", "高速", "低速", and "中速", ensuring 100% strict physical symmetry between aerodynamic filter loading and electric thermodynamic power;
+    - Added the unified `currentIndoorHumidity(for:)` property accessor on `AppModel`, standardizing scattered humidity reading points;
+    - Linked humidity dual-control feedback in voice queries (`queryStatus` / `queryStatusAll`), providing device-level relative humidity and whole-home average humidity reporting.
+  - 🍱 **macOS Native Status Bar Multi-Device Matrix Perception Symmetry & Climate Presentation (`StatusItemController`)**:
+    - Added an informational condition header at the top of each device submenu (`devSubmenu`) in the multi-device control matrix (e.g. `🟢 客厅空调: ❄️ 制冷 26°C [强劲风] (室内 28°C · 55% RH)`), achieving perfect visual symmetry with the single-device context menu;
+    - Enriched single-device condition headers and status bar hover tooltips with indoor relative humidity (`(室内 26°C · 58% RH)`), providing denser, higher-fidelity ambient climate perception.
+
 - 🏷 **Natural Language Delay Countdown Semantics & Instant Power-Off Guard, Colloquial Comfort Temp Stepping, Aerodynamic Airflow Symmetry & Status Bar Condition Perception (v1.9.50)**:
   - ⏱️ **Natural Language Delay Countdown Semantics Closure & Immediate Shutdown Guard (`VoiceCommandParser` / `VoiceCommandParserTests`)**:
     - **Prefix Delays and Direct Duration Countdown Alignment**: Permanently fixed the critical misoperation flaw where high-frequency spoken commands like "过半小时关机", "30分钟关机", "延迟半小时关机", "等一个小时关机", "全屋过半小时关机", "全屋30分钟关机", and "稍后30分钟开机" lacked the "后" or "定时" keywords, escaped countdown parsing, and were intercepted by immediate power toggles (`isPowerOff` / `isAllPowerOff`), immediately shutting down active air conditioners;

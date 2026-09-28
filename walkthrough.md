@@ -1,49 +1,50 @@
-# Haier AC Mac v1.9.50 发布与巡检演进报告
+# Haier AC Mac v1.9.51 发布与巡检演进报告
 
 ## 1. 概述与版本定位
-- **版本号**：`v1.9.50`
-- **发版主题**：自然语言延迟倒计时语义闭环与防误立即关机、口语冷暖体感调温、全风量动力学校准及状态栏工况感知
+- **版本号**：`v1.9.51`
+- **发版主题**：口语“X度五/X度5”高精解析、停止关机意图与温湿度工况全景感知
 - **核心目标与架构演进**：
-  1. **自然语言延迟倒计时语义闭环与防误立即关机缺陷根治 (`VoiceCommandParser` / `VoiceCommandParserTests`)**：
-     - **前置延迟助词与直接时长倒计时闭环**：彻底修复日常高频口语“过半小时关机”、“30分钟关机”、“延迟半小时关机”、“等一个小时关机”、“全屋过半小时关机”、“全屋30分钟关机”、“稍后30分钟开机”等因缺少“后”或“定时”关键词导致逃逸出倒计时判定，进而被立即开关机（`isPowerOff` / `isAllPowerOff`）提前拦截并执行立即关机的重大误操作隐患；
-     - **延迟意图防误触守卫**：引入 `hasTimingOrCountdownIntent` 延迟时间意图守护，并在 `parseScheduleOrCountdown` 中全面支持延迟助词（过/等/延迟/延后/稍后）与直接时长表达式；
-     - **钟点定时与倒计时判定层级优化**：优先判定钟点定时，确保具体钟点定时（含“差半小时八点关机”、“十点差五分关机”等逆序时间）与倒计时互不干扰、分秒不差；
-     - **“点5”小数归一化与风量/动作否定保护**：补齐“点5”阿拉伯数字小数时间解析（如“1点5小时后关机”精确折算为 90 分钟），并在开关机判定中完善风量口令守卫（“开到最大”、“开三档风”正确识别为风速调节而非开启电源），同时扩充动作否定词涵盖送风与除湿，并特例放行日常高频关机口令“别吹了”。
-  2. **自然语言口语化冷暖体感与相对调温扩展 (`VoiceCommandParser` / `VoiceCommandParserTests`)**：
-     - 全面支持“暖和点”、“暖一点”、“更热一点”、“热点”、“凉快一点”、“凉快点”、“更冷一点”、“太冻了”、“冻死了”、“热死了”等日常高频体感表达；
-     - 无缝联动全屋相对调温（如“全屋暖和点” -> 全屋升温 1°C，“全屋凉快一点” -> 全屋降温 1°C）。
-  3. **全风量空气动力学能耗与滤网磨损衰减系数严格统一 (`EnergyAnalyticsEngine` / `AppModel`)**：
-     - 在 `EnergyAnalyticsEngine.estimateInstantaneousPower` 与 `AppModel.calculateFilterWearFactor` 中，对风量档位判定进行多维度统配：覆盖英文枚举（`turbo`, `high`, `medium`, `mid`, `low`, `micro`, `quiet`, `mute`）、档位数字（`1~3档`, `一/二/三档`）以及口语化描述（`超强`, `强劲`, `大风`, `小风`, `最大`, `最小`）；
-     - 彻底消除以往传入英文风速枚举或数字档位时在 `EnergyAnalyticsEngine` 中回退为 40W 默认基准导致的高风量电功率严重低估缺陷，实现全风量热力学能耗与空气动力学滤网积尘负荷的严格对称性仿真。
-  4. **macOS 原生状态栏单机实时工况与室内温感知标头及悬浮 Tooltip 精致化 (`StatusItemController`)**：
-     - 针对单设备用户场景，在状态栏右键上下文菜单顶部新增专属实时运行工况与室内温度感知标头（如 `🟢 客厅空调: ❄️ 制冷 26°C [强劲风] (室内 28°C)` 或 `⚪️ 客厅空调: 待机 (室内 28°C)`），无需打开面板即可掌握设备运行工况；
-     - 状态栏悬浮 Tooltip 设备行全面优化：整数温度消除多余的 `.0` 展现（显示为 `26°C`），并同步展示当前风速档位标签（如 `[高风]`、`[中风]`、`[微风]`、`[自动风]`），视觉层级更加优雅、信息密度更高。
+  1. **自然语言口语“X度五 / X度5”温度与相对微调高精解析 (`VoiceCommandParser` / `VoiceCommandParserTests`)**：
+     - **“X度五 / X度5”绝对温度精准提取**：彻底修复日常口语高频出现的“二十六度五”、“26度5”、“开到25度5”、“制冷二十六度五”、“制冷26度5”、“全屋二十六度五”、“全屋开到26度5”在归一化中由于仅匹配“度半”而遗漏“度五/度5”导致丢失 0.5°C 精度、被错误降级为整数温度（如 26°C / 25°C）的严重缺陷；通过 `([一二两三四五六七八九\d]+)度(?:半|五|5)` 统一正则，精准无损折算为 26.5°C、25.5°C 等 0.5°C 步进目标温度；
+     - **口语“一度五 / 1度5”相对调温微调**：解决“调高一度五”、“升温1度5”、“降温一度五”、“调低1度5”以及全屋联动“全屋升温一度五”、“全屋降温1度5”在相对调温中被错误判定为 1.0°C 的缺陷，精准提取为 $\pm 1.5^\circ\text{C}$ 微调；
+     - **“停止”类口语关机意图与否定安全闭环**：扩充开关机意图判定，覆盖日常高频口语“把空调停了”、“停止运行”、“停止运转”、“停止工作”、“停掉空调”以及全屋口令“全屋空调停止运行”、“所有空调停止运行”、“所有空调都停了”，精准分发为单机/全屋关机指令（`.setPower(false)` / `.turnOffAll`），同时保持结构化否定安全防线（“千万别把空调停了”、“不要停止运行”等严格拦截）；
+     - **状态与温湿度口语查询扩展**：全面支持“查询状态”、“空调开着吗”、“空调开了吗”、“空调关了吗”、“空调开着没”、“空调关了没”、“室内湿度多少”、“查询湿度”等自然口语，智能分发至 `.queryStatus` / `.queryStatusAll`。
+  2. **空气动力学风量档位扩展与温湿度双控感知收敛 (`EnergyAnalyticsEngine` / `AppModel` / `VoiceCapsuleWindowController`)**：
+     - 在 `EnergyAnalyticsEngine.estimateInstantaneousPower` 与 `AppModel.calculateFilterWearFactor` 中扩展“极速”、“高速”、“低速”、“中速”等风速别名映射，确保全仓风速档位空气动力学与电热功率动力学 100% 严格对齐；
+     - 在 `AppModel` 中提供统一的 `currentIndoorHumidity(for:)` 属性访问器，收敛散落的多处温湿度属性读取；
+     - 在语音状态查询（`queryStatus` / `queryStatusAll`）中联动温湿度双控，提供设备湿度与全屋平均环境湿度反馈。
+  3. **macOS 原生状态栏多设备控制矩阵实时工况感知对称性与温湿度全景呈现 (`StatusItemController`)**：
+     - 在状态栏右键菜单的「空调设备控制矩阵」各个子设备菜单项（`devSubmenu`）顶部，增设与单设备模式严格对称的实时工况感知禁用态标头（如 `🟢 客厅空调: ❄️ 制冷 26°C [强劲风] (室内 28°C · 55% RH)`），使多设备场景下每个房间设备的当前状态一目了然；
+     - 在单设备工况标头与悬浮 Tooltip 设备行中，加入环境湿度感知展示（如 `(室内 26°C · 58% RH)`），提升视觉精致度与信息感知密度。
 
 ---
 
 ## 2. 关键架构变更与代码实现
 
-### 2.1 延迟倒计时语义与防误立即关机闭环 (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)
-- **延迟助词与直接时长解析**：
-  - 新增 `hasTimingOrCountdownIntent` 辅助判断，拦截 `isPowerOff`、`isPowerOn`、`isAllPowerOff`、`isAllPowerOn`；
-  - 在 `parseScheduleOrCountdown` 中扩展 `isCountdownTrigger` 与 `hasDuration`，精准识别“过半小时关机”、“30分钟关机”、“延迟半小时关机”、“等一个小时关机”等口语并构建倒计时命令；
-  - 调整优先级：优先检查具体钟点定时（`parseScheduleTime`），再进入倒计时解析，彻底解决逆序倒算钟点（如“差半小时八点关机”）与倒计时之间的边界竞争。
-- **体感冷暖与动作否定守卫**：
-  - 扩展 `warmerKeywords` 与 `coolerKeywords`，纳入“暖和点/更热一点/凉快一点/更冷一点”与“太冻了/冻死了/热死了”；
-  - 扩展 `negativeActionRegex` 涵盖 `吹|送|抽|除`，并特例放行“别吹了”等同关机。
-- **单元测试覆盖**：
-  - 新增 `testCountdownDelayAndDirectDurationVariations`、`testColloquialRelativeTemperatureVariations` 与 `testFilterResetAndWindGuards`，覆盖超过 27 组真实自然语言口语用例，100% 校验通过。
+### 2.1 口语“X度五/X度5”精确解析与停止关机意图闭环 (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)
+- **度五/度5正则归一化**：
+  - 将 `degreeHalfPattern` 升级为 `degreeHalfOrFivePattern = #"([一二两三四五六七八九\d]+)度(?:半|五|5)"#`，无缝支持“二十六度五/26度5/开到25度5/制冷26度5/全屋26度5/调高一度五/升温1度5/降温一度五”；
+  - 补充 `五分度 -> 0.5度` 替换。
+- **停止类口语关机识别**：
+  - `isPowerOff` 扩充停止关键词：`"停止运行", "停止运转", "停止工作", "停掉空调", "停掉", "停一下", "停止"`，并支持以 `停/停止/停了/停机` 开头与结尾的口语结构；
+  - `isAllPowerOff` 扩充全屋停止口令：`"停止所有空调", "停止全部空调", "所有空调停止", "全部空调停止", "全屋停止", "所有空调都停了", "全部空调都停了", "全屋停机", "全部停机"`。
+- **状态与温湿度查询扩展**：
+  - 扩充查询词库，支持“空调开着吗/空调关了吗/空调开了没/空调关了没/室内湿度多少/查询湿度/查询状态”。
+- **单元测试验证**：
+  - 新增 `testOralDegreeFiveAndStoppingAndStatusQueries` 测试套件，覆盖 20 组真实用例，全部验证通过。
 
-### 2.2 全风量热力学电功率与滤网磨损空气动力学对齐 (`EnergyAnalyticsEngine.swift` / `AppModel.swift`)
-- **多维度风量档位判定统配**：
-  - 统一映射：强劲/Turbo（180W / 1.70）、高风/High（110W / 1.35）、中风/Medium（65W / 1.00）、低风/Low（35W / 0.80）、微风/Quiet（15W / 0.60）、自动风/Auto（40W / 1.00）；
-  - 兼容英文枚举、数字档位与中文多变口语。
+### 2.2 全风量档位扩展与温湿度双控收敛 (`EnergyAnalyticsEngine.swift` / `AppModel.swift` / `VoiceCapsuleWindowController.swift`)
+- **全风量别名对齐**：
+  - 在 `EnergyAnalyticsEngine.estimateInstantaneousPower` 与 `AppModel.calculateFilterWearFactor` 中，对“极速/高速/中速/低速”进行空气动力学系数统一映射。
+- **温湿度双控属性收敛与语音反馈**：
+  - `AppModel` 增设 `public func currentIndoorHumidity(for deviceId: String) -> Double?`；
+  - `VoiceCapsuleWindowController` 的 `.queryStatus` 与 `.queryStatusAll` 增加环境相对湿度感知与平均湿度播报。
 
-### 2.3 状态栏单机运行工况感知与悬浮 Tooltip 优化 (`StatusItemController.swift`)
-- **单设备工况信息标头**：
-  - 在单设备右键上下文菜单顶部新增禁用态信息标头，清晰展示当前状态、模式、目标温度、风速与室内温度；
-- **Tooltip 整数温展示与风速标定**：
-  - 消除整数温度的 `.0` 后缀，追加当前风速档位标签，提示信息更加干练明晰。
+### 2.3 状态栏多设备矩阵工况对称与温湿度呈现 (`StatusItemController.swift`)
+- **多设备矩阵标头对称化**：
+  - 在 `devSubmenu` 顶部插入实时工况与温湿度感知信息标头（如 `🟢 客厅空调: ❄️ 制冷 26°C [强劲风] (室内 28°C · 55% RH)`），使多设备矩阵与单设备菜单完全对称；
+- **Tooltip 与单设备标头丰富化**：
+  - 注入设备当前相对湿度 `(室内 26°C · 58% RH)`。
 
 ---
 
@@ -51,5 +52,5 @@
 - **底层编译与语法校验**：
   - 运行 `SDKROOT=/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk swift build`，全模块编译 100% 通过（Build complete!）；
 - **应用打包与代码签名**：
-  - 执行 `./build_app.sh 1.9.50` 打包，小组件（沙盒 + Application Support 只读例外）与主应用签名全部就绪；
-  - 产出安装包：`dist/HaierAC-v1.9.50-macOS.zip`（2.6MB）。
+  - 执行 `./build_app.sh 1.9.51` 打包，小组件（沙盒 + Application Support 只读例外）与主应用签名全部就绪；
+  - 产出安装包：`dist/HaierAC-v1.9.51-macOS.zip`。
