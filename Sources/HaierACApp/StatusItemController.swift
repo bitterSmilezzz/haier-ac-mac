@@ -231,8 +231,15 @@ final class StatusItemController: NSObject {
         }
 
         if !model.scheduledActions.isEmpty {
-            let activeCount = model.scheduledActions.count
-            tooltipParts.append("⏱ 计划调度: \(activeCount) 个定时/倒计时任务生效中")
+            let enabledCount = model.scheduledActions.filter(\.enabled).count
+            let pausedCount = model.scheduledActions.count - enabledCount
+            if pausedCount == 0 {
+                tooltipParts.append("⏱ 计划调度: \(enabledCount) 个定时/倒计时任务生效中")
+            } else if enabledCount == 0 {
+                tooltipParts.append("⏱ 计划调度: \(pausedCount) 个定时任务已全部暂停")
+            } else {
+                tooltipParts.append("⏱ 计划调度: \(enabledCount) 个生效中 · \(pausedCount) 个已暂停")
+            }
         }
 
         let lowCleanDevices = allDevices.compactMap { dev -> (name: String, pct: Int)? in
@@ -1031,6 +1038,28 @@ final class StatusItemController: NSObject {
                 scheduleMenu.addItem(item)
             }
             scheduleMenu.addItem(.separator())
+            let enabledCount = activeSchedules.filter(\.enabled).count
+            let pausedCount = activeSchedules.count - enabledCount
+
+            if enabledCount > 0 {
+                let pauseAllItem = NSMenuItem(
+                    title: "⏸ 暂停全屋所有定时任务",
+                    action: #selector(pauseAllSchedulesFromMenu),
+                    keyEquivalent: ""
+                )
+                pauseAllItem.target = self
+                scheduleMenu.addItem(pauseAllItem)
+            }
+            if pausedCount > 0 {
+                let resumeAllItem = NSMenuItem(
+                    title: "▶️ 恢复全屋所有定时任务",
+                    action: #selector(resumeAllSchedulesFromMenu),
+                    keyEquivalent: ""
+                )
+                resumeAllItem.target = self
+                scheduleMenu.addItem(resumeAllItem)
+            }
+
             let cancelAllItem = NSMenuItem(
                 title: "🗑 取消全屋所有定时与倒计时",
                 action: #selector(cancelAllSchedulesFromMenu),
@@ -1039,7 +1068,15 @@ final class StatusItemController: NSObject {
             cancelAllItem.target = self
             scheduleMenu.addItem(cancelAllItem)
 
-            let scheduleParentItem = NSMenuItem(title: "⏱ 计划调度 (\(activeSchedules.count) 个任务生效中)...", action: nil, keyEquivalent: "")
+            let scheduleParentTitle: String
+            if pausedCount == 0 {
+                scheduleParentTitle = "⏱ 计划调度 (\(enabledCount) 个任务生效中)..."
+            } else if enabledCount == 0 {
+                scheduleParentTitle = "⏱ 计划调度 (\(pausedCount) 个任务已暂停)..."
+            } else {
+                scheduleParentTitle = "⏱ 计划调度 (\(enabledCount) 生效 / \(pausedCount) 暂停)..."
+            }
+            let scheduleParentItem = NSMenuItem(title: scheduleParentTitle, action: nil, keyEquivalent: "")
             menu.setSubmenu(scheduleMenu, for: scheduleParentItem)
             menu.addItem(scheduleParentItem)
         } else {
@@ -1316,6 +1353,22 @@ final class StatusItemController: NSObject {
     @objc private func cancelAllSchedulesFromMenu() {
         let count = model.cancelAllSchedules()
         if count > 0 {
+            refreshTemperature()
+        }
+    }
+
+    @objc private func pauseAllSchedulesFromMenu() {
+        let count = model.setAllScheduledActionsEnabled(false)
+        if count > 0 {
+            model.operationNotice = AppModel.OperationNotice(text: "⏸ 已临时暂停全屋所有定时任务（共 \(count) 个）", isError: false)
+            refreshTemperature()
+        }
+    }
+
+    @objc private func resumeAllSchedulesFromMenu() {
+        let count = model.setAllScheduledActionsEnabled(true)
+        if count > 0 {
+            model.operationNotice = AppModel.OperationNotice(text: "▶️ 已恢复全屋所有定时任务生效（共 \(count) 个）", isError: false)
             refreshTemperature()
         }
     }

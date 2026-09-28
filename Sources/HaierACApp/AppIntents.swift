@@ -519,6 +519,72 @@ struct CancelACSchedulesIntent: AppIntent {
     }
 }
 
+// MARK: - 暂停/恢复计划调度任务 (v1.9.60)
+
+struct PauseACSchedulesIntent: AppIntent {
+    static var title: LocalizedStringResource = "暂停空调定时任务"
+    static var description = IntentDescription("临时暂停海尔空调已设定的定时任务或倒计时", categoryName: "空调控制")
+
+    @Parameter(title: "设备名称", description: "可选；留空则暂停全屋所有定时任务，指定名称则暂停该设备任务")
+    var deviceName: String?
+
+    @MainActor
+    func perform() async throws -> some IntentResult & ProvidesDialog {
+        let model = AppModel.shared
+        if let name = deviceName, !name.isEmpty && !name.contains("全") && !name.contains("所有") {
+            guard let deviceId = resolveDeviceId(named: name) else {
+                throw ACIntentError.message("未找到指定名称的空调设备")
+            }
+            let devName = model.allUnifiedDevices.first(where: { $0.id == deviceId })?.name ?? "目标空调"
+            let count = model.setScheduledActionsEnabled(for: [deviceId], enabled: false)
+            if count > 0 {
+                return .result(dialog: "已为您暂停「\(devName)」的 \(count) 个定时任务")
+            } else {
+                return .result(dialog: "「\(devName)」当前没有可暂停的定时任务")
+            }
+        } else {
+            let count = model.setAllScheduledActionsEnabled(false)
+            if count > 0 {
+                return .result(dialog: "已为您临时暂停全屋所有定时与倒计时任务（共 \(count) 个）")
+            } else {
+                return .result(dialog: "全屋当前没有可暂停的定时任务")
+            }
+        }
+    }
+}
+
+struct ResumeACSchedulesIntent: AppIntent {
+    static var title: LocalizedStringResource = "恢复空调定时任务"
+    static var description = IntentDescription("恢复海尔空调已暂停的定时任务生效", categoryName: "空调控制")
+
+    @Parameter(title: "设备名称", description: "可选；留空则恢复全屋所有定时任务，指定名称则恢复该设备任务")
+    var deviceName: String?
+
+    @MainActor
+    func perform() async throws -> some IntentResult & ProvidesDialog {
+        let model = AppModel.shared
+        if let name = deviceName, !name.isEmpty && !name.contains("全") && !name.contains("所有") {
+            guard let deviceId = resolveDeviceId(named: name) else {
+                throw ACIntentError.message("未找到指定名称的空调设备")
+            }
+            let devName = model.allUnifiedDevices.first(where: { $0.id == deviceId })?.name ?? "目标空调"
+            let count = model.setScheduledActionsEnabled(for: [deviceId], enabled: true)
+            if count > 0 {
+                return .result(dialog: "已为您恢复「\(devName)」的 \(count) 个定时任务生效")
+            } else {
+                return .result(dialog: "「\(devName)」当前没有需要恢复的暂停任务")
+            }
+        } else {
+            let count = model.setAllScheduledActionsEnabled(true)
+            if count > 0 {
+                return .result(dialog: "已为您恢复全屋所有定时与倒计时任务生效（共 \(count) 个）")
+            } else {
+                return .result(dialog: "全屋当前没有需要恢复的暂停任务")
+            }
+        }
+    }
+}
+
 // MARK: - 定时与倒计时计划调度 (v1.9.56)
 
 struct ScheduleACPowerIntent: AppIntent {
@@ -625,8 +691,20 @@ struct ScheduleACPowerIntent: AppIntent {
                 return ([2, 3, 4, 5], false, "周一至周四")
             } else if sched.contains("周一到周三") || sched.contains("周一至周三") || sched.contains("礼拜一到礼拜三") || sched.contains("礼拜一至礼拜三") {
                 return ([2, 3, 4], false, "周一至周三")
+            } else if sched.contains("周一到周二") || sched.contains("周一至周二") || sched.contains("礼拜一到礼拜二") || sched.contains("礼拜一至礼拜二") {
+                return ([2, 3], false, "周一至周二")
             } else if sched.contains("周二到周五") || sched.contains("周二至周五") || sched.contains("礼拜二到礼拜五") || sched.contains("礼拜二至礼拜五") {
                 return ([3, 4, 5, 6], false, "周二至周五")
+            } else if sched.contains("周二到周四") || sched.contains("周二至周四") || sched.contains("礼拜二到礼拜四") || sched.contains("礼拜二至礼拜四") {
+                return ([3, 4, 5], false, "周二至周四")
+            } else if sched.contains("周二到周六") || sched.contains("周二至周六") || sched.contains("礼拜二到礼拜六") || sched.contains("礼拜二至礼拜六") {
+                return ([3, 4, 5, 6, 7], false, "周二至周六")
+            } else if sched.contains("周三到周五") || sched.contains("周三至周五") || sched.contains("礼拜三到礼拜五") || sched.contains("礼拜三至礼拜五") {
+                return ([4, 5, 6], false, "周三至周五")
+            } else if sched.contains("周三到周六") || sched.contains("周三至周六") || sched.contains("礼拜三到礼拜六") || sched.contains("礼拜三至礼拜六") {
+                return ([4, 5, 6, 7], false, "周三至周六")
+            } else if sched.contains("周四到周日") || sched.contains("周四至周日") || sched.contains("礼拜四到礼拜天") || sched.contains("礼拜四至礼拜天") {
+                return ([1, 5, 6, 7], false, "周四至周日")
             } else if sched.contains("周五到周日") || sched.contains("周五至周日") || sched.contains("礼拜五到礼拜天") || sched.contains("礼拜五至礼拜天") || sched.contains("周五周六周日") || sched.contains("周末三天") {
                 return ([1, 6, 7], false, "周五至周日")
             } else if sched.contains("一三五") || sched.contains("一、三、五") {
@@ -635,7 +713,7 @@ struct ScheduleACPowerIntent: AppIntent {
                 return ([3, 5, 7], false, "每周二、四、六")
             } else if sched.contains("二四") || sched.contains("二、四") {
                 return ([3, 5], false, "每周二、四")
-            } else if sched.contains("周末") || sched.contains("双休") || sched.contains("周六周日") || sched.contains("周六和周日") || sched.contains("礼拜六礼拜天") || sched.contains("礼拜六和礼拜天") || sched.contains("礼拜六礼拜日") || sched.contains("礼拜六和礼拜日") {
+            } else if sched.contains("周末") || sched.contains("双休") || sched.contains("周六周日") || sched.contains("周六和周日") || sched.contains("周六到周日") || sched.contains("周六至周日") || sched.contains("礼拜六礼拜天") || sched.contains("礼拜六和礼拜天") || sched.contains("礼拜六礼拜日") || sched.contains("礼拜六和礼拜日") || sched.contains("礼拜六到礼拜天") || sched.contains("礼拜六至礼拜天") {
                 return ([1, 7], false, "周末")
             } else if sched.contains("周一") || sched.contains("星期一") || sched.contains("礼拜一") {
                 return ([2], false, "每周一")
@@ -854,6 +932,28 @@ struct ACAppShortcuts: AppShortcutsProvider {
                     systemImageName: "xmark.circle"
                 ),
                 AppShortcut(
+                    intent: PauseACSchedulesIntent(),
+                    phrases: [
+                        "用 \(.applicationName) 暂停定时",
+                        "用 \(.applicationName) 暂停所有定时",
+                        "\(.applicationName) 暂停定时",
+                        "暂停全屋定时 \(.applicationName)",
+                    ],
+                    shortTitle: "暂停定时",
+                    systemImageName: "pause.circle"
+                ),
+                AppShortcut(
+                    intent: ResumeACSchedulesIntent(),
+                    phrases: [
+                        "用 \(.applicationName) 恢复定时",
+                        "用 \(.applicationName) 恢复所有定时",
+                        "\(.applicationName) 恢复定时",
+                        "恢复全屋定时 \(.applicationName)",
+                    ],
+                    shortTitle: "恢复定时",
+                    systemImageName: "play.circle"
+                ),
+                AppShortcut(
                     intent: ScheduleACPowerIntent(),
                     phrases: [
                         "用 \(.applicationName) 定时关机",
@@ -998,6 +1098,20 @@ struct ACAppShortcuts: AppShortcutsProvider {
                     phrases: [
                         "用 \(.applicationName) 取消定时",
                         "用 \(.applicationName) 取消所有定时",
+                    ]
+                ),
+                AppShortcut(
+                    intent: PauseACSchedulesIntent(),
+                    phrases: [
+                        "用 \(.applicationName) 暂停定时",
+                        "用 \(.applicationName) 暂停所有定时",
+                    ]
+                ),
+                AppShortcut(
+                    intent: ResumeACSchedulesIntent(),
+                    phrases: [
+                        "用 \(.applicationName) 恢复定时",
+                        "用 \(.applicationName) 恢复所有定时",
                     ]
                 ),
                 AppShortcut(

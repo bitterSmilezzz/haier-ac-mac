@@ -423,6 +423,26 @@ public final class VoiceCapsuleWindowController: NSObject, NSWindowDelegate {
             scheduleAutoDismiss(delay: 1.8)
             return
 
+        case .pauseSchedulesAll:
+            let count = model.setAllScheduledActionsEnabled(false)
+            if count > 0 {
+                VoiceControlManager.shared.markSuccess("已临时暂停全屋所有定时任务（共 \(count) 个）")
+            } else {
+                VoiceControlManager.shared.markSuccess("全屋当前没有可暂停的定时任务")
+            }
+            scheduleAutoDismiss(delay: 1.8)
+            return
+
+        case .resumeSchedulesAll:
+            let count = model.setAllScheduledActionsEnabled(true)
+            if count > 0 {
+                VoiceControlManager.shared.markSuccess("已恢复全屋所有定时任务生效（共 \(count) 个）")
+            } else {
+                VoiceControlManager.shared.markSuccess("全屋当前没有需要恢复的暂停任务")
+            }
+            scheduleAutoDismiss(delay: 1.8)
+            return
+
         case .resetFilterMaintenanceAll:
             model.resetAllFilterMaintenance()
             VoiceControlManager.shared.markSuccess("已重置全屋 \(model.allUnifiedDevices.count) 台空调滤网保养计时，洁净度恢复 100%")
@@ -845,6 +865,22 @@ public final class VoiceCapsuleWindowController: NSObject, NSWindowDelegate {
                 VoiceControlManager.shared.markSuccess("「\(targetName)」当前没有正在运行的定时任务")
             }
 
+        case .pauseSchedules:
+            let count = model.setScheduledActionsEnabled(for: [deviceId], enabled: false)
+            if count > 0 {
+                VoiceControlManager.shared.markSuccess("已临时暂停\(prefix)定时任务（共 \(count) 个）")
+            } else {
+                VoiceControlManager.shared.markSuccess("「\(targetName)」当前没有可暂停的定时任务")
+            }
+
+        case .resumeSchedules:
+            let count = model.setScheduledActionsEnabled(for: [deviceId], enabled: true)
+            if count > 0 {
+                VoiceControlManager.shared.markSuccess("已恢复\(prefix)定时任务生效（共 \(count) 个）")
+            } else {
+                VoiceControlManager.shared.markSuccess("「\(targetName)」当前没有需要恢复的暂停任务")
+            }
+
         case .startSleepCurve(let curveName):
             guard ensureControllable() else { return }
             let curve: SleepCurveConfig
@@ -898,7 +934,7 @@ public final class VoiceCapsuleWindowController: NSObject, NSWindowDelegate {
                 VoiceControlManager.shared.markSuccess("已为\(prefix)启动 56°C 蒸发器高温自清洁")
             }
 
-        case .turnOffAll, .turnOnAll, .stopSelfCleaning, .stopSleepCurve, .presetAll, .setTemperatureAll, .adjustTemperatureAll, .setWindSpeedAll, .cancelSchedulesAll, .queryStatusAll, .queryFilterHealthAll, .resetFilterMaintenanceAll:
+        case .turnOffAll, .turnOnAll, .stopSelfCleaning, .stopSleepCurve, .presetAll, .setTemperatureAll, .adjustTemperatureAll, .setWindSpeedAll, .cancelSchedulesAll, .pauseSchedulesAll, .resumeSchedulesAll, .queryStatusAll, .queryFilterHealthAll, .resetFilterMaintenanceAll:
             break // 已在指令前置流程中由全局调度完成分发
         }
 
@@ -1002,6 +1038,22 @@ public final class VoiceCapsuleWindowController: NSObject, NSWindowDelegate {
                 VoiceControlManager.shared.markSuccess("已取消\(prefix)定时任务（共 \(totalRemoved) 个）")
             } else {
                 VoiceControlManager.shared.markSuccess("\(prefix)当前没有正在运行的定时任务")
+            }
+
+        case .pauseSchedules:
+            let count = model.setScheduledActionsEnabled(for: ids, enabled: false)
+            if count > 0 {
+                VoiceControlManager.shared.markSuccess("已临时暂停\(prefix)定时任务（共 \(count) 个）")
+            } else {
+                VoiceControlManager.shared.markSuccess("\(prefix)当前没有可暂停的定时任务")
+            }
+
+        case .resumeSchedules:
+            let count = model.setScheduledActionsEnabled(for: ids, enabled: true)
+            if count > 0 {
+                VoiceControlManager.shared.markSuccess("已恢复\(prefix)定时任务生效（共 \(count) 个）")
+            } else {
+                VoiceControlManager.shared.markSuccess("\(prefix)当前没有需要恢复的暂停任务")
             }
 
         case .applyScene(let sceneName):

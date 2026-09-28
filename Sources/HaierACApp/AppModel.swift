@@ -44,7 +44,7 @@ struct ScheduledAction: Identifiable, Codable, Hashable {
         AttrValueCodec.encode(value)
     }
 
-    /// 重复规则的中文描述（如「每天」「工作日」「周末」「每周一」「每周一、三、五」），一次性返回 nil (v1.9.57, v1.9.58, v1.9.59)
+    /// 重复规则的中文描述（如「每天」「工作日」「周末」「每周一」「每周一、三、五」），一次性返回 nil (v1.9.57, v1.9.58, v1.9.59, v1.9.60)
     var repeatLabel: String? {
         if !repeatWeekdays.isEmpty {
             let sorted = repeatWeekdays.sorted()
@@ -54,7 +54,13 @@ struct ScheduledAction: Identifiable, Codable, Hashable {
             if sorted == [2, 3, 4, 5, 6, 7] { return "周一至周六" }
             if sorted == [2, 3, 4, 5] { return "周一至周四" }
             if sorted == [2, 3, 4] { return "周一至周三" }
+            if sorted == [2, 3] { return "周一至周二" }
+            if sorted == [3, 4, 5, 6, 7] { return "周二至周六" }
             if sorted == [3, 4, 5, 6] { return "周二至周五" }
+            if sorted == [3, 4, 5] { return "周二至周四" }
+            if sorted == [4, 5, 6, 7] { return "周三至周六" }
+            if sorted == [4, 5, 6] { return "周三至周五" }
+            if sorted == [1, 5, 6, 7] { return "周四至周日" }
             if sorted == [1, 6, 7] { return "周五至周日" }
             if sorted == [2, 4, 6] { return "每周一、三、五" }
             if sorted == [3, 5, 7] { return "每周二、四、六" }
@@ -216,7 +222,13 @@ public struct BedtimeSchedule: Codable, Equatable {
         if sorted == [2, 3, 4, 5, 6, 7] { return "周一至周六" }
         if sorted == [2, 3, 4, 5] { return "周一至周四" }
         if sorted == [2, 3, 4] { return "周一至周三" }
+        if sorted == [2, 3] { return "周一至周二" }
+        if sorted == [3, 4, 5, 6, 7] { return "周二至周六" }
         if sorted == [3, 4, 5, 6] { return "周二至周五" }
+        if sorted == [3, 4, 5] { return "周二至周四" }
+        if sorted == [4, 5, 6, 7] { return "周三至周六" }
+        if sorted == [4, 5, 6] { return "周三至周五" }
+        if sorted == [1, 5, 6, 7] { return "周四至周日" }
         if sorted == [1, 6, 7] { return "周五至周日" }
         if sorted == [2, 4, 6] { return "每周一、三、五" }
         if sorted == [3, 5, 7] { return "每周二、四、六" }
@@ -777,12 +789,20 @@ final class AppModel: ObservableObject {
         } else if speed.contains("微") || speed.contains("静") || speed.contains("quiet") || speed.contains("mute") || speed.contains("micro") || speed.contains("柔") {
             windFactor = 0.60
         } else {
-            // 自动风速热物理自适应通量校准 (v1.9.59)
-            // 当风速设为“自动”时，内机电控芯片根据室内温度与目标温度差值动态调整风机转速：
-            // 大温差重载（|indoor - target| >= 4.0°C）时自动拉升高风强循环，空气通量剧增，等效 windFactor = 1.30；
-            // 稳态微载（|indoor - target| <= 0.8°C）时自动降档至静音低风节能，等效 windFactor = 0.75；
-            // 常规平稳过渡区间与无温感时维持中性基准 1.00，彻底消除固定 1.00 导致的重载低估与稳态高估。
-            if let indoor = indoorTemp {
+            // 自动风速热物理自适应通量校准 (v1.9.59, v1.9.60)
+            // 当风速设为“自动”时，内机电控芯片根据运行模式与室内温差动态调整风机转速：
+            // 1. 除湿工况（.dehumidify）：主板强制维持低风/微风防止冷凝水二次蒸发带出，自动风速动态锁定微通量基准 0.75，消除温差带来的高估
+            // 2. 送风工况（.fan）：无冷热温控动作，温差项不参与，自动风速维持平稳中低通量 0.85
+            // 3. 制冷/制热/自动工况：
+            //    大温差重载（|indoor - target| >= 4.0°C）时自动拉升高风强循环，空气通量剧增，等效 windFactor = 1.30；
+            //    稳态微载（|indoor - target| <= 0.8°C）时自动降档至静音低风节能，等效 windFactor = 0.75；
+            //    常规平稳过渡区间与无温感时维持中性基准 1.00，彻底消除系统性偏差。
+            let modeCode = ACModeCode.match(from: mode)
+            if modeCode == .dehumidify {
+                windFactor = 0.75
+            } else if modeCode == .fan {
+                windFactor = 0.85
+            } else if let indoor = indoorTemp {
                 let tempDelta = abs(indoor - targetTemp)
                 if tempDelta >= 4.0 {
                     windFactor = 1.30
@@ -1310,6 +1330,42 @@ final class AppModel: ObservableObject {
         scheduledActions[idx].enabled = enabled
         AppLog.log(enabled ? "启用调度: \(scheduledActions[idx].name)" : "暂停调度: \(scheduledActions[idx].name)")
         wakeScheduler()
+    }
+
+    /// 批量启用/禁用所有调度任务（返回受影响的任务数）(v1.9.60)
+    @discardableResult
+    public func setAllScheduledActionsEnabled(_ enabled: Bool) -> Int {
+        guard !scheduledActions.isEmpty else { return 0 }
+        var changed = 0
+        for idx in 0..<scheduledActions.count {
+            if scheduledActions[idx].enabled != enabled {
+                scheduledActions[idx].enabled = enabled
+                changed += 1
+            }
+        }
+        if changed > 0 {
+            AppLog.log(enabled ? "已恢复全屋 \(changed) 个定时任务" : "已暂停全屋 \(changed) 个定时任务")
+            wakeScheduler()
+        }
+        return changed
+    }
+
+    /// 批量启用/禁用指定设备的调度任务（返回受影响的任务数）(v1.9.60)
+    @discardableResult
+    public func setScheduledActionsEnabled(for deviceIds: [String], enabled: Bool) -> Int {
+        guard !scheduledActions.isEmpty else { return 0 }
+        var changed = 0
+        for idx in 0..<scheduledActions.count {
+            if deviceIds.contains(scheduledActions[idx].deviceId) && scheduledActions[idx].enabled != enabled {
+                scheduledActions[idx].enabled = enabled
+                changed += 1
+            }
+        }
+        if changed > 0 {
+            AppLog.log(enabled ? "已恢复设备 \(deviceIds) 的 \(changed) 个定时任务" : "已暂停设备 \(deviceIds) 的 \(changed) 个定时任务")
+            wakeScheduler()
+        }
+        return changed
     }
 
     /// 任务列表变化后唤醒调度器，立即按新时间重新休眠（不用等封顶延迟）

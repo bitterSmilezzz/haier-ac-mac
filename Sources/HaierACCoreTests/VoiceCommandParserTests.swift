@@ -1894,6 +1894,100 @@ final class VoiceCommandParserTests: XCTestCase {
         XCTAssertNil(VoiceCommandParser.parse("别周二到周五定时开机"))
     }
 
+    // MARK: - 计划任务暂停与恢复测试 (v1.9.60)
+
+    func testPauseAndResumeSchedules() {
+        // 1. 定向 / 当前设备暂停与恢复
+        let p1 = VoiceCommandParser.parse("暂停定时")
+        XCTAssertEqual(p1?.command, .pauseSchedules)
+        XCTAssertEqual(p1?.displayText, "临时暂停定时任务")
+
+        let p2 = VoiceCommandParser.parse("暂停倒计时")
+        XCTAssertEqual(p2?.command, .pauseSchedules)
+        XCTAssertEqual(p2?.displayText, "临时暂停定时任务")
+
+        let p3 = VoiceCommandParser.parse("暂停调度计划")
+        XCTAssertEqual(p3?.command, .pauseSchedules)
+
+        let r1 = VoiceCommandParser.parse("恢复定时")
+        XCTAssertEqual(r1?.command, .resumeSchedules)
+        XCTAssertEqual(r1?.displayText, "恢复定时任务生效")
+
+        let r2 = VoiceCommandParser.parse("恢复倒计时")
+        XCTAssertEqual(r2?.command, .resumeSchedules)
+        XCTAssertEqual(r2?.displayText, "恢复定时任务生效")
+
+        let r3 = VoiceCommandParser.parse("继续定时任务")
+        XCTAssertEqual(r3?.command, .resumeSchedules)
+
+        // 2. 全屋批量暂停与恢复
+        let pAll1 = VoiceCommandParser.parse("暂停所有定时任务")
+        XCTAssertEqual(pAll1?.command, .pauseSchedulesAll)
+        XCTAssertEqual(pAll1?.displayText, "临时暂停全屋所有定时任务")
+
+        let pAll2 = VoiceCommandParser.parse("暂停全屋定时")
+        XCTAssertEqual(pAll2?.command, .pauseSchedulesAll)
+        XCTAssertEqual(pAll2?.displayText, "临时暂停全屋所有定时任务")
+
+        let pAll3 = VoiceCommandParser.parse("暂停全部倒计时")
+        XCTAssertEqual(pAll3?.command, .pauseSchedulesAll)
+
+        let rAll1 = VoiceCommandParser.parse("恢复所有定时任务")
+        XCTAssertEqual(rAll1?.command, .resumeSchedulesAll)
+        XCTAssertEqual(rAll1?.displayText, "恢复全屋所有定时任务")
+
+        let rAll2 = VoiceCommandParser.parse("恢复全屋定时")
+        XCTAssertEqual(rAll2?.command, .resumeSchedulesAll)
+        XCTAssertEqual(rAll2?.displayText, "恢复全屋所有定时任务")
+
+        let rAll3 = VoiceCommandParser.parse("恢复全部定时任务")
+        XCTAssertEqual(rAll3?.command, .resumeSchedulesAll)
+
+        // 3. 动作否定安全拦截（杜绝误触发）
+        XCTAssertNil(VoiceCommandParser.parse("千万别暂停定时"))
+        XCTAssertNil(VoiceCommandParser.parse("不要暂停定时"))
+        XCTAssertNil(VoiceCommandParser.parse("不用暂停全屋定时"))
+        XCTAssertNil(VoiceCommandParser.parse("千万别恢复定时"))
+        XCTAssertNil(VoiceCommandParser.parse("不要恢复定时任务"))
+    }
+
+    // MARK: - 复合星期周期扩展与即时防误触发测试 (v1.9.60)
+
+    func testCompoundWeekdayScheduleRanges() {
+        // 1. 周三至周五（[4, 5, 6]）
+        let m35_1 = VoiceCommandParser.parse("周三至周五早上8点开机")
+        XCTAssertEqual(m35_1?.command, .scheduleRepeatPower(hour: 8, minute: 0, power: true, repeatWeekdays: [4, 5, 6], repeatLabel: "周三至周五"))
+        XCTAssertEqual(m35_1?.displayText, "定时在 周三至周五 08:00 开机")
+
+        let m35_2 = VoiceCommandParser.parse("星期三到星期五晚上10点关空调")
+        XCTAssertEqual(m35_2?.command, .scheduleRepeatPower(hour: 22, minute: 0, power: false, repeatWeekdays: [4, 5, 6], repeatLabel: "周三至周五"))
+
+        // 2. 周一至周二（[2, 3]）
+        let m12_1 = VoiceCommandParser.parse("周一到周二晚上10点关空调")
+        XCTAssertEqual(m12_1?.command, .scheduleRepeatPower(hour: 22, minute: 0, power: false, repeatWeekdays: [2, 3], repeatLabel: "周一至周二"))
+
+        // 3. 周二至周四（[3, 4, 5]）
+        let m24_1 = VoiceCommandParser.parse("周二至周四早上7点开空调")
+        XCTAssertEqual(m24_1?.command, .scheduleRepeatPower(hour: 7, minute: 0, power: true, repeatWeekdays: [3, 4, 5], repeatLabel: "周二至周四"))
+
+        // 4. 周六到周日 / 星期六至星期天（[1, 7]）
+        let m67_1 = VoiceCommandParser.parse("周六到周日晚上10点关空调")
+        XCTAssertEqual(m67_1?.command, .scheduleRepeatPower(hour: 22, minute: 0, power: false, repeatWeekdays: [1, 7], repeatLabel: "周末"))
+
+        let m67_2 = VoiceCommandParser.parse("星期六至星期天早上9点开空调")
+        XCTAssertEqual(m67_2?.command, .scheduleRepeatPower(hour: 9, minute: 0, power: true, repeatWeekdays: [1, 7], repeatLabel: "周末"))
+
+        // 5. 即时误开机安全拦截校验（省略“定时”二字时严禁触发立即全屋开机）
+        let check1 = VoiceCommandParser.parse("全屋周三至周五开机")
+        XCTAssertNotEqual(check1?.command, .turnOnAll)
+
+        let check2 = VoiceCommandParser.parse("全屋周六到周日开机")
+        XCTAssertNotEqual(check2?.command, .turnOnAll)
+
+        let check3 = VoiceCommandParser.parse("全屋周一到周二开机")
+        XCTAssertNotEqual(check3?.command, .turnOnAll)
+    }
+
     // MARK: - 无效输入测试
 
     func testInvalidCommands() {

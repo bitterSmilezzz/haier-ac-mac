@@ -28,6 +28,14 @@ public enum VoiceCommand: Equatable {
     case cancelSchedules
     /// 取消全屋所有设备的定时与倒计时任务 (v1.9.36)
     case cancelSchedulesAll
+    /// 临时暂停定向/当前设备定时与倒计时 (v1.9.60)
+    case pauseSchedules
+    /// 临时暂停全屋所有设备的定时与倒计时任务 (v1.9.60)
+    case pauseSchedulesAll
+    /// 恢复生效定向/当前设备定时与倒计时 (v1.9.60)
+    case resumeSchedules
+    /// 恢复生效全屋所有设备的定时与倒计时任务 (v1.9.60)
+    case resumeSchedulesAll
     /// 启动智能睡眠温阶（curveName: 可选曲线名称）
     case startSleepCurve(curveName: String?)
     /// 停止智能睡眠温阶
@@ -110,6 +118,24 @@ public struct VoiceCommandParser {
                 return VoiceParseResult(command: .cancelSchedulesAll, displayText: "取消全屋所有定时与倒计时")
             } else {
                 return VoiceParseResult(command: .cancelSchedules, displayText: "取消定时与倒计时")
+            }
+        }
+
+        // 2.1 定时与倒计时临时暂停 (v1.9.60)
+        if isPauseSchedule(cleaned) {
+            if isAllDeviceScope(cleaned) {
+                return VoiceParseResult(command: .pauseSchedulesAll, displayText: "临时暂停全屋所有定时任务")
+            } else {
+                return VoiceParseResult(command: .pauseSchedules, displayText: "临时暂停定时任务")
+            }
+        }
+
+        // 2.2 定时与倒计时恢复生效 (v1.9.60)
+        if isResumeSchedule(cleaned) {
+            if isAllDeviceScope(cleaned) {
+                return VoiceParseResult(command: .resumeSchedulesAll, displayText: "恢复全屋所有定时任务")
+            } else {
+                return VoiceParseResult(command: .resumeSchedules, displayText: "恢复定时任务生效")
             }
         }
 
@@ -292,6 +318,42 @@ public struct VoiceCommandParser {
         return false
     }
 
+    private static func isPauseSchedule(_ text: String) -> Bool {
+        // 若包含明确否定动作（如“别暂停定时”、“千万别暂停”），属于动作否定拦截，严禁误触发暂停 (v1.9.60)
+        if (text.contains("别") || text.contains("不要") || text.contains("不用") || text.contains("千万") || containsNegativeAction(text)) &&
+           (text.contains("别暂停") || text.contains("不要暂停") || text.contains("不用暂停") || text.contains("千万别暂停")) {
+            return false
+        }
+        let pauseKeywords = ["暂停定时", "暂停倒计时", "暂停调度", "暂停计划", "挂起定时", "暂挂定时"]
+        if pauseKeywords.contains(where: { text.contains($0) }) {
+            return true
+        }
+        // 自然语言容错：包含“暂停/暂缓/挂起”且包含“定时/倒计时/计划/调度”（如“暂停所有定时任务”、“暂停全屋定时”）
+        if (text.contains("暂停") || text.contains("暂缓") || text.contains("挂起")) &&
+           (text.contains("定时") || text.contains("倒计时") || text.contains("计划") || text.contains("调度")) {
+            return true
+        }
+        return false
+    }
+
+    private static func isResumeSchedule(_ text: String) -> Bool {
+        // 若包含明确否定动作（如“别恢复定时”、“不要恢复”），属于动作否定拦截 (v1.9.60)
+        if (text.contains("别") || text.contains("不要") || text.contains("不用") || text.contains("千万") || containsNegativeAction(text)) &&
+           (text.contains("别恢复") || text.contains("不要恢复") || text.contains("不用恢复") || text.contains("千万别恢复")) {
+            return false
+        }
+        let resumeKeywords = ["恢复定时", "恢复倒计时", "恢复调度", "恢复计划", "继续定时", "重新启用定时", "启用定时任务"]
+        if resumeKeywords.contains(where: { text.contains($0) }) {
+            return true
+        }
+        // 自然语言容错：包含“恢复/继续/重新启用/重新激活”且包含“定时/倒计时/计划/调度”（如“恢复全屋定时任务”、“继续定时”）
+        if (text.contains("恢复") || text.contains("继续") || text.contains("重新启用") || text.contains("重新激活")) &&
+           (text.contains("定时") || text.contains("倒计时") || text.contains("计划") || text.contains("调度")) {
+            return true
+        }
+        return false
+    }
+
     private static func parseScheduleOrCountdown(_ text: String) -> VoiceParseResult? {
         guard !containsNegativeAction(text) else { return nil }
         let isAll = isAllDeviceScope(text)
@@ -314,8 +376,20 @@ public struct VoiceCommandParser {
                     return ([2, 3, 4, 5], "周一至周四")
                 } else if text.contains("周一到周三") || text.contains("周一至周三") || text.contains("星期一到星期三") || text.contains("星期一至星期三") || text.contains("礼拜一到礼拜三") || text.contains("礼拜一至礼拜三") {
                     return ([2, 3, 4], "周一至周三")
+                } else if text.contains("周一到周二") || text.contains("周一至周二") || text.contains("星期一到星期二") || text.contains("星期一至星期二") || text.contains("礼拜一到礼拜二") || text.contains("礼拜一至礼拜二") {
+                    return ([2, 3], "周一至周二")
                 } else if text.contains("周二到周五") || text.contains("周二至周五") || text.contains("星期二到星期五") || text.contains("星期二至星期五") || text.contains("礼拜二到礼拜五") || text.contains("礼拜二至礼拜五") {
                     return ([3, 4, 5, 6], "周二至周五")
+                } else if text.contains("周二到周四") || text.contains("周二至周四") || text.contains("星期二到星期四") || text.contains("星期二至星期四") || text.contains("礼拜二到礼拜四") || text.contains("礼拜二至礼拜四") {
+                    return ([3, 4, 5], "周二至周四")
+                } else if text.contains("周二到周六") || text.contains("周二至周六") || text.contains("星期二到星期六") || text.contains("星期二至星期六") || text.contains("礼拜二到礼拜六") || text.contains("礼拜二至礼拜六") {
+                    return ([3, 4, 5, 6, 7], "周二至周六")
+                } else if text.contains("周三到周五") || text.contains("周三至周五") || text.contains("星期三到星期五") || text.contains("星期三至星期五") || text.contains("礼拜三到礼拜五") || text.contains("礼拜三至礼拜五") {
+                    return ([4, 5, 6], "周三至周五")
+                } else if text.contains("周三到周六") || text.contains("周三至周六") || text.contains("星期三到星期六") || text.contains("星期三至星期六") || text.contains("礼拜三到礼拜六") || text.contains("礼拜三至礼拜六") {
+                    return ([4, 5, 6, 7], "周三至周六")
+                } else if text.contains("周四到周日") || text.contains("周四至周日") || text.contains("星期四到星期天") || text.contains("星期四至星期天") || text.contains("星期四到星期日") || text.contains("星期四至星期日") || text.contains("礼拜四到礼拜天") || text.contains("礼拜四至礼拜天") || text.contains("礼拜四到礼拜日") || text.contains("礼拜四至礼拜日") {
+                    return ([1, 5, 6, 7], "周四至周日")
                 } else if text.contains("周五到周日") || text.contains("周五至周日") || text.contains("星期五到星期天") || text.contains("星期五至星期天") || text.contains("星期五到星期日") || text.contains("星期五至星期日") || text.contains("礼拜五到礼拜天") || text.contains("礼拜五至礼拜天") || text.contains("礼拜五到礼拜日") || text.contains("礼拜五至礼拜日") || text.contains("周五周六周日") || text.contains("周五周六周天") || text.contains("周末三天") {
                     return ([1, 6, 7], "周五至周日")
                 } else if text.contains("一三五") || text.contains("一、三、五") {
@@ -324,7 +398,7 @@ public struct VoiceCommandParser {
                     return ([3, 5, 7], "每周二、四、六")
                 } else if text.contains("二四") || text.contains("二、四") {
                     return ([3, 5], "每周二、四")
-                } else if text.contains("周末") || text.contains("双休") || text.contains("周六周日") || text.contains("周六和周日") || text.contains("星期六星期天") || text.contains("星期六和星期天") || text.contains("周六周天") || text.contains("礼拜六礼拜天") || text.contains("礼拜六和礼拜天") || text.contains("礼拜六礼拜日") || text.contains("礼拜六和礼拜日") {
+                } else if text.contains("周末") || text.contains("双休") || text.contains("周六周日") || text.contains("周六和周日") || text.contains("周六到周日") || text.contains("周六至周日") || text.contains("周六到周天") || text.contains("周六至周天") || text.contains("星期六星期天") || text.contains("星期六和星期天") || text.contains("星期六到星期天") || text.contains("星期六至星期天") || text.contains("星期六到星期日") || text.contains("星期六至星期日") || text.contains("周六周天") || text.contains("礼拜六礼拜天") || text.contains("礼拜六和礼拜天") || text.contains("礼拜六到礼拜天") || text.contains("礼拜六至礼拜天") || text.contains("礼拜六礼拜日") || text.contains("礼拜六和礼拜日") || text.contains("礼拜六到礼拜日") || text.contains("礼拜六至礼拜日") {
                     return ([1, 7], "周末")
                 } else if text.contains("每周一") || text.contains("每个周一") || text.contains("每个星期一") || text.contains("每周星期一") || text.contains("逢周一") || text.contains("每逢周一") || text.contains("每逢星期一") || text.contains("逢星期一") || text.contains("每个礼拜一") || text.contains("每周礼拜一") || text.contains("逢礼拜一") || text.contains("每逢礼拜一") {
                     return ([2], "每周一")
@@ -608,12 +682,12 @@ public struct VoiceCommandParser {
     private static let negativeActionRegex: NSRegularExpression? = {
         // 否定词（别/不要/不用/不必/无需/先别/先不要/暂不/暂不要/千万别/千万不要/不能/不可以/切勿/切莫/不要再/别再/暂时不用/暂时不要）
         // 允许中间插入 0~10 个任意非标点非空白字符（如“周一到周六定时”、“星期一到星期五”、“给我”、“帮我”、“急着”、“现在”等，彻底杜绝插字绕过漏洞） (v1.9.40, v1.9.57)
-        // 动作谓词（关/停/开/启动/运转/打开/关闭/调/设/升/降/重置/复位/清零/吹/送/抽/除） (v1.9.39 扩展调温与变频动作否定, v1.9.45 扩展滤网重置否定, v1.9.50 扩展吹风除湿动作否定)
-        let pattern = #"(?:别|不要|不用|不必|无需|先别|先不要|暂不|暂不要|千万别|千万不要|不能|不可以|切勿|切莫|不要再|别再|暂时不用|暂时不要)[^，。！？\s]{0,10}?(?:关|停|开|启动|运转|打开|关闭|调|设|升|降|重置|复位|清零|吹|送|抽|除)"#
+        // 动作谓词（关/停/开/启动/运转/打开/关闭/调/设/升/降/重置/复位/清零/吹/送/抽/除/暂停/恢复） (v1.9.39 扩展调温与变频动作否定, v1.9.45 扩展滤网重置否定, v1.9.50 扩展吹风除湿动作否定, v1.9.60 扩展计划调度暂停恢复动作否定)
+        let pattern = #"(?:别|不要|不用|不必|无需|先别|先不要|暂不|暂不要|千万别|千万不要|不能|不可以|切勿|切莫|不要再|别再|暂时不用|暂时不要)[^，。！？\s]{0,10}?(?:关|停|开|启动|运转|打开|关闭|调|设|升|降|重置|复位|清零|吹|送|抽|除|暂停|恢复)"#
         return try? NSRegularExpression(pattern: pattern)
     }()
 
-    /// 检测文本中是否包含针对开关机/调温/模式动作的否定意图（如“别关”、“不要开”、“先别急着关”、“别给我关了”、“千万别现在关”、“别开制冷”、“不要调”、“别重置”、“别吹风”等，防止误触发） (v1.9.36, v1.9.40, v1.9.45, v1.9.50)
+    /// 检测文本中是否包含针对开关机/调温/模式动作的否定意图（如“别关”、“不要开”、“先别急着关”、“别给我关了”、“千万别现在关”、“别开制冷”、“不要调”、“别重置”、“别吹风”、“别暂停定时”等，防止误触发） (v1.9.36, v1.9.40, v1.9.45, v1.9.50, v1.9.60)
     private static func containsNegativeAction(_ text: String) -> Bool {
         // 特例：“别吹了”属于日常高频关机意图（显式关机口令，非动作否定拦截）
         if text.contains("别吹了") {
@@ -626,6 +700,7 @@ public struct VoiceCommandParser {
                 "别调", "不要调", "不用调", "别设", "不要设", "别升", "不要升", "别降", "不要降",
                 "别重置", "不要重置", "不用重置", "别复位", "不要复位", "别清零",
                 "别吹", "不要吹", "不用吹", "别送风", "不要送风", "别抽湿", "不要抽湿", "别除湿", "不要除湿",
+                "别暂停", "不要暂停", "不用暂停", "千万别暂停", "别恢复", "不要恢复", "不用恢复", "千万别恢复",
                 "别给我关", "千万别关", "千万别开"
             ]
             return fallbackPatterns.contains(where: { text.contains($0) })
@@ -642,7 +717,7 @@ public struct VoiceCommandParser {
         targetRoomKeywords.contains(where: { text.contains($0) })
     }
 
-    /// 判断口令是否包含定时、倒计时或延迟执行时间语义，杜绝误触发即时开关机 (v1.9.50, v1.9.56, v1.9.57, v1.9.59)
+    /// 判断口令是否包含定时、倒计时或延迟执行时间语义，杜绝误触发即时开关机 (v1.9.50, v1.9.56, v1.9.57, v1.9.59, v1.9.60)
     private static func hasTimingOrCountdownIntent(_ text: String) -> Bool {
         if text.contains("后") || text.contains("倒计时") || text.contains("定时") || text.contains("预约") ||
            text.contains("延迟") || text.contains("延后") || text.contains("稍后") ||
@@ -650,10 +725,21 @@ public struct VoiceCommandParser {
            text.contains("工作日") || text.contains("周末") || text.contains("双休") ||
            text.contains("每周") || text.contains("每逢") || text.contains("逢周") || text.contains("每个周") || text.contains("每个星期") ||
            text.contains("礼拜") || text.contains("逢星期") || text.contains("一三五") || text.contains("二四六") || text.contains("二四") ||
-           text.contains("周一到") || text.contains("周一至") || text.contains("周二到") || text.contains("周二至") ||
-           text.contains("周五到") || text.contains("周五至") || text.contains("周末三天") || text.contains("星期一到") || text.contains("星期一至") ||
-           text.contains("礼拜一到") || text.contains("礼拜一至") {
+           text.contains("周末三天") ||
+           (text.contains("暂停") && (text.contains("定时") || text.contains("倒计时") || text.contains("计划") || text.contains("调度"))) ||
+           (text.contains("恢复") && (text.contains("定时") || text.contains("倒计时") || text.contains("计划") || text.contains("调度"))) {
             return true
+        }
+        let weekdayPrefixes = ["周", "星期", "礼拜"]
+        let weekdayConnectors = ["到", "至"]
+        for p in weekdayPrefixes {
+            for c in weekdayConnectors {
+                if text.contains("\(p)一\(c)") || text.contains("\(p)二\(c)") || text.contains("\(p)三\(c)") ||
+                   text.contains("\(p)四\(c)") || text.contains("\(p)五\(c)") || text.contains("\(p)六\(c)") ||
+                   text.contains("\(p)日\(c)") || text.contains("\(p)天\(c)") {
+                    return true
+                }
+            }
         }
         if text.contains("过") && (text.contains("分") || text.contains("小时") || text.contains("钟头") || text.contains("半") || text.contains("刻")) {
             return true
