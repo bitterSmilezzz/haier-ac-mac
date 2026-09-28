@@ -6,6 +6,20 @@ A native SwiftUI app to control Haier / Leader (统帅) smart air conditioners o
 
 ## Features
 
+- 🏷 **Chinese Compound Number Decimal Parsing & Clock Schedule Conflict Closure, Siri Shortcuts High-Precision Relative Stepping, High-Humidity Dehumidification Condensate Filter Dynamics & Status Bar 0.5°C Matrix Synchronization (v1.9.53)**:
+  - ⏱️ **Natural Language Chinese Compound Number Decimal Parsing & Erroneous Clock Schedule Guard (`VoiceCommandParser` / `VoiceCommandParserTests`)**:
+    - **Eradication of Accidental Midnight/Evening Scheduling for Chinese Compound Decimals**: Completely resolved the critical bug where high-frequency spoken commands like "开到二十点五", "开二十点五", "打开二十点五", "全屋开到二十点五", "全屋开二十点五", "空调开到二十点五", "制冷开到二十点五", "开到十八点五", "开到十九点五", "开到二十一点五", "开到二十二点五", and "开到二十三点五" previously suffered from inverted execution order where `compoundPattern` ran after `decimalPointPattern`, outputting broken intermediate tokens like "20点5" and "18点5"; `parseScheduleTime` subsequently matched 20 and 18 as valid clock hours and erroneously queued power-on schedules at 20:05 and 18:05 PM;
+    - **Structured 1~99 Compound Number & Decimal Pattern Sequencing**: Re-architected `convertChineseNumbers` to first normalize 1~99 compound Chinese numbers into standard Arabic digits before executing `decimalPointPattern`, guaranteeing that "开到二十点五", "二十点五度", and "全屋开到二十点五" cleanly normalize to 20.5°C;
+    - **Clock Schedule Semantic Exclusion Safeguard**: Introduced semantic action and range exclusion in `parseScheduleTime`, strictly disallowing bare numbers within the core AC temperature envelope (16~23°C) that lack "分/分钟" suffixes from being parsed as clock times.
+  - 🎙️ **Siri Shortcuts & AppIntents Relative Stepping Ecosystem Integration (`AppIntents.swift`)**:
+    - Introduced `AdjustACTemperatureIntent` for fine relative temperature adjustments, supporting custom `delta` values (e.g. +1°C, +0.5°C, -0.5°C, -2°C) with seamless single-device and whole-house dispatching;
+    - Registered intuitive spoken phrases in `ACAppShortcuts` ("用海尔空调微调温度", "用海尔空调升高温度/降低温度", "用海尔空调升温/降温", "海尔空调 调高温度/调低温度"), achieving end-to-end Siri Shortcuts compatibility.
+  - 🍃 **High-Humidity Dehumidification Water Film Aerodynamic Filter Dynamics (`AppModel.calculateFilterWearFactor`)**:
+    - Grounded in fluid mechanics and psychrometric condensation: under high relative humidity (RH >= 75% rainy/muggy seasons), thick condensation water films on the evaporator and filter mesh accelerate particulate entrapment and mud clumping; dynamically increased the dehumidification wear factor from 1.30 to 1.45 (1.20 for low-humidity steady state), achieving 100% physical symmetry with inverter energy simulations.
+  - 🍱 **macOS Native Status Bar 0.5°C Stepping Matrix Symmetry & Real-Time Temperature Feedback (`StatusItemController`)**:
+    - Added running device count descriptors `(N台运行中)` / `(当前均未开机)` to whole-house 0.5°C micro-stepping items, ensuring strict visual and state symmetry with 1°C step items;
+    - Enhanced single-device and device submenu 0.5°C micro-stepping items with real-time base temperature indicators (e.g. `🔼 升温 0.5°C (高精微调 · 当前 26.0°C)`), maximizing menu clarity and state transparency.
+
 - 🏷 **Colloquial "0.5°C" Fine Stepping & Decimal Power-On Guard, High-Delta Heating Thermophoresis Filter Dynamics & Status Bar 0.5°C Stepping Matrix (v1.9.52)**:
   - ⏱️ **Natural Language Decimal Degree Normalization & Erroneous Clock Schedule Guard (`VoiceCommandParser` / `VoiceCommandParserTests`)**:
     - **Eradication of Accidental Midnight 00:05 Scheduling for Spoken Decimals**: Completely resolved the critical bug where spoken commands without the explicit "度" word (e.g. "开到26点5", "开26点5", "打开26点5", "全屋开到26点5", "全屋开26点5", "空调开到26点5", "制冷开到26点5") previously escaped decimal parsing, leading `parseScheduleOrCountdown` to erroneously treat "点5" as a clock schedule at 00:05 AM and queue `schedulePower(hour: 0, minute: 5, power: true)`; optimized `decimalPointPattern` with negative lookahead `(?![分分钟])` to accurately set 26.5°C target temperature;

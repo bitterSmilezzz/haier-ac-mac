@@ -104,6 +104,65 @@ struct SetACTemperatureIntent: AppIntent {
     }
 }
 
+// MARK: - 相对微调温度 (v1.9.53)
+
+struct AdjustACTemperatureIntent: AppIntent {
+    static var title: LocalizedStringResource = "微调空调温度"
+    static var description = IntentDescription("相对微调海尔空调的目标温度（如升温 1°C、降温 0.5°C）", categoryName: "空调控制")
+
+    @Parameter(title: "调节幅度（°C，正数为升温，负数为降温）", default: 1.0)
+    var delta: Double
+
+    @Parameter(title: "全屋应用", default: false)
+    var allDevices: Bool
+
+    @Parameter(title: "设备名称", description: "可选；留空使用主设备，填“全屋”或“全部”统一调节所有设备")
+    var deviceName: String?
+
+    @MainActor
+    func perform() async throws -> some IntentResult & ProvidesDialog {
+        let model = AppModel.shared
+        guard model.gatewayConnected else {
+            throw ACIntentError.message("空调连接中断，请稍后重试")
+        }
+
+        let isAll = allDevices || (deviceName?.contains("全") == true) || (deviceName?.contains("所有") == true)
+        let dir = delta > 0 ? "升温" : "降温"
+        let deltaAbs = abs(delta)
+        let deltaStr = deltaAbs.truncatingRemainder(dividingBy: 1.0) == 0 ? "\(Int(deltaAbs))" : String(format: "%.1f", deltaAbs)
+
+        if isAll {
+            let count = model.adjustTemperatureAll(delta: delta)
+            if count > 0 {
+                return .result(dialog: "已将全屋 \(count) 台运行中的空调统一\(dir) \(deltaStr) 度")
+            } else {
+                let limitDesc = delta > 0 ? "已达到最高温度 30°C 上限" : "已达到最低温度 16°C 下限"
+                return .result(dialog: "全屋运行中的空调均\(limitDesc)")
+            }
+        }
+
+        guard let deviceId = resolveDeviceId(named: deviceName) else {
+            throw ACIntentError.message("没有可控制的空调设备")
+        }
+        let reach = model.reachability(for: deviceId)
+        guard reach.isControllable else {
+            let devName = model.allUnifiedDevices.first(where: { $0.id == deviceId })?.name ?? "目标空调"
+            throw ACIntentError.message("\(devName)当前离线或不可控")
+        }
+
+        let count = model.adjustTemperature(deviceIds: [deviceId], delta: delta)
+        let devName = model.allUnifiedDevices.first(where: { $0.id == deviceId })?.name ?? "空调"
+        if count > 0 {
+            let cur = model.attribute("targetTemperature", deviceId: deviceId)?.doubleValue ?? 26.0
+            let curStr = cur.truncatingRemainder(dividingBy: 1.0) == 0 ? "\(Int(cur))" : String(format: "%.1f", cur)
+            return .result(dialog: "已将「\(devName)」\(dir) \(deltaStr) 度，当前为 \(curStr) 度")
+        } else {
+            let limitDesc = delta > 0 ? "已达到最高温度 30°C 上限" : "已达到最低温度 16°C 下限"
+            return .result(dialog: "「\(devName)」\(limitDesc)")
+        }
+    }
+}
+
 // MARK: - 运行模式
 
 struct SetACModeIntent: AppIntent {
@@ -568,6 +627,20 @@ struct ACAppShortcuts: AppShortcutsProvider {
                     shortTitle: "调节风速",
                     systemImageName: "wind"
                 ),
+                AppShortcut(
+                    intent: AdjustACTemperatureIntent(),
+                    phrases: [
+                        "用 \(.applicationName) 微调温度",
+                        "用 \(.applicationName) 升高温度",
+                        "用 \(.applicationName) 降低温度",
+                        "用 \(.applicationName) 升温",
+                        "用 \(.applicationName) 降温",
+                        "\(.applicationName) 调高温度",
+                        "\(.applicationName) 调低温度",
+                    ],
+                    shortTitle: "微调温度",
+                    systemImageName: "thermometer.high"
+                ),
             ]
         } else {
             return [
@@ -583,6 +656,16 @@ struct ACAppShortcuts: AppShortcutsProvider {
                     intent: SetACTemperatureIntent(),
                     phrases: [
                         "用 \(.applicationName) 设置温度",
+                    ]
+                ),
+                AppShortcut(
+                    intent: AdjustACTemperatureIntent(),
+                    phrases: [
+                        "用 \(.applicationName) 微调温度",
+                        "用 \(.applicationName) 升高温度",
+                        "用 \(.applicationName) 降低温度",
+                        "用 \(.applicationName) 升温",
+                        "用 \(.applicationName) 降温",
                     ]
                 ),
                 AppShortcut(

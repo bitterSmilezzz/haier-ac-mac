@@ -467,14 +467,23 @@ public struct VoiceCommandParser {
                 let ns = normalized as NSString
                 if let match = regex.matches(in: normalized, range: NSRange(location: 0, length: ns.length)).first {
                     let hStr = ns.substring(with: match.range(at: 1))
-                    if let h = Int(hStr), h <= 23 {
-                        hour = h
-                    }
+                    var candidateMinute = 0
                     let minRange = match.range(at: 2)
                     if minRange.location != NSNotFound {
                         let mStr = ns.substring(with: minRange)
                         if let m = Int(mStr), m < 60 {
-                            minute = m
+                            candidateMinute = m
+                        }
+                    }
+                    if let h = Int(hStr), h <= 23 {
+                        // 语义安全防线：若数值位于 16~23°C 空调核心温度区间且疑似分钟为 5，但文本未明确指明“分/分钟”且包含开/调/设等温控动作词，
+                        // 明确判定为省略“度”字的小数温度（如“开20点5/开到21点5”），彻底杜绝误判为时间 (v1.9.53)
+                        let isLikelyDecimalTemp = (h >= 16 && h <= 23) && (candidateMinute == 5) &&
+                            (!normalized.contains("分") && !normalized.contains("过") && !normalized.contains("零") && !normalized.contains("0")) &&
+                            (normalized.contains("开") || normalized.contains("调") || normalized.contains("设") || normalized.contains("空调") || normalized.contains("全屋"))
+                        if !isLikelyDecimalTemp {
+                            hour = h
+                            minute = candidateMinute
                         }
                     }
                 }
@@ -1162,18 +1171,9 @@ public struct VoiceCommandParser {
         str = str.replacingOccurrences(of: "差3刻", with: "差45分")
         str = str.replacingOccurrences(of: "一百", with: "100")
 
-        // 温度与时间小数转换：匹配小数点五或点5（如“二十六点五度” -> 26.5度，“开到26点5” -> 开到26.5，“1点5小时” -> 1.5小时，“零点五度” -> 0.5度）
-        // 排除后接“分/分钟”的钟点分表达（如“十点五分” -> 10点5分），彻底杜绝无上下文粗暴替换导致误判为倒计时或误判为定时开关机 (v1.9.47, v1.9.50, v1.9.52)
-        let decimalPointPattern = #"([零0一二两三四五六七八九\d]+)点(?:五|5)(?![分分钟])"#
-        if let regex = try? NSRegularExpression(pattern: decimalPointPattern) {
-            let ns = str as NSString
-            let matches = regex.matches(in: str, range: NSRange(location: 0, length: ns.length)).reversed()
-            for m in matches {
-                let prefix = ns.substring(with: m.range(at: 1))
-                let range = Range(m.range, in: str)!
-                str.replaceSubrange(range, with: "\(prefix).5")
-            }
-        }
+        // 1. 结构化解析 1~99 中文复合数字（如：二十 -> 20, 二十六 -> 26, 十八 -> 18, 十五 -> 15, 十 -> 10）
+        // 必须优先于小数与点五转换，彻底避免“二十点五/开到二十点五/开到十八点五”等口语中“二十/十八”因滞后转换导致破坏性输出“20点5”，
+        // 进而在 parseScheduleTime 中将 20、18 误作为有效钟点小时、误触发 20:05/18:05 定时开机的重大缺陷 (v1.9.53 彻底根除)
         let compoundPattern = #"([一二两三四五六七八九])?十([一二三四五六七八九])?"#
         if let regex = try? NSRegularExpression(pattern: compoundPattern) {
             let ns = str as NSString
@@ -1186,6 +1186,19 @@ public struct VoiceCommandParser {
                 let value = tens * 10 + ones
                 let range = Range(m.range, in: str)!
                 str.replaceSubrange(range, with: "\(value)")
+            }
+        }
+
+        // 2. 温度与时间小数转换：匹配小数点五或点5（如“26点5” -> 26.5，“20点五” -> 20.5，“18点5” -> 18.5，“0点5” -> 0.5，“零点五度” -> 0.5度）
+        // 排除后接“分/分钟”的钟点分表达（如“十点五分” -> 10点5分），彻底杜绝无上下文粗暴替换导致误判为倒计时或误判为定时开关机 (v1.9.47, v1.9.50, v1.9.52, v1.9.53)
+        let decimalPointPattern = #"([零0一二两三四五六七八九\d]+)点(?:五|5)(?![分分钟])"#
+        if let regex = try? NSRegularExpression(pattern: decimalPointPattern) {
+            let ns = str as NSString
+            let matches = regex.matches(in: str, range: NSRange(location: 0, length: ns.length)).reversed()
+            for m in matches {
+                let prefix = ns.substring(with: m.range(at: 1))
+                let range = Range(m.range, in: str)!
+                str.replaceSubrange(range, with: "\(prefix).5")
             }
         }
 

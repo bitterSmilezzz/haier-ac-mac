@@ -1423,6 +1423,61 @@ final class VoiceCommandParserTests: XCTestCase {
         XCTAssertEqual(s2?.command, .schedulePower(hour: 22, minute: 5, power: true))
     }
 
+    // MARK: - 中文数十复合数字与小数温度解析测试 (v1.9.53)
+
+    func testChineseCompoundDecimalTemperatureParsing() {
+        // 1. 中文复合数字小数温度（彻底杜绝误判为 20:05/18:05 等钟点定时开机重大缺陷）
+        let c1 = VoiceCommandParser.parse("开到二十点五")
+        XCTAssertEqual(c1?.command, .setTemperature(20.5))
+        XCTAssertEqual(c1?.displayText, "设置温度为 20.5°C")
+
+        let c2 = VoiceCommandParser.parse("开二十点五")
+        XCTAssertEqual(c2?.command, .setTemperature(20.5))
+
+        let c3 = VoiceCommandParser.parse("打开二十点五")
+        XCTAssertEqual(c3?.command, .setTemperature(20.5))
+
+        let c4 = VoiceCommandParser.parse("全屋开到二十点五")
+        XCTAssertEqual(c4?.command, .setTemperatureAll(20.5))
+        XCTAssertEqual(c4?.displayText, "全屋温度调至 20.5°C")
+
+        let c5 = VoiceCommandParser.parse("全屋开二十点五")
+        XCTAssertEqual(c5?.command, .setTemperatureAll(20.5))
+
+        let c6 = VoiceCommandParser.parse("空调开到二十点五")
+        XCTAssertEqual(c6?.command, .setTemperature(20.5))
+
+        let c7 = VoiceCommandParser.parse("二十点五")
+        XCTAssertEqual(c7?.command, .setTemperature(20.5))
+
+        let c8 = VoiceCommandParser.parse("二十点五度")
+        XCTAssertEqual(c8?.command, .setTemperature(20.5))
+
+        let c9 = VoiceCommandParser.parse("开到十八点五")
+        XCTAssertEqual(c9?.command, .setTemperature(18.5))
+
+        let c10 = VoiceCommandParser.parse("开到十九点五")
+        XCTAssertEqual(c10?.command, .setTemperature(19.5))
+
+        let c11 = VoiceCommandParser.parse("开到二十一点五")
+        XCTAssertEqual(c11?.command, .setTemperature(21.5))
+
+        let c12 = VoiceCommandParser.parse("开到二十二点五")
+        XCTAssertEqual(c12?.command, .setTemperature(22.5))
+
+        let c13 = VoiceCommandParser.parse("开到二十三点五")
+        XCTAssertEqual(c13?.command, .setTemperature(23.5))
+
+        let c14 = VoiceCommandParser.parse("制冷开到二十点五")
+        XCTAssertEqual(c14?.command, .setModeAndTemperature(mode: "制冷", temperature: 20.5))
+
+        let c15 = VoiceCommandParser.parse("二十度半")
+        XCTAssertEqual(c15?.command, .setTemperature(20.5))
+
+        let c16 = VoiceCommandParser.parse("二十度五")
+        XCTAssertEqual(c16?.command, .setTemperature(20.5))
+    }
+
     // MARK: - 无效输入测试
 
     func testInvalidCommands() {

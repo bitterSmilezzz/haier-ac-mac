@@ -383,7 +383,7 @@ final class StatusItemController: NSObject {
                 let curTemp = model.attribute("targetTemperature", deviceId: dev.id)?.doubleValue ?? 26.0
                 return curTemp <= 29.5
             }
-            let stepUpHalfAllItem = NSMenuItem(title: "🔼 全屋微调升温 0.5°C", action: #selector(stepUpHalfAllTemperature), keyEquivalent: "")
+            let stepUpHalfAllItem = NSMenuItem(title: "🔼 全屋微调升温 0.5°C\(runningCountDesc)", action: #selector(stepUpHalfAllTemperature), keyEquivalent: "")
             stepUpHalfAllItem.target = self
             stepUpHalfAllItem.isEnabled = canStepUpHalfAll
             menu.addItem(stepUpHalfAllItem)
@@ -392,7 +392,7 @@ final class StatusItemController: NSObject {
                 let curTemp = model.attribute("targetTemperature", deviceId: dev.id)?.doubleValue ?? 26.0
                 return curTemp >= 16.5
             }
-            let stepDownHalfAllItem = NSMenuItem(title: "🔽 全屋微调降温 0.5°C", action: #selector(stepDownHalfAllTemperature), keyEquivalent: "")
+            let stepDownHalfAllItem = NSMenuItem(title: "🔽 全屋微调降温 0.5°C\(runningCountDesc)", action: #selector(stepDownHalfAllTemperature), keyEquivalent: "")
             stepDownHalfAllItem.target = self
             stepDownHalfAllItem.isEnabled = canStepDownHalfAll
             menu.addItem(stepDownHalfAllItem)
@@ -607,7 +607,7 @@ final class StatusItemController: NSObject {
                 devSubmenu.addItem(upItem)
 
                 let upHalfItem = NSMenuItem(
-                    title: "🔼 升温 0.5°C (高精微调)",
+                    title: "🔼 升温 0.5°C (高精微调 · 当前 \(curTempStr)°C)",
                     action: #selector(stepUpHalfDeviceTemperature(_:)),
                     keyEquivalent: ""
                 )
@@ -617,7 +617,7 @@ final class StatusItemController: NSObject {
                 devSubmenu.addItem(upHalfItem)
 
                 let downHalfItem = NSMenuItem(
-                    title: "🔽 降温 0.5°C (高精微调)",
+                    title: "🔽 降温 0.5°C (高精微调 · 当前 \(curTempStr)°C)",
                     action: #selector(stepDownHalfDeviceTemperature(_:)),
                     keyEquivalent: ""
                 )
@@ -792,12 +792,12 @@ final class StatusItemController: NSObject {
             stepUpItem.isEnabled = isControllable && isPowerOn && curTemp < 30.0
             menu.addItem(stepUpItem)
 
-            let stepUpHalfItem = NSMenuItem(title: "🔼 升温 0.5°C (高精微调)", action: #selector(stepUpHalfPrimaryTemperature), keyEquivalent: "")
+            let stepUpHalfItem = NSMenuItem(title: "🔼 升温 0.5°C (高精微调 · 当前 \(curTempStr)°C)", action: #selector(stepUpHalfPrimaryTemperature), keyEquivalent: "")
             stepUpHalfItem.target = self
             stepUpHalfItem.isEnabled = isControllable && isPowerOn && curTemp <= 29.5
             menu.addItem(stepUpHalfItem)
 
-            let stepDownHalfItem = NSMenuItem(title: "🔽 降温 0.5°C (高精微调)", action: #selector(stepDownHalfPrimaryTemperature), keyEquivalent: "")
+            let stepDownHalfItem = NSMenuItem(title: "🔽 降温 0.5°C (高精微调 · 当前 \(curTempStr)°C)", action: #selector(stepDownHalfPrimaryTemperature), keyEquivalent: "")
             stepDownHalfItem.target = self
             stepDownHalfItem.isEnabled = isControllable && isPowerOn && curTemp >= 16.5
             menu.addItem(stepDownHalfItem)

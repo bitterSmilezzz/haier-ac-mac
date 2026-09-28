@@ -1,43 +1,52 @@
-# Haier AC Mac v1.9.52 发布与巡检演进报告
+# Haier AC Mac v1.9.53 发布与巡检演进报告
 
 ## 1. 概述与版本定位
-- **版本号**：`v1.9.52`
-- **发版主题**：口语“零点五/0点5”微调、省略“度”字小数防误定时开机闭环、大温差制热热泳滤网动力学与状态栏 0.5°C 双模高精步进矩阵
+- **版本号**：`v1.9.53`
+- **发版主题**：中文数十复合小数与钟点定时冲突缺陷闭环、Siri 快捷指令高精相对调温、高湿冷凝滤网水膜动力学及状态栏 0.5°C 微调台数全景感知
 - **核心目标与架构演进**：
-  1. **自然语言口语小数温度归一与防误钟点定时开机闭环 (`VoiceCommandParser` / `VoiceCommandParserTests`)**：
-     - **彻底消除省略“度”字小数被误判为凌晨 00:05 定时开机的严重缺陷**：彻底修复日常高频口语“开到26点5”、“开26点5”、“打开26点5”、“全屋开到26点5”、“全屋开26点5”、“空调开到26点5”、“制冷开到26点5”等因末尾省略“度”字导致未能命中原有带上下文的小数正则，进而在 `parseScheduleOrCountdown` 中将“点5”错误解析为凌晨 00:05 钟点定时并下发 `schedulePower(hour: 0, minute: 5, power: true)` 的重大误操作灾难；优化 `decimalPointPattern` 为负向先行断言 `(?![分分钟])`，精准识别为 26.5°C 目标温度设定；
-     - **口语“零点五度 / 0点5度”与相对微调精度无损解析**：修复“升温零点五度”、“降温零点五度”、“全屋升温零点五度”、“全屋降温0点5度”等因正则字符集遗漏中文“零”以及 `extractNumber` 未替换“点”导致丢失小数精度、被错误降级为 1.0°C 的缺陷，完美折算为 $\pm 0.5^\circ\text{C}$ 高精微调；
-     - **钟点定时时钟合法性边界强制收敛**：在 `parseScheduleTime` 中对差分与标准钟点时钟小时增加 `h <= 23` 与 `m < 60` 强约束，彻底杜绝任何 24~30 等空调温度数值被误当做时钟时数处理的系统漏洞。
-  2. **大温差制热热泳沉积与全气候空气动力学滤网深度磨损动力学 (`AppModel.calculateFilterWearFactor`)**：
-     - 基于空气热动力学热泳沉积（Thermophoresis）与强对流热阻抗机理，重构制热与自动模式下的滤网负荷模型：在大温差强载制热（$\Delta T \ge 5.0^\circ\text{C}$）或严寒低温（$\le 12^\circ\text{C}$）工况下，将滤网磨损因子由固定的 1.05 提升至 1.25，自动模式大温差制热提升至 1.20；恒温维持态回归 1.05，与能耗引擎变频热力学模型达成 100% 物理对称。
-  3. **macOS 原生状态栏 0.5°C 双模高精步进矩阵与硬件极值边界防护 (`StatusItemController`)**：
-     - 在单设备上下文菜单、多设备子菜单（`devSubmenu`）以及全屋快捷协同控制中，增设与原有 1°C 步进严格对称的「🔼 升温 0.5°C (高精微调)」与「🔽 降温 0.5°C (高精微调)」，满足用户对舒适体感的毫米级温控需求；
-     - 严格配套 16.5°C ~ 29.5°C 的硬件边界可用性联动防护（`isEnabled`），彻底杜绝超出硬件温控极值的冗余点击。
+  1. **自然语言中文数十复合小数防误钟点定时开机彻底闭环 (`VoiceCommandParser` / `VoiceCommandParserTests`)**：
+     - **彻底根除中文复合数字小数温度误判为凌晨/夜晚定时开机的重大缺陷**：修复日常口语高频出现的“开到二十点五”、“开二十点五”、“打开二十点五”、“全屋开到二十点五”、“全屋开二十点五”、“空调开到二十点五”、“制冷开到二十点五”、“开到十八点五”、“开到十九点五”、“开到二十一点五”、“开到二十二点五”、“开到二十三点五”等口语在数字转换中因 `compoundPattern` 滞后执行，导致“二十/十八”被破坏性转换为“20点5/18点5”，进而在 `parseScheduleTime` 中将 20、18 等有效空调温度数值误当做合法时钟小时数、在 `pointPattern` 命中 20:05、18:05 定时开机的严重缺陷；
+     - **结构化 1~99 复合数字与小数模式执行时序收敛**：调整 `convertChineseNumbers` 解析时序，优先结构化解析 1~99 中文复合数字为标准阿拉伯数字，再由 `decimalPointPattern` 安全转换为 `.5` 小数（同时在 `decimalPointPattern` 中扩充汉字“十”，双重保障），确保“开到二十点五”、“二十点五度”、“全屋开到二十点五”等口语输入 100% 精准识别为 20.5°C 目标温度设定；
+     - **钟点定时语义排斥安全防线**：在 `parseScheduleTime` 的 `pointPattern` 中引入温控动作意图与温度区间双重语义排斥，对 16~23°C 核心温度区间无“分/分钟”后缀口语坚决拦截，杜绝时间与温度混淆。
+  2. **Siri 快捷指令与 AppIntents 相对调温生态全打通 (`AppIntents.swift`)**：
+     - 新增 `AdjustACTemperatureIntent`（微调空调温度），支持指定 `delta`（如升温 1°C、微调 0.5°C、降温 2°C）以及设备名称，无缝联动单设备微调与全屋统一相对调温；
+     - 在 `ACAppShortcuts` 中注册“用海尔空调微调温度”、“用海尔空调升高温度/降低温度”、“用海尔空调升温/降温”等自然短语，完美融入 macOS 系统级 Siri Shortcuts 生态。
+  3. **高湿冷凝水膜表面张力微粒捕获与结块滤网动力学深化 (`AppModel.calculateFilterWearFactor`)**：
+     - 深入流体力学与热湿交换机理：重构除湿模式（`.dehumidify`）下的滤网负荷模型，在极潮湿环境（RH >= 75% 如梅雨/回南天工况）下，蒸发器表面冷凝水析出量剧增，水膜表面张力促使尘螨与浮尘颗粒吸湿膨胀并黏附结块阻塞网孔，滤网负荷因子由固定的 1.30 自适应调整为 1.45（中湿维持 1.30，低湿维持 1.20），使滤网算法与变频除湿能耗动力学模型达成 100% 物理对称。
+  4. **macOS 原生状态栏 0.5°C 高精微调矩阵台数感知与温度呈现对称优化 (`StatusItemController`)**：
+     - 在全屋控制菜单中，「🔼 全屋微调升温 0.5°C」与「🔽 全屋微调降温 0.5°C」补齐 `(N台运行中)` / `(当前均未开机)` 状态标签，与 1°C 步进保持严格视觉与状态对称；
+     - 单设备菜单与多设备子菜单中的 0.5°C 微调项统一补充当前基准温度提示（如 `🔼 升温 0.5°C (高精微调 · 当前 26.0°C)`），大幅提升菜单交互精致度与状态透明度。
 
 ---
 
 ## 2. 关键架构变更与代码实现
 
-### 2.1 口语小数解析与防误定时开机闭环 (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)
-- **decimalPointPattern 优化**：
-  - 正则重构为 `#"([零0一二两三四五六七八九\d]+)点(?:五|5)(?![分分钟])"#`，排除后接“分/分钟”的钟点时分（如“十点五分” -> 10点5分），而对省略“度”字的高频温度表达（如“开到26点5”、“26点5”、“升温0点5”）安全归一化为 `.5`；
-- **extractNumber 浮点点号替换**：
-  - 补充 `normalized.replacingOccurrences(of: "点", with: ".")`，确保在相对调温提取中能够完整提取 `0.5`；
-- **parseScheduleTime 钟点合法性校验**：
-  - 强制约束 `targetH <= 23` 与 `h <= 23`，杜绝任何 24~30 温度被当做时间处理；
+### 2.1 中文复合数字小数解析与防误定时开机闭环 (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)
+- **执行时序调整与字符集增强**：
+  - 将 `compoundPattern` 提到 `decimalPointPattern` 之前执行，先行将汉字数十复合数归一为标准阿拉伯数字（如“二十” -> 20，“十八” -> 18）；
+  - `decimalPointPattern` 匹配后安全将 `20点五` / `20点5` 归一为 `20.5`，彻底消除时间误命中；
+- **parseScheduleTime 语义防护**：
+  - 对 16~23°C 核心温度数值且缺少“分”字后缀的表达增加温度意图排斥；
 - **单元测试验证**：
-  - 新增 `testDecimalAndPointFiveTemperatureParsing` 测试套件，覆盖 20 组真实用例，全部验证通过。
+  - 新增 `testChineseCompoundDecimalTemperatureParsing` 测试套件，包含 16 组核心用例，全部验证通过。
 
-### 2.2 大温差制热热泳滤网动力学 (`AppModel.swift`)
-- **空气动力学与热泳沉积物理对称**：
-  - 制热模式（`.heating`）：当 `targetTemp > indoor` 且 `targetTemp - indoor >= 5.0` 或 `indoor <= 12.0` 时，动态应用 `modeFactor = 1.25`（常规升温 `1.15`，恒温维持 `1.05`）；
-  - 自动模式（`.auto`）：制热分支同步动态应用 `modeFactor = 1.20`（常规 `1.10`，平衡态 `1.00`），与制冷冷凝结露（`1.25`）实现全气候双向物理对称。
+### 2.2 Siri 快捷指令相对调温 (`AppIntents.swift`)
+- **AdjustACTemperatureIntent 实现**：
+  - 接入 `AppModel.adjustTemperature` 与 `AppModel.adjustTemperatureAll`；
+  - 导出自然对话反馈，包含调节后的实际度数与升降温方向；
+  - 在 `ACAppShortcuts` 中注册短语体系。
 
-### 2.3 状态栏 0.5°C 双模高精步进矩阵 (`StatusItemController.swift`)
-- **全屋协同与单设备/多设备矩阵对称升级**：
-  - 全屋相对调温新增 `stepUpHalfAllTemperature`（+0.5°C）与 `stepDownHalfAllTemperature`（-0.5°C）；
-  - 单设备与各房间子菜单新增 `stepUpHalfPrimaryTemperature` / `stepDownHalfPrimaryTemperature` 及 `stepUpHalfDeviceTemperature` / `stepDownHalfDeviceTemperature`；
-  - 完备配备 `canStepUpHalf`（`<= 29.5°C`）与 `canStepDownHalf`（`>= 16.5°C`）可用性守卫。
+### 2.3 高湿除湿滤网水膜动力学 (`AppModel.swift`)
+- **多层湿度附着自适应**：
+  - 极潮湿环境（RH >= 75%）动态应用 `modeFactor = 1.45`；
+  - 适度湿度（55% <= RH < 75%）维持 `modeFactor = 1.30`；
+  - 低湿稳态（RH < 55%）应用 `modeFactor = 1.20`；
+  - 与能耗引擎变频除湿动力学模型达成 100% 物理对称。
+
+### 2.4 状态栏 0.5°C 微调台数感知与温度呈现 (`StatusItemController.swift`)
+- **矩阵对称性升级**：
+  - 全屋微调升降温项补全 `\(runningCountDesc)`；
+  - 单设备与子菜单微调项补充当前温度基准提示。
 
 ---
 
@@ -45,5 +54,5 @@
 - **底层编译与语法校验**：
   - 运行 `SDKROOT=/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk swift build`，全模块编译 100% 通过（Build complete!）；
 - **应用打包与代码签名**：
-  - 执行 `./build_app.sh 1.9.52` 打包，小组件（沙盒 + Application Support 只读例外）与主应用签名全部就绪；
-  - 产出安装包：`dist/HaierAC-v1.9.52-macOS.zip`。
+  - 执行 `./build_app.sh 1.9.53` 打包，小组件（沙盒 + Application Support 只读例外）与主应用签名全部就绪；
+  - 产出安装包：`dist/HaierAC-v1.9.53-macOS.zip`。

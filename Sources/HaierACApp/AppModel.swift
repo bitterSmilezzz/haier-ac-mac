@@ -778,7 +778,21 @@ final class AppModel: ObservableObject {
                     modeFactor = 1.20
                 }
             case .dehumidify:
-                modeFactor = 1.30
+                // 除湿冷凝水膜表面张力微粒捕获与结块动力学 (v1.9.53)：
+                // 在极潮湿环境（RH >= 75% 如梅雨/回南天工况）下，蒸发器翅片与滤网网眼析水冷凝液膜急剧增厚，
+                // 水膜表面张力促使尘螨与浮尘颗粒吸湿膨胀并黏附结块阻塞网孔，滤网负荷因子由固定 1.30 提升至 1.45；
+                // 适度湿度（55% <= RH < 75%）为 1.30；低湿平稳运行（RH < 55%）为 1.20
+                if let hum = indoorHumidity {
+                    if hum >= 75.0 {
+                        modeFactor = 1.45
+                    } else if hum >= 55.0 {
+                        modeFactor = 1.30
+                    } else {
+                        modeFactor = 1.20
+                    }
+                } else {
+                    modeFactor = 1.30
+                }
             case .heating:
                 if let indoor = indoorTemp, targetTemp > indoor {
                     let diff = targetTemp - indoor
