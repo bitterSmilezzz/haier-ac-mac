@@ -1943,15 +1943,40 @@ final class VoiceCommandParserTests: XCTestCase {
         let rAll3 = VoiceCommandParser.parse("恢复全部定时任务")
         XCTAssertEqual(rAll3?.command, .resumeSchedulesAll)
 
-        // 3. 动作否定安全拦截（杜绝误触发）
+        // 3. 动作否定安全拦截（杜绝误触发，包括紧邻与带插入字场景） (v1.9.60, v1.9.61)
         XCTAssertNil(VoiceCommandParser.parse("千万别暂停定时"))
         XCTAssertNil(VoiceCommandParser.parse("不要暂停定时"))
         XCTAssertNil(VoiceCommandParser.parse("不用暂停全屋定时"))
         XCTAssertNil(VoiceCommandParser.parse("千万别恢复定时"))
         XCTAssertNil(VoiceCommandParser.parse("不要恢复定时任务"))
+        XCTAssertNil(VoiceCommandParser.parse("别给我暂停定时"))
+        XCTAssertNil(VoiceCommandParser.parse("千万不要暂停定时"))
+        XCTAssertNil(VoiceCommandParser.parse("先别急着暂停定时"))
+        XCTAssertNil(VoiceCommandParser.parse("千万别恢复全屋定时"))
+        XCTAssertNil(VoiceCommandParser.parse("不要给我恢复定时"))
     }
 
-    // MARK: - 复合星期周期扩展与即时防误触发测试 (v1.9.60)
+    // MARK: - 计划调度取消与删除否定安全拦截测试 (v1.9.61 闭环重大否定穿透漏洞)
+
+    func testCancelScheduleNegationProtection() {
+        // 正常取消
+        let c1 = VoiceCommandParser.parse("取消定时")
+        XCTAssertEqual(c1?.command, .cancelSchedules)
+
+        let cAll = VoiceCommandParser.parse("取消所有定时任务")
+        XCTAssertEqual(cAll?.command, .cancelSchedulesAll)
+
+        // 动作否定严格保护：杜绝误删任务
+        XCTAssertNil(VoiceCommandParser.parse("千万别取消定时"))
+        XCTAssertNil(VoiceCommandParser.parse("不要取消定时"))
+        XCTAssertNil(VoiceCommandParser.parse("别给我取消定时任务"))
+        XCTAssertNil(VoiceCommandParser.parse("先别急着取消定时"))
+        XCTAssertNil(VoiceCommandParser.parse("千万不要删除全屋定时"))
+        XCTAssertNil(VoiceCommandParser.parse("不要清除定时"))
+        XCTAssertNil(VoiceCommandParser.parse("别撤销定时任务"))
+    }
+
+    // MARK: - 复合星期周期扩展与即时防误触发测试 (v1.9.60, v1.9.61)
 
     func testCompoundWeekdayScheduleRanges() {
         // 1. 周三至周五（[4, 5, 6]）
@@ -1977,7 +2002,20 @@ final class VoiceCommandParserTests: XCTestCase {
         let m67_2 = VoiceCommandParser.parse("星期六至星期天早上9点开空调")
         XCTAssertEqual(m67_2?.command, .scheduleRepeatPower(hour: 9, minute: 0, power: true, repeatWeekdays: [1, 7], repeatLabel: "周末"))
 
-        // 5. 即时误开机安全拦截校验（省略“定时”二字时严禁触发立即全屋开机）
+        // 5. 新增复合星期周期范围 (v1.9.61)
+        let m46 = VoiceCommandParser.parse("周四至周六晚上10点关空调")
+        XCTAssertEqual(m46?.command, .scheduleRepeatPower(hour: 22, minute: 0, power: false, repeatWeekdays: [5, 6, 7], repeatLabel: "周四至周六"))
+
+        let m56 = VoiceCommandParser.parse("周五到周六早上8点开机")
+        XCTAssertEqual(m56?.command, .scheduleRepeatPower(hour: 8, minute: 0, power: true, repeatWeekdays: [6, 7], repeatLabel: "周五至周六"))
+
+        let m37 = VoiceCommandParser.parse("周三至周日早上7点开空调")
+        XCTAssertEqual(m37?.command, .scheduleRepeatPower(hour: 7, minute: 0, power: true, repeatWeekdays: [1, 4, 5, 6, 7], repeatLabel: "周三至周日"))
+
+        let m27 = VoiceCommandParser.parse("周二到周日晚上11点关机")
+        XCTAssertEqual(m27?.command, .scheduleRepeatPower(hour: 23, minute: 0, power: false, repeatWeekdays: [1, 3, 4, 5, 6, 7], repeatLabel: "周二至周日"))
+
+        // 6. 即时误开机安全拦截校验（省略“定时”二字时严禁触发立即全屋开机）
         let check1 = VoiceCommandParser.parse("全屋周三至周五开机")
         XCTAssertNotEqual(check1?.command, .turnOnAll)
 
@@ -1986,6 +2024,12 @@ final class VoiceCommandParserTests: XCTestCase {
 
         let check3 = VoiceCommandParser.parse("全屋周一到周二开机")
         XCTAssertNotEqual(check3?.command, .turnOnAll)
+
+        let check4 = VoiceCommandParser.parse("全屋周四至周六开机")
+        XCTAssertNotEqual(check4?.command, .turnOnAll)
+
+        let check5 = VoiceCommandParser.parse("全屋周五到周六开机")
+        XCTAssertNotEqual(check5?.command, .turnOnAll)
     }
 
     // MARK: - 无效输入测试

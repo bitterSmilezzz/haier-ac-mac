@@ -8,6 +8,22 @@
 
 ## 功能
 
+- 🏷 **闭环计划调度取消/暂停否定动作安全防线、单设备状态栏调度管理矩阵及自动风速能效动力学 (v1.9.61)**：
+  - 🛡️ **计划调度取消/暂停/恢复动作否定防线安全加固 (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)**：
+    - **彻底修复取消/暂停/恢复否定意图穿透缺陷**：旧版否定判定主要拦截开关机动作（开/关/启动等），对“千万别取消定时”、“不要取消定时任务”、“别给我暂停定时”、“不要恢复定时”等否定口令未能拦截；
+    - **单机与全屋动作否定无缝防护**：引入 `containsNegativeForAction`，支持在否定词与“取消/暂停/恢复”动作词之间容忍最多 10 个插入字符，彻底拦截日常闲聊、纠结改口等否定场景，避免误删或误改用户既定的计划调度。
+  - ⏱️ **重复调度标签计算引擎统一收敛与复合星期周期拓展 (`AppModel.swift` / `VoiceCommandParser.swift` / `AppIntents.swift`)**：
+    - **标签引擎架构解耦与统一**：在 `AppModel` 中提供统一的 `nonisolated public static func formatRepeatWeekdaysLabel(_ repeatWeekdays: [Int]) -> String?`，彻底消除 `ScheduledAction.repeatLabel` 与 `BedtimeSchedule.repeatLabel` 中数百行的重复代码，杜绝因未来扩展周期导致两处标签不同步；
+    - **泛化拓展高频复合星期周期**：新增“周四至周六/周四到周六”（`[5, 6, 7]`）、“周五至周六/周五到周六”（`[6, 7]`）、“周二至周日/周二到周日”（`[1, 3, 4, 5, 6, 7]`）、“周三至周日/周三到周日”（`[1, 4, 5, 6, 7]`），在自然语言语义解析、调度模型标签展示及 `AppIntents` 中全链路贯通；
+    - **单设备调度批量接口支持**：`AppModel` 增设单设备调度状态切换通用接口 `setScheduledActionsEnabled(for deviceId: String, enabled: Bool) -> Int`。
+  - 🍱 **macOS 状态栏设备级计划调度全景控制矩阵 (`StatusItemController.swift`)**：
+    - **设备专属计划调度二级菜单**：在状态栏设备列表的二级子菜单中新增设备专属「⏱ 计划调度...」子菜单；
+    - **单任务精细化操作**：清晰罗列该设备当前所有生效中与已暂停的计划调度任务，并支持二级悬浮菜单快速执行「⏸ 暂停此任务」/「▶️ 恢复此任务」/「🗑️ 取消此任务」；
+    - **设备级一键批量调度管理**：提供该设备专属的「⏸ 暂停该设备所有定时任务」、「▶️ 恢复该设备所有定时任务」与「🗑️ 取消该设备所有定时任务」快捷批处理能力。
+  - ⚡️ **热物理自适应风速能效动力学校准 (`EnergyAnalyticsEngine.swift`)**：
+    - 在瞬时功率估算 `estimateInstantaneousPower` 中，升级“自动”风速（`speed` 为“自动”）的附加风机功率动力学（`windOffset`）：
+    - 摆脱原先固定的 40W 经验值；除湿模式（`.dehumidify`）因微电脑强制维持极低微风设定为 25W；送风模式（`.fan`）维持平稳中风 50W；制冷/制热模式引入基于室内外温差（`|indoor - target|`）的连续线性动力学阻尼（20W ~ 120W），使自动风速下的瞬时功率与能耗测算与真实变频空调节能工况完全贴合自洽。
+
 - 🏷 **闭环计划任务批量暂停/恢复全链路语音与快捷指令打通、泛化复合星期周期调度引擎与自动风速工况物理自洽动力学 (v1.9.60)**：
   - ⏸️ **计划调度任务全生命周期管理 —— 批量暂停/恢复全链路打通 (`AppModel` / `VoiceCommandParser` / `VoiceCapsuleWindowController` / `AppIntents` / `StatusItemController`)**：
     - **AppModel 调度模型扩展**：新增 `setAllScheduledActionsEnabled(_ enabled: Bool) -> Int` 与 `setScheduledActionsEnabled(for:enabled:) -> Int`，支持一键批量暂停或恢复全屋/指定设备的所有定时任务，返回受影响的任务数并即时唤醒调度器；

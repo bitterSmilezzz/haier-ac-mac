@@ -237,26 +237,53 @@ public final class EnergyAnalyticsEngine: ObservableObject {
         isSelfCleaning: Bool = false
     ) -> Double {
         let windOffset: Double = {
-            guard let wind = windSpeed?.lowercased() else { return 40.0 }
-            if wind.contains("强") || wind.contains("turbo") || wind.contains("超强") || wind.contains("最大") ||
-               wind.contains("3档") || wind.contains("三档") || wind == "3" || wind.contains("极速") || wind.contains("高速") {
-                return 180.0
+            let wind = windSpeed?.lowercased()
+            if let wind = wind {
+                if wind.contains("强") || wind.contains("turbo") || wind.contains("超强") || wind.contains("最大") ||
+                   wind.contains("3档") || wind.contains("三档") || wind == "3" || wind.contains("极速") || wind.contains("高速") {
+                    return 180.0
+                }
+                if wind.contains("高") || wind.contains("high") || wind.contains("大风") || wind.contains("大") {
+                    return 110.0
+                }
+                if wind.contains("中") || wind.contains("medium") || wind.contains("mid") ||
+                   wind.contains("2档") || wind.contains("二档") || wind.contains("两档") || wind == "2" || wind.contains("中速") {
+                    return 65.0
+                }
+                if wind.contains("低") || wind.contains("low") ||
+                   wind.contains("1档") || wind.contains("一档") || wind == "1" || wind.contains("小风") || wind.contains("低速") {
+                    return 35.0
+                }
+                if wind.contains("微") || wind.contains("静") || wind.contains("quiet") || wind.contains("mute") || wind.contains("micro") || wind.contains("柔") {
+                    return 15.0
+                }
             }
-            if wind.contains("高") || wind.contains("high") || wind.contains("大风") || wind.contains("大") {
-                return 110.0
+            // 自动风速热物理自适应风机电动力学模型 (v1.9.61)
+            // 变频内机电控芯片在自动风速下根据运行工况与室内外热负荷动态调节风机转速：
+            // 1. 除湿工况（.dehumidify）：强制低通量微风防止冷凝水重蒸发 (25W)
+            // 2. 送风工况（.fan）：平稳中风对流 (50W)
+            // 3. 制冷/制热/自动工况：
+            //    大温差重载（|indoor - target| >= 4.0°C）：高频强风加速室内对流 (120W)
+            //    稳态维持态（|indoor - target| <= 0.8°C）：静音低风节能 (20W)
+            //    过渡温差：连续线性热阻尼插值 (20W ~ 120W)
+            let mode = ACModeCode.match(from: modeCode)
+            if mode == .dehumidify {
+                return 25.0
+            } else if mode == .fan {
+                return 50.0
+            } else if let indoor = indoorTemp, let target = targetTemp {
+                let tempDelta = abs(indoor - target)
+                if tempDelta >= 4.0 {
+                    return 120.0
+                } else if tempDelta <= 0.8 {
+                    return 20.0
+                } else {
+                    let progress = (tempDelta - 0.8) / 3.2
+                    return 20.0 + (progress * 100.0)
+                }
+            } else {
+                return 50.0 // 无温度传感器中性基准
             }
-            if wind.contains("中") || wind.contains("medium") || wind.contains("mid") ||
-               wind.contains("2档") || wind.contains("二档") || wind.contains("两档") || wind == "2" || wind.contains("中速") {
-                return 65.0
-            }
-            if wind.contains("低") || wind.contains("low") ||
-               wind.contains("1档") || wind.contains("一档") || wind == "1" || wind.contains("小风") || wind.contains("低速") {
-                return 35.0
-            }
-            if wind.contains("微") || wind.contains("静") || wind.contains("quiet") || wind.contains("mute") || wind.contains("micro") || wind.contains("柔") {
-                return 15.0
-            }
-            return 40.0
         }()
 
         if isSelfCleaning {

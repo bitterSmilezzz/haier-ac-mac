@@ -703,6 +703,14 @@ struct ScheduleACPowerIntent: AppIntent {
                 return ([4, 5, 6], false, "周三至周五")
             } else if sched.contains("周三到周六") || sched.contains("周三至周六") || sched.contains("礼拜三到礼拜六") || sched.contains("礼拜三至礼拜六") {
                 return ([4, 5, 6, 7], false, "周三至周六")
+            } else if sched.contains("周四到周六") || sched.contains("周四至周六") || sched.contains("礼拜四到礼拜六") || sched.contains("礼拜四至礼拜六") {
+                return ([5, 6, 7], false, "周四至周六")
+            } else if sched.contains("周五到周六") || sched.contains("周五至周六") || sched.contains("礼拜五到礼拜六") || sched.contains("礼拜五至礼拜六") {
+                return ([6, 7], false, "周五至周六")
+            } else if sched.contains("周二到周日") || sched.contains("周二至周日") || sched.contains("礼拜二到礼拜天") || sched.contains("礼拜二至礼拜天") || sched.contains("礼拜二到礼拜日") || sched.contains("礼拜二至礼拜日") {
+                return ([1, 3, 4, 5, 6, 7], false, "周二至周日")
+            } else if sched.contains("周三到周日") || sched.contains("周三至周日") || sched.contains("礼拜三到礼拜天") || sched.contains("礼拜三至礼拜天") || sched.contains("礼拜三到礼拜日") || sched.contains("礼拜三至礼拜日") {
+                return ([1, 4, 5, 6, 7], false, "周三至周日")
             } else if sched.contains("周四到周日") || sched.contains("周四至周日") || sched.contains("礼拜四到礼拜天") || sched.contains("礼拜四至礼拜天") {
                 return ([1, 5, 6, 7], false, "周四至周日")
             } else if sched.contains("周五到周日") || sched.contains("周五至周日") || sched.contains("礼拜五到礼拜天") || sched.contains("礼拜五至礼拜天") || sched.contains("周五周六周日") || sched.contains("周末三天") {

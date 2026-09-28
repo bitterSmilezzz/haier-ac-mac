@@ -300,6 +300,10 @@ public struct VoiceCommandParser {
     }
 
     private static func isCancelSchedule(_ text: String) -> Bool {
+        // 若包含明确否定“取消/清除/删除/撤销”的动作（如“千万别取消定时”、“不要取消定时”、“别给我取消定时任务”、“千万不要删除全屋定时”），必须严格拦截，杜绝误取消 (v1.9.61)
+        if containsNegativeForAction(text: text, actionPattern: #"(?:取消|清除|删除|撤销)"#) {
+            return false
+        }
         // 若包含明确动作谓词且为否定动作（如“别定时开机”、“不要定时关机”、“千万别定时开”），属于动作否定拦截，严禁误判为取消定时 (v1.9.55)
         if (text.contains("开") || text.contains("关") || text.contains("停") || text.contains("启动")) &&
            (text.contains("别") || text.contains("不要") || text.contains("不用") || text.contains("千万") || containsNegativeAction(text)) &&
@@ -319,9 +323,8 @@ public struct VoiceCommandParser {
     }
 
     private static func isPauseSchedule(_ text: String) -> Bool {
-        // 若包含明确否定动作（如“别暂停定时”、“千万别暂停”），属于动作否定拦截，严禁误触发暂停 (v1.9.60)
-        if (text.contains("别") || text.contains("不要") || text.contains("不用") || text.contains("千万") || containsNegativeAction(text)) &&
-           (text.contains("别暂停") || text.contains("不要暂停") || text.contains("不用暂停") || text.contains("千万别暂停")) {
+        // 若包含结构化否定“暂停/挂起/暂缓”动作（如“别暂停定时”、“千万别暂停”、“别给我暂停定时”、“先别急着暂停定时”），严格拦截防误触 (v1.9.60, v1.9.61 消除字面量紧邻缺陷)
+        if containsNegativeForAction(text: text, actionPattern: #"(?:暂停|挂起|暂缓)"#) {
             return false
         }
         let pauseKeywords = ["暂停定时", "暂停倒计时", "暂停调度", "暂停计划", "挂起定时", "暂挂定时"]
@@ -337,9 +340,8 @@ public struct VoiceCommandParser {
     }
 
     private static func isResumeSchedule(_ text: String) -> Bool {
-        // 若包含明确否定动作（如“别恢复定时”、“不要恢复”），属于动作否定拦截 (v1.9.60)
-        if (text.contains("别") || text.contains("不要") || text.contains("不用") || text.contains("千万") || containsNegativeAction(text)) &&
-           (text.contains("别恢复") || text.contains("不要恢复") || text.contains("不用恢复") || text.contains("千万别恢复")) {
+        // 若包含结构化否定“恢复/继续/启用”动作（如“别恢复定时”、“不要恢复”、“千万别恢复全屋定时”、“不要给我恢复定时”），严格拦截 (v1.9.60, v1.9.61 消除字面量紧邻缺陷)
+        if containsNegativeForAction(text: text, actionPattern: #"(?:恢复|继续|重新启用|启用)"#) {
             return false
         }
         let resumeKeywords = ["恢复定时", "恢复倒计时", "恢复调度", "恢复计划", "继续定时", "重新启用定时", "启用定时任务"]
@@ -388,6 +390,14 @@ public struct VoiceCommandParser {
                     return ([4, 5, 6], "周三至周五")
                 } else if text.contains("周三到周六") || text.contains("周三至周六") || text.contains("星期三到星期六") || text.contains("星期三至星期六") || text.contains("礼拜三到礼拜六") || text.contains("礼拜三至礼拜六") {
                     return ([4, 5, 6, 7], "周三至周六")
+                } else if text.contains("周四到周六") || text.contains("周四至周六") || text.contains("星期四到星期六") || text.contains("星期四至星期六") || text.contains("礼拜四到礼拜六") || text.contains("礼拜四至礼拜六") {
+                    return ([5, 6, 7], "周四至周六")
+                } else if text.contains("周五到周六") || text.contains("周五至周六") || text.contains("星期五到星期六") || text.contains("星期五至星期六") || text.contains("礼拜五到礼拜六") || text.contains("礼拜五至礼拜六") {
+                    return ([6, 7], "周五至周六")
+                } else if text.contains("周二到周日") || text.contains("周二至周日") || text.contains("星期二到星期天") || text.contains("星期二至星期天") || text.contains("星期二到星期日") || text.contains("星期二至星期日") || text.contains("礼拜二到礼拜天") || text.contains("礼拜二至礼拜天") || text.contains("礼拜二到礼拜日") || text.contains("礼拜二至礼拜日") {
+                    return ([1, 3, 4, 5, 6, 7], "周二至周日")
+                } else if text.contains("周三到周日") || text.contains("周三至周日") || text.contains("星期三到星期天") || text.contains("星期三至星期天") || text.contains("星期三到星期日") || text.contains("星期三至星期日") || text.contains("礼拜三到礼拜天") || text.contains("礼拜三至礼拜天") || text.contains("礼拜三到礼拜日") || text.contains("礼拜三至礼拜日") {
+                    return ([1, 4, 5, 6, 7], "周三至周日")
                 } else if text.contains("周四到周日") || text.contains("周四至周日") || text.contains("星期四到星期天") || text.contains("星期四至星期天") || text.contains("星期四到星期日") || text.contains("星期四至星期日") || text.contains("礼拜四到礼拜天") || text.contains("礼拜四至礼拜天") || text.contains("礼拜四到礼拜日") || text.contains("礼拜四至礼拜日") {
                     return ([1, 5, 6, 7], "周四至周日")
                 } else if text.contains("周五到周日") || text.contains("周五至周日") || text.contains("星期五到星期天") || text.contains("星期五至星期天") || text.contains("星期五到星期日") || text.contains("星期五至星期日") || text.contains("礼拜五到礼拜天") || text.contains("礼拜五至礼拜天") || text.contains("礼拜五到礼拜日") || text.contains("礼拜五至礼拜日") || text.contains("周五周六周日") || text.contains("周五周六周天") || text.contains("周末三天") {
@@ -682,12 +692,22 @@ public struct VoiceCommandParser {
     private static let negativeActionRegex: NSRegularExpression? = {
         // 否定词（别/不要/不用/不必/无需/先别/先不要/暂不/暂不要/千万别/千万不要/不能/不可以/切勿/切莫/不要再/别再/暂时不用/暂时不要）
         // 允许中间插入 0~10 个任意非标点非空白字符（如“周一到周六定时”、“星期一到星期五”、“给我”、“帮我”、“急着”、“现在”等，彻底杜绝插字绕过漏洞） (v1.9.40, v1.9.57)
-        // 动作谓词（关/停/开/启动/运转/打开/关闭/调/设/升/降/重置/复位/清零/吹/送/抽/除/暂停/恢复） (v1.9.39 扩展调温与变频动作否定, v1.9.45 扩展滤网重置否定, v1.9.50 扩展吹风除湿动作否定, v1.9.60 扩展计划调度暂停恢复动作否定)
-        let pattern = #"(?:别|不要|不用|不必|无需|先别|先不要|暂不|暂不要|千万别|千万不要|不能|不可以|切勿|切莫|不要再|别再|暂时不用|暂时不要)[^，。！？\s]{0,10}?(?:关|停|开|启动|运转|打开|关闭|调|设|升|降|重置|复位|清零|吹|送|抽|除|暂停|恢复)"#
+        // 动作谓词（关/停/开/启动/运转/打开/关闭/调/设/升/降/重置/复位/清零/吹/送/抽/除/暂停/恢复/取消/清除/删除/撤销） (v1.9.39 扩展调温与变频动作否定, v1.9.45 扩展滤网重置否定, v1.9.50 扩展吹风除湿动作否定, v1.9.60 扩展计划调度暂停恢复动作否定, v1.9.61 扩展取消删除调度动作否定)
+        let pattern = #"(?:别|不要|不用|不必|无需|先别|先不要|暂不|暂不要|千万别|千万不要|不能|不可以|切勿|切莫|不要再|别再|暂时不用|暂时不要)[^，。！？\s]{0,10}?(?:关|停|开|启动|运转|打开|关闭|调|设|升|降|重置|复位|清零|吹|送|抽|除|暂停|恢复|取消|清除|删除|撤销)"#
         return try? NSRegularExpression(pattern: pattern)
     }()
 
-    /// 检测文本中是否包含针对开关机/调温/模式动作的否定意图（如“别关”、“不要开”、“先别急着关”、“别给我关了”、“千万别现在关”、“别开制冷”、“不要调”、“别重置”、“别吹风”、“别暂停定时”等，防止误触发） (v1.9.36, v1.9.40, v1.9.45, v1.9.50, v1.9.60)
+    /// 结构化匹配特定动作的否定意图（允许中间插入 0~10 个任意非标点非空白字符，彻底杜绝插字绕过漏洞） (v1.9.61)
+    private static func containsNegativeForAction(text: String, actionPattern: String) -> Bool {
+        let pattern = #"(?:别|不要|不用|不必|无需|先别|先不要|暂不|暂不要|千万别|千万不要|不能|不可以|切勿|切莫|不要再|别再|暂时不用|暂时不要)[^，。！？\s]{0,10}?"# + actionPattern
+        guard let regex = try? NSRegularExpression(pattern: pattern) else {
+            return false
+        }
+        let range = NSRange(text.startIndex..<text.endIndex, in: text)
+        return regex.firstMatch(in: text, options: [], range: range) != nil
+    }
+
+    /// 检测文本中是否包含针对开关机/调温/模式动作的否定意图（如“别关”、“不要开”、“先别急着关”、“别给我关了”、“千万别现在关”、“别开制冷”、“不要调”、“别重置”、“别吹风”、“别暂停定时”等，防止误触发） (v1.9.36, v1.9.40, v1.9.45, v1.9.50, v1.9.60, v1.9.61)
     private static func containsNegativeAction(_ text: String) -> Bool {
         // 特例：“别吹了”属于日常高频关机意图（显式关机口令，非动作否定拦截）
         if text.contains("别吹了") {
@@ -701,6 +721,7 @@ public struct VoiceCommandParser {
                 "别重置", "不要重置", "不用重置", "别复位", "不要复位", "别清零",
                 "别吹", "不要吹", "不用吹", "别送风", "不要送风", "别抽湿", "不要抽湿", "别除湿", "不要除湿",
                 "别暂停", "不要暂停", "不用暂停", "千万别暂停", "别恢复", "不要恢复", "不用恢复", "千万别恢复",
+                "别取消", "不要取消", "不用取消", "千万别取消", "别清除", "不要清除", "别删除", "不要删除",
                 "别给我关", "千万别关", "千万别开"
             ]
             return fallbackPatterns.contains(where: { text.contains($0) })

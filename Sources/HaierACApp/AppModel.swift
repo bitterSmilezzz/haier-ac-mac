@@ -44,30 +44,10 @@ struct ScheduledAction: Identifiable, Codable, Hashable {
         AttrValueCodec.encode(value)
     }
 
-    /// 重复规则的中文描述（如「每天」「工作日」「周末」「每周一」「每周一、三、五」），一次性返回 nil (v1.9.57, v1.9.58, v1.9.59, v1.9.60)
+    /// 重复规则的中文描述（如「每天」「工作日」「周末」「每周一」「每周一、三、五」），一次性返回 nil (v1.9.57, v1.9.58, v1.9.59, v1.9.60, v1.9.61)
     var repeatLabel: String? {
         if !repeatWeekdays.isEmpty {
-            let sorted = repeatWeekdays.sorted()
-            if sorted.count == 7 { return "每天" }
-            if sorted == [2, 3, 4, 5, 6] { return "工作日" }
-            if sorted == [1, 7] { return "周末" }
-            if sorted == [2, 3, 4, 5, 6, 7] { return "周一至周六" }
-            if sorted == [2, 3, 4, 5] { return "周一至周四" }
-            if sorted == [2, 3, 4] { return "周一至周三" }
-            if sorted == [2, 3] { return "周一至周二" }
-            if sorted == [3, 4, 5, 6, 7] { return "周二至周六" }
-            if sorted == [3, 4, 5, 6] { return "周二至周五" }
-            if sorted == [3, 4, 5] { return "周二至周四" }
-            if sorted == [4, 5, 6, 7] { return "周三至周六" }
-            if sorted == [4, 5, 6] { return "周三至周五" }
-            if sorted == [1, 5, 6, 7] { return "周四至周日" }
-            if sorted == [1, 6, 7] { return "周五至周日" }
-            if sorted == [2, 4, 6] { return "每周一、三、五" }
-            if sorted == [3, 5, 7] { return "每周二、四、六" }
-            if sorted == [3, 5] { return "每周二、四" }
-            let dayChars = ["日", "一", "二", "三", "四", "五", "六"]
-            let dayNames = sorted.map { dayChars[max(0, min($0 - 1, 6))] }
-            return "每周" + dayNames.joined(separator: "、")
+            return AppModel.formatRepeatWeekdaysLabel(repeatWeekdays)
         }
         if repeatsDaily { return "每天" }
         return nil
@@ -215,27 +195,7 @@ public struct BedtimeSchedule: Codable, Equatable {
     }
 
     public var repeatLabel: String {
-        let sorted = repeatWeekdays.sorted()
-        if sorted.count == 7 { return "每天" }
-        if sorted == [2, 3, 4, 5, 6] { return "工作日" }
-        if sorted == [1, 7] { return "周末" }
-        if sorted == [2, 3, 4, 5, 6, 7] { return "周一至周六" }
-        if sorted == [2, 3, 4, 5] { return "周一至周四" }
-        if sorted == [2, 3, 4] { return "周一至周三" }
-        if sorted == [2, 3] { return "周一至周二" }
-        if sorted == [3, 4, 5, 6, 7] { return "周二至周六" }
-        if sorted == [3, 4, 5, 6] { return "周二至周五" }
-        if sorted == [3, 4, 5] { return "周二至周四" }
-        if sorted == [4, 5, 6, 7] { return "周三至周六" }
-        if sorted == [4, 5, 6] { return "周三至周五" }
-        if sorted == [1, 5, 6, 7] { return "周四至周日" }
-        if sorted == [1, 6, 7] { return "周五至周日" }
-        if sorted == [2, 4, 6] { return "每周一、三、五" }
-        if sorted == [3, 5, 7] { return "每周二、四、六" }
-        if sorted == [3, 5] { return "每周二、四" }
-        let dayChars = ["日", "一", "二", "三", "四", "五", "六"]
-        let dayNames = sorted.map { dayChars[max(0, min($0 - 1, 6))] }
-        return "每周" + dayNames.joined(separator: "、")
+        AppModel.formatRepeatWeekdaysLabel(repeatWeekdays) ?? "工作日"
     }
 }
 
@@ -1366,6 +1326,42 @@ final class AppModel: ObservableObject {
             wakeScheduler()
         }
         return changed
+    }
+
+    /// 批量启用/禁用指定单设备的调度任务（返回受影响的任务数）(v1.9.61)
+    @discardableResult
+    public func setScheduledActionsEnabled(for deviceId: String, enabled: Bool) -> Int {
+        setScheduledActionsEnabled(for: [deviceId], enabled: enabled)
+    }
+
+    /// 统一格式化周期重复星期数组为自然语言中文描述 (v1.9.61)
+    nonisolated public static func formatRepeatWeekdaysLabel(_ repeatWeekdays: [Int]) -> String? {
+        guard !repeatWeekdays.isEmpty else { return nil }
+        let sorted = repeatWeekdays.sorted()
+        if sorted.count == 7 { return "每天" }
+        if sorted == [2, 3, 4, 5, 6] { return "工作日" }
+        if sorted == [1, 7] { return "周末" }
+        if sorted == [2, 3, 4, 5, 6, 7] { return "周一至周六" }
+        if sorted == [2, 3, 4, 5] { return "周一至周四" }
+        if sorted == [2, 3, 4] { return "周一至周三" }
+        if sorted == [2, 3] { return "周一至周二" }
+        if sorted == [3, 4, 5, 6, 7] { return "周二至周六" }
+        if sorted == [3, 4, 5, 6] { return "周二至周五" }
+        if sorted == [3, 4, 5] { return "周二至周四" }
+        if sorted == [4, 5, 6, 7] { return "周三至周六" }
+        if sorted == [4, 5, 6] { return "周三至周五" }
+        if sorted == [5, 6, 7] { return "周四至周六" }
+        if sorted == [6, 7] { return "周五至周六" }
+        if sorted == [1, 5, 6, 7] { return "周四至周日" }
+        if sorted == [1, 4, 5, 6, 7] { return "周三至周日" }
+        if sorted == [1, 3, 4, 5, 6, 7] { return "周二至周日" }
+        if sorted == [1, 6, 7] { return "周五至周日" }
+        if sorted == [2, 4, 6] { return "每周一、三、五" }
+        if sorted == [3, 5, 7] { return "每周二、四、六" }
+        if sorted == [3, 5] { return "每周二、四" }
+        let dayChars = ["日", "一", "二", "三", "四", "五", "六"]
+        let dayNames = sorted.map { dayChars[max(0, min($0 - 1, 6))] }
+        return "每周" + dayNames.joined(separator: "、")
     }
 
     /// 任务列表变化后唤醒调度器，立即按新时间重新休眠（不用等封顶延迟）

@@ -6,6 +6,22 @@ A native SwiftUI app to control Haier / Leader (统帅) smart air conditioners o
 
 ## Features
 
+- 🏷 **Defensive Action Negation for Schedule Cancellation/Pause/Resume, Device-Level Menu Bar Schedule Matrix, Generalized Repeat Day Engine & Thermodynamic Auto-Wind Dynamics (v1.9.61)**:
+  - 🛡️ **Schedule Action Negation Defense for Cancel, Pause & Resume (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)**:
+    - **Thorough Defense Against Negated Schedule Modification Intentions**: The previous negation filter only blocked power-switching verbs (on/off/start). It did not guard schedule mutation phrases like "千万别取消定时", "不要取消定时任务", "别给我暂停定时", "千万不要恢复定时";
+    - **Single-Device & Whole-House Scope Protection**: Introduced `containsNegativeForAction`, supporting up to 10 inserted characters between negation words and action keywords, preventing accidental cancellation or modification during casual speech or sentence revisions.
+  - ⏱️ **Harmonized Repeat Schedule Engine & Compound Weekday Range Extension (`AppModel.swift` / `VoiceCommandParser.swift` / `AppIntents.swift`)**:
+    - **Unified Architecture for Repeat Weekday Formatting**: Centralized formatting logic into `AppModel.formatRepeatWeekdaysLabel(_ repeatWeekdays: [Int]) -> String?`, removing hundreds of lines of duplicated code across `ScheduledAction.repeatLabel` and `BedtimeSchedule.repeatLabel`;
+    - **Generalized High-Frequency Compound Weekdays**: Added Thu-Sat ("周四至周六", `[5, 6, 7]`), Fri-Sat ("周五至周六", `[6, 7]`), Tue-Sun ("周二至周日", `[1, 3, 4, 5, 6, 7]`), and Wed-Sun ("周三至周日", `[1, 4, 5, 6, 7]`), seamlessly integrated across NLP parser, scheduling UI labels, and `AppIntents`;
+    - **Single-Device Schedule Control API**: Added `AppModel.setScheduledActionsEnabled(for deviceId: String, enabled: Bool) -> Int`.
+  - 🍱 **macOS Menu Bar Per-Device Schedule Management Matrix (`StatusItemController.swift`)**:
+    - **Dedicated Device Schedule Submenu**: Added a device-specific "⏱ 计划调度..." submenu inside each device's menu entry;
+    - **Granular Per-Task Operations**: Displays all active and paused schedules for the specific device, with secondary popouts to quickly pause, resume, or cancel individual tasks;
+    - **Device-Level Batch Operations**: Provides "⏸ 暂停该设备所有定时任务", "▶️ 恢复该设备所有定时任务", and "🗑️ 取消该设备所有定时任务" for swift bulk control.
+  - ⚡️ **Thermodynamic Adaptive Auto-Wind Energy Dynamics Calibration (`EnergyAnalyticsEngine.swift`)**:
+    - Refined the fan power offset (`windOffset`) in `estimateInstantaneousPower` when `windSpeed` is "自动" (Auto):
+    - Replaced the hardcoded 40W constant with physics-based dynamic modeling: locked to low-speed 25W under dehumidify mode, steady 50W under fan mode, and continuous linear thermal damping (20W ~ 120W) based on `|indoor - target|` temperature differential in cooling/heating/auto modes.
+
 - 🏷 **Comprehensive Schedule Batch Pause/Resume Lifecycle Across Voice & Siri, Generalized Compound Weekday Schedule Engine, and Dynamic Auto-Wind Thermodynamic Physical Consistency (v1.9.60)**:
   - ⏸️ **Schedule Lifecycle Management — Full-Stack Batch Pause / Resume Integration (`AppModel` / `VoiceCommandParser` / `VoiceCapsuleWindowController` / `AppIntents` / `StatusItemController`)**:
     - **`AppModel` Scheduling Lifecycle Expansion**: Added `setAllScheduledActionsEnabled(_ enabled: Bool) -> Int` and `setScheduledActionsEnabled(for:enabled:) -> Int`, enabling one-click batch pause or resume for whole-house or per-device schedules, returning affected action counts and instantly waking the scheduler timer;

@@ -713,6 +713,90 @@ final class StatusItemController: NSObject {
                 devSubmenu.setSubmenu(devCountdownMenu, for: devCountdownParent)
                 devSubmenu.addItem(devCountdownParent)
 
+                // 单设备计划调度全生命周期管理与感知矩阵 (v1.9.61)
+                let devSchedules = model.scheduledActions.filter { $0.deviceId == devId }
+                let devScheduleMenu = NSMenu()
+                devScheduleMenu.autoenablesItems = false
+                let devEnabledCount = devSchedules.filter(\.enabled).count
+                let devPausedCount = devSchedules.count - devEnabledCount
+
+                if !devSchedules.isEmpty {
+                    for action in devSchedules {
+                        let timeStr = DateFormatter.localizedString(from: action.fireDate, dateStyle: .none, timeStyle: .short)
+                        var cleanActionName = action.name
+                        if cleanActionName.hasPrefix("「\(dev.name)」") {
+                            cleanActionName = String(cleanActionName.dropFirst("「\(dev.name)」".count))
+                        }
+                        let repeatTag = action.repeatLabel.map { " [\($0)]" } ?? ""
+                        let statusTag = action.enabled ? "" : " [已暂停]"
+                        let sItem = NSMenuItem(title: "⏱ \(cleanActionName) (\(timeStr))\(repeatTag)\(statusTag)", action: nil, keyEquivalent: "")
+
+                        let singleMenu = NSMenu()
+                        singleMenu.autoenablesItems = false
+                        let fullTimeStr = DateFormatter.localizedString(from: action.fireDate, dateStyle: .medium, timeStyle: .medium)
+                        let timeInfo = NSMenuItem(title: "下次执行: \(fullTimeStr)", action: nil, keyEquivalent: "")
+                        timeInfo.isEnabled = false
+                        singleMenu.addItem(timeInfo)
+
+                        if let rep = action.repeatLabel {
+                            let repInfo = NSMenuItem(title: "周期重复: \(rep)", action: nil, keyEquivalent: "")
+                            repInfo.isEnabled = false
+                            singleMenu.addItem(repInfo)
+                        }
+                        singleMenu.addItem(.separator())
+
+                        let toggleTitle = action.enabled ? "⏸ 暂停此任务" : "▶️ 恢复此任务"
+                        let toggleItem = NSMenuItem(title: toggleTitle, action: #selector(toggleSingleScheduleEnabledFromMenu(_:)), keyEquivalent: "")
+                        toggleItem.target = self
+                        toggleItem.representedObject = action.id.uuidString
+                        singleMenu.addItem(toggleItem)
+
+                        let cancelItem = NSMenuItem(title: "❌ 取消该任务", action: #selector(cancelSingleScheduleFromMenu(_:)), keyEquivalent: "")
+                        cancelItem.target = self
+                        cancelItem.representedObject = action.id.uuidString
+                        singleMenu.addItem(cancelItem)
+
+                        devScheduleMenu.setSubmenu(singleMenu, for: sItem)
+                        devScheduleMenu.addItem(sItem)
+                    }
+                    devScheduleMenu.addItem(.separator())
+
+                    if devEnabledCount > 0 {
+                        let pItem = NSMenuItem(title: "⏸ 暂停该设备所有定时", action: #selector(pauseDeviceSchedulesFromMenu(_:)), keyEquivalent: "")
+                        pItem.target = self
+                        pItem.representedObject = devId
+                        devScheduleMenu.addItem(pItem)
+                    }
+                    if devPausedCount > 0 {
+                        let rItem = NSMenuItem(title: "▶️ 恢复该设备所有定时", action: #selector(resumeDeviceSchedulesFromMenu(_:)), keyEquivalent: "")
+                        rItem.target = self
+                        rItem.representedObject = devId
+                        devScheduleMenu.addItem(rItem)
+                    }
+                    let cItem = NSMenuItem(title: "🗑 取消该设备所有定时与倒计时", action: #selector(cancelDeviceSchedulesFromMenu(_:)), keyEquivalent: "")
+                    cItem.target = self
+                    cItem.representedObject = devId
+                    devScheduleMenu.addItem(cItem)
+                } else {
+                    let emptyItem = NSMenuItem(title: "当前无生效中的计划任务", action: nil, keyEquivalent: "")
+                    emptyItem.isEnabled = false
+                    devScheduleMenu.addItem(emptyItem)
+                }
+
+                let devScheduleParentTitle: String
+                if devSchedules.isEmpty {
+                    devScheduleParentTitle = "⏱ 计划调度 (无任务)..."
+                } else if devPausedCount == 0 {
+                    devScheduleParentTitle = "⏱ 计划调度 (\(devEnabledCount) 项生效)..."
+                } else if devEnabledCount == 0 {
+                    devScheduleParentTitle = "⏱ 计划调度 (\(devPausedCount) 项已暂停)..."
+                } else {
+                    devScheduleParentTitle = "⏱ 计划调度 (\(devEnabledCount) 生效 / \(devPausedCount) 暂停)..."
+                }
+                let devScheduleParent = NSMenuItem(title: devScheduleParentTitle, action: nil, keyEquivalent: "")
+                devSubmenu.setSubmenu(devScheduleMenu, for: devScheduleParent)
+                devSubmenu.addItem(devScheduleParent)
+
                 let statusBadge: String
                 switch reach {
                 case .gatewayReconnecting: statusBadge = "⏳ 重连中"
@@ -1391,6 +1475,36 @@ final class StatusItemController: NSObject {
         if let action = model.scheduledActions.first(where: { $0.id == uuid }) {
             model.removeScheduledAction(action)
             model.operationNotice = AppModel.OperationNotice(text: "🗑 已取消计划任务「\(action.name)」", isError: false)
+            refreshTemperature()
+        }
+    }
+
+    @objc private func pauseDeviceSchedulesFromMenu(_ sender: NSMenuItem) {
+        guard let devId = sender.representedObject as? String else { return }
+        let count = model.setScheduledActionsEnabled(for: devId, enabled: false)
+        if count > 0 {
+            let devName = model.allUnifiedDevices.first(where: { $0.id == devId })?.name ?? "设备"
+            model.operationNotice = AppModel.OperationNotice(text: "⏸ 已临时暂停「\(devName)」所有定时任务（共 \(count) 个）", isError: false)
+            refreshTemperature()
+        }
+    }
+
+    @objc private func resumeDeviceSchedulesFromMenu(_ sender: NSMenuItem) {
+        guard let devId = sender.representedObject as? String else { return }
+        let count = model.setScheduledActionsEnabled(for: devId, enabled: true)
+        if count > 0 {
+            let devName = model.allUnifiedDevices.first(where: { $0.id == devId })?.name ?? "设备"
+            model.operationNotice = AppModel.OperationNotice(text: "▶️ 已恢复「\(devName)」所有定时任务生效（共 \(count) 个）", isError: false)
+            refreshTemperature()
+        }
+    }
+
+    @objc private func cancelDeviceSchedulesFromMenu(_ sender: NSMenuItem) {
+        guard let devId = sender.representedObject as? String else { return }
+        let count = model.cancelSchedules(for: devId)
+        if count > 0 {
+            let devName = model.allUnifiedDevices.first(where: { $0.id == devId })?.name ?? "设备"
+            model.operationNotice = AppModel.OperationNotice(text: "🗑 已取消「\(devName)」所有定时与倒计时（共 \(count) 个）", isError: false)
             refreshTemperature()
         }
     }
