@@ -1354,6 +1354,75 @@ final class VoiceCommandParserTests: XCTestCase {
         XCTAssertNil(VoiceCommandParser.parse("先不要停"))
     }
 
+    // MARK: - 零点五与省略“度”字小数高精调温测试 (v1.9.52)
+
+    func testDecimalAndPointFiveTemperatureParsing() {
+        // 1. 口语“零点五度 / 0点5度”与相对微调
+        let r1 = VoiceCommandParser.parse("升温零点五度")
+        XCTAssertEqual(r1?.command, .adjustTemperature(delta: 0.5))
+        XCTAssertEqual(r1?.displayText, "升温 0.5°C")
+
+        let r2 = VoiceCommandParser.parse("降温零点五度")
+        XCTAssertEqual(r2?.command, .adjustTemperature(delta: -0.5))
+        XCTAssertEqual(r2?.displayText, "降温 0.5°C")
+
+        let r3 = VoiceCommandParser.parse("全屋升温零点五度")
+        XCTAssertEqual(r3?.command, .adjustTemperatureAll(delta: 0.5))
+        XCTAssertEqual(r3?.displayText, "全屋升温 0.5°C")
+
+        let r4 = VoiceCommandParser.parse("全屋降温0点5度")
+        XCTAssertEqual(r4?.command, .adjustTemperatureAll(delta: -0.5))
+
+        let r5 = VoiceCommandParser.parse("调高0点5度")
+        XCTAssertEqual(r5?.command, .adjustTemperature(delta: 0.5))
+
+        let r6 = VoiceCommandParser.parse("降温0点5度")
+        XCTAssertEqual(r6?.command, .adjustTemperature(delta: -0.5))
+
+        let r7 = VoiceCommandParser.parse("升温0点5")
+        XCTAssertEqual(r7?.command, .adjustTemperature(delta: 0.5))
+
+        let r8 = VoiceCommandParser.parse("降温0点5")
+        XCTAssertEqual(r8?.command, .adjustTemperature(delta: -0.5))
+
+        // 2. 省略“度”字小数绝对温度及开机联动（彻底杜绝误判为 00:05 定时开关机缺陷）
+        let t1 = VoiceCommandParser.parse("开到26点5")
+        XCTAssertEqual(t1?.command, .setTemperature(26.5))
+        XCTAssertEqual(t1?.displayText, "设置温度为 26.5°C")
+
+        let t2 = VoiceCommandParser.parse("开26点5")
+        XCTAssertEqual(t2?.command, .setTemperature(26.5))
+
+        let t3 = VoiceCommandParser.parse("打开26点5")
+        XCTAssertEqual(t3?.command, .setTemperature(26.5))
+
+        let t4 = VoiceCommandParser.parse("全屋开到26点5")
+        XCTAssertEqual(t4?.command, .setTemperatureAll(26.5))
+        XCTAssertEqual(t4?.displayText, "全屋温度调至 26.5°C")
+
+        let t5 = VoiceCommandParser.parse("全屋开26点5")
+        XCTAssertEqual(t5?.command, .setTemperatureAll(26.5))
+
+        let t6 = VoiceCommandParser.parse("空调开到26点5")
+        XCTAssertEqual(t6?.command, .setTemperature(26.5))
+
+        let t7 = VoiceCommandParser.parse("制冷开到26点5")
+        XCTAssertEqual(t7?.command, .setModeAndTemperature(mode: "制冷", temperature: 26.5))
+
+        let t8 = VoiceCommandParser.parse("二十六点五")
+        XCTAssertEqual(t8?.command, .setTemperature(26.5))
+
+        let t9 = VoiceCommandParser.parse("调到26点5")
+        XCTAssertEqual(t9?.command, .setTemperature(26.5))
+
+        // 3. 钟点时间解析未受影响防线回归
+        let s1 = VoiceCommandParser.parse("十点五分关机")
+        XCTAssertEqual(s1?.command, .schedulePower(hour: 10, minute: 5, power: false))
+
+        let s2 = VoiceCommandParser.parse("晚上10点5分开机")
+        XCTAssertEqual(s2?.command, .schedulePower(hour: 22, minute: 5, power: true))
+    }
+
     // MARK: - 无效输入测试
 
     func testInvalidCommands() {

@@ -436,7 +436,7 @@ public struct VoiceCommandParser {
                 if let match = regex.matches(in: normalized, range: NSRange(location: 0, length: ns.length)).first {
                     let targetHStr = ns.substring(with: match.range(at: 1))
                     let diffMStr = ns.substring(with: match.range(at: 2))
-                    if let targetH = Int(targetHStr), let diffM = Int(diffMStr), diffM > 0 && diffM < 60 {
+                    if let targetH = Int(targetHStr), targetH <= 23, let diffM = Int(diffMStr), diffM > 0 && diffM < 60 {
                         hour = (targetH + 24 - 1) % 24
                         minute = 60 - diffM
                     }
@@ -452,7 +452,7 @@ public struct VoiceCommandParser {
                 if let match = regex.matches(in: normalized, range: NSRange(location: 0, length: ns.length)).first {
                     let diffMStr = ns.substring(with: match.range(at: 1))
                     let targetHStr = ns.substring(with: match.range(at: 2))
-                    if let targetH = Int(targetHStr), let diffM = Int(diffMStr), diffM > 0 && diffM < 60 {
+                    if let targetH = Int(targetHStr), targetH <= 23, let diffM = Int(diffMStr), diffM > 0 && diffM < 60 {
                         hour = (targetH + 24 - 1) % 24
                         minute = 60 - diffM
                     }
@@ -467,13 +467,13 @@ public struct VoiceCommandParser {
                 let ns = normalized as NSString
                 if let match = regex.matches(in: normalized, range: NSRange(location: 0, length: ns.length)).first {
                     let hStr = ns.substring(with: match.range(at: 1))
-                    if let h = Int(hStr) {
+                    if let h = Int(hStr), h <= 23 {
                         hour = h
                     }
                     let minRange = match.range(at: 2)
                     if minRange.location != NSNotFound {
                         let mStr = ns.substring(with: minRange)
-                        if let m = Int(mStr) {
+                        if let m = Int(mStr), m < 60 {
                             minute = m
                         }
                     }
@@ -1055,7 +1055,8 @@ public struct VoiceCommandParser {
     }
 
     private static func extractNumber(from text: String) -> Double? {
-        let normalized = convertChineseNumbers(in: text)
+        var normalized = convertChineseNumbers(in: text)
+        normalized = normalized.replacingOccurrences(of: "点", with: ".")
         let pattern = #"(\d+(?:\.\d+)?)"#
         if let regex = try? NSRegularExpression(pattern: pattern) {
             let nsString = normalized as NSString
@@ -1161,9 +1162,9 @@ public struct VoiceCommandParser {
         str = str.replacingOccurrences(of: "差3刻", with: "差45分")
         str = str.replacingOccurrences(of: "一百", with: "100")
 
-        // 温度与时间小数转换：仅匹配紧跟“度/°/小时/个钟头”的小数点五（如“二十六点五度” -> 26.5度，“1点5小时” -> 1.5小时）
-        // 彻底杜绝无上下文粗暴替换“点五”导致“十点五分/八点五分/十点五十分”被破坏为“10.5分”进而被误判为5分钟倒计时的灾难性缺陷 (v1.9.47, v1.9.50 支持阿拉伯数字“点5”)
-        let decimalPointPattern = #"([一二两三四五六七八九\d]+)点(?:五|5)(?=度|°|个?小时|个钟头)"#
+        // 温度与时间小数转换：匹配小数点五或点5（如“二十六点五度” -> 26.5度，“开到26点5” -> 开到26.5，“1点5小时” -> 1.5小时，“零点五度” -> 0.5度）
+        // 排除后接“分/分钟”的钟点分表达（如“十点五分” -> 10点5分），彻底杜绝无上下文粗暴替换导致误判为倒计时或误判为定时开关机 (v1.9.47, v1.9.50, v1.9.52)
+        let decimalPointPattern = #"([零0一二两三四五六七八九\d]+)点(?:五|5)(?![分分钟])"#
         if let regex = try? NSRegularExpression(pattern: decimalPointPattern) {
             let ns = str as NSString
             let matches = regex.matches(in: str, range: NSRange(location: 0, length: ns.length)).reversed()

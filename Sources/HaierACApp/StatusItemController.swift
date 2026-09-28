@@ -368,7 +368,7 @@ final class StatusItemController: NSObject {
             autoAllItem.isEnabled = hasControllable
             menu.addItem(autoAllItem)
 
-            // 全屋统一相对调温 (v1.9.35, v1.9.36 闭环 CR P2-3 增设 16/30°C 极值边界判定, v1.9.42 补齐运行台数精准反馈)
+            // 全屋统一相对调温 (v1.9.35, v1.9.36 闭环 CR P2-3 增设 16/30°C 极值边界判定, v1.9.42 补齐运行台数精准反馈, v1.9.52 增加 0.5°C 高精微调矩阵)
             let runningCountDesc = !onDevices.isEmpty ? " (\(onDevices.count)台运行中)" : " (当前均未开机)"
             let canStepUpAll = model.gatewayConnected && onDevices.contains { dev in
                 let curTemp = model.attribute("targetTemperature", deviceId: dev.id)?.doubleValue ?? 26.0
@@ -378,6 +378,24 @@ final class StatusItemController: NSObject {
             stepUpAllItem.target = self
             stepUpAllItem.isEnabled = canStepUpAll
             menu.addItem(stepUpAllItem)
+
+            let canStepUpHalfAll = model.gatewayConnected && onDevices.contains { dev in
+                let curTemp = model.attribute("targetTemperature", deviceId: dev.id)?.doubleValue ?? 26.0
+                return curTemp <= 29.5
+            }
+            let stepUpHalfAllItem = NSMenuItem(title: "🔼 全屋微调升温 0.5°C", action: #selector(stepUpHalfAllTemperature), keyEquivalent: "")
+            stepUpHalfAllItem.target = self
+            stepUpHalfAllItem.isEnabled = canStepUpHalfAll
+            menu.addItem(stepUpHalfAllItem)
+
+            let canStepDownHalfAll = model.gatewayConnected && onDevices.contains { dev in
+                let curTemp = model.attribute("targetTemperature", deviceId: dev.id)?.doubleValue ?? 26.0
+                return curTemp >= 16.5
+            }
+            let stepDownHalfAllItem = NSMenuItem(title: "🔽 全屋微调降温 0.5°C", action: #selector(stepDownHalfAllTemperature), keyEquivalent: "")
+            stepDownHalfAllItem.target = self
+            stepDownHalfAllItem.isEnabled = canStepDownHalfAll
+            menu.addItem(stepDownHalfAllItem)
 
             let canStepDownAll = model.gatewayConnected && onDevices.contains { dev in
                 let curTemp = model.attribute("targetTemperature", deviceId: dev.id)?.doubleValue ?? 26.0
@@ -577,7 +595,7 @@ final class StatusItemController: NSObject {
                 autoItem.isEnabled = isControllable
                 devSubmenu.addItem(autoItem)
 
-                // 升降温 1°C (v1.9.35)
+                // 升降温与微调温阶 (v1.9.35, v1.9.52 增加 0.5°C 高精微调矩阵)
                 let upItem = NSMenuItem(
                     title: "🔼 升温 1°C (当前 \(curTempStr)°C)",
                     action: #selector(stepUpDeviceTemperature(_:)),
@@ -587,6 +605,26 @@ final class StatusItemController: NSObject {
                 upItem.representedObject = devId
                 upItem.isEnabled = isControllable && isPowerOn && curTemp < 30.0
                 devSubmenu.addItem(upItem)
+
+                let upHalfItem = NSMenuItem(
+                    title: "🔼 升温 0.5°C (高精微调)",
+                    action: #selector(stepUpHalfDeviceTemperature(_:)),
+                    keyEquivalent: ""
+                )
+                upHalfItem.target = self
+                upHalfItem.representedObject = devId
+                upHalfItem.isEnabled = isControllable && isPowerOn && curTemp <= 29.5
+                devSubmenu.addItem(upHalfItem)
+
+                let downHalfItem = NSMenuItem(
+                    title: "🔽 降温 0.5°C (高精微调)",
+                    action: #selector(stepDownHalfDeviceTemperature(_:)),
+                    keyEquivalent: ""
+                )
+                downHalfItem.target = self
+                downHalfItem.representedObject = devId
+                downHalfItem.isEnabled = isControllable && isPowerOn && curTemp >= 16.5
+                devSubmenu.addItem(downHalfItem)
 
                 let downItem = NSMenuItem(
                     title: "🔽 降温 1°C (当前 \(curTempStr)°C)",
@@ -753,6 +791,16 @@ final class StatusItemController: NSObject {
             stepUpItem.target = self
             stepUpItem.isEnabled = isControllable && isPowerOn && curTemp < 30.0
             menu.addItem(stepUpItem)
+
+            let stepUpHalfItem = NSMenuItem(title: "🔼 升温 0.5°C (高精微调)", action: #selector(stepUpHalfPrimaryTemperature), keyEquivalent: "")
+            stepUpHalfItem.target = self
+            stepUpHalfItem.isEnabled = isControllable && isPowerOn && curTemp <= 29.5
+            menu.addItem(stepUpHalfItem)
+
+            let stepDownHalfItem = NSMenuItem(title: "🔽 降温 0.5°C (高精微调)", action: #selector(stepDownHalfPrimaryTemperature), keyEquivalent: "")
+            stepDownHalfItem.target = self
+            stepDownHalfItem.isEnabled = isControllable && isPowerOn && curTemp >= 16.5
+            menu.addItem(stepDownHalfItem)
 
             let stepDownItem = NSMenuItem(title: "🔽 降温 1°C (当前 \(curTempStr)°C)", action: #selector(stepDownPrimaryTemperature), keyEquivalent: "")
             stepDownItem.target = self
@@ -934,6 +982,14 @@ final class StatusItemController: NSObject {
         model.adjustTemperatureAll(delta: 1.0)
     }
 
+    @objc private func stepUpHalfAllTemperature() {
+        model.adjustTemperatureAll(delta: 0.5)
+    }
+
+    @objc private func stepDownHalfAllTemperature() {
+        model.adjustTemperatureAll(delta: -0.5)
+    }
+
     @objc private func stepDownAllTemperature() {
         model.adjustTemperatureAll(delta: -1.0)
     }
@@ -941,6 +997,16 @@ final class StatusItemController: NSObject {
     @objc private func stepUpPrimaryTemperature() {
         guard let devId = primaryDeviceId else { return }
         model.adjustDeviceTemperature(deviceId: devId, delta: 1.0)
+    }
+
+    @objc private func stepUpHalfPrimaryTemperature() {
+        guard let devId = primaryDeviceId else { return }
+        model.adjustDeviceTemperature(deviceId: devId, delta: 0.5)
+    }
+
+    @objc private func stepDownHalfPrimaryTemperature() {
+        guard let devId = primaryDeviceId else { return }
+        model.adjustDeviceTemperature(deviceId: devId, delta: -0.5)
     }
 
     @objc private func stepDownPrimaryTemperature() {
@@ -951,6 +1017,16 @@ final class StatusItemController: NSObject {
     @objc private func stepUpDeviceTemperature(_ sender: NSMenuItem) {
         guard let devId = sender.representedObject as? String else { return }
         model.adjustDeviceTemperature(deviceId: devId, delta: 1.0)
+    }
+
+    @objc private func stepUpHalfDeviceTemperature(_ sender: NSMenuItem) {
+        guard let devId = sender.representedObject as? String else { return }
+        model.adjustDeviceTemperature(deviceId: devId, delta: 0.5)
+    }
+
+    @objc private func stepDownHalfDeviceTemperature(_ sender: NSMenuItem) {
+        guard let devId = sender.representedObject as? String else { return }
+        model.adjustDeviceTemperature(deviceId: devId, delta: -0.5)
     }
 
     @objc private func stepDownDeviceTemperature(_ sender: NSMenuItem) {

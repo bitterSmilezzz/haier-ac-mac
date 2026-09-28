@@ -780,7 +780,16 @@ final class AppModel: ObservableObject {
             case .dehumidify:
                 modeFactor = 1.30
             case .heating:
-                modeFactor = 1.05
+                if let indoor = indoorTemp, targetTemp > indoor {
+                    let diff = targetTemp - indoor
+                    if diff >= 5.0 || indoor <= 12.0 {
+                        modeFactor = 1.25 // 大温差强对流与PTC热对流微粒热泳沉积加速 (v1.9.52)
+                    } else {
+                        modeFactor = 1.15 // 常规升温对流附着 (v1.9.52)
+                    }
+                } else {
+                    modeFactor = 1.05 // 恒温微载维持
+                }
             case .fan:
                 modeFactor = 0.85
             case .auto:
@@ -788,7 +797,12 @@ final class AppModel: ObservableObject {
                     if indoor > targetTemp {
                         modeFactor = 1.25 // 自动制冷冷凝结露
                     } else if indoor < targetTemp {
-                        modeFactor = 1.05 // 自动制热微附着
+                        let diff = targetTemp - indoor
+                        if diff >= 5.0 || indoor <= 12.0 {
+                            modeFactor = 1.20 // 自动大温差制热热对流 (v1.9.52)
+                        } else {
+                            modeFactor = 1.10 // 自动制热平稳附着 (v1.9.52)
+                        }
                     } else {
                         modeFactor = 1.00 // 稳态平衡
                     }

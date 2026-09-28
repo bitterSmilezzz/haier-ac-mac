@@ -6,6 +6,17 @@ A native SwiftUI app to control Haier / Leader (统帅) smart air conditioners o
 
 ## Features
 
+- 🏷 **Colloquial "0.5°C" Fine Stepping & Decimal Power-On Guard, High-Delta Heating Thermophoresis Filter Dynamics & Status Bar 0.5°C Stepping Matrix (v1.9.52)**:
+  - ⏱️ **Natural Language Decimal Degree Normalization & Erroneous Clock Schedule Guard (`VoiceCommandParser` / `VoiceCommandParserTests`)**:
+    - **Eradication of Accidental Midnight 00:05 Scheduling for Spoken Decimals**: Completely resolved the critical bug where spoken commands without the explicit "度" word (e.g. "开到26点5", "开26点5", "打开26点5", "全屋开到26点5", "全屋开26点5", "空调开到26点5", "制冷开到26点5") previously escaped decimal parsing, leading `parseScheduleOrCountdown` to erroneously treat "点5" as a clock schedule at 00:05 AM and queue `schedulePower(hour: 0, minute: 5, power: true)`; optimized `decimalPointPattern` with negative lookahead `(?![分分钟])` to accurately set 26.5°C target temperature;
+    - **Lossless Spoken "零点五度 / 0点5度" Micro-Stepping**: Fixed regex character class omission of Chinese "零" and missing dot replacement in `extractNumber` that previously caused "升温零点五度", "降温零点五度", "全屋升温零点五度", and "全屋降温0点5度" to degrade to 1.0°C; now flawlessly executes $\pm 0.5^\circ\text{C}$ micro-adjustments;
+    - **Strict Clock Schedule Validity Boundaries**: Enforced strict `h <= 23` and `m < 60` constraints in `parseScheduleTime`, preventing AC temperature values (24~30) from ever being misinterpreted as clock hours.
+  - 🍃 **High-Delta Heating Thermophoresis & Aerodynamic Filter Dynamics (`AppModel.calculateFilterWearFactor`)**:
+    - Formulated a thermodynamic filter wear model incorporating thermophoresis and convective particulate deposition: under heavy heating loads ($\Delta T \ge 5.0^\circ\text{C}$) or severe cold ($\le 12^\circ\text{C}$), increased the wear factor from static 1.05 to 1.25 (1.20 in auto mode heating), achieving 100% physical symmetry with inverter energy simulations.
+  - 🍱 **macOS Native Status Bar 0.5°C Dual-Mode Stepping Matrix & Hardware Limit Guards (`StatusItemController`)**:
+    - Added high-precision 「🔼 升温 0.5°C (高精微调)」 and 「🔽 降温 0.5°C (高精微调)」 items across single-device menus, multi-device submenus (`devSubmenu`), and whole-house synchronized controls;
+    - Guarded with strict 16.5°C ~ 29.5°C hardware boundary enablement checks (`isEnabled`), preventing redundant network writes at extreme operational limits.
+
 - 🏷 **Colloquial "X-Point-5" Degree Parsing, Stopping Power-Off Semantics, Airflow Dynamics Alignment & Status Bar Matrix Climate Perception (v1.9.51)**:
   - ⏱️ **Natural Language "X度五 / X度5" Temperature & Relative Stepping Precision (`VoiceCommandParser` / `VoiceCommandParserTests`)**:
     - **"X度五 / X度5" Absolute Temperature Extraction**: Thoroughly resolved the precision truncation flaw where high-frequency spoken commands like "二十六度五", "26度5", "开到25度5", "制冷二十六度五", "制冷26度5", "全屋二十六度五", and "全屋开到26度5" previously missed decimal conversion because the regex only checked "度半", resulting in severe 0.5°C truncation to integer values (26°C / 25°C); introduced `([一二两三四五六七八九\d]+)度(?:半|五|5)` to losslessly normalize spoken values to target decimal temperatures (26.5°C, 25.5°C);
