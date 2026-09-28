@@ -959,6 +959,16 @@ final class StatusItemController: NSObject {
                 pItem.representedObject = ["minutes": p.mins, "powerOn": false, "all": true] as [String: Any]
                 quickCountdownMenu.addItem(pItem)
             }
+            let allOnPresets: [(title: String, mins: Int)] = [
+                ("❄️ 全屋 30 分钟后开机预冷/预热", 30),
+                ("❄️ 全屋 1 小时后开机预冷/预热", 60)
+            ]
+            for p in allOnPresets {
+                let pItem = NSMenuItem(title: p.title, action: #selector(quickCountdownFromMenu(_:)), keyEquivalent: "")
+                pItem.target = self
+                pItem.representedObject = ["minutes": p.mins, "powerOn": true, "all": true] as [String: Any]
+                quickCountdownMenu.addItem(pItem)
+            }
         }
         let quickCountdownParent = NSMenuItem(title: "⚡️ 快捷倒计时调度...", action: nil, keyEquivalent: "")
         scheduleMenu.setSubmenu(quickCountdownMenu, for: quickCountdownParent)

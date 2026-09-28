@@ -6,6 +6,21 @@ A native SwiftUI app to control Haier / Leader (统帅) smart air conditioners o
 
 ## Features
 
+- 🏷 **Natural Language Libai (礼拜) Repeating Cycles & Multi-Day Weekday Combinations, Bedtime Schedule Prefix Defect Elimination, macOS Status Bar Full-House Pre-Cooling/Pre-Heating Symmetry & Siri Repeat Shortcuts (v1.9.58)**:
+  - ⏱️ **Natural Language Libai (礼拜) Cycles & Multi-Day Weekday Combinations ("一三五/二四六/二四/周一至周四") Full-Stack Closure (`VoiceCommandParser` / `VoiceCapsuleWindowController` / `VoiceCommandParserTests`)**:
+    - **Eradication of Colloquial "礼拜" Repeating Schedules Falling Back to One-Time Tasks & Deleted Upon First Execution**: Permanently resolved the critical defect where spoken recurring commands with colloquial "礼拜" (e.g. "每个礼拜一早上8点开空调", "礼拜一到礼拜五早上8点开空调", "礼拜一至礼拜六早上7点开机", "礼拜六礼拜天早上9点开空调", "每个礼拜日晚上11点关空调") previously lacked keyword matching and fell back to single-shot `.schedulePower`, causing recurring schedules to be permanently deleted after firing once;
+    - **Multi-Day Weekday Combinations (1-3-5 / 2-4-6 / 2-4 / Mon-Thu) Full Closure**: Accurately recognizes "每周一三五/周一三五" (`[2, 4, 6]`, "每周一、三、五"), "每周二四六/周二四六" (`[3, 5, 7]`, "每周二、四、六"), "每周二四/周二四" (`[3, 5]`, "每周二、四"), and "周一到周四/周一至周四" (`[2, 3, 4, 5]`, "周一至周四"), resolving the truncation defect where "每周一三五" was previously truncated to Monday only;
+    - **Whole-House Scope & Long Compound Negation Defense Extension**: Expanded `hasTimingOrCountdownIntent` to incorporate "礼拜", "逢星期", "一三五", "二四六", "二四", preventing commands like "全屋每个礼拜一开机" from being misjudged as immediate power-on; negation regex protects against "千万别每个礼拜一开机", "别每周一三五开空调", "不要礼拜一到礼拜五开机".
+  - ⏱️ **Bedtime Schedule Descriptor Double "周" Bug & Multi-Day Symmetry Alignment (`AppModel.swift`)**:
+    - Harmonized `BedtimeSchedule.repeatLabel` with `ScheduledAction.repeatLabel`, permanently eliminating the awkward double "周" artifact ("每周 周一") and raw day-by-day concatenation ("每周 周一 周二 周三 周四 周五 周六"), formalizing natural Chinese descriptors: "每周一", "工作日", "周末", "周一至周六", "周一至周四", and "每周一、三、五".
+  - 🍱 **macOS Native Status Bar Full-House Pre-Cooling/Pre-Heating Countdown Symmetry (`StatusItemController`)**:
+    - In the top-level "⏱ 计划调度" -> "⚡️ 快捷倒计时调度..." submenu under the multi-device section, introduced "❄️ 全屋 30 分钟后开机预冷/预热" and "❄️ 全屋 1 小时后开机预冷/预热", establishing 100% action symmetry with existing full-house shutdown countdowns.
+  - 🎙️ **Siri Shortcuts & AppIntents Schedule Flexibility Enhancement (`AppIntents.swift`)**:
+    - `ScheduleACPowerIntent`'s `repeatSchedule` parameter now recognizes "礼拜", "周一至周四", "一三五", "二四六", "二四";
+    - Registered intuitive phrases in `ACAppShortcuts` ("用海尔空调工作日定时开机", "用海尔空调周末定时开机", "用海尔空调一三五定时开机", "用海尔空调一三五定时关机").
+  - 📊 **Energy Analytics Engine Device Minutes Initialization Robustness (`EnergyAnalyticsEngine.swift`)**:
+    - Enhanced `EnergyDayRecord.init` to ensure `totalDeviceMinutes` is at least `max(sumModes, totalMinutes)` whenever total minutes is positive, guaranteeing data consistency under edge conditions.
+
 - 🏷 **Natural Language Single Weekday & Extended Repeating Schedule Cycles, Scheduler Clock Drift Elimination, macOS Status Bar Per-Device Countdown Matrix & Siri Repeat Shortcuts (v1.9.57)**:
   - ⏱️ **Natural Language "每周一至周日/逢周一/周一到周六" Single Weekday & Extended Repeating Cycle Scheduling Closure (`VoiceCommandParser` / `VoiceCapsuleWindowController` / `VoiceCommandParserTests`)**:
     - **Eradication of Single Weekday & Extended Cycle Requests Falling Back to One-Time Tasks & Deleted Upon First Execution**: Permanently fixed the critical defect where spoken recurring commands for specific weekdays (e.g. "每周一早上8点开空调", "每周五晚上10点关机", "每周日晚上11点关空调", "每个星期一早上7点开空调", "逢周一早上8点开机", "周一到周六早上7点开机") previously lacked weekday matching and fell back to single-shot `.schedulePower`, causing recurring schedules to be permanently deleted after firing once;

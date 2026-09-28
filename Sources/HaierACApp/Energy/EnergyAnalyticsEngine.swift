@@ -47,7 +47,8 @@ public struct EnergyDayRecord: Codable, Equatable, Identifiable {
     ) {
         self.date = date
         self.totalMinutes = totalMinutes
-        self.totalDeviceMinutes = totalDeviceMinutes > 0 ? totalDeviceMinutes : (coolingMinutes + heatingMinutes + fanMinutes + dehumMinutes + unknownMinutes)
+        let sumModes = coolingMinutes + heatingMinutes + fanMinutes + dehumMinutes + unknownMinutes
+        self.totalDeviceMinutes = totalDeviceMinutes > 0 ? totalDeviceMinutes : max(sumModes, totalMinutes)
         self.coolingMinutes = coolingMinutes
         self.heatingMinutes = heatingMinutes
         self.fanMinutes = fanMinutes

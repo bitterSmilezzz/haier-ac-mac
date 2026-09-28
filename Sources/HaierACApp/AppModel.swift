@@ -44,7 +44,7 @@ struct ScheduledAction: Identifiable, Codable, Hashable {
         AttrValueCodec.encode(value)
     }
 
-    /// 重复规则的中文描述（如「每天」「工作日」「周末」「每周一」），一次性返回 nil (v1.9.57)
+    /// 重复规则的中文描述（如「每天」「工作日」「周末」「每周一」「每周一、三、五」），一次性返回 nil (v1.9.57, v1.9.58)
     var repeatLabel: String? {
         if !repeatWeekdays.isEmpty {
             let sorted = repeatWeekdays.sorted()
@@ -52,6 +52,10 @@ struct ScheduledAction: Identifiable, Codable, Hashable {
             if sorted == [2, 3, 4, 5, 6] { return "工作日" }
             if sorted == [1, 7] { return "周末" }
             if sorted == [2, 3, 4, 5, 6, 7] { return "周一至周六" }
+            if sorted == [2, 3, 4, 5] { return "周一至周四" }
+            if sorted == [2, 4, 6] { return "每周一、三、五" }
+            if sorted == [3, 5, 7] { return "每周二、四、六" }
+            if sorted == [3, 5] { return "每周二、四" }
             let dayChars = ["日", "一", "二", "三", "四", "五", "六"]
             let dayNames = sorted.map { dayChars[max(0, min($0 - 1, 6))] }
             return "每周" + dayNames.joined(separator: "、")
@@ -202,19 +206,18 @@ public struct BedtimeSchedule: Codable, Equatable {
     }
 
     public var repeatLabel: String {
-        if repeatWeekdays.count == 7 {
-            return "每天"
-        }
         let sorted = repeatWeekdays.sorted()
-        if sorted == [2, 3, 4, 5, 6] {
-            return "工作日"
-        }
-        if sorted == [1, 7] {
-            return "周末"
-        }
-        let names = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"]
-        let days = sorted.map { names[max(0, min($0 - 1, 6))] }
-        return "每周 " + days.joined(separator: " ")
+        if sorted.count == 7 { return "每天" }
+        if sorted == [2, 3, 4, 5, 6] { return "工作日" }
+        if sorted == [1, 7] { return "周末" }
+        if sorted == [2, 3, 4, 5, 6, 7] { return "周一至周六" }
+        if sorted == [2, 3, 4, 5] { return "周一至周四" }
+        if sorted == [2, 4, 6] { return "每周一、三、五" }
+        if sorted == [3, 5, 7] { return "每周二、四、六" }
+        if sorted == [3, 5] { return "每周二、四" }
+        let dayChars = ["日", "一", "二", "三", "四", "五", "六"]
+        let dayNames = sorted.map { dayChars[max(0, min($0 - 1, 6))] }
+        return "每周" + dayNames.joined(separator: "、")
     }
 }
 

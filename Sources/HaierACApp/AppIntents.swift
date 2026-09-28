@@ -617,25 +617,33 @@ struct ScheduleACPowerIntent: AppIntent {
 
         let (targetWeekdays, isDaily, repeatLabel): ([Int], Bool, String) = {
             let sched = repeatSchedule ?? ""
-            if sched.contains("工作日") || sched.contains("平时") || sched.contains("周一到周五") || sched.contains("周一至周五") {
+            if sched.contains("工作日") || sched.contains("平时") || sched.contains("周一到周五") || sched.contains("周一至周五") || sched.contains("礼拜一到礼拜五") || sched.contains("礼拜一至礼拜五") {
                 return ([2, 3, 4, 5, 6], false, "工作日")
-            } else if sched.contains("周一到周六") || sched.contains("周一至周六") {
+            } else if sched.contains("周一到周六") || sched.contains("周一至周六") || sched.contains("礼拜一到礼拜六") || sched.contains("礼拜一至礼拜六") {
                 return ([2, 3, 4, 5, 6, 7], false, "周一至周六")
-            } else if sched.contains("周末") || sched.contains("双休") || sched.contains("周六周日") || sched.contains("周六和周日") {
+            } else if sched.contains("周一到周四") || sched.contains("周一至周四") || sched.contains("礼拜一到礼拜四") || sched.contains("礼拜一至礼拜四") {
+                return ([2, 3, 4, 5], false, "周一至周四")
+            } else if sched.contains("一三五") || sched.contains("一、三、五") {
+                return ([2, 4, 6], false, "每周一、三、五")
+            } else if sched.contains("二四六") || sched.contains("二、四、六") {
+                return ([3, 5, 7], false, "每周二、四、六")
+            } else if sched.contains("二四") || sched.contains("二、四") {
+                return ([3, 5], false, "每周二、四")
+            } else if sched.contains("周末") || sched.contains("双休") || sched.contains("周六周日") || sched.contains("周六和周日") || sched.contains("礼拜六礼拜天") || sched.contains("礼拜六和礼拜天") || sched.contains("礼拜六礼拜日") || sched.contains("礼拜六和礼拜日") {
                 return ([1, 7], false, "周末")
-            } else if sched.contains("周一") || sched.contains("星期一") {
+            } else if sched.contains("周一") || sched.contains("星期一") || sched.contains("礼拜一") {
                 return ([2], false, "每周一")
-            } else if sched.contains("周二") || sched.contains("星期二") {
+            } else if sched.contains("周二") || sched.contains("星期二") || sched.contains("礼拜二") {
                 return ([3], false, "每周二")
-            } else if sched.contains("周三") || sched.contains("星期三") {
+            } else if sched.contains("周三") || sched.contains("星期三") || sched.contains("礼拜三") {
                 return ([4], false, "每周三")
-            } else if sched.contains("周四") || sched.contains("星期四") {
+            } else if sched.contains("周四") || sched.contains("星期四") || sched.contains("礼拜四") {
                 return ([5], false, "每周四")
-            } else if sched.contains("周五") || sched.contains("星期五") {
+            } else if sched.contains("周五") || sched.contains("星期五") || sched.contains("礼拜五") {
                 return ([6], false, "每周五")
-            } else if sched.contains("周六") || sched.contains("星期六") {
+            } else if sched.contains("周六") || sched.contains("星期六") || sched.contains("礼拜六") {
                 return ([7], false, "每周六")
-            } else if sched.contains("周日") || sched.contains("周天") || sched.contains("星期天") || sched.contains("星期日") {
+            } else if sched.contains("周日") || sched.contains("周天") || sched.contains("星期天") || sched.contains("星期日") || sched.contains("礼拜天") || sched.contains("礼拜日") {
                 return ([1], false, "每周日")
             } else if repeatsDaily || sched.contains("每天") || sched.contains("天天") || sched.contains("每日") || sched.contains("每晚") || sched.contains("每早") {
                 return ([], true, "每天")
@@ -989,7 +997,11 @@ struct ACAppShortcuts: AppShortcutsProvider {
                         "用 \(.applicationName) 每天定时关机",
                         "用 \(.applicationName) 每天定时开机",
                         "用 \(.applicationName) 工作日定时关机",
+                        "用 \(.applicationName) 工作日定时开机",
                         "用 \(.applicationName) 周末定时关机",
+                        "用 \(.applicationName) 周末定时开机",
+                        "用 \(.applicationName) 一三五定时开机",
+                        "用 \(.applicationName) 一三五定时关机",
                     ]
                 ),
             ]
