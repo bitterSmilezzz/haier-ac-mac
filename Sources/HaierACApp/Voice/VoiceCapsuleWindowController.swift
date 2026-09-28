@@ -1203,6 +1203,46 @@ public final class VoiceCapsuleWindowController: NSObject, NSWindowDelegate {
             }
             VoiceControlManager.shared.markSuccess("已为\(prefix)设定：\(actionName)")
 
+        case .startSelfCleaning:
+            if model.isSelfCleaningActive {
+                let remaining = model.selfCleaningRemainingSeconds
+                VoiceControlManager.shared.markSuccess("56°C 蒸发器自清洁进行中（剩余 \(remaining / 60) 分钟）")
+            } else if let firstDev = controllable.first {
+                model.startSelfCleaning(deviceId: firstDev.id)
+                VoiceControlManager.shared.markSuccess("已为「\(firstDev.name)」启动 56°C 自清洁（建议单台依次清洁）")
+            } else {
+                VoiceControlManager.shared.markFailed("未发现可执行自清洁的空调设备")
+            }
+
+        case .stopSelfCleaning:
+            if model.isSelfCleaningActive {
+                model.stopSelfCleaning()
+                VoiceControlManager.shared.markSuccess("已终止 56°C 自清洁")
+            } else {
+                VoiceControlManager.shared.markSuccess("当前没有正在运行的自清洁任务")
+            }
+
+        case .startSleepCurve(let curveName):
+            if let firstDev = controllable.first {
+                let curve: SleepCurveConfig
+                if let curveName, let match = SleepCurveConfig.allPresets.first(where: { $0.name.contains(curveName) }) {
+                    curve = match
+                } else {
+                    curve = .standard
+                }
+                model.startSleepCurve(curve: curve, deviceId: firstDev.id)
+                VoiceControlManager.shared.markSuccess("已为「\(firstDev.name)」启动「\(curve.name)」睡眠温阶曲线")
+            }
+
+        case .stopSleepCurve:
+            if model.activeSleepSession != nil {
+                let name = model.activeSleepSession?.curveConfig.name ?? "智能睡眠"
+                model.stopSleepCurve()
+                VoiceControlManager.shared.markSuccess("已退出「\(name)」睡眠曲线")
+            } else {
+                VoiceControlManager.shared.markSuccess("当前未运行睡眠温阶曲线")
+            }
+
         default:
             VoiceControlManager.shared.markFailed("该操作暂不支持多设备批量执行")
         }

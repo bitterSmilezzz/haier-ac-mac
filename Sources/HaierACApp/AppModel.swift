@@ -769,7 +769,9 @@ final class AppModel: ObservableObject {
                 } else if tempDelta <= 0.8 {
                     windFactor = 0.75
                 } else {
-                    windFactor = 1.00
+                    // 稳态微载(0.8°C)到重载大温差(4.0°C)连续线性热物理阻尼插值 (v1.9.63 消除阶跃跳变，与能耗引擎对齐)
+                    let progress = (tempDelta - 0.8) / 3.2
+                    windFactor = 0.75 + (progress * 0.55)
                 }
             } else {
                 windFactor = 1.00 // 自动风速默认中性基准
@@ -789,9 +791,13 @@ final class AppModel: ObservableObject {
                     if indoor > targetTemp {
                         let diff = indoor - targetTemp
                         if diff >= 5.0 || indoor >= 30.0 {
-                            modeFactor = 1.45
+                            let heatExcess = max(0.0, indoor - 30.0)
+                            let diffExcess = max(0.0, diff - 5.0)
+                            modeFactor = 1.45 + min(0.15, (heatExcess * 0.02) + (diffExcess * 0.02))
                         } else {
-                            modeFactor = 1.30
+                            // 0~5°C 连续平滑线性阻尼插值 (1.15 ~ 1.45) (v1.9.63)
+                            let progress = min(1.0, max(0.0, diff / 5.0))
+                            modeFactor = 1.15 + (progress * 0.30)
                         }
                     } else {
                         modeFactor = 1.15
@@ -820,9 +826,13 @@ final class AppModel: ObservableObject {
                     if targetTemp > indoor {
                         let diff = targetTemp - indoor
                         if diff >= 5.0 || indoor <= 12.0 {
-                            modeFactor = 1.25 // 大温差强对流与PTC热对流微粒热泳沉积加速 (v1.9.52)
+                            let coldDeficit = max(0.0, 12.0 - indoor)
+                            let diffExcess = max(0.0, diff - 5.0)
+                            modeFactor = 1.25 + min(0.15, (coldDeficit * 0.02) + (diffExcess * 0.02))
                         } else {
-                            modeFactor = 1.15 // 常规升温对流附着 (v1.9.52)
+                            // 0~5°C 连续平滑线性对流插值 (1.05 ~ 1.25) (v1.9.63)
+                            let progress = min(1.0, max(0.0, diff / 5.0))
+                            modeFactor = 1.05 + (progress * 0.20)
                         }
                     } else {
                         modeFactor = 1.05 // 恒温微载维持
@@ -841,14 +851,16 @@ final class AppModel: ObservableObject {
                         if diff >= 5.0 || indoor >= 30.0 {
                             modeFactor = 1.35 // 自动酷暑大温差制冷强通量
                         } else {
-                            modeFactor = 1.25 // 自动常规制冷冷凝结露
+                            let progress = min(1.0, max(0.0, diff / 5.0))
+                            modeFactor = 1.15 + (progress * 0.20) // 1.15 ~ 1.35 连续平滑过渡 (v1.9.63)
                         }
                     } else if indoor < targetTemp {
                         let diff = targetTemp - indoor
                         if diff >= 5.0 || indoor <= 12.0 {
                             modeFactor = 1.20 // 自动大温差制热热对流 (v1.9.52)
                         } else {
-                            modeFactor = 1.10 // 自动制热平稳附着 (v1.9.52)
+                            let progress = min(1.0, max(0.0, diff / 5.0))
+                            modeFactor = 1.05 + (progress * 0.15) // 1.05 ~ 1.20 连续平滑过渡 (v1.9.63)
                         }
                     } else {
                         modeFactor = 1.00 // 稳态平衡
@@ -1361,6 +1373,12 @@ final class AppModel: ObservableObject {
         if sorted == [1, 6, 7] { return "周五至周日" }
         if sorted == [1, 2, 7] { return "周六至周一" }
         if sorted == [1, 2] { return "周日至周一" }
+        if sorted == [1, 2, 6, 7] { return "周五至周一" }
+        if sorted == [1, 2, 3, 7] { return "周六至周二" }
+        if sorted == [1, 2, 3, 4, 5, 6] { return "周日至周五" }
+        if sorted == [1, 2, 3, 4, 5] { return "周日至周四" }
+        if sorted == [1, 2, 3, 4] { return "周日至周三" }
+        if sorted == [1, 2, 3] { return "周日至周二" }
         if sorted == [2, 4, 6] { return "每周一、三、五" }
         if sorted == [3, 5, 7] { return "每周二、四、六" }
         if sorted == [3, 5] { return "每周二、四" }

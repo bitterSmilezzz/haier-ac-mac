@@ -6,6 +6,21 @@ A native SwiftUI app to control Haier / Leader (统帅) smart air conditioners o
 
 ## Features
 
+- 🏷 **Cross-Weekend Repeating Schedule Engine, Status Bar Single-Device Deduplication & Filter Symmetry, and Continuous Aerodynamic Filter Damping Dynamics (v1.9.63)**:
+  - ⏱️ **Cross-Weekend Repeating Schedule Engine & Full Task Semantics (`VoiceCommandParser.swift` / `AppModel.swift` / `VoiceCommandParserTests.swift`)**:
+    - **Cross-Weekend Long Span Expansion**: Extended the shared `parseRepeatWeekdays` engine with multi-day cross-weekend recurring schedules: Friday-to-Monday (`[1, 2, 6, 7]`), Saturday-to-Tuesday (`[1, 2, 3, 7]`), and Sunday-anchored spans including Sunday-to-Friday (`[1..6]`), Sunday-to-Thursday (`[1..5]`), Sunday-to-Wednesday (`[1..4]`), and Sunday-to-Tuesday (`[1..3]`), harmonized with natural language integer mappings;
+    - **Weekend Colloquial Variation Parity**: Normalized spoken variants like "周六日/周六天/星期六天/礼拜六天/礼拜六日" into standard weekend recurrence (`[1, 7]`);
+    - **Task Scheduling Clearing & Universal Task Semantics**: Extended `isCancelSchedule`, `isPauseSchedule`, and `isResumeSchedule` with "清空" (clear all) and "任务" (task) keywords (e.g., "清空定时", "取消所有任务", "暂停所有任务", "恢复所有任务"), backed by defensive negation protection in `containsNegativeForAction` and `negativeActionRegex`;
+    - **Harmonized UI Labels**: Aligned `AppModel.formatRepeatWeekdaysLabel` with all newly added recurring schedule spans.
+  - 🍱 **macOS Status Bar Single-Device Deduplication & Filter Reset Symmetry (`StatusItemController.swift` / `VoiceCapsuleWindowController.swift`)**:
+    - **Eradication of Redundant Root Schedule Menus for Single-Device Users**: Gated the root-level whole-house schedule menu to only appear when multiple devices exist (`allDevices.count > 1`), eliminating duplicate schedule menus in single-device mode;
+    - **Full Control Parity with Single-Device Filter Reset**: Added a dedicated "🧼 重置滤网计时 (当前 X%，良好/需拆洗)" entry in single-device control areas, matching multi-device submenu capabilities;
+    - **Graceful Multi-Device Voice Capsule Fallback**: Enhanced `executeMultiDeviceCommand` to handle self-cleaning (`.startSelfCleaning` / `.stopSelfCleaning`) and sleep curves (`.startSleepCurve` / `.stopSleepCurve`) with friendly single-device fallback feedback, eliminating batch execution rejection errors.
+  - 🍃 **Continuous Linear Damping Dynamics for Aerodynamic Filter Wear (`AppModel.calculateFilterWearFactor`)**:
+    - **Eliminated Step-Function Discontinuities**: Re-architected `calculateFilterWearFactor` to employ continuous linear interpolation aligned with the energy dynamics engine:
+    - Auto-wind speed smoothly interpolates across steady-state micro-load (0.8°C) to heavy load (4.0°C) via `0.75 + progress * 0.55`;
+    - High-temperature cooling condensation dynamically ramps across 0~5°C via `1.15 + progress * 0.30`, ensuring physically self-consistent filter cleanliness wear.
+
 - 🏷 **Unified Repeat Schedule Parser Engine, Status Bar Single-Device Schedule & Countdown Full Symmetry, and Continuous Bilinear Inverter Overclock & PTC Damping Dynamics (v1.9.62)**:
   - ⏱️ **Unified Repeating Schedule Parser Engine Across NLP & Siri Shortcuts (`VoiceCommandParser.swift` / `AppModel.swift` / `AppIntents.swift` / `VoiceCommandParserTests.swift`)**:
     - **Shared Parser Extraction**: Extracted `public static func parseRepeatWeekdays(_ text: String) -> (weekdays: [Int], label: String)?` in `VoiceCommandParser`, eliminating over 60 lines of duplicate matching logic across NLP voice parsing and `AppIntents`, ensuring 100% semantic alignment;

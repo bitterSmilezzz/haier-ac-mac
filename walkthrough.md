@@ -1,75 +1,89 @@
-# Haier AC Mac v1.9.62 发布与巡检演进报告
+# Haier AC Mac v1.9.63 发布与巡检演进报告
 
 ## 1. 概述与版本定位
-- **版本号**：`v1.9.62`
-- **发版主题**：闭环周期重复调度大一统解析引擎、单设备状态栏调度与倒计时全对称设计及变频能耗超频平滑过渡模型
+- **版本号**：`v1.9.63`
+- **发版主题**：闭环多日跨周与全任务调度语义泛化、macOS 状态栏单机去重对称重构及滤网气动力学连续阻尼模型
 - **核心目标与架构演进**：
-  1. **周期重复调度全链路统一解析引擎与全星期范围扩展 (`VoiceCommandParser.swift` / `AppModel.swift` / `AppIntents.swift` / `VoiceCommandParserTests.swift`)**：
-     - **公共引擎抽离**：在 `VoiceCommandParser` 中提取公共入口 `public static func parseRepeatWeekdays(_ text: String) -> (weekdays: [Int], label: String)?`，彻底消除 `VoiceCommandParser` 与 `AppIntents` 中两处 60+ 行的重复代码分支，保证语音交互与 Siri Shortcuts 100% 语义严密对齐；
-     - **全量支持“周一至周日”7天全周调度**：补齐“周一至周日/周一到周日/星期一到星期天/礼拜一到礼拜天”（`[1, 2, 3, 4, 5, 6, 7]`），彻底根除口语“周一至周日晚上10点关空调”被降级为单次定时并在触发一次后永久销毁的缺陷；
-     - **泛化拓展短周期连续星期范围**：新增“周二至周三”（`[3, 4]`）、“周三至周四”（`[4, 5]`）、“周四至周五”（`[5, 6]`）、“周日至周一”（`[1, 2]`）、“周六至周一”（`[1, 2, 7]`），并在 `AppModel.formatRepeatWeekdaysLabel` 中对齐自然语言中文映射；
-     - **即时开机防线接入**：在 `hasTimingOrCountdownIntent` 中全面接入 `parseRepeatWeekdays` 判定，严密防守所有周期口语在省略“定时”二字时误穿透为即时开机；在 `ACAppShortcuts` 中注册“周一至周日定时开机/关机”系统短语。
-  2. **macOS 状态栏单设备计划调度管理矩阵与快捷倒计时全对称设计 (`StatusItemController.swift`)**：
-     - **单设备与多设备全景对称**：在单设备运行工况控制流中，无缝补齐专属「⏱ 快捷倒计时...」子菜单（30分/1小时/2小时后关机，晨间过渡关机45分钟，30分/1小时后开机预冷/预热）；
-     - **单设备计划调度全生命周期管理**：新增单设备专属「⏱ 计划调度...」子菜单，直观罗列该设备所有生效中与已暂停任务，支持二级悬浮快速暂停/恢复/取消单任务，并提供该设备一键暂停/恢复/取消所有任务的快捷批处理能力，为单空调用户带来一致且优雅的原生 macOS 交互体验。
-  3. **变频能耗动力学超频与 PTC 辅助电热连续过渡阻尼模型 (`EnergyAnalyticsEngine.swift`)**：
-     - **双线性连续过渡动力学**：重构 `estimateInstantaneousPower` 中的酷暑高温超频补偿（`heatBoost`）与严寒低温 PTC 电辅热补偿（`coldBoost`）；
-     - **消除阶跃突变断崖**：制冷工况在 `indoor >= 28.0°C` 与 `delta >= 4.0°C` 区间平滑线性过渡介入，消除 30°C/5°C 时的 100W 硬阶跃突变；制热工况在 `indoor <= 17.0°C` 与 `delta >= 4.0°C` 区间平滑线性过渡介入，消除 15°C/5°C 时的 120W 硬阶跃突变；
-     - **全模式物理自洽对称**：在 `.auto` 模式的制冷与制热分支中同步对齐该平滑连续动力学，真实拟真变频压缩机与电辅热微调工况，提供平滑自洽的瞬时电功率曲线。
+  1. **周期调度跨周全星期范围与调度全任务语义泛化 (`VoiceCommandParser.swift` / `AppModel.swift` / `VoiceCommandParserTests.swift`)**：
+     - **跨周末长周期调度引擎拓展**：在公共解析引擎 `parseRepeatWeekdays` 中全面覆盖多日跨周末周期：“周五至周一”（`[1, 2, 6, 7]`）、“周六至周二”（`[1, 2, 3, 7]`）以及以周日为起点的“周日至周五”（`[1..6]`）、“周日至周四”（`[1..5]`）、“周日至周三”（`[1..4]`）、“周日至周二”（`[1..3]`），全链路打通中文口语与周几数字映射；
+     - **周末口语全变体兼容**：补齐“周六日/周六天/星期六天/礼拜六天/礼拜六日”高频口语变体，统一收敛为标准周末（`[1, 7]`）；
+     - **任务调度清空与全任务语义拓展**：在 `isCancelSchedule`、`isPauseSchedule`、`isResumeSchedule` 中引入“清空”与“任务”语义（如“清空定时”、“取消所有任务”、“暂停所有任务”、“恢复所有任务”），并在否定动作防线（`containsNegativeForAction` 与 `negativeActionRegex`）中同步增加“清空”保护，严防误清空；
+     - **调度标签展示统一映射**：在 `AppModel.formatRepeatWeekdaysLabel` 中对齐新增的全部周期标签映射。
+  2. **macOS 状态栏单设备去重重构与滤网快速重置对称设计 (`StatusItemController.swift` / `VoiceCapsuleWindowController.swift`)**：
+     - **根除单设备双重计划菜单冗余**：重构状态栏计划调度布局逻辑，仅在多设备场景下渲染全局顶层「⏱ 计划调度...」菜单，单设备场景由其专属就绪菜单全权管理，彻底消除单设备用户界面中出现两个计划调度入口的冗余问题；
+     - **单设备滤网快速重置入口全景对称**：在单设备运行工况控制区中，与多设备二级菜单对称补齐「🧼 重置滤网计时 (当前 X%，良好/需拆洗)」，实现单机与多机操控体验的严密自洽；
+     - **语音胶囊多设备执行自愈降级**：在 `executeMultiDeviceCommand` 中补齐自清洁（`.startSelfCleaning` / `.stopSelfCleaning`）与睡眠曲线（`.startSleepCurve` / `.stopSleepCurve`）的分发逻辑，提供友好的单台优先执行与温和反馈，彻底消除“暂不支持多设备批量执行”报错。
+  3. **滤网空气动力学连续线性阻尼物理模型 (`AppModel.calculateFilterWearFactor`)**：
+     - **消除阶跃跳变断崖**：重构 `calculateFilterWearFactor` 中自动风速与制冷模式下的系数计算，采用与能耗引擎对齐的连续线性物理阻尼插值：
+     - 自动风速在稳态微载（0.8°C）到重载大温差（4.0°C）之间采用连续渐进插值（`0.75 + progress * 0.55`），消除阶跃跳变；
+     - 制冷大温差冷凝在 0~5°C 范围采用平滑线性插值（`1.15 + progress * 0.30`），保证滤网洁净度衰减曲线更加平滑自洽。
 
 ---
 
 ## 2. 关键架构变更与代码实现
 
-### 2.1 周期重复调度大一统解析引擎
-- **`VoiceCommandParser.swift` 架构解耦**：
+### 2.1 跨周周期重复与全任务调度语义泛化
+- **`VoiceCommandParser.swift` 周期规则拓展**：
   ```swift
-  public static func parseRepeatWeekdays(_ text: String) -> (weekdays: [Int], label: String)? {
-      // 统一收敛“工作日”、“周末”、“每天”、“周一至周日”、“周一至周五”以及所有复合星期范围
+  } else if text.contains("周五到周一") || text.contains("周五至周一") || ... {
+      return ([1, 2, 6, 7], "周五至周一")
+  } else if text.contains("周六到周二") || text.contains("周六至周二") || ... {
+      return ([1, 2, 3, 7], "周六至周二")
+  } else if text.contains("周日到周五") || text.contains("周日至周五") || ... {
+      return ([1, 2, 3, 4, 5, 6], "周日至周五")
+  ...
+  ```
+- **清空任务语义与否定安全防线加固**：
+  - 判定扩展：“清空定时”、“清空倒计时”、“清空所有任务”、“清空任务”；
+  - 否定防御：“千万别清空定时”、“不要清空所有任务”，杜绝误操作。
+- **`AppModel.swift` 标签对齐**：
+  - `formatRepeatWeekdaysLabel` 扩充对应中文格式化输出。
+
+### 2.2 macOS 状态栏单机去重与全景对称
+- **`StatusItemController.swift` 菜单去重与滤网重置对称**：
+  ```swift
+  // 单设备专属滤网快速重置
+  let filterPct = model.filterCleanlinessPercentage(for: dev.id)
+  let filterStatus = filterPct <= 20 ? "⚠️ 需拆洗" : "良好"
+  let singleResetFilterItem = NSMenuItem(
+      title: "🧼 重置滤网计时 (当前 \(filterPct)%，\(filterStatus))",
+      action: #selector(resetDeviceFilterFromMenu(_:)),
+      keyEquivalent: ""
+  )
+  ...
+  // 顶层全局调度仅在多设备下挂载，单设备由专属子项管理
+  if allDevices.count > 1 {
+      // 计划调度与定时任务感知 (多设备全屋调度矩阵)
+      ...
   }
   ```
-- **`AppIntents.swift` 彻底消除冗余**：
-  - `ScheduleACPowerIntent` 移除 60+ 行 `if/else` 重复解析，直接调用 `VoiceCommandParser.parseRepeatWeekdays(repeatDays)`；
-  - `ACAppShortcuts` 注册“用海尔空调周一至周日定时开机/关机”。
-- **`AppModel.swift` 中文标签同步补齐**：
-  - `formatRepeatWeekdaysLabel` 扩充对 `[1..7]`（"周一至周日"）、`[3, 4]`（"周二至周三"）、`[4, 5]`（"周三至周四"）、`[5, 6]`（"周四至周五"）、`[1, 2]`（"周日至周一"）、`[1, 2, 7]`（"周六至周一"）的原生友好映射。
 
-### 2.2 macOS 状态栏单设备全景对称控制
-- **`StatusItemController.swift` 交互对称完善**：
-  - 单设备模式下补全 `buildDeviceCountdownSubmenu(for: dev)`，提供关机与预冷/预热的倒计时快捷项；
-  - 单设备模式下挂载 `buildDeviceScheduleSubmenu(for: dev)`，单任务与批量调度控制一应俱全。
-
-### 2.3 变频能耗超频与 PTC 电辅热连续过渡动力学
-- **`EnergyAnalyticsEngine.swift` 双线性平滑阻尼**：
+### 2.3 滤网空气动力学连续线性阻尼物理模型
+- **`AppModel.swift` 消除阶跃断崖**：
   ```swift
-  let heatBoost: Double = {
-      guard indoorTemp >= 28.0 && delta >= 4.0 else { return 0.0 }
-      let indoorFactor = min(1.0, (indoorTemp - 28.0) / 4.0)
-      let deltaFactor = min(1.0, (delta - 4.0) / 3.0)
-      return indoorFactor * deltaFactor * 100.0
-  }()
-
-  let coldBoost: Double = {
-      guard indoorTemp <= 17.0 && delta >= 4.0 else { return 0.0 }
-      let indoorFactor = min(1.0, (17.0 - indoorTemp) / 4.0)
-      let deltaFactor = min(1.0, (delta - 4.0) / 3.0)
-      return indoorFactor * deltaFactor * 120.0
-  }()
+  // 稳态微载(0.8°C)到重载大温差(4.0°C)连续线性热物理阻尼插值 (v1.9.63 消除阶跃跳变，与能耗引擎对齐)
+  let progress = (tempDelta - 0.8) / 3.2
+  windFactor = 0.75 + (progress * 0.55)
+  ...
+  // 0~5°C 连续平滑线性阻尼插值 (1.15 ~ 1.45) (v1.9.63)
+  let progress = min(1.0, max(0.0, diff / 5.0))
+  modeFactor = 1.15 + (progress * 0.30)
   ```
 
 ---
 
 ## 3. 验证与测试闭环
 - **单元测试与端到端断言**：
-  - 在 `VoiceCommandParserTests.swift` 中新增 `testUnifiedRepeatWeekdayEngine`，编译运行通过 12 项关键断言：
-    1. 周一至周日全周解析验证 ("周一至周日", "周一到周天", "星期一到星期日") -> `[1, 2, 3, 4, 5, 6, 7]` ✅
-    2. 短周期连续星期范围解析验证 ("周二至周三" -> `[3, 4]`, "周三至周四" -> `[4, 5]`, "周四至周五" -> `[5, 6]`, "周日至周一" -> `[1, 2]`, "周六至周一" -> `[1, 2, 7]`) ✅
-    3. `AppModel.formatRepeatWeekdaysLabel` 标签一致性对齐验证 ✅
-    4. 省略“定时”二字时的周期口令防即时开机穿透验证 ("全屋周一至周日晚上10点开机", "周二至周三早上7点开空调") ✅
+  - 在 `VoiceCommandParserTests.swift` 中新增 `testExtendedRepeatWeekdaysAndCancelTaskGeneralization`，并通过独立二进制完全验证所有用例：
+    1. 周五至周一、周六至周二跨周末长周期解析验证 ✅
+    2. 周日至各工作日周期范围解析验证 ✅
+    3. 周末口语变体（周六日、周六天、星期六天、礼拜六天）统一归一化 ✅
+    4. “取消所有任务”、“清空定时”、“清空所有定时任务”全语义覆盖 ✅
+    5. “千万别清空定时”、“不要取消所有任务”动作否定防御拦截 ✅
 - **编译与静态分析**：
   - `SDKROOT=/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk swift build` 0 警告 0 错误编译通过。
 - **发布构建与产物校验**：
-  - 执行 `./build_app.sh 1.9.62`，打包签名产出：
+  - 执行 `./build_app.sh 1.9.63`，打包签名产出：
     - `dist/HaierAC.app`
-    - `dist/HaierAC-v1.9.62-macOS.zip` (大小: 2,850,025 bytes)
-    - SHA256 校验和：`e9e9b628acab17d0096c17b536cdc50fcf7c99a03f9af0665161b24c3e9c552b`
+    - `dist/HaierAC-v1.9.63-macOS.zip` (大小: 2.7M)
+    - SHA256 校验和：`99bfe7328f8d49667d5410445b2ddfaa4b8a13ae447e5fe23c4c6640611c45e7`

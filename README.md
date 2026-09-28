@@ -8,6 +8,21 @@
 
 ## 功能
 
+- 🏷 **闭环多日跨周与全任务调度语义泛化、macOS 状态栏单机去重对称重构及滤网气动力学连续阻尼模型 (v1.9.63)**：
+  - ⏱️ **周期调度跨周全星期范围与调度全任务语义泛化 (`VoiceCommandParser.swift` / `AppModel.swift` / `VoiceCommandParserTests.swift`)**：
+    - **跨周末长周期调度引擎拓展**：在公共解析引擎 `parseRepeatWeekdays` 中全面覆盖多日跨周末周期：“周五至周一”（`[1, 2, 6, 7]`）、“周六至周二”（`[1, 2, 3, 7]`）以及以周日为起点的“周日至周五”（`[1..6]`）、“周日至周四”（`[1..5]`）、“周日至周三”（`[1..4]`）、“周日至周二”（`[1..3]`），全链路打通中文口语与周几数字映射；
+    - **周末口语全变体兼容**：补齐“周六日/周六天/星期六天/礼拜六天/礼拜六日”高频口语变体，统一收敛为标准周末（`[1, 7]`）；
+    - **任务调度清空与全任务语义拓展**：在 `isCancelSchedule`、`isPauseSchedule`、`isResumeSchedule` 中引入“清空”与“任务”语义（如“清空定时”、“取消所有任务”、“暂停所有任务”、“恢复所有任务”），并在否定动作防线（`containsNegativeForAction` 与 `negativeActionRegex`）中同步增加“清空”保护，严防误清空；
+    - **调度标签展示统一映射**：在 `AppModel.formatRepeatWeekdaysLabel` 中对齐新增的全部周期标签映射。
+  - 🍱 **macOS 状态栏单设备去重重构与滤网快速重置对称设计 (`StatusItemController.swift` / `VoiceCapsuleWindowController.swift`)**：
+    - **根除单设备双重计划菜单冗余**：重构状态栏计划调度布局逻辑，仅在多设备场景下渲染全局顶层「⏱ 计划调度...」菜单，单设备场景由其专属就绪菜单全权管理，彻底消除单设备用户界面中出现两个计划调度入口的冗余问题；
+    - **单设备滤网快速重置入口全景对称**：在单设备运行工况控制区中，与多设备二级菜单对称补齐「🧼 重置滤网计时 (当前 X%，良好/需拆洗)」，实现单机与多机操控体验的严密自洽；
+    - **语音胶囊多设备执行自愈降级**：在 `executeMultiDeviceCommand` 中补齐自清洁（`.startSelfCleaning` / `.stopSelfCleaning`）与睡眠曲线（`.startSleepCurve` / `.stopSleepCurve`）的分发逻辑，提供友好的单台优先执行与温和反馈，彻底消除“暂不支持多设备批量执行”报错。
+  - 🍃 **滤网空气动力学连续线性阻尼物理模型 (`AppModel.calculateFilterWearFactor`)**：
+    - **消除阶跃跳变断崖**：重构 `calculateFilterWearFactor` 中自动风速与制冷模式下的系数计算，采用与能耗引擎对齐的连续线性物理阻尼插值：
+    - 自动风速在稳态微载（0.8°C）到重载大温差（4.0°C）之间采用连续渐进插值（`0.75 + progress * 0.55`），消除阶跃跳变；
+    - 制冷大温差冷凝在 0~5°C 范围采用平滑线性插值（`1.15 + progress * 0.30`），保证滤网洁净度衰减曲线更加平滑自洽。
+
 - 🏷 **闭环周期重复调度大一统解析引擎、单设备状态栏调度与倒计时全对称设计、变频能耗动力学超频平滑过渡模型 (v1.9.62)**：
   - ⏱️ **周期重复调度全链路统一解析引擎与全星期范围扩展 (`VoiceCommandParser.swift` / `AppModel.swift` / `AppIntents.swift` / `VoiceCommandParserTests.swift`)**：
     - **提取公共解析引擎**：在 `VoiceCommandParser` 中提取公共入口 `public static func parseRepeatWeekdays(_ text: String) -> (weekdays: [Int], label: String)?`，彻底消除 `VoiceCommandParser` 与 `AppIntents` 中两处 60+ 行的分支重复代码，保证语音交互与 Siri Shortcuts 100% 语义严密对齐；

@@ -2090,6 +2090,64 @@ final class VoiceCommandParserTests: XCTestCase {
         XCTAssertNotEqual(prevent3?.command, .turnOnAll)
     }
 
+    // MARK: - 跨周与全任务调度语义泛化测试 (v1.9.63)
+
+    func testExtendedRepeatWeekdaysAndCancelTaskGeneralization() {
+        // 1. 周五至周一跨周末周期（[1, 2, 6, 7]）
+        let m51 = VoiceCommandParser.parse("周五至周一晚上10点关空调")
+        XCTAssertEqual(m51?.command, .scheduleRepeatPower(hour: 22, minute: 0, power: false, repeatWeekdays: [1, 2, 6, 7], repeatLabel: "周五至周一"))
+
+        let m51_colloquial = VoiceCommandParser.parse("礼拜五到礼拜一早上8点开机")
+        XCTAssertEqual(m51_colloquial?.command, .scheduleRepeatPower(hour: 8, minute: 0, power: true, repeatWeekdays: [1, 2, 6, 7], repeatLabel: "周五至周一"))
+
+        // 2. 周六至周二跨周末周期（[1, 2, 3, 7]）
+        let m62 = VoiceCommandParser.parse("周六到周二早上9点开空调")
+        XCTAssertEqual(m62?.command, .scheduleRepeatPower(hour: 9, minute: 0, power: true, repeatWeekdays: [1, 2, 3, 7], repeatLabel: "周六至周二"))
+
+        // 3. 周日至各工作日周期
+        let m16 = VoiceCommandParser.parse("周日至周五晚上11点关空调")
+        XCTAssertEqual(m16?.command, .scheduleRepeatPower(hour: 23, minute: 0, power: false, repeatWeekdays: [1, 2, 3, 4, 5, 6], repeatLabel: "周日至周五"))
+
+        let m15 = VoiceCommandParser.parse("周日到周四晚上10点关空调")
+        XCTAssertEqual(m15?.command, .scheduleRepeatPower(hour: 22, minute: 0, power: false, repeatWeekdays: [1, 2, 3, 4, 5], repeatLabel: "周日至周四"))
+
+        let m14 = VoiceCommandParser.parse("周日至周三早上7点开空调")
+        XCTAssertEqual(m14?.command, .scheduleRepeatPower(hour: 7, minute: 0, power: true, repeatWeekdays: [1, 2, 3, 4], repeatLabel: "周日至周三"))
+
+        let m13 = VoiceCommandParser.parse("周日到周二早上8点开机")
+        XCTAssertEqual(m13?.command, .scheduleRepeatPower(hour: 8, minute: 0, power: true, repeatWeekdays: [1, 2, 3], repeatLabel: "周日至周二"))
+
+        // 4. 周末口语变体（周六日、周六天）
+        let satSun1 = VoiceCommandParser.parse("周六日早上9点开机")
+        XCTAssertEqual(satSun1?.command, .scheduleRepeatPower(hour: 9, minute: 0, power: true, repeatWeekdays: [1, 7], repeatLabel: "周末"))
+
+        let satSun2 = VoiceCommandParser.parse("星期六天晚上10点关空调")
+        XCTAssertEqual(satSun2?.command, .scheduleRepeatPower(hour: 22, minute: 0, power: false, repeatWeekdays: [1, 7], repeatLabel: "周末"))
+
+        // 5. 调度取消/清空与“任务”语义
+        let cancelTask1 = VoiceCommandParser.parse("取消所有任务")
+        XCTAssertEqual(cancelTask1?.command, .cancelSchedulesAll)
+
+        let cancelTask2 = VoiceCommandParser.parse("清空定时")
+        XCTAssertEqual(cancelTask2?.command, .cancelSchedules)
+
+        let cancelTask3 = VoiceCommandParser.parse("清空所有定时任务")
+        XCTAssertEqual(cancelTask3?.command, .cancelSchedulesAll)
+
+        let pauseTask1 = VoiceCommandParser.parse("暂停所有任务")
+        XCTAssertEqual(pauseTask1?.command, .pauseSchedulesAll)
+
+        let resumeTask1 = VoiceCommandParser.parse("恢复所有任务")
+        XCTAssertEqual(resumeTask1?.command, .resumeSchedulesAll)
+
+        // 6. 否定防线拦截清空指令
+        let negative1 = VoiceCommandParser.parse("千万别清空定时")
+        XCTAssertNil(negative1)
+
+        let negative2 = VoiceCommandParser.parse("不要取消所有任务")
+        XCTAssertNil(negative2)
+    }
+
     // MARK: - 无效输入测试
 
     func testInvalidCommands() {

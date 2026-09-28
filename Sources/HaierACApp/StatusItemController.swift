@@ -962,6 +962,18 @@ final class StatusItemController: NSObject {
             menu.setSubmenu(singleWindMenu, for: singleWindItem)
             menu.addItem(singleWindItem)
 
+            // 滤网洁净度与快速重置 (v1.9.63 单设备与多设备矩阵全景对称)
+            let filterPct = model.filterCleanlinessPercentage(for: dev.id)
+            let filterStatus = filterPct <= 20 ? "⚠️ 需拆洗" : "良好"
+            let singleResetFilterItem = NSMenuItem(
+                title: "🧼 重置滤网计时 (当前 \(filterPct)%，\(filterStatus))",
+                action: #selector(resetDeviceFilterFromMenu(_:)),
+                keyEquivalent: ""
+            )
+            singleResetFilterItem.target = self
+            singleResetFilterItem.representedObject = dev.id
+            menu.addItem(singleResetFilterItem)
+
             // 单设备快捷倒计时调度 (v1.9.62 单设备与多设备矩阵全景对称)
             let singleCountdownMenu = NSMenu()
             singleCountdownMenu.autoenablesItems = false
@@ -1121,7 +1133,8 @@ final class StatusItemController: NSObject {
         menu.setSubmenu(filterMenu, for: filterParentItem)
         menu.addItem(filterParentItem)
 
-        // 计划调度与定时任务感知 (v1.9.54, v1.9.55 支持单项查看与快速取消, v1.9.56 消除设备名重复/增设周期重复感知与快捷关机倒计时)
+        // 计划调度与定时任务感知 (多设备全屋调度矩阵，v1.9.63 单设备免去重置避免双重计划菜单)
+        if allDevices.count > 1 {
         let activeSchedules = model.scheduledActions
         let scheduleMenu = NSMenu()
         scheduleMenu.autoenablesItems = false
@@ -1277,6 +1290,7 @@ final class StatusItemController: NSObject {
             let scheduleParentItem = NSMenuItem(title: "⏱ 计划调度 (无生效任务)...", action: nil, keyEquivalent: "")
             menu.setSubmenu(scheduleMenu, for: scheduleParentItem)
             menu.addItem(scheduleParentItem)
+        }
         }
 
         menu.addItem(.separator())
