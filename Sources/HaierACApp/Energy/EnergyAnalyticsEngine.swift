@@ -389,14 +389,17 @@ public final class EnergyAnalyticsEngine: ObservableObject {
                 // 接近目标温差 (0 < ΔT < 1.0°C)：平滑过渡至稳态低频
                 power = 300.0 + (delta * 250.0) + (windOffset * 0.8) + (heatHumComp * 0.7)
             } else {
-                // 变频重载升温区 (ΔT >= 1.0°C)
-                // 严寒低温速热热力补偿：当室内温度偏低（indoor <= 15°C）且大温差升温（delta >= 5.0°C）时，
-                // 拟真变频空调自动启动 PTC 辅助加热与大压比高频超载运转，动态补偿热负荷功率 (120W ~ 320W)
+                // 严寒低温速热热力补偿：当室内温度偏低（indoor <= 17.0°C）且大温差升温（delta >= 4.0°C）时，
+                // 拟真变频空调自动启动 PTC 辅助加热与大压比高频超载运转；
+                // 采用双线性连续过渡阻尼模型 (v1.9.62 消除 15°C/5°C 阶跃断崖，平滑补偿 0W ~ 320W 电热与超载功率)
                 let coldBoost: Double = {
-                    if indoor <= 15.0 && delta >= 5.0 {
-                        let deficit = min(10.0, 15.0 - indoor)
-                        let excess = min(8.0, delta - 5.0)
-                        return 120.0 + (deficit * 10.0) + (excess * 12.0)
+                    if indoor <= 17.0 && delta >= 4.0 {
+                        let indoorFactor = min(1.0, max(0.0, (17.0 - indoor) / 2.0)) // 17°C ~ 15°C 线性平滑插值
+                        let deltaFactor = min(1.0, max(0.0, (delta - 4.0) / 1.0))    // 4°C ~ 5°C 线性平滑插值
+                        let ramp = indoorFactor * deltaFactor
+                        let deficit = min(10.0, max(0.0, 15.0 - indoor))
+                        let excess = min(8.0, max(0.0, delta - 5.0))
+                        return (120.0 * ramp) + (deficit * 10.0) + (excess * 12.0)
                     }
                     return 0.0
                 }()
@@ -412,7 +415,7 @@ public final class EnergyAnalyticsEngine: ObservableObject {
 
             // 环境湿度潜热冷凝补偿 (v1.9.45)：
             // 典型变频空调制冷热力学：空气流经蒸发器翅片时发生水汽冷凝相变释放汽化潜热(2260 kJ/kg)，
-            // 在高湿环境(RH >= 65%)下潜热负荷急剧攀升，压缩机需提高转速以维持冷凝析水能力 (最高补偿 +66W)；
+            // 在高湿环境(RH >= 65%)下潜热负料急剧攀升，压缩机需提高转速以维持冷凝析水能力 (最高补偿 +66W)；
             // 在极干燥环境(RH <= 40%)下水汽析出少，换热以显热为主，动态调减负荷 (-20W ~ 0W)
             let latentHumComp: Double = {
                 guard let hum = indoorHumidity else { return 0.0 }
@@ -435,14 +438,17 @@ public final class EnergyAnalyticsEngine: ObservableObject {
                 power = 220.0 + (delta * 160.0) + (windOffset * 0.8) + (latentHumComp * 0.7)
             } else {
                 // 变频重载降温区 (ΔT >= 1.0°C)
-                // 酷暑高温大温差超载动力学补偿：当室内温度偏高（indoor >= 30.0°C）且大温差降温（delta >= 5.0°C）时，
-                // 拟真变频压缩机处于高频满载运转，且高温环境下外机冷凝器散热恶化导致冷凝压力与压比急剧攀升，
-                // 动态补偿热阻抗超载电热功率 (100W ~ 280W)，与严寒制热 PTC 形成全气候对称动力学仿真
+                // 酷暑高温大温差超载动力学补偿：当室内温度偏高（indoor >= 28.0°C）且大温差降温（delta >= 4.0°C）时，
+                // 拟真变频压缩机处于高频满载运转，且高温环境下外机冷凝器散热恶化导致冷凝压力与压比急剧攀升；
+                // 采用双线性连续过渡阻尼模型 (v1.9.62 消除 30°C/5°C 阶跃断崖，平滑补偿 0W ~ 280W 热阻抗超载电热功率)
                 let heatBoost: Double = {
-                    if indoor >= 30.0 && delta >= 5.0 {
-                        let excessIndoor = min(8.0, indoor - 30.0)
-                        let excessDelta = min(8.0, delta - 5.0)
-                        return 100.0 + (excessIndoor * 12.0) + (excessDelta * 10.0)
+                    if indoor >= 28.0 && delta >= 4.0 {
+                        let indoorFactor = min(1.0, max(0.0, (indoor - 28.0) / 2.0)) // 28°C ~ 30°C 线性平滑插值
+                        let deltaFactor = min(1.0, max(0.0, (delta - 4.0) / 1.0))   // 4°C ~ 5°C 线性平滑插值
+                        let ramp = indoorFactor * deltaFactor
+                        let excessIndoor = min(8.0, max(0.0, indoor - 30.0))
+                        let excessDelta = min(8.0, max(0.0, delta - 5.0))
+                        return (100.0 * ramp) + (excessIndoor * 12.0) + (excessDelta * 10.0)
                     }
                     return 0.0
                 }()
@@ -474,12 +480,15 @@ public final class EnergyAnalyticsEngine: ObservableObject {
                 } else if delta < 1.0 {
                     power = 220.0 + (delta * 160.0) + (windOffset * 0.8) + (latentHumComp * 0.7)
                 } else {
-                    // 酷暑极端高温与冷凝器恶化超频动力学补偿
+                    // 酷暑极端高温与冷凝器恶化超频动力学补偿 (v1.9.62 双线性平滑过渡)
                     let heatBoost: Double = {
-                        if indoor >= 30.0 && delta >= 5.0 {
-                            let excessIndoor = min(8.0, indoor - 30.0)
-                            let excessDelta = min(8.0, delta - 5.0)
-                            return 100.0 + (excessIndoor * 12.0) + (excessDelta * 10.0)
+                        if indoor >= 28.0 && delta >= 4.0 {
+                            let indoorFactor = min(1.0, max(0.0, (indoor - 28.0) / 2.0))
+                            let deltaFactor = min(1.0, max(0.0, (delta - 4.0) / 1.0))
+                            let ramp = indoorFactor * deltaFactor
+                            let excessIndoor = min(8.0, max(0.0, indoor - 30.0))
+                            let excessDelta = min(8.0, max(0.0, delta - 5.0))
+                            return (100.0 * ramp) + (excessIndoor * 12.0) + (excessDelta * 10.0)
                         }
                         return 0.0
                     }()
@@ -506,12 +515,15 @@ public final class EnergyAnalyticsEngine: ObservableObject {
                 } else if delta < 1.0 {
                     power = 300.0 + (delta * 250.0) + (windOffset * 0.8) + (heatHumOffset * 0.7)
                 } else {
-                    // 严寒低温大温差 PTC 电辅热与大压比高频超载运转补偿
+                    // 严寒低温大温差 PTC 电辅热与大压比高频超载运转补偿 (v1.9.62 双线性平滑过渡)
                     let coldBoost: Double = {
-                        if indoor <= 15.0 && delta >= 5.0 {
-                            let deficit = min(10.0, 15.0 - indoor)
-                            let excess = min(8.0, delta - 5.0)
-                            return 120.0 + (deficit * 10.0) + (excess * 12.0)
+                        if indoor <= 17.0 && delta >= 4.0 {
+                            let indoorFactor = min(1.0, max(0.0, (17.0 - indoor) / 2.0))
+                            let deltaFactor = min(1.0, max(0.0, (delta - 4.0) / 1.0))
+                            let ramp = indoorFactor * deltaFactor
+                            let deficit = min(10.0, max(0.0, 15.0 - indoor))
+                            let excess = min(8.0, max(0.0, delta - 5.0))
+                            return (120.0 * ramp) + (deficit * 10.0) + (excess * 12.0)
                         }
                         return 0.0
                     }()

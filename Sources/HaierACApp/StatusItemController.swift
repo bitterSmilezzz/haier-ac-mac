@@ -961,6 +961,112 @@ final class StatusItemController: NSObject {
             let singleWindItem = NSMenuItem(title: "🍃 调节风速 (当前: \(curWind))", action: nil, keyEquivalent: "")
             menu.setSubmenu(singleWindMenu, for: singleWindItem)
             menu.addItem(singleWindItem)
+
+            // 单设备快捷倒计时调度 (v1.9.62 单设备与多设备矩阵全景对称)
+            let singleCountdownMenu = NSMenu()
+            singleCountdownMenu.autoenablesItems = false
+            let singleCountdownPresets: [(title: String, mins: Int, powerOn: Bool)] = [
+                ("⏱ 30 分钟后关机", 30, false),
+                ("⏱ 1 小时后关机", 60, false),
+                ("⏱ 2 小时后关机", 120, false),
+                ("⏱ 晨间过渡关机 (45分钟)", 45, false),
+                ("❄️ 30 分钟后开机预冷/预热", 30, true),
+                ("❄️ 1 小时后开机预冷/预热", 60, true)
+            ]
+            for p in singleCountdownPresets {
+                let pItem = NSMenuItem(title: p.title, action: #selector(quickCountdownFromMenu(_:)), keyEquivalent: "")
+                pItem.target = self
+                pItem.representedObject = ["deviceId": dev.id, "minutes": p.mins, "powerOn": p.powerOn] as [String: Any]
+                pItem.isEnabled = isControllable
+                singleCountdownMenu.addItem(pItem)
+            }
+            let singleCountdownParent = NSMenuItem(title: "⏱ 快捷倒计时...", action: nil, keyEquivalent: "")
+            menu.setSubmenu(singleCountdownMenu, for: singleCountdownParent)
+            menu.addItem(singleCountdownParent)
+
+            // 单设备计划调度全生命周期管理与感知矩阵 (v1.9.62)
+            let devSchedules = model.scheduledActions.filter { $0.deviceId == dev.id }
+            let devScheduleMenu = NSMenu()
+            devScheduleMenu.autoenablesItems = false
+            let devEnabledCount = devSchedules.filter(\.enabled).count
+            let devPausedCount = devSchedules.count - devEnabledCount
+
+            if !devSchedules.isEmpty {
+                for action in devSchedules {
+                    let timeStr = DateFormatter.localizedString(from: action.fireDate, dateStyle: .none, timeStyle: .short)
+                    var cleanActionName = action.name
+                    if cleanActionName.hasPrefix("「\(dev.name)」") {
+                        cleanActionName = String(cleanActionName.dropFirst("「\(dev.name)」".count))
+                    }
+                    let repeatTag = action.repeatLabel.map { " [\($0)]" } ?? ""
+                    let statusTag = action.enabled ? "" : " [已暂停]"
+                    let sItem = NSMenuItem(title: "⏱ \(cleanActionName) (\(timeStr))\(repeatTag)\(statusTag)", action: nil, keyEquivalent: "")
+
+                    let singleMenu = NSMenu()
+                    singleMenu.autoenablesItems = false
+                    let fullTimeStr = DateFormatter.localizedString(from: action.fireDate, dateStyle: .medium, timeStyle: .medium)
+                    let timeInfo = NSMenuItem(title: "下次执行: \(fullTimeStr)", action: nil, keyEquivalent: "")
+                    timeInfo.isEnabled = false
+                    singleMenu.addItem(timeInfo)
+
+                    if let rep = action.repeatLabel {
+                        let repInfo = NSMenuItem(title: "周期重复: \(rep)", action: nil, keyEquivalent: "")
+                        repInfo.isEnabled = false
+                        singleMenu.addItem(repInfo)
+                    }
+                    singleMenu.addItem(.separator())
+
+                    let toggleTitle = action.enabled ? "⏸ 暂停此任务" : "▶️ 恢复此任务"
+                    let toggleItem = NSMenuItem(title: toggleTitle, action: #selector(toggleSingleScheduleEnabledFromMenu(_:)), keyEquivalent: "")
+                    toggleItem.target = self
+                    toggleItem.representedObject = action.id.uuidString
+                    singleMenu.addItem(toggleItem)
+
+                    let cancelItem = NSMenuItem(title: "❌ 取消该任务", action: #selector(cancelSingleScheduleFromMenu(_:)), keyEquivalent: "")
+                    cancelItem.target = self
+                    cancelItem.representedObject = action.id.uuidString
+                    singleMenu.addItem(cancelItem)
+
+                    devScheduleMenu.setSubmenu(singleMenu, for: sItem)
+                    devScheduleMenu.addItem(sItem)
+                }
+                devScheduleMenu.addItem(.separator())
+
+                if devEnabledCount > 0 {
+                    let pItem = NSMenuItem(title: "⏸ 暂停该设备所有定时", action: #selector(pauseDeviceSchedulesFromMenu(_:)), keyEquivalent: "")
+                    pItem.target = self
+                    pItem.representedObject = dev.id
+                    devScheduleMenu.addItem(pItem)
+                }
+                if devPausedCount > 0 {
+                    let rItem = NSMenuItem(title: "▶️ 恢复该设备所有定时", action: #selector(resumeDeviceSchedulesFromMenu(_:)), keyEquivalent: "")
+                    rItem.target = self
+                    rItem.representedObject = dev.id
+                    devScheduleMenu.addItem(rItem)
+                }
+                let cItem = NSMenuItem(title: "🗑 取消该设备所有定时与倒计时", action: #selector(cancelDeviceSchedulesFromMenu(_:)), keyEquivalent: "")
+                cItem.target = self
+                cItem.representedObject = dev.id
+                devScheduleMenu.addItem(cItem)
+            } else {
+                let emptyItem = NSMenuItem(title: "当前无生效中的计划任务", action: nil, keyEquivalent: "")
+                emptyItem.isEnabled = false
+                devScheduleMenu.addItem(emptyItem)
+            }
+
+            let devScheduleParentTitle: String
+            if devSchedules.isEmpty {
+                devScheduleParentTitle = "⏱ 计划调度 (无任务)..."
+            } else if devPausedCount == 0 {
+                devScheduleParentTitle = "⏱ 计划调度 (\(devEnabledCount) 项生效)..."
+            } else if devEnabledCount == 0 {
+                devScheduleParentTitle = "⏱ 计划调度 (\(devPausedCount) 项已暂停)..."
+            } else {
+                devScheduleParentTitle = "⏱ 计划调度 (\(devEnabledCount) 生效 / \(devPausedCount) 暂停)..."
+            }
+            let devScheduleParentItem = NSMenuItem(title: devScheduleParentTitle, action: nil, keyEquivalent: "")
+            menu.setSubmenu(devScheduleMenu, for: devScheduleParentItem)
+            menu.addItem(devScheduleParentItem)
         }
 
         let openItem = NSMenuItem(title: "打开主窗口", action: #selector(openMainWindow), keyEquivalent: "")

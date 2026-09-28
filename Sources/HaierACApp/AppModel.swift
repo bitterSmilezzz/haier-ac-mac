@@ -1348,14 +1348,19 @@ final class AppModel: ObservableObject {
         if sorted == [3, 4, 5, 6, 7] { return "周二至周六" }
         if sorted == [3, 4, 5, 6] { return "周二至周五" }
         if sorted == [3, 4, 5] { return "周二至周四" }
+        if sorted == [3, 4] { return "周二至周三" }
         if sorted == [4, 5, 6, 7] { return "周三至周六" }
         if sorted == [4, 5, 6] { return "周三至周五" }
+        if sorted == [4, 5] { return "周三至周四" }
         if sorted == [5, 6, 7] { return "周四至周六" }
+        if sorted == [5, 6] { return "周四至周五" }
         if sorted == [6, 7] { return "周五至周六" }
         if sorted == [1, 5, 6, 7] { return "周四至周日" }
         if sorted == [1, 4, 5, 6, 7] { return "周三至周日" }
         if sorted == [1, 3, 4, 5, 6, 7] { return "周二至周日" }
         if sorted == [1, 6, 7] { return "周五至周日" }
+        if sorted == [1, 2, 7] { return "周六至周一" }
+        if sorted == [1, 2] { return "周日至周一" }
         if sorted == [2, 4, 6] { return "每周一、三、五" }
         if sorted == [3, 5, 7] { return "每周二、四、六" }
         if sorted == [3, 5] { return "每周二、四" }

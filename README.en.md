@@ -6,6 +6,20 @@ A native SwiftUI app to control Haier / Leader (统帅) smart air conditioners o
 
 ## Features
 
+- 🏷 **Unified Repeat Schedule Parser Engine, Status Bar Single-Device Schedule & Countdown Full Symmetry, and Continuous Bilinear Inverter Overclock & PTC Damping Dynamics (v1.9.62)**:
+  - ⏱️ **Unified Repeating Schedule Parser Engine Across NLP & Siri Shortcuts (`VoiceCommandParser.swift` / `AppModel.swift` / `AppIntents.swift` / `VoiceCommandParserTests.swift`)**:
+    - **Shared Parser Extraction**: Extracted `public static func parseRepeatWeekdays(_ text: String) -> (weekdays: [Int], label: String)?` in `VoiceCommandParser`, eliminating over 60 lines of duplicate matching logic across NLP voice parsing and `AppIntents`, ensuring 100% semantic alignment;
+    - **Monday-to-Sunday 7-Day Repeating Schedule**: Added full support for "周一至周日/周一到周日/星期一到星期天/礼拜一到礼拜天" (`[1, 2, 3, 4, 5, 6, 7]`), permanently resolving the defect where spoken 7-day recurring schedules fell back to single-shot tasks and were deleted after first execution;
+    - **Expanded Contiguous Weekday Spans**: Added Tue-Wed (`[3, 4]`), Wed-Thu (`[4, 5]`), Thu-Fri (`[5, 6]`), Sun-Mon (`[1, 2]`), and Sat-Mon (`[1, 2, 7]`), seamlessly integrated with natural Chinese formatting in `AppModel.formatRepeatWeekdaysLabel`;
+    - **Immediate Mis-Trigger Defense & Siri Phrases**: Hooked `parseRepeatWeekdays` into `hasTimingOrCountdownIntent` to safeguard against accidental immediate power-on when omitting the word "定时"; registered system shortcuts for Monday-to-Sunday schedules in `ACAppShortcuts`.
+  - 🍱 **macOS Menu Bar Single-Device Schedule Matrix & Quick Countdown Symmetry (`StatusItemController.swift`)**:
+    - **Single-Device & Multi-Device Parity**: Seamlessly introduced a dedicated "⏱ 快捷倒计时..." submenu in single-device mode (30m / 1h / 2h turn-off, 45m morning transition turn-off, 30m / 1h pre-cooling/pre-heating turn-on);
+    - **Single-Device Schedule Lifecycle Management**: Added a dedicated "⏱ 计划调度..." submenu for single-device installations, listing all active and paused tasks with granular pause/resume/cancel controls and single-click device-level batch actions, delivering a consistent and elegant native macOS experience.
+  - ⚡️ **Thermodynamic Inverter Overclock & PTC Auxiliary Heating Continuous Bilinear Dynamics (`EnergyAnalyticsEngine.swift`)**:
+    - **Bilinear Smooth Transition Dynamics**: Overhauled high-heat cooling overclock compensation (`heatBoost`) and deep-freeze PTC auxiliary heat compensation (`coldBoost`) in `estimateInstantaneousPower`;
+    - **Eliminated Hard Step Cliff Discontinuities**: Cooling mode smoothly scales over `indoor >= 28.0°C` and `delta >= 4.0°C` (eliminating the 100W cliff at 30°C / 5°C); heating mode smoothly scales over `indoor <= 17.0°C` and `delta >= 4.0°C` (eliminating the 120W cliff at 15°C / 5°C);
+    - **Full-Mode Physical Consistency**: Symmetrically aligned `.auto` mode cooling and heating branches with these continuous transition ramps, reflecting true inverter compressor and PTC heating physics.
+
 - 🏷 **Defensive Action Negation for Schedule Cancellation/Pause/Resume, Device-Level Menu Bar Schedule Matrix, Generalized Repeat Day Engine & Thermodynamic Auto-Wind Dynamics (v1.9.61)**:
   - 🛡️ **Schedule Action Negation Defense for Cancel, Pause & Resume (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)**:
     - **Thorough Defense Against Negated Schedule Modification Intentions**: The previous negation filter only blocked power-switching verbs (on/off/start). It did not guard schedule mutation phrases like "千万别取消定时", "不要取消定时任务", "别给我暂停定时", "千万不要恢复定时";
