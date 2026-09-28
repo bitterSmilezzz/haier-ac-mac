@@ -408,6 +408,8 @@ final class StatusItemController: NSObject {
                 let isControllable = reach.isControllable
                 let curTemp = model.attribute("targetTemperature", deviceId: devId)?.doubleValue ?? 26.0
                 let curTempStr = curTemp.truncatingRemainder(dividingBy: 1.0) == 0 ? "\(Int(curTemp))" : String(format: "%.1f", curTemp)
+                let rawMode = model.attribute("operationMode", deviceId: devId)?.stringValue
+                let modeCode = ACModeCode.match(from: rawMode)
 
                 let devSubmenu = NSMenu()
                 devSubmenu.autoenablesItems = false
@@ -546,7 +548,28 @@ final class StatusItemController: NSObject {
                 switch reach {
                 case .gatewayReconnecting: statusBadge = "⏳ 重连中"
                 case .deviceOffline: statusBadge = "⚡️ 离线"
-                case .available: statusBadge = isPowerOn ? "🟢 开机" : "⚪️ 待机"
+                case .available:
+                    if isPowerOn {
+                        let modeStr: String = {
+                            if let code = modeCode {
+                                switch code {
+                                case .cooling: return "制冷"
+                                case .heating: return "制热"
+                                case .fan: return "送风"
+                                case .dehumidify: return "除湿"
+                                case .auto: return "自动"
+                                }
+                            }
+                            return "运行中"
+                        }()
+                        if modeCode == .fan {
+                            statusBadge = "🟢 \(modeStr)"
+                        } else {
+                            statusBadge = "🟢 \(modeStr) \(curTempStr)°C"
+                        }
+                    } else {
+                        statusBadge = "⚪️ 待机"
+                    }
                 }
 
                 let pinBadge = isPrimary ? "★ " : ""

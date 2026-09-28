@@ -747,10 +747,10 @@ final class AppModel: ObservableObject {
         windSpeed: String,
         deviceId: String? = nil
     ) -> Double {
-        // 1. 风量通量因子（高速风量通过滤网单位时间截留更多浮尘颗粒）
+        // 1. 风量通量因子（高速风量通过滤网单位时间截留更多浮尘颗粒） (v1.9.49 补齐“强劲/强”档位匹配，杜绝高风量被误判为默认基准)
         let windFactor: Double
         let speed = windSpeed.lowercased()
-        if speed.contains("强力") || speed.contains("turbo") || speed.contains("超强") {
+        if speed.contains("强") || speed.contains("turbo") || speed.contains("超强") {
             windFactor = 1.70
         } else if speed.contains("高") || speed.contains("high") {
             windFactor = 1.35

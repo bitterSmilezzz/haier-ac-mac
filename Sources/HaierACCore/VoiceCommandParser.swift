@@ -422,10 +422,10 @@ public struct VoiceCommandParser {
             }
         }
 
-        // 2. 差分倒算结构 (v1.9.48: 支持“十点差五分”与“差五分十点”等逆序时间计算)
-        // 2.1 Pattern: (\d{1,2})\s*(?:点|时)\s*差\s*(\d{1,2})\s*分? (如 10点差5分 -> 09:55)
+        // 2. 差分倒算结构 (v1.9.48: 支持“十点差五分”与“差五分十点”等逆序时间计算, v1.9.49: 支持“分钟”与半小时/刻度倒算)
+        // 2.1 Pattern: (\d{1,2})\s*(?:点|时)\s*差\s*(\d{1,2})\s*(?:分钟|分)? (如 10点差5分 / 10点差5分钟 -> 09:55)
         if hour == nil {
-            let diffPattern1 = #"(\d{1,2})\s*(?:点|时)\s*差\s*(\d{1,2})\s*分?"#
+            let diffPattern1 = #"(\d{1,2})\s*(?:点|时)\s*差\s*(\d{1,2})\s*(?:分钟|分)?"#
             if let regex = try? NSRegularExpression(pattern: diffPattern1) {
                 let ns = normalized as NSString
                 if let match = regex.matches(in: normalized, range: NSRange(location: 0, length: ns.length)).first {
@@ -439,9 +439,9 @@ public struct VoiceCommandParser {
             }
         }
 
-        // 2.2 Pattern: 差\s*(\d{1,2})\s*分?\s*(\d{1,2})\s*(?:点|时) (如 差5分10点 -> 09:55)
+        // 2.2 Pattern: 差\s*(\d{1,2})\s*(?:分钟|分)?\s*(\d{1,2})\s*(?:点|时) (如 差5分10点 / 差5分钟10点 -> 09:55)
         if hour == nil {
-            let diffPattern2 = #"差\s*(\d{1,2})\s*分?\s*(\d{1,2})\s*(?:点|时)"#
+            let diffPattern2 = #"差\s*(\d{1,2})\s*(?:分钟|分)?\s*(\d{1,2})\s*(?:点|时)"#
             if let regex = try? NSRegularExpression(pattern: diffPattern2) {
                 let ns = normalized as NSString
                 if let match = regex.matches(in: normalized, range: NSRange(location: 0, length: ns.length)).first {
@@ -457,7 +457,7 @@ public struct VoiceCommandParser {
 
         // 3. X点 / X时 (含零点 / 0点及后接分钟提取)
         if hour == nil {
-            let pointPattern = #"(\d{1,2})\s*(?:点|时)(?:\s*(?:过|零|0)?\s*(\d{1,2})\s*分?)?"#
+            let pointPattern = #"(\d{1,2})\s*(?:点|时)(?:\s*(?:过|零|0)?\s*(\d{1,2})\s*(?:分钟|分)?)?"#
             if let regex = try? NSRegularExpression(pattern: pointPattern) {
                 let ns = normalized as NSString
                 if let match = regex.matches(in: normalized, range: NSRange(location: 0, length: ns.length)).first {
@@ -480,7 +480,7 @@ public struct VoiceCommandParser {
 
         // 4. 兜底后置分钟（以防复杂修饰语未被第3条捕获）
         if minute == 0 {
-            let minPattern = #"(?:点|时)\s*(?:过|零|0)?\s*(\d{1,2})\s*分"#
+            let minPattern = #"(?:点|时)\s*(?:过|零|0)?\s*(\d{1,2})\s*(?:分钟|分)"#
             if let regex = try? NSRegularExpression(pattern: minPattern) {
                 let ns = normalized as NSString
                 if let match = regex.matches(in: normalized, range: NSRange(location: 0, length: ns.length)).first {
@@ -1146,6 +1146,23 @@ public struct VoiceCommandParser {
                 str.replaceSubrange(range, with: "\(value)")
             }
         }
+
+        // 温度“X度半”与“半度”精确解析 (v1.9.49 闭环“二十六度半/26度半/开到25度半/一度半/两度半”及“升温半度/降半度/调低半度/全屋升高半度”)
+        let degreeHalfPattern = #"([一二两三四五六七八九\d]+)度半"#
+        if let regex = try? NSRegularExpression(pattern: degreeHalfPattern) {
+            let ns = str as NSString
+            let matches = regex.matches(in: str, range: NSRange(location: 0, length: ns.length)).reversed()
+            for m in matches {
+                let digitStr = ns.substring(with: m.range(at: 1))
+                let digitVal: Double = {
+                    if let d = Double(digitStr) { return d }
+                    return Double(digitMap[digitStr.first ?? " "] ?? 0)
+                }()
+                let range = Range(m.range, in: str)!
+                str.replaceSubrange(range, with: "\(formatTemp(digitVal + 0.5))度")
+            }
+        }
+        str = str.replacingOccurrences(of: "半度", with: "0.5度")
 
         for (cn, val) in digitMap {
             str = str.replacingOccurrences(of: String(cn), with: "\(val)")

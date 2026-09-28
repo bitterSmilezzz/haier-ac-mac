@@ -6,6 +6,17 @@ A native SwiftUI app to control Haier / Leader (统帅) smart air conditioners o
 
 ## Features
 
+- 🏷 **Natural Language Half-Degree Temperature Tuning, Differential Time "Minute" Reverse Parsing, Turbo Airflow Filter Dynamics & Status Bar Matrix Real-Time Perception (v1.9.49)**:
+  - ⏱️ **Natural Language "Half-Degree" Temperature High-Precision Tuning & Differential "Minute" Inverse Scheduling (`VoiceCommandParser` / `VoiceCommandParserTests`)**:
+    - **"X度半" Absolute Temperature Extraction**: Permanently fixed the precision loss where high-frequency colloquial phrases ("二十六度半", "26度半", "开到25度半", "制冷二十六度半", "全屋二十六度半") dropped the "半" suffix and downgraded to integer values (e.g., 26°C); introduced `([一二两三四五六七八九\d]+)度半` pattern mapping accurately to decimal values (26.5°C, 25.5°C);
+    - **"半度" and Compound "一度半/两度半" Relative Step Adjustment**: Thoroughly fixed relative temperature commands ("升温半度", "调高半度", "降半度", "调低半度", "降低半度", "升高半度", "全屋升高半度", "全屋降半度") which previously failed number extraction and defaulted to 1.0°C; standardized "半度" to "0.5度", allowing `extractNumber` and `validDelta` to accurately apply 0.5°C micro-stepping; also supports composite adjustments like "调高一度半" (+1.5°C) and "降温两度半" (-2.5°C);
+    - **Differential / Inverse Scheduling Minute Regex Expansion**: In `parseScheduleTime`, updated inverse differential patterns `diffPattern1` and `diffPattern2` to match `(?:分钟|分)?`, eradicating failures for phrases containing "分钟" (e.g., "差五分钟十点关机", "10点差5分钟关机", "差5分钟10点关机", "差一刻钟十点关机", "十点差一刻钟关机", "差三刻钟十点关机", "差半小时八点关机", "八点差半小时关机").
+  - 🍃 **Airflow Filter Wear Factor Turbo / High Speed Alignment (`AppModel`)**:
+    - Fixed `AppModel.calculateFilterWearFactor` where `windFactor` only checked `"强力" / "turbo" / "超强"`, missing the primary Haier AC gears `"强劲"` and `"强"`;
+    - Accurately assigns a 1.70 wear factor (up from the incorrect 1.00 baseline) when operating in Turbo / Strong airflow mode, matching `EnergyAnalyticsEngine`.
+  - 🍱 **macOS Native Status Bar Device Matrix Real-Time State Perception (`StatusItemController`)**:
+    - The right-click status bar context menu entries in "空调设备控制矩阵" now dynamically display active operating modes and target temperatures: e.g., `(🟢 制冷 26°C)`, `(🟢 制热 20°C)`, `(🟢 除湿 24°C)`, `(🟢 自动 24°C)`, `(🟢 送风)` instead of a generic `(🟢 开机)`;
+    - Delivers full visibility into whole-home climate states directly from the status bar menu.
 - 🏷 **Natural Language Midnight/Noon Clock Calibration, Differential Minute/Quarter Parsing, Auto Mode Latent Heat Dynamics & Status Bar Device Matrix Perception (v1.9.48)**:
   - ⏱️ **Natural Language Midnight & Noon Clock Calibration, Missing Minutes & Differential "差分/差刻" Time Parsing Defect Eradication (`VoiceCommandParser` / `VoiceCommandParserTests`)**:
     - Permanently eradicated the severe time-drift flaw for colloquial midnight hours ("晚上12点", "今晚12点", "半夜12点", "午夜12点", "凌晨12点", "今晚零点", "晚上0点"): previously, `isPM` incorrectly added 12 hours, misclassifying midnight as midday 12:00; now strictly normalized to `00:00`;

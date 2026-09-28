@@ -1078,6 +1078,93 @@ final class VoiceCommandParserTests: XCTestCase {
         XCTAssertEqual(sc4?.command, .schedulePower(hour: 10, minute: 30, power: false))
     }
 
+    // MARK: - 半度温度微调与差分“分钟”逆序时间测试 (v1.9.49)
+
+    func testTemperatureHalfDegreeParsing() {
+        // “X度半”绝对温度解析 (v1.9.49 彻底杜绝丢失“半度”降级为整数)
+        let t1 = VoiceCommandParser.parse("二十六度半")
+        XCTAssertEqual(t1?.command, .setTemperature(26.5))
+
+        let t2 = VoiceCommandParser.parse("26度半")
+        XCTAssertEqual(t2?.command, .setTemperature(26.5))
+
+        let t3 = VoiceCommandParser.parse("调到二十六度半")
+        XCTAssertEqual(t3?.command, .setTemperature(26.5))
+
+        let t4 = VoiceCommandParser.parse("开到25度半")
+        XCTAssertEqual(t4?.command, .setTemperature(25.5))
+
+        let t5 = VoiceCommandParser.parse("制冷二十六度半")
+        XCTAssertEqual(t5?.command, .setModeAndTemperature(mode: "制冷", temperature: 26.5))
+
+        let t6 = VoiceCommandParser.parse("全屋二十六度半")
+        XCTAssertEqual(t6?.command, .setTemperatureAll(26.5))
+
+        let t7 = VoiceCommandParser.parse("全部空调调到26度半")
+        XCTAssertEqual(t7?.command, .setTemperatureAll(26.5))
+
+        // “半度”与复合“X度半”相对升降温步进 (v1.9.49 解决半度被误判为1度缺陷)
+        let r1 = VoiceCommandParser.parse("升温半度")
+        XCTAssertEqual(r1?.command, .adjustTemperature(delta: 0.5))
+
+        let r2 = VoiceCommandParser.parse("调高半度")
+        XCTAssertEqual(r2?.command, .adjustTemperature(delta: 0.5))
+
+        let r3 = VoiceCommandParser.parse("升高半度")
+        XCTAssertEqual(r3?.command, .adjustTemperature(delta: 0.5))
+
+        let r4 = VoiceCommandParser.parse("降半度")
+        XCTAssertEqual(r4?.command, .adjustTemperature(delta: -0.5))
+
+        let r5 = VoiceCommandParser.parse("降温半度")
+        XCTAssertEqual(r5?.command, .adjustTemperature(delta: -0.5))
+
+        let r6 = VoiceCommandParser.parse("调低半度")
+        XCTAssertEqual(r6?.command, .adjustTemperature(delta: -0.5))
+
+        let r7 = VoiceCommandParser.parse("全屋升高半度")
+        XCTAssertEqual(r7?.command, .adjustTemperatureAll(delta: 0.5))
+
+        let r8 = VoiceCommandParser.parse("全屋降半度")
+        XCTAssertEqual(r8?.command, .adjustTemperatureAll(delta: -0.5))
+
+        let r9 = VoiceCommandParser.parse("调高一度半")
+        XCTAssertEqual(r9?.command, .adjustTemperature(delta: 1.5))
+
+        let r10 = VoiceCommandParser.parse("降温两度半")
+        XCTAssertEqual(r10?.command, .adjustTemperature(delta: -2.5))
+    }
+
+    func testScheduleTimeMinuteAndQuarterVariations() {
+        // “差分/差刻”倒算支持“分钟”与半小时 (v1.9.49)
+        let d1 = VoiceCommandParser.parse("十点差五分钟关机")
+        XCTAssertEqual(d1?.command, .schedulePower(hour: 9, minute: 55, power: false))
+
+        let d2 = VoiceCommandParser.parse("差五分钟十点关机")
+        XCTAssertEqual(d2?.command, .schedulePower(hour: 9, minute: 55, power: false))
+
+        let d3 = VoiceCommandParser.parse("差5分钟10点关机")
+        XCTAssertEqual(d3?.command, .schedulePower(hour: 9, minute: 55, power: false))
+
+        let d4 = VoiceCommandParser.parse("10点差5分钟关机")
+        XCTAssertEqual(d4?.command, .schedulePower(hour: 9, minute: 55, power: false))
+
+        let d5 = VoiceCommandParser.parse("差一刻钟十点关机")
+        XCTAssertEqual(d5?.command, .schedulePower(hour: 9, minute: 45, power: false))
+
+        let d6 = VoiceCommandParser.parse("十点差一刻钟关机")
+        XCTAssertEqual(d6?.command, .schedulePower(hour: 9, minute: 45, power: false))
+
+        let d7 = VoiceCommandParser.parse("差三刻钟十点关机")
+        XCTAssertEqual(d7?.command, .schedulePower(hour: 9, minute: 15, power: false))
+
+        let d8 = VoiceCommandParser.parse("差半小时八点关机")
+        XCTAssertEqual(d8?.command, .schedulePower(hour: 7, minute: 30, power: false))
+
+        let d9 = VoiceCommandParser.parse("八点差半小时关机")
+        XCTAssertEqual(d9?.command, .schedulePower(hour: 7, minute: 30, power: false))
+    }
+
     // MARK: - 无效输入测试
 
     func testInvalidCommands() {
