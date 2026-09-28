@@ -237,11 +237,24 @@ public final class EnergyAnalyticsEngine: ObservableObject {
     ) -> Double {
         let windOffset: Double = {
             guard let wind = windSpeed?.lowercased() else { return 40.0 }
-            if wind.contains("微") || wind.contains("静") { return 15.0 }
-            if wind.contains("低") { return 35.0 }
-            if wind.contains("中") { return 65.0 }
-            if wind.contains("高") { return 110.0 }
-            if wind.contains("强") { return 180.0 }
+            if wind.contains("强") || wind.contains("turbo") || wind.contains("超强") || wind.contains("最大") ||
+               wind.contains("3档") || wind.contains("三档") || wind == "3" {
+                return 180.0
+            }
+            if wind.contains("高") || wind.contains("high") || wind.contains("大风") || wind.contains("大") {
+                return 110.0
+            }
+            if wind.contains("中") || wind.contains("medium") || wind.contains("mid") ||
+               wind.contains("2档") || wind.contains("二档") || wind.contains("两档") || wind == "2" {
+                return 65.0
+            }
+            if wind.contains("低") || wind.contains("low") ||
+               wind.contains("1档") || wind.contains("一档") || wind == "1" || wind.contains("小风") {
+                return 35.0
+            }
+            if wind.contains("微") || wind.contains("静") || wind.contains("quiet") || wind.contains("mute") || wind.contains("micro") || wind.contains("柔") {
+                return 15.0
+            }
             return 40.0
         }()
 

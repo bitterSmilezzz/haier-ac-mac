@@ -6,6 +6,22 @@ A native SwiftUI app to control Haier / Leader (统帅) smart air conditioners o
 
 ## Features
 
+- 🏷 **Natural Language Delay Countdown Semantics & Instant Power-Off Guard, Colloquial Comfort Temp Stepping, Aerodynamic Airflow Symmetry & Status Bar Condition Perception (v1.9.50)**:
+  - ⏱️ **Natural Language Delay Countdown Semantics Closure & Immediate Shutdown Guard (`VoiceCommandParser` / `VoiceCommandParserTests`)**:
+    - **Prefix Delays and Direct Duration Countdown Alignment**: Permanently fixed the critical misoperation flaw where high-frequency spoken commands like "过半小时关机", "30分钟关机", "延迟半小时关机", "等一个小时关机", "全屋过半小时关机", "全屋30分钟关机", and "稍后30分钟开机" lacked the "后" or "定时" keywords, escaped countdown parsing, and were intercepted by immediate power toggles (`isPowerOff` / `isAllPowerOff`), immediately shutting down active air conditioners;
+    - **Delay Intent Guard**: Introduced `hasTimingOrCountdownIntent` to safeguard delay time expressions across all power actions and extended `parseScheduleOrCountdown` to support prefix delays (`过`, `等`, `延迟`, `延后`, `稍后`) and direct durations;
+    - **Clock Scheduling vs. Countdown Hierarchy Optimization**: Prioritizes clock schedule evaluations, guaranteeing inverse differential clock timings ("差半小时八点关机", "十点差五分关机") and countdowns operate with zero mutual interference;
+    - **Decimal Dot-5 Normalization & Wind/Negation Protection**: Added support for Arabic numerals with dot-5 (e.g. "1点5小时后关机" cleanly parses to 90 minutes), guarded immediate power toggles against wind level expressions ("开到最大", "开三档风"), expanded negative action patterns to cover ventilation and dehumidification, and allowed colloquial shutdown intent "别吹了".
+  - 🌡️ **Colloquial Thermal Sensation & Relative Stepping Expansion (`VoiceCommandParser` / `VoiceCommandParserTests`)**:
+    - Broadened relative stepping vocabulary to accommodate natural comfort expressions: "暖和点", "暖一点", "更热一点", "热点", "凉快一点", "凉快点", "更冷一点", "太冻了", "冻死了", "热死了";
+    - Seamless whole-house relative stepping linkage ("全屋暖和点" -> all units +1°C, "全屋凉快一点" -> all units -1°C).
+  - 🍃 **Aerodynamic Airflow Power Consumption & Filter Wear Symmetry (`EnergyAnalyticsEngine` / `AppModel`)**:
+    - Unified wind level evaluations in `EnergyAnalyticsEngine.estimateInstantaneousPower` and `AppModel.calculateFilterWearFactor` across English enumerations (`turbo`, `high`, `medium`, `mid`, `low`, `micro`, `quiet`, `mute`), gear digits (`1~3档`, `一/二/三档`), and colloquial descriptions (`超强`, `强劲`, `大风`, `小风`, `最大`, `最小`);
+    - Eradicated the regression where English gear tokens or numeric levels fell back to 40W baseline in `EnergyAnalyticsEngine`, restoring physical symmetry between thermodynamic power consumption and aerodynamic filter loading.
+  - 🍱 **macOS Native Status Bar Single-Device Real-Time Condition Header & Tooltip Refinement (`StatusItemController`)**:
+    - For single-device setups, introduced an informative condition header item at the top of the right-click menu (e.g. `🟢 客厅空调: ❄️ 制冷 26°C [强劲风] (室内 28°C)` or `⚪️ 客厅空调: 待机 (室内 28°C)`), providing instant visibility into operational states without opening panels;
+    - Enhanced status bar hover tooltips: integer temperatures omit superfluous `.0` decimals (`26°C`), and current fan speed labels (`[高风]`, `[中风]`, `[微风]`, `[自动风]`) are clearly indicated.
+
 - 🏷 **Natural Language Half-Degree Temperature Tuning, Differential Time "Minute" Reverse Parsing, Turbo Airflow Filter Dynamics & Status Bar Matrix Real-Time Perception (v1.9.49)**:
   - ⏱️ **Natural Language "Half-Degree" Temperature High-Precision Tuning & Differential "Minute" Inverse Scheduling (`VoiceCommandParser` / `VoiceCommandParserTests`)**:
     - **"X度半" Absolute Temperature Extraction**: Permanently fixed the precision loss where high-frequency colloquial phrases ("二十六度半", "26度半", "开到25度半", "制冷二十六度半", "全屋二十六度半") dropped the "半" suffix and downgraded to integer values (e.g., 26°C); introduced `([一二两三四五六七八九\d]+)度半` pattern mapping accurately to decimal values (26.5°C, 25.5°C);

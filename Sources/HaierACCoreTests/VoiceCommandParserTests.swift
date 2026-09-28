@@ -1165,6 +1165,115 @@ final class VoiceCommandParserTests: XCTestCase {
         XCTAssertEqual(d9?.command, .schedulePower(hour: 7, minute: 30, power: false))
     }
 
+    // MARK: - 延迟倒计时与直接时长防误关机测试 (v1.9.50)
+
+    func testCountdownDelayAndDirectDurationVariations() {
+        // 前置延迟助词（过/等/延迟/延后/稍后）与直接时长
+        let c1 = VoiceCommandParser.parse("过半小时关机")
+        XCTAssertEqual(c1?.command, .countdownPower(minutes: 30, power: false))
+        XCTAssertEqual(c1?.displayText, "设定 30 分钟后关机")
+
+        let c2 = VoiceCommandParser.parse("30分钟关机")
+        XCTAssertEqual(c2?.command, .countdownPower(minutes: 30, power: false))
+        XCTAssertEqual(c2?.displayText, "设定 30 分钟后关机")
+
+        let c3 = VoiceCommandParser.parse("延迟半小时关机")
+        XCTAssertEqual(c3?.command, .countdownPower(minutes: 30, power: false))
+
+        let c4 = VoiceCommandParser.parse("等一个小时关机")
+        XCTAssertEqual(c4?.command, .countdownPower(minutes: 60, power: false))
+        XCTAssertEqual(c4?.displayText, "设定 1 小时后关机")
+
+        let c5 = VoiceCommandParser.parse("稍后30分钟开机")
+        XCTAssertEqual(c5?.command, .countdownPower(minutes: 30, power: true))
+        XCTAssertEqual(c5?.displayText, "设定 30 分钟后开机")
+
+        let c6 = VoiceCommandParser.parse("全屋过半小时关机")
+        XCTAssertEqual(c6?.command, .countdownPower(minutes: 30, power: false))
+        XCTAssertEqual(c6?.displayText, "全屋设定 30 分钟后关机")
+
+        let c7 = VoiceCommandParser.parse("全屋30分钟关机")
+        XCTAssertEqual(c7?.command, .countdownPower(minutes: 30, power: false))
+        XCTAssertEqual(c7?.displayText, "全屋设定 30 分钟后关机")
+
+        let c8 = VoiceCommandParser.parse("1点5小时后关机")
+        XCTAssertEqual(c8?.command, .countdownPower(minutes: 90, power: false))
+
+        // 确保“差半小时八点关机”依然准确解析为钟点定时，不被倒计时抢占
+        let s1 = VoiceCommandParser.parse("差半小时八点关机")
+        XCTAssertEqual(s1?.command, .schedulePower(hour: 7, minute: 30, power: false))
+    }
+
+    // MARK: - 口语化冷暖体感与相对调温测试 (v1.9.50)
+
+    func testColloquialRelativeTemperatureVariations() {
+        let t1 = VoiceCommandParser.parse("暖和点")
+        XCTAssertEqual(t1?.command, .adjustTemperature(delta: 1.0))
+        XCTAssertEqual(t1?.displayText, "升温 1°C")
+
+        let t2 = VoiceCommandParser.parse("暖一点")
+        XCTAssertEqual(t2?.command, .adjustTemperature(delta: 1.0))
+
+        let t3 = VoiceCommandParser.parse("更热一点")
+        XCTAssertEqual(t3?.command, .adjustTemperature(delta: 1.0))
+
+        let t4 = VoiceCommandParser.parse("凉快一点")
+        XCTAssertEqual(t4?.command, .adjustTemperature(delta: -1.0))
+        XCTAssertEqual(t4?.displayText, "降温 1°C")
+
+        let t5 = VoiceCommandParser.parse("凉快点")
+        XCTAssertEqual(t5?.command, .adjustTemperature(delta: -1.0))
+
+        let t6 = VoiceCommandParser.parse("更冷一点")
+        XCTAssertEqual(t6?.command, .adjustTemperature(delta: -1.0))
+
+        let t7 = VoiceCommandParser.parse("太冻了")
+        XCTAssertEqual(t7?.command, .adjustTemperature(delta: 1.0))
+
+        let t8 = VoiceCommandParser.parse("冻死了")
+        XCTAssertEqual(t8?.command, .adjustTemperature(delta: 1.0))
+
+        let t9 = VoiceCommandParser.parse("热死了")
+        XCTAssertEqual(t9?.command, .adjustTemperature(delta: -1.0))
+
+        // 全屋相对调温联动
+        let all1 = VoiceCommandParser.parse("全屋暖和点")
+        XCTAssertEqual(all1?.command, .adjustTemperatureAll(delta: 1.0))
+        XCTAssertEqual(all1?.displayText, "全屋升温 1°C")
+
+        let all2 = VoiceCommandParser.parse("全屋凉快一点")
+        XCTAssertEqual(all2?.command, .adjustTemperatureAll(delta: -1.0))
+        XCTAssertEqual(all2?.displayText, "全屋降温 1°C")
+    }
+
+    // MARK: - 滤网重置与风量口令防误开机测试 (v1.9.50)
+
+    func testFilterResetAndWindGuards() {
+        let f1 = VoiceCommandParser.parse("洗过滤网了")
+        XCTAssertEqual(f1?.command, .resetFilterMaintenance)
+
+        let f2 = VoiceCommandParser.parse("更换滤网完成")
+        XCTAssertEqual(f2?.command, .resetFilterMaintenance)
+
+        let f3 = VoiceCommandParser.parse("滤网换过了")
+        XCTAssertEqual(f3?.command, .resetFilterMaintenance)
+
+        // “开到最大”或“开三档风”应解析为风速调节而非开启电源
+        let w1 = VoiceCommandParser.parse("开到最大")
+        XCTAssertEqual(w1?.command, .setWindSpeed("turbo"))
+
+        let w2 = VoiceCommandParser.parse("开三档风")
+        XCTAssertEqual(w2?.command, .setWindSpeed("high"))
+
+        // 动作否定包含送风/除湿
+        XCTAssertNil(VoiceCommandParser.parse("不要开送风"))
+        XCTAssertNil(VoiceCommandParser.parse("别抽湿"))
+
+        // 特例放行：“别吹了”等同关机
+        let off = VoiceCommandParser.parse("别吹了")
+        XCTAssertEqual(off?.command, .setPower(false))
+    }
+
     // MARK: - 无效输入测试
 
     func testInvalidCommands() {

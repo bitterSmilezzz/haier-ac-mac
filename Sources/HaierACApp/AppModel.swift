@@ -747,18 +747,21 @@ final class AppModel: ObservableObject {
         windSpeed: String,
         deviceId: String? = nil
     ) -> Double {
-        // 1. 风量通量因子（高速风量通过滤网单位时间截留更多浮尘颗粒） (v1.9.49 补齐“强劲/强”档位匹配，杜绝高风量被误判为默认基准)
+        // 1. 风量通量因子（高速风量通过滤网单位时间截留更多浮尘颗粒） (v1.9.49 补齐“强劲/强”档位匹配，v1.9.50 全面统配英文枚举、档位数字与口语描述)
         let windFactor: Double
         let speed = windSpeed.lowercased()
-        if speed.contains("强") || speed.contains("turbo") || speed.contains("超强") {
+        if speed.contains("强") || speed.contains("turbo") || speed.contains("超强") || speed.contains("最大") ||
+           speed.contains("3档") || speed.contains("三档") || speed == "3" {
             windFactor = 1.70
-        } else if speed.contains("高") || speed.contains("high") {
+        } else if speed.contains("高") || speed.contains("high") || speed.contains("大风") || speed.contains("大") {
             windFactor = 1.35
-        } else if speed.contains("中") || speed.contains("medium") || speed.contains("mid") {
+        } else if speed.contains("中") || speed.contains("medium") || speed.contains("mid") ||
+                  speed.contains("2档") || speed.contains("二档") || speed.contains("两档") || speed == "2" {
             windFactor = 1.00
-        } else if speed.contains("低") || speed.contains("low") {
+        } else if speed.contains("低") || speed.contains("low") ||
+                  speed.contains("1档") || speed.contains("一档") || speed == "1" || speed.contains("小风") {
             windFactor = 0.80
-        } else if speed.contains("微") || speed.contains("静") || speed.contains("quiet") || speed.contains("mute") {
+        } else if speed.contains("微") || speed.contains("静") || speed.contains("quiet") || speed.contains("mute") || speed.contains("micro") || speed.contains("柔") {
             windFactor = 0.60
         } else {
             windFactor = 1.00 // 自动风速默认基准
@@ -3086,7 +3089,7 @@ final class AppModel: ObservableObject {
         guard let url = URL(string: "https://api.github.com/repos/bitterSmilezzz/haier-ac-mac/releases/latest") else { return }
         var request = URLRequest(url: url)
         request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
-        let appVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.9.48"
+        let appVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.9.50"
         request.setValue("HaierAC-Mac/\(appVersion)", forHTTPHeaderField: "User-Agent")
         guard let (data, _) = try? await URLSession.shared.data(for: request),
               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],

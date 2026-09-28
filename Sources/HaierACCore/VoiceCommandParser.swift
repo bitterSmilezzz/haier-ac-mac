@@ -250,16 +250,16 @@ public struct VoiceCommandParser {
 
         let resetKeywords = [
             "重置", "复位", "清零", "已清洗", "清洗完成", "洗好了", "洗完了", "洗过了", "洗好", "洗完",
-            "已洗", "刚洗", "换好了", "换完了", "已更换", "更换完成", "换新", "换了新", "装了新", "已装好", "恢复100"
+            "已洗", "刚洗", "洗过", "洗了", "换过", "换了", "已换", "换好了", "换完了", "已更换", "更换完成", "换新", "换了新", "装了新", "已装好", "恢复100"
         ]
 
         if resetKeywords.contains(where: { text.contains($0) }) {
             return true
         }
 
-        // 结构化时态匹配：包含“洗/换/擦”且包含“干净了/好了/完了/过了/搞定”
+        // 结构化时态匹配：包含“洗/换/擦”且包含“干净了/好了/完了/过了/搞定/完成”
         if (text.contains("洗") || text.contains("换") || text.contains("擦")) &&
-           (text.contains("干净了") || text.contains("好了") || text.contains("完了") || text.contains("过了") || text.contains("搞定")) {
+           (text.contains("干净了") || text.contains("好了") || text.contains("完了") || text.contains("过了") || text.contains("搞定") || text.contains("完成")) {
             return true
         }
 
@@ -282,38 +282,11 @@ public struct VoiceCommandParser {
     private static func parseScheduleOrCountdown(_ text: String) -> VoiceParseResult? {
         let isAll = isAllDeviceScope(text)
 
-        // 判定是否包含明确的具体钟点时间指示词（点/时/:），此时即使包含“定时”与“分”（如“定时在十点五分关机”），也不应误判为倒计时 (v1.9.48)
-        let withoutTiming = text.replacingOccurrences(of: "定时", with: "")
-        let hasClockTime = (withoutTiming.contains("点") || withoutTiming.contains("时") || withoutTiming.contains(":")) &&
-                           !withoutTiming.contains("小时") && !withoutTiming.contains("钟头") &&
-                           !withoutTiming.contains("后") && !withoutTiming.contains("倒计时")
-
-        // 先判断是否为倒计时（如包含“后”、“倒计时”、“定时关/开”或“定时X分钟/小时”）
-        if !hasClockTime && (text.contains("后") || text.contains("倒计时") ||
-           text.contains("定时关") || text.contains("定时开") ||
-           (text.contains("定时") && (text.contains("分") || text.contains("小时") || text.contains("钟头")))) {
-            if let minutes = parseCountdownMinutes(from: text) {
-                let isPowerOn = text.contains("开") && !text.contains("关")
-                let actionStr = isPowerOn ? "开机" : "关机"
-                let timeStr: String
-                if minutes >= 60 && minutes % 60 == 0 {
-                    timeStr = "\(minutes / 60) 小时"
-                } else {
-                    timeStr = "\(minutes) 分钟"
-                }
-                let display = isAll ? "全屋设定 \(timeStr)后\(actionStr)" : "设定 \(timeStr)后\(actionStr)"
-                return VoiceParseResult(
-                    command: .countdownPower(minutes: minutes, power: isPowerOn),
-                    displayText: display
-                )
-            }
-        }
-
-        // 再判断是否为指定具体钟点定时（如“晚上10点关机”、“明早7点开空调”）
-        // 必须包含关机/开机意图或“定时”，避免“大风一点”、“调高一点”等“一点”被误判为 1 点钟
-        if (text.contains("关") || text.contains("开") || text.contains("定时") || text.contains("预约")),
+        // 1. 优先判断指定具体钟点定时（如“晚上10点关机”、“明早7点开空调”、“差半小时八点关机”、“十点差五分关机”）
+        // 必须包含关机/开机/停意图或“定时/预约”，避免“大风一点”、“调高一点”等“一点”被误判为 1 点钟 (v1.9.48, v1.9.50)
+        if (text.contains("关") || text.contains("开") || text.contains("停") || text.contains("定时") || text.contains("预约")),
            let time = parseScheduleTime(from: text) {
-            let isPowerOn = text.contains("开") && !text.contains("关")
+            let isPowerOn = text.contains("开") && !text.contains("关") && !text.contains("停")
             let actionStr = isPowerOn ? "开机" : "关机"
             let timeStr = String(format: "%02d:%02d", time.hour, time.minute)
             let display = isAll ? "定时全屋在 \(timeStr) \(actionStr)" : "定时在 \(timeStr) \(actionStr)"
@@ -321,6 +294,33 @@ public struct VoiceCommandParser {
                 command: .schedulePower(hour: time.hour, minute: time.minute, power: isPowerOn),
                 displayText: display
             )
+        }
+
+        // 2. 判断倒计时（如包含“后”、“倒计时”、“定时关/开”、“定时X分钟/小时”或前置“过/等/延迟/稍后”及直接持续时间“30分钟关机/半小时关机”） (v1.9.50)
+        let isCountdownTrigger = (text.contains("后") || text.contains("倒计时") ||
+                                  text.contains("定时关") || text.contains("定时开") ||
+                                  (text.contains("定时") && (text.contains("分") || text.contains("小时") || text.contains("钟头"))) ||
+                                  text.contains("过") || text.contains("等") || text.contains("延迟") || text.contains("延后") || text.contains("稍后"))
+        let hasDuration = (text.contains("分") || text.contains("小时") || text.contains("钟头") || text.contains("半") || text.contains("刻"))
+
+        if isCountdownTrigger || hasDuration {
+            if let minutes = parseCountdownMinutes(from: text), minutes > 0 {
+                if text.contains("关") || text.contains("开") || text.contains("停") || text.contains("定时") || text.contains("倒计时") {
+                    let isPowerOn = text.contains("开") && !text.contains("关") && !text.contains("停")
+                    let actionStr = isPowerOn ? "开机" : "关机"
+                    let timeStr: String
+                    if minutes >= 60 && minutes % 60 == 0 {
+                        timeStr = "\(minutes / 60) 小时"
+                    } else {
+                        timeStr = "\(minutes) 分钟"
+                    }
+                    let display = isAll ? "全屋设定 \(timeStr)后\(actionStr)" : "设定 \(timeStr)后\(actionStr)"
+                    return VoiceParseResult(
+                        command: .countdownPower(minutes: minutes, power: isPowerOn),
+                        displayText: display
+                    )
+                }
+            }
         }
 
         return nil
@@ -520,19 +520,24 @@ public struct VoiceCommandParser {
     private static let negativeActionRegex: NSRegularExpression? = {
         // 否定词（别/不要/不用/不必/无需/先别/先不要/暂不/暂不要/千万别/千万不要/不能/不可以/切勿/切莫/不要再/别再/暂时不用/暂时不要）
         // 允许中间插入 0~6 个任意非标点非空白字符（如“给我”、“帮我”、“急着”、“现在”、“太快”、“乱”、“随便”等，彻底杜绝插字绕过漏洞） (v1.9.40)
-        // 动作谓词（关/停/开/启动/运转/打开/关闭/调/设/升/降/重置/复位/清零） (v1.9.39 扩展调温与变频动作否定, v1.9.45 扩展滤网重置否定)
-        let pattern = #"(?:别|不要|不用|不必|无需|先别|先不要|暂不|暂不要|千万别|千万不要|不能|不可以|切勿|切莫|不要再|别再|暂时不用|暂时不要)[^，。！？\s]{0,6}?(?:关|停|开|启动|运转|打开|关闭|调|设|升|降|重置|复位|清零)"#
+        // 动作谓词（关/停/开/启动/运转/打开/关闭/调/设/升/降/重置/复位/清零/吹/送/抽/除） (v1.9.39 扩展调温与变频动作否定, v1.9.45 扩展滤网重置否定, v1.9.50 扩展吹风除湿动作否定)
+        let pattern = #"(?:别|不要|不用|不必|无需|先别|先不要|暂不|暂不要|千万别|千万不要|不能|不可以|切勿|切莫|不要再|别再|暂时不用|暂时不要)[^，。！？\s]{0,6}?(?:关|停|开|启动|运转|打开|关闭|调|设|升|降|重置|复位|清零|吹|送|抽|除)"#
         return try? NSRegularExpression(pattern: pattern)
     }()
 
-    /// 检测文本中是否包含针对开关机/调温/模式动作的否定意图（如“别关”、“不要开”、“先别急着关”、“别给我关了”、“千万别现在关”、“别开制冷”、“不要调”、“别重置”等，防止误触发） (v1.9.36, v1.9.40, v1.9.45)
+    /// 检测文本中是否包含针对开关机/调温/模式动作的否定意图（如“别关”、“不要开”、“先别急着关”、“别给我关了”、“千万别现在关”、“别开制冷”、“不要调”、“别重置”、“别吹风”等，防止误触发） (v1.9.36, v1.9.40, v1.9.45, v1.9.50)
     private static func containsNegativeAction(_ text: String) -> Bool {
+        // 特例：“别吹了”属于日常高频关机意图（显式关机口令，非动作否定拦截）
+        if text.contains("别吹了") {
+            return false
+        }
         guard let regex = negativeActionRegex else {
             let fallbackPatterns = [
                 "别关", "不要关", "不用关", "先别关", "先不要关", "暂不关", "不能关", "不可以关", "别停", "不要停", "不用停",
                 "别开", "不要开", "不用开", "先别开", "先不要开", "暂不开", "不能开", "不可以开", "别启动", "不要启动",
                 "别调", "不要调", "不用调", "别设", "不要设", "别升", "不要升", "别降", "不要降",
                 "别重置", "不要重置", "不用重置", "别复位", "不要复位", "别清零",
+                "别吹", "不要吹", "不用吹", "别送风", "不要送风", "别抽湿", "不要抽湿", "别除湿", "不要除湿",
                 "别给我关", "千万别关", "千万别开"
             ]
             return fallbackPatterns.contains(where: { text.contains($0) })
@@ -549,10 +554,31 @@ public struct VoiceCommandParser {
         targetRoomKeywords.contains(where: { text.contains($0) })
     }
 
+    /// 判断口令是否包含定时、倒计时或延迟执行时间语义，杜绝误触发即时开关机 (v1.9.50)
+    private static func hasTimingOrCountdownIntent(_ text: String) -> Bool {
+        if text.contains("后") || text.contains("倒计时") || text.contains("定时") || text.contains("预约") ||
+           text.contains("延迟") || text.contains("延后") || text.contains("稍后") {
+            return true
+        }
+        if text.contains("过") && (text.contains("分") || text.contains("小时") || text.contains("钟头") || text.contains("半") || text.contains("刻")) {
+            return true
+        }
+        if text.contains("等") && (text.contains("分") || text.contains("小时") || text.contains("钟头") || text.contains("半") || text.contains("刻")) {
+            return true
+        }
+        if parseCountdownMinutes(from: text) != nil {
+            return true
+        }
+        if parseScheduleTime(from: text) != nil {
+            return true
+        }
+        return false
+    }
+
     private static func isAllPowerOff(_ text: String) -> Bool {
         guard !containsNegativeAction(text) else { return false }
-        // 排除定时与倒计时命令（如“全屋30分钟后关机”、“全屋定时关机”、“所有空调晚上10点关机”） (v1.9.40)
-        if text.contains("后") || text.contains("倒计时") || text.contains("定时") || text.contains("预约") {
+        // 排除定时与倒计时命令（如“全屋30分钟后关机”、“全屋过半小时关机”、“全屋30分钟关机”、“所有空调晚上10点关机”） (v1.9.40, v1.9.50)
+        if hasTimingOrCountdownIntent(text) {
             return false
         }
         // 若口令中包含明确的定向房间/设备词且未包含全屋全局作用域词（如“客厅和主卧都关了”），
@@ -595,8 +621,9 @@ public struct VoiceCommandParser {
         guard !containsNegativeAction(text) else { return nil }
         guard isAllDeviceScope(text) else { return nil }
 
-        // 排除风速调节命令（如“全屋自动风”、“全屋开大风”、“所有空调微风”） (v1.9.41)
-        if text.contains("自动风") || text.contains("风速") || text.contains("微风") || text.contains("大风") || text.contains("强劲") {
+        // 排除风速调节命令（如“全屋自动风”、“全屋开大风”、“所有空调微风”、“全屋开到最大”） (v1.9.41, v1.9.50)
+        if text.contains("自动风") || text.contains("风速") || text.contains("微风") || text.contains("大风") || text.contains("强劲") ||
+           text.contains("最大") || text.contains("最小") {
             return nil
         }
 
@@ -687,8 +714,8 @@ public struct VoiceCommandParser {
 
     private static func isAllPowerOn(_ text: String) -> Bool {
         guard !containsNegativeAction(text) else { return false }
-        // 排除定时与倒计时命令（如“全屋半小时后开机”、“全屋明早7点开机”） (v1.9.40)
-        if text.contains("后") || text.contains("倒计时") || text.contains("定时") || text.contains("预约") {
+        // 排除定时与倒计时命令（如“全屋半小时后开机”、“全屋过半小时开机”、“全屋明早7点开机”） (v1.9.40, v1.9.50)
+        if hasTimingOrCountdownIntent(text) {
             return false
         }
         // 若口令包含明确的定向房间/设备词且未包含全屋全局作用域词（如“客厅和次卧都开了”），
@@ -705,9 +732,10 @@ public struct VoiceCommandParser {
            text.contains("冷风") || text.contains("暖风") || text.contains("度") {
             return false
         }
-        // 排除风速调节命令（如“全屋开大风”、“所有空调开微风”、“全屋自动风”） (v1.9.41)
+        // 排除风速调节命令（如“全屋开大风”、“所有空调开微风”、“全屋自动风”、“全屋开到最大”） (v1.9.41, v1.9.50)
         let windKeywords = [
-            "自动风", "风速", "大风", "风大", "强劲", "高风", "微风", "小风", "风小", "静音", "柔风", "低风", "中风"
+            "自动风", "风速", "大风", "风大", "强劲", "高风", "微风", "小风", "风小", "静音", "柔风", "低风", "中风",
+            "最大", "最小", "开到最大", "开到最小", "高速风", "低速风", "中速风", "档", "档位", "档风"
         ]
         if windKeywords.contains(where: { text.contains($0) }) {
             return false
@@ -735,8 +763,8 @@ public struct VoiceCommandParser {
 
     private static func isPowerOff(_ text: String) -> Bool {
         guard !containsNegativeAction(text) else { return false }
-        // 排除定时与倒计时命令（如“30分钟后关机”、“晚上10点关空调”） (v1.9.40)
-        if text.contains("后") || text.contains("倒计时") || text.contains("定时") || text.contains("预约") {
+        // 排除定时与倒计时命令（如“30分钟后关机”、“过半小时关机”、“30分钟关机”、“晚上10点关空调”） (v1.9.40, v1.9.50)
+        if hasTimingOrCountdownIntent(text) {
             return false
         }
         // 排除风速调节（如“关小风”、“风速关小一点”）与相对调温（如“关小一点”） (v1.9.38)
@@ -763,8 +791,8 @@ public struct VoiceCommandParser {
 
     private static func isPowerOn(_ text: String) -> Bool {
         guard !containsNegativeAction(text) else { return false }
-        // 排除定时与倒计时命令（如“30分钟后开机”、“早上7点开空调”） (v1.9.40)
-        if text.contains("后") || text.contains("倒计时") || text.contains("定时") || text.contains("预约") {
+        // 排除定时与倒计时命令（如“30分钟后开机”、“过半小时开机”、“早上7点开空调”） (v1.9.40, v1.9.50)
+        if hasTimingOrCountdownIntent(text) {
             return false
         }
         // 排除带有具体有效温度（16~30°C）的口令（如“开26度”、“开26”、“打开25”、“开到26度”）(v1.9.40 彻底消除省略“度”字时被误判为单纯开机的缺陷)
@@ -779,9 +807,10 @@ public struct VoiceCommandParser {
         if modeKeywords.contains(where: { text.contains($0) }) {
             return false
         }
-        // 排除风速调节命令（如“开大风”、“开微风”、“开小风”、“开强劲风”、“开静音”、“自动风”）(v1.9.38)
+        // 排除风速调节命令（如“开大风”、“开微风”、“开小风”、“开强劲风”、“开静音”、“自动风”、“开到最大”、“开到最小”）(v1.9.38, v1.9.50)
         let windKeywords = [
-            "自动风", "风速", "大风", "风大", "强劲", "高风", "微风", "小风", "风小", "静音", "柔风", "低风", "中风"
+            "自动风", "风速", "大风", "风大", "强劲", "高风", "微风", "小风", "风小", "静音", "柔风", "低风", "中风",
+            "最大", "最小", "开到最大", "开到最小", "高速风", "低速风", "中速风", "档", "档位", "档风"
         ]
         if windKeywords.contains(where: { text.contains($0) }) {
             return false
@@ -810,8 +839,9 @@ public struct VoiceCommandParser {
         if text.contains("不要") || text.contains("别") || text.contains("不用") || text.contains("暂不") {
             return nil
         }
-        // 优先匹配带明确方向与幅度的口令（如“太冷了调高两度”、“升温2度”、“降温两度”、“降温1度”）
-        if text.contains("高") || text.contains("升") || text.contains("加") || text.contains("热一点") || text.contains("暖和一点") {
+        // 优先匹配带明确方向与幅度的口令（如“太冷了调高两度”、“升温2度”、“暖和一点”、“暖一点”、“更热一点”、“降温两度”、“凉快一点”、“凉快点”、“更冷一点”） (v1.9.50)
+        let warmerKeywords = ["高", "升", "加", "热一点", "热点", "更热", "暖和一点", "暖和点", "暖和些", "暖一点", "暖点", "暖些"]
+        if warmerKeywords.contains(where: { text.contains($0) }) {
             let delta = extractNumber(from: text) ?? 1.0
             let validDelta = (delta > 0 && delta <= 5) ? delta : 1.0
             return VoiceParseResult(
@@ -820,7 +850,8 @@ public struct VoiceCommandParser {
             )
         }
 
-        if text.contains("低") || text.contains("降") || text.contains("减") || text.contains("冷一点") || text.contains("凉一点") {
+        let coolerKeywords = ["低", "降", "减", "冷一点", "冷点", "更冷", "冷些", "凉一点", "凉点", "更凉", "凉些", "凉快一点", "凉快点", "凉快些"]
+        if coolerKeywords.contains(where: { text.contains($0) }) {
             let delta = extractNumber(from: text) ?? 1.0
             let validDelta = (delta > 0 && delta <= 5) ? delta : 1.0
             return VoiceParseResult(
@@ -833,7 +864,8 @@ public struct VoiceCommandParser {
         if text.contains("太热") || text.contains("好热") || text.contains("有点热") || text.contains("热死") {
             return VoiceParseResult(command: .adjustTemperature(delta: -1.0), displayText: "降温 1°C")
         }
-        if text.contains("太冷") || text.contains("好冷") || text.contains("有点冷") || text.contains("冷死") {
+        if text.contains("太冷") || text.contains("好冷") || text.contains("有点冷") || text.contains("冷死") ||
+           text.contains("太冻") || text.contains("好冻") || text.contains("有点冻") || text.contains("冻死") || text.contains("冻僵") {
             return VoiceParseResult(command: .adjustTemperature(delta: 1.0), displayText: "升温 1°C")
         }
 
@@ -1121,8 +1153,8 @@ public struct VoiceCommandParser {
         str = str.replacingOccurrences(of: "一百", with: "100")
 
         // 温度与时间小数转换：仅匹配紧跟“度/°/小时/个钟头”的小数点五（如“二十六点五度” -> 26.5度，“1点5小时” -> 1.5小时）
-        // 彻底杜绝无上下文粗暴替换“点五”导致“十点五分/八点五分/十点五十分”被破坏为“10.5分”进而被误判为5分钟倒计时的灾难性缺陷 (v1.9.47)
-        let decimalPointPattern = #"([一二两三四五六七八九\d]+)点五(?=度|°|个?小时|个钟头)"#
+        // 彻底杜绝无上下文粗暴替换“点五”导致“十点五分/八点五分/十点五十分”被破坏为“10.5分”进而被误判为5分钟倒计时的灾难性缺陷 (v1.9.47, v1.9.50 支持阿拉伯数字“点5”)
+        let decimalPointPattern = #"([一二两三四五六七八九\d]+)点(?:五|5)(?=度|°|个?小时|个钟头)"#
         if let regex = try? NSRegularExpression(pattern: decimalPointPattern) {
             let ns = str as NSString
             let matches = regex.matches(in: str, range: NSRange(location: 0, length: ns.length)).reversed()

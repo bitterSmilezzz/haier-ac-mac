@@ -164,15 +164,26 @@ final class StatusItemController: NSObject {
                         } else {
                             modeGlyph = "⚙️ 运行中"
                         }
-                        var line = "\(starPrefix) \(devName): \(modeGlyph) \(String(format: "%.1f°C", targetTemp))"
+                        let targetTempStr = (targetTemp.truncatingRemainder(dividingBy: 1.0) == 0)
+                            ? "\(Int(targetTemp))°C"
+                            : String(format: "%.1f°C", targetTemp)
+                        let rawWind = attrs["windSpeed"]?.value?.stringValue
+                        let windStr = formatDisplayWindSpeed(rawWind)
+                        var line = "\(starPrefix) \(devName): \(modeGlyph) \(targetTempStr) [\(windStr)]"
                         if let indoor = indoorTemp {
-                            line += " (室内 \(String(format: "%.1f°C", indoor)))"
+                            let indoorStr = (indoor.truncatingRemainder(dividingBy: 1.0) == 0)
+                                ? "\(Int(indoor))°C"
+                                : String(format: "%.1f°C", indoor)
+                            line += " (室内 \(indoorStr))"
                         }
                         tooltipParts.append(line)
                     } else {
                         var line = "\(starPrefix) \(devName): ⚪️ 待机"
                         if let indoor = indoorTemp {
-                            line += " (室内 \(String(format: "%.1f°C", indoor)))"
+                            let indoorStr = (indoor.truncatingRemainder(dividingBy: 1.0) == 0)
+                                ? "\(Int(indoor))°C"
+                                : String(format: "%.1f°C", indoor)
+                            line += " (室内 \(indoorStr))"
                         }
                         tooltipParts.append(line)
                     }
@@ -221,6 +232,19 @@ final class StatusItemController: NSObject {
 
         tooltipParts.append("💡 左键呼出快捷控制面板，右键展开系统菜单")
         button.toolTip = tooltipParts.joined(separator: "\n")
+    }
+
+    private func formatDisplayWindSpeed(_ raw: String?) -> String {
+        guard let raw = raw?.lowercased() else { return "自动风" }
+        if raw.contains("强") || raw.contains("turbo") || raw.contains("超强") || raw.contains("最大") ||
+           raw.contains("3档") || raw.contains("三档") || raw == "3" { return "强劲风" }
+        if raw.contains("高") || raw.contains("high") || raw.contains("大风") || raw.contains("大") { return "高风" }
+        if raw.contains("中") || raw.contains("medium") || raw.contains("mid") ||
+           raw.contains("2档") || raw.contains("二档") || raw.contains("两档") || raw == "2" { return "中风" }
+        if raw.contains("低") || raw.contains("low") ||
+           raw.contains("1档") || raw.contains("一档") || raw == "1" || raw.contains("小风") { return "低风" }
+        if raw.contains("微") || raw.contains("静") || raw.contains("quiet") || raw.contains("mute") || raw.contains("micro") || raw.contains("柔") { return "微风" }
+        return "自动风"
     }
 
     @objc private func togglePopover(_ sender: Any?) {
@@ -583,11 +607,48 @@ final class StatusItemController: NSObject {
             menu.setSubmenu(devicesMenu, for: devicesParentItem)
             menu.addItem(devicesParentItem)
         } else if let dev = allDevices.first {
-            // 单设备场景：保留快速电源开关与一键冷暖预设及升降温步进 (v1.9.33, v1.9.35, v1.9.36 补齐除湿送风)
+            // 单设备场景：当前运行工况感知信息标头与控制预设 (v1.9.33, v1.9.35, v1.9.36 补齐除湿送风, v1.9.50 增设当前运行工况与室内温感知状态标头)
             let isPowerOn = model.attribute("onOffStatus", deviceId: dev.id)?.boolValue ?? false
             let isControllable = model.reachability(for: dev.id).isControllable
             let curTemp = model.attribute("targetTemperature", deviceId: dev.id)?.doubleValue ?? 26.0
             let curTempStr = curTemp.truncatingRemainder(dividingBy: 1.0) == 0 ? "\(Int(curTemp))" : String(format: "%.1f", curTemp)
+            let indoorTemp = model.currentIndoorTemperature(for: dev.id)
+            let rawMode = model.attribute("operationMode", deviceId: dev.id)?.stringValue
+            let modeCode = ACModeCode.match(from: rawMode)
+            let rawWind = model.attribute("windSpeed", deviceId: dev.id)?.stringValue
+            let windStr = formatDisplayWindSpeed(rawWind)
+
+            let conditionTitle: String = {
+                let indoorStr: String = {
+                    guard let indoor = indoorTemp else { return "" }
+                    let s = indoor.truncatingRemainder(dividingBy: 1.0) == 0 ? "\(Int(indoor))°C" : String(format: "%.1f°C", indoor)
+                    return " (室内 \(s))"
+                }()
+                if !isControllable {
+                    return "⚡️ \(dev.name): 离线\(indoorStr)"
+                }
+                if isPowerOn {
+                    let modeStr: String = {
+                        if let modeCode = modeCode {
+                            switch modeCode {
+                            case .cooling: return "❄️ 制冷"
+                            case .heating: return "🔥 制热"
+                            case .fan: return "🍃 送风"
+                            case .dehumidify: return "💧 除湿"
+                            case .auto: return "🔄 自动"
+                            }
+                        }
+                        return "⚙️ 运行中"
+                    }()
+                    return "🟢 \(dev.name): \(modeStr) \(curTempStr)°C [\(windStr)]\(indoorStr)"
+                } else {
+                    return "⚪️ \(dev.name): 待机\(indoorStr)"
+                }
+            }()
+            let headerItem = NSMenuItem(title: conditionTitle, action: nil, keyEquivalent: "")
+            headerItem.isEnabled = false
+            menu.addItem(headerItem)
+            menu.addItem(.separator())
 
             let powerTitle = isPowerOn ? "关机「\(dev.name)」" : "开机「\(dev.name)」"
             let powerItem = NSMenuItem(title: powerTitle, action: #selector(togglePrimaryPower), keyEquivalent: "")
