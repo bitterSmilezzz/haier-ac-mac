@@ -304,7 +304,7 @@ public struct VoiceCommandParser {
             let actionStr = isPowerOn ? "开机" : "关机"
             let timeStr = String(format: "%02d:%02d", time.hour, time.minute)
 
-            // 循环周期判定 (v1.9.56 支持每天/工作日/周末/按星期重复定时, v1.9.57 补齐单星期与扩展周期重复定时, v1.9.58 补齐礼拜周期与多日复合星期一三五/二四六)
+            // 循环周期判定 (v1.9.56 支持每天/工作日/周末/按星期重复定时, v1.9.57 补齐单星期与扩展周期重复定时, v1.9.58 补齐礼拜周期与多日复合星期一三五/二四六, v1.9.59 补齐周一至周三/周二至周五/周五至周日复合星期)
             let repeatInfo: (weekdays: [Int], label: String)? = {
                 if text.contains("工作日") || text.contains("平时") || text.contains("周一到周五") || text.contains("周一至周五") || text.contains("星期一到星期五") || text.contains("星期一至星期五") || text.contains("礼拜一到礼拜五") || text.contains("礼拜一至礼拜五") {
                     return ([2, 3, 4, 5, 6], "工作日")
@@ -312,6 +312,12 @@ public struct VoiceCommandParser {
                     return ([2, 3, 4, 5, 6, 7], "周一至周六")
                 } else if text.contains("周一到周四") || text.contains("周一至周四") || text.contains("星期一到星期四") || text.contains("星期一至星期四") || text.contains("礼拜一到礼拜四") || text.contains("礼拜一至礼拜四") {
                     return ([2, 3, 4, 5], "周一至周四")
+                } else if text.contains("周一到周三") || text.contains("周一至周三") || text.contains("星期一到星期三") || text.contains("星期一至星期三") || text.contains("礼拜一到礼拜三") || text.contains("礼拜一至礼拜三") {
+                    return ([2, 3, 4], "周一至周三")
+                } else if text.contains("周二到周五") || text.contains("周二至周五") || text.contains("星期二到星期五") || text.contains("星期二至星期五") || text.contains("礼拜二到礼拜五") || text.contains("礼拜二至礼拜五") {
+                    return ([3, 4, 5, 6], "周二至周五")
+                } else if text.contains("周五到周日") || text.contains("周五至周日") || text.contains("星期五到星期天") || text.contains("星期五至星期天") || text.contains("星期五到星期日") || text.contains("星期五至星期日") || text.contains("礼拜五到礼拜天") || text.contains("礼拜五至礼拜天") || text.contains("礼拜五到礼拜日") || text.contains("礼拜五至礼拜日") || text.contains("周五周六周日") || text.contains("周五周六周天") || text.contains("周末三天") {
+                    return ([1, 6, 7], "周五至周日")
                 } else if text.contains("一三五") || text.contains("一、三、五") {
                     return ([2, 4, 6], "每周一、三、五")
                 } else if text.contains("二四六") || text.contains("二、四、六") {
@@ -636,14 +642,17 @@ public struct VoiceCommandParser {
         targetRoomKeywords.contains(where: { text.contains($0) })
     }
 
-    /// 判断口令是否包含定时、倒计时或延迟执行时间语义，杜绝误触发即时开关机 (v1.9.50, v1.9.56, v1.9.57)
+    /// 判断口令是否包含定时、倒计时或延迟执行时间语义，杜绝误触发即时开关机 (v1.9.50, v1.9.56, v1.9.57, v1.9.59)
     private static func hasTimingOrCountdownIntent(_ text: String) -> Bool {
         if text.contains("后") || text.contains("倒计时") || text.contains("定时") || text.contains("预约") ||
            text.contains("延迟") || text.contains("延后") || text.contains("稍后") ||
            text.contains("每天") || text.contains("天天") || text.contains("每日") || text.contains("每晚") || text.contains("每早") || text.contains("每夜") ||
            text.contains("工作日") || text.contains("周末") || text.contains("双休") ||
            text.contains("每周") || text.contains("每逢") || text.contains("逢周") || text.contains("每个周") || text.contains("每个星期") ||
-           text.contains("礼拜") || text.contains("逢星期") || text.contains("一三五") || text.contains("二四六") || text.contains("二四") {
+           text.contains("礼拜") || text.contains("逢星期") || text.contains("一三五") || text.contains("二四六") || text.contains("二四") ||
+           text.contains("周一到") || text.contains("周一至") || text.contains("周二到") || text.contains("周二至") ||
+           text.contains("周五到") || text.contains("周五至") || text.contains("周末三天") || text.contains("星期一到") || text.contains("星期一至") ||
+           text.contains("礼拜一到") || text.contains("礼拜一至") {
             return true
         }
         if text.contains("过") && (text.contains("分") || text.contains("小时") || text.contains("钟头") || text.contains("半") || text.contains("刻")) {

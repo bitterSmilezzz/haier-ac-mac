@@ -44,7 +44,7 @@ struct ScheduledAction: Identifiable, Codable, Hashable {
         AttrValueCodec.encode(value)
     }
 
-    /// 重复规则的中文描述（如「每天」「工作日」「周末」「每周一」「每周一、三、五」），一次性返回 nil (v1.9.57, v1.9.58)
+    /// 重复规则的中文描述（如「每天」「工作日」「周末」「每周一」「每周一、三、五」），一次性返回 nil (v1.9.57, v1.9.58, v1.9.59)
     var repeatLabel: String? {
         if !repeatWeekdays.isEmpty {
             let sorted = repeatWeekdays.sorted()
@@ -53,6 +53,9 @@ struct ScheduledAction: Identifiable, Codable, Hashable {
             if sorted == [1, 7] { return "周末" }
             if sorted == [2, 3, 4, 5, 6, 7] { return "周一至周六" }
             if sorted == [2, 3, 4, 5] { return "周一至周四" }
+            if sorted == [2, 3, 4] { return "周一至周三" }
+            if sorted == [3, 4, 5, 6] { return "周二至周五" }
+            if sorted == [1, 6, 7] { return "周五至周日" }
             if sorted == [2, 4, 6] { return "每周一、三、五" }
             if sorted == [3, 5, 7] { return "每周二、四、六" }
             if sorted == [3, 5] { return "每周二、四" }
@@ -212,6 +215,9 @@ public struct BedtimeSchedule: Codable, Equatable {
         if sorted == [1, 7] { return "周末" }
         if sorted == [2, 3, 4, 5, 6, 7] { return "周一至周六" }
         if sorted == [2, 3, 4, 5] { return "周一至周四" }
+        if sorted == [2, 3, 4] { return "周一至周三" }
+        if sorted == [3, 4, 5, 6] { return "周二至周五" }
+        if sorted == [1, 6, 7] { return "周五至周日" }
         if sorted == [2, 4, 6] { return "每周一、三、五" }
         if sorted == [3, 5, 7] { return "每周二、四、六" }
         if sorted == [3, 5] { return "每周二、四" }
@@ -771,7 +777,23 @@ final class AppModel: ObservableObject {
         } else if speed.contains("微") || speed.contains("静") || speed.contains("quiet") || speed.contains("mute") || speed.contains("micro") || speed.contains("柔") {
             windFactor = 0.60
         } else {
-            windFactor = 1.00 // 自动风速默认基准
+            // 自动风速热物理自适应通量校准 (v1.9.59)
+            // 当风速设为“自动”时，内机电控芯片根据室内温度与目标温度差值动态调整风机转速：
+            // 大温差重载（|indoor - target| >= 4.0°C）时自动拉升高风强循环，空气通量剧增，等效 windFactor = 1.30；
+            // 稳态微载（|indoor - target| <= 0.8°C）时自动降档至静音低风节能，等效 windFactor = 0.75；
+            // 常规平稳过渡区间与无温感时维持中性基准 1.00，彻底消除固定 1.00 导致的重载低估与稳态高估。
+            if let indoor = indoorTemp {
+                let tempDelta = abs(indoor - targetTemp)
+                if tempDelta >= 4.0 {
+                    windFactor = 1.30
+                } else if tempDelta <= 0.8 {
+                    windFactor = 0.75
+                } else {
+                    windFactor = 1.00
+                }
+            } else {
+                windFactor = 1.00 // 自动风速默认中性基准
+            }
         }
 
         // 2. 冷凝结露与工况因子（采用 ACModeCode 标准码表，未识别模式回归中性基准 1.00，消除虚标高估）

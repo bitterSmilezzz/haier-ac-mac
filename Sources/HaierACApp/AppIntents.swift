@@ -623,6 +623,12 @@ struct ScheduleACPowerIntent: AppIntent {
                 return ([2, 3, 4, 5, 6, 7], false, "周一至周六")
             } else if sched.contains("周一到周四") || sched.contains("周一至周四") || sched.contains("礼拜一到礼拜四") || sched.contains("礼拜一至礼拜四") {
                 return ([2, 3, 4, 5], false, "周一至周四")
+            } else if sched.contains("周一到周三") || sched.contains("周一至周三") || sched.contains("礼拜一到礼拜三") || sched.contains("礼拜一至礼拜三") {
+                return ([2, 3, 4], false, "周一至周三")
+            } else if sched.contains("周二到周五") || sched.contains("周二至周五") || sched.contains("礼拜二到礼拜五") || sched.contains("礼拜二至礼拜五") {
+                return ([3, 4, 5, 6], false, "周二至周五")
+            } else if sched.contains("周五到周日") || sched.contains("周五至周日") || sched.contains("礼拜五到礼拜天") || sched.contains("礼拜五至礼拜天") || sched.contains("周五周六周日") || sched.contains("周末三天") {
+                return ([1, 6, 7], false, "周五至周日")
             } else if sched.contains("一三五") || sched.contains("一、三、五") {
                 return ([2, 4, 6], false, "每周一、三、五")
             } else if sched.contains("二四六") || sched.contains("二、四、六") {
@@ -858,6 +864,9 @@ struct ACAppShortcuts: AppShortcutsProvider {
                         "用 \(.applicationName) 工作日定时开机",
                         "用 \(.applicationName) 周末定时关机",
                         "用 \(.applicationName) 周末定时开机",
+                        "用 \(.applicationName) 周五至周日定时开机",
+                        "用 \(.applicationName) 周五至周日定时关机",
+                        "用 \(.applicationName) 周一至周三定时开机",
                         "\(.applicationName) 定时关机",
                         "\(.applicationName) 倒计时关机",
                         "\(.applicationName) 每天定时关机",
@@ -866,6 +875,8 @@ struct ACAppShortcuts: AppShortcutsProvider {
                         "\(.applicationName) 工作日定时开机",
                         "\(.applicationName) 周末定时关机",
                         "\(.applicationName) 周末定时开机",
+                        "\(.applicationName) 周五至周日定时开机",
+                        "\(.applicationName) 周五至周日定时关机",
                     ],
                     shortTitle: "设置定时",
                     systemImageName: "clock.badge.checkmark"

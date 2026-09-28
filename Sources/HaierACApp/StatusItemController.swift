@@ -961,7 +961,8 @@ final class StatusItemController: NSObject {
             }
             let allOnPresets: [(title: String, mins: Int)] = [
                 ("❄️ 全屋 30 分钟后开机预冷/预热", 30),
-                ("❄️ 全屋 1 小时后开机预冷/预热", 60)
+                ("❄️ 全屋 1 小时后开机预冷/预热", 60),
+                ("❄️ 全屋 2 小时后开机预冷/预热", 120)
             ]
             for p in allOnPresets {
                 let pItem = NSMenuItem(title: p.title, action: #selector(quickCountdownFromMenu(_:)), keyEquivalent: "")
@@ -984,7 +985,8 @@ final class StatusItemController: NSObject {
                     cleanActionName = String(cleanActionName.dropFirst("「\(devName)」".count))
                 }
                 let repeatTag = action.repeatLabel.map { " [\($0)]" } ?? ""
-                let item = NSMenuItem(title: "⏱ \(devName): \(cleanActionName) (\(timeStr))\(repeatTag)", action: nil, keyEquivalent: "")
+                let statusTag = action.enabled ? "" : " [已暂停]"
+                let item = NSMenuItem(title: "⏱ \(devName): \(cleanActionName) (\(timeStr))\(repeatTag)\(statusTag)", action: nil, keyEquivalent: "")
 
                 let singleTaskMenu = NSMenu()
                 singleTaskMenu.autoenablesItems = false
@@ -1005,6 +1007,16 @@ final class StatusItemController: NSObject {
                 }
 
                 singleTaskMenu.addItem(.separator())
+
+                let toggleEnabledTitle = action.enabled ? "⏸ 暂停此定时任务" : "▶️ 恢复此定时任务"
+                let toggleEnabledItem = NSMenuItem(
+                    title: toggleEnabledTitle,
+                    action: #selector(toggleSingleScheduleEnabledFromMenu(_:)),
+                    keyEquivalent: ""
+                )
+                toggleEnabledItem.target = self
+                toggleEnabledItem.representedObject = action.id.uuidString
+                singleTaskMenu.addItem(toggleEnabledItem)
 
                 let cancelSingleItem = NSMenuItem(
                     title: "❌ 取消该定时任务",
@@ -1304,6 +1316,18 @@ final class StatusItemController: NSObject {
     @objc private func cancelAllSchedulesFromMenu() {
         let count = model.cancelAllSchedules()
         if count > 0 {
+            refreshTemperature()
+        }
+    }
+
+    @objc private func toggleSingleScheduleEnabledFromMenu(_ sender: NSMenuItem) {
+        guard let idStr = sender.representedObject as? String,
+              let uuid = UUID(uuidString: idStr) else { return }
+        if let action = model.scheduledActions.first(where: { $0.id == uuid }) {
+            let nextState = !action.enabled
+            model.setScheduledActionEnabled(uuid, enabled: nextState)
+            let statusText = nextState ? "已恢复生效" : "已临时暂停"
+            model.operationNotice = AppModel.OperationNotice(text: "⏱ 定时任务「\(action.name)」\(statusText)", isError: false)
             refreshTemperature()
         }
     }

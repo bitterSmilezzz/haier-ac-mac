@@ -6,6 +6,22 @@ A native SwiftUI app to control Haier / Leader (统帅) smart air conditioners o
 
 ## Features
 
+- 🏷 **Natural Language Extended Multi-Day Weekday Schedules, Adaptive Auto-Wind Filter Dynamics, macOS Status Bar Schedule Pause/Resume & Full-House Countdown Symmetry (v1.9.59)**:
+  - ⏱️ **Natural Language "周一至周三 / 周二至周五 / 周五至周日 / 周末三天" Extended Multi-Day Weekday Repeating Schedule Closure (`VoiceCommandParser` / `VoiceCapsuleWindowController` / `VoiceCommandParserTests`)**:
+    - **Comprehensive Coverage of Compound Weekday Spans**: Full-stack support for Mon-Wed ("周一到周三/周一至周三/礼拜一到礼拜三/星期一到星期三", `[2, 3, 4]`, "周一至周三"), Tue-Fri ("周二到周五/周二至周五/礼拜二到礼拜五/星期二至星期五", `[3, 4, 5, 6]`, "周二至周五"), and Fri-Sun / Weekend 3 Days ("周五到周日/周五至周日/周末三天/礼拜五到礼拜天", `[1, 6, 7]`, "周五至周日"); thoroughly resolves spoken multi-day cycles being misparsed as single-shot tasks and destroyed upon first run;
+    - **Natural Descriptor Alignment in `repeatLabel`**: Both `ScheduledAction.repeatLabel` and `BedtimeSchedule.repeatLabel` now naturally map `[2, 3, 4]`, `[3, 4, 5, 6]`, and `[1, 6, 7]` to elegant Chinese phrases instead of mechanical day concatenations;
+    - **Enhanced Prefix Safeguards & Negation Defense**: Extended `hasTimingOrCountdownIntent` with compound spans to prevent spoken schedule commands like "周五到周日晚上10点开空调" from misfiring immediate power-on; negation regex reliably intercepts "千万别周五到周日开机", "不要周一至周三关空调".
+  - 🍃 **Aerodynamic Filter Health Algorithm Upgrade — Adaptive Auto-Wind Dynamic Flux Calibration (`AppModel.calculateFilterWearFactor`)**:
+    - Overhauled the legacy static `1.00` factor for auto wind speed in `calculateFilterWearFactor` with a physical Adaptive Auto-Wind Dynamics model based on indoor-to-target temperature differences;
+    - When wind speed is set to "自动" (Auto): under high-load heavy thermal delta (`|indoor - target| >= 4.0°C`), the fan runs at maximum convection velocity, dynamically adapting `windFactor` to `1.30`; under equilibrium steady-state (`|indoor - target| <= 0.8°C`), the fan ramps down to whisper-quiet low speed, tuning `windFactor` down to `0.75`; normal transitions and missing temperature sensor conditions retain neutral `1.00`, eliminating algorithmic load underestimation and steady-state overestimation.
+  - 🍱 **macOS Native Status Bar Schedule Management & Full-House Symmetry (`StatusItemController`)**:
+    - **Per-Task Pause / Resume Toggle**: Added "⏸ 暂停此定时任务" / "▶️ 恢复此定时任务" in the schedule item context submenu, allowing users to temporarily disable schedules without having to delete and re-create them; paused tasks prominently display `[已暂停]` in the main menu list;
+    - **Full-House Pre-Cooling/Pre-Heating Symmetry**: Added "❄️ 全屋 2 小时后开机预冷/预热" to the quick countdown submenu, achieving 100% action symmetry with existing 30m / 1h / 2h shutdown countdowns.
+  - 🎙️ **Siri Shortcuts & AppIntents Repeat Schedule Alignment (`AppIntents.swift`)**:
+    - `ScheduleACPowerIntent` recognizes "周一至周三", "周二至周五", "周五至周日"; registered system phrases in `ACAppShortcuts` ("用海尔空调周五至周日定时开机", "用海尔空调周一至周三定时开机").
+  - 🧪 **Unit Test Suite Expansion (`VoiceCommandParserTests`)**:
+    - Added comprehensive `testExtendedMultiWeekdayScheduleParsing` suite verifying single-device, whole-house, negation prevention, and immediate-power-on defense boundaries.
+
 - 🏷 **Natural Language Libai (礼拜) Repeating Cycles & Multi-Day Weekday Combinations, Bedtime Schedule Prefix Defect Elimination, macOS Status Bar Full-House Pre-Cooling/Pre-Heating Symmetry & Siri Repeat Shortcuts (v1.9.58)**:
   - ⏱️ **Natural Language Libai (礼拜) Cycles & Multi-Day Weekday Combinations ("一三五/二四六/二四/周一至周四") Full-Stack Closure (`VoiceCommandParser` / `VoiceCapsuleWindowController` / `VoiceCommandParserTests`)**:
     - **Eradication of Colloquial "礼拜" Repeating Schedules Falling Back to One-Time Tasks & Deleted Upon First Execution**: Permanently resolved the critical defect where spoken recurring commands with colloquial "礼拜" (e.g. "每个礼拜一早上8点开空调", "礼拜一到礼拜五早上8点开空调", "礼拜一至礼拜六早上7点开机", "礼拜六礼拜天早上9点开空调", "每个礼拜日晚上11点关空调") previously lacked keyword matching and fell back to single-shot `.schedulePower`, causing recurring schedules to be permanently deleted after firing once;
