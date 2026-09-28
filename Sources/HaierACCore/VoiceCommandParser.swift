@@ -22,6 +22,8 @@ public enum VoiceCommand: Equatable {
     case countdownPower(minutes: Int, power: Bool)
     /// 指定钟点开关机（hour: 0~23, minute: 0~59, power: true=开机, false=关机）
     case schedulePower(hour: Int, minute: Int, power: Bool)
+    /// 循环周期定时开关机（hour: 0~23, minute: 0~59, power: true=开机, false=关机, repeatWeekdays: [Int], repeatLabel: String）(v1.9.56)
+    case scheduleRepeatPower(hour: Int, minute: Int, power: Bool, repeatWeekdays: [Int], repeatLabel: String)
     /// 取消定向/当前设备定时与倒计时
     case cancelSchedules
     /// 取消全屋所有设备的定时与倒计时任务 (v1.9.36)
@@ -294,13 +296,34 @@ public struct VoiceCommandParser {
         guard !containsNegativeAction(text) else { return nil }
         let isAll = isAllDeviceScope(text)
 
-        // 1. 优先判断指定具体钟点定时（如“晚上10点关机”、“明早7点开空调”、“差半小时八点关机”、“十点差五分关机”）
+        // 1. 优先判断指定具体钟点定时（如“晚上10点关机”、“明早7点开空调”、“差半小时八点关机”、“十点差五分关机”、“每天晚上10点关机”、“工作日早上7点开空调”）
         // 必须包含关机/开机/停意图或“定时/预约”，避免“大风一点”、“调高一点”等“一点”被误判为 1 点钟 (v1.9.48, v1.9.50)
         if (text.contains("关") || text.contains("开") || text.contains("停") || text.contains("定时") || text.contains("预约")),
            let time = parseScheduleTime(from: text) {
             let isPowerOn = text.contains("开") && !text.contains("关") && !text.contains("停")
             let actionStr = isPowerOn ? "开机" : "关机"
             let timeStr = String(format: "%02d:%02d", time.hour, time.minute)
+
+            // 循环周期判定 (v1.9.56 支持每天/工作日/周末/按星期重复定时)
+            let repeatInfo: (weekdays: [Int], label: String)? = {
+                if text.contains("工作日") || text.contains("平时") || text.contains("周一到周五") || text.contains("周一至周五") || text.contains("星期一到星期五") || text.contains("星期一至星期五") {
+                    return ([2, 3, 4, 5, 6], "工作日")
+                } else if text.contains("周末") || text.contains("双休") || text.contains("周六周日") || text.contains("周六和周日") || text.contains("星期六星期天") || text.contains("星期六和星期天") || text.contains("周六周天") {
+                    return ([1, 7], "周末")
+                } else if text.contains("每天") || text.contains("天天") || text.contains("每日") || text.contains("每晚") || text.contains("每早") || text.contains("每晨") {
+                    return ([], "每天")
+                }
+                return nil
+            }()
+
+            if let rep = repeatInfo {
+                let display = isAll ? "定时全屋在 \(rep.label) \(timeStr) \(actionStr)" : "定时在 \(rep.label) \(timeStr) \(actionStr)"
+                return VoiceParseResult(
+                    command: .scheduleRepeatPower(hour: time.hour, minute: time.minute, power: isPowerOn, repeatWeekdays: rep.weekdays, repeatLabel: rep.label),
+                    displayText: display
+                )
+            }
+
             let dayDesc: String = {
                 if text.contains("明天") || text.contains("明早") || text.contains("明晚") || text.contains("次日") || text.contains("明儿") {
                     return "明天 "
@@ -422,9 +445,9 @@ public struct VoiceCommandParser {
         }
 
         let isNightMidnight = normalized.contains("晚上") || normalized.contains("今晚") ||
-                              normalized.contains("明晚") || normalized.contains("夜里") ||
-                              normalized.contains("半夜") || normalized.contains("午夜") ||
-                              normalized.contains("凌晨")
+                              normalized.contains("明晚") || normalized.contains("每晚") ||
+                              normalized.contains("夜里") || normalized.contains("半夜") ||
+                              normalized.contains("午夜") || normalized.contains("凌晨")
         let isAfternoonPM = normalized.contains("下午") || normalized.contains("傍晚") || normalized.contains("午后")
         let isNoon = normalized.contains("中午")
 
@@ -534,7 +557,7 @@ public struct VoiceCommandParser {
             // 明确的“零点/0点/0时”，无论前缀如何，恒定为 00:xx，严禁累加 12
             finalHour = 0
         } else if finalHour > 0 && finalHour < 12 {
-            if isAfternoonPM || (normalized.contains("晚上") || normalized.contains("今晚") || normalized.contains("明晚") || normalized.contains("夜里") || normalized.contains("傍晚")) {
+            if isAfternoonPM || (normalized.contains("晚上") || normalized.contains("今晚") || normalized.contains("明晚") || normalized.contains("每晚") || normalized.contains("夜里") || normalized.contains("傍晚")) {
                 finalHour += 12
             } else if (normalized.contains("半夜") || normalized.contains("午夜")) && finalHour >= 9 {
                 // 口语“半夜9/10/11点”或“午夜9/10/11点”归入深夜时段 21:00 ~ 23:00 (v1.9.55)
@@ -589,10 +612,12 @@ public struct VoiceCommandParser {
         targetRoomKeywords.contains(where: { text.contains($0) })
     }
 
-    /// 判断口令是否包含定时、倒计时或延迟执行时间语义，杜绝误触发即时开关机 (v1.9.50)
+    /// 判断口令是否包含定时、倒计时或延迟执行时间语义，杜绝误触发即时开关机 (v1.9.50, v1.9.56)
     private static func hasTimingOrCountdownIntent(_ text: String) -> Bool {
         if text.contains("后") || text.contains("倒计时") || text.contains("定时") || text.contains("预约") ||
-           text.contains("延迟") || text.contains("延后") || text.contains("稍后") {
+           text.contains("延迟") || text.contains("延后") || text.contains("稍后") ||
+           text.contains("每天") || text.contains("天天") || text.contains("每日") || text.contains("每晚") || text.contains("每早") ||
+           text.contains("工作日") || text.contains("周末") || text.contains("双休") {
             return true
         }
         if text.contains("过") && (text.contains("分") || text.contains("小时") || text.contains("钟头") || text.contains("半") || text.contains("刻")) {

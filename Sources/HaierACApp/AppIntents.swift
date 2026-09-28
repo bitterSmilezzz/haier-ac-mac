@@ -519,6 +519,124 @@ struct CancelACSchedulesIntent: AppIntent {
     }
 }
 
+// MARK: - 定时与倒计时计划调度 (v1.9.56)
+
+struct ScheduleACPowerIntent: AppIntent {
+    static var title: LocalizedStringResource = "设置空调定时与倒计时"
+    static var description = IntentDescription("为海尔空调设定定时开关机或倒计时任务", categoryName: "空调控制")
+
+    @Parameter(title: "开机", default: false)
+    var powerOn: Bool
+
+    @Parameter(title: "倒计时（分钟）", description: "例如 30、60；若指定则优先作为倒计时任务")
+    var countdownMinutes: Int?
+
+    @Parameter(title: "指定时间（时:分）", description: "例如 22:00、07:30")
+    var timeString: String?
+
+    @Parameter(title: "每天重复", default: false)
+    var repeatsDaily: Bool
+
+    @Parameter(title: "设备名称", description: "可选；留空控制全屋或默认设备")
+    var deviceName: String?
+
+    @MainActor
+    func perform() async throws -> some IntentResult & ProvidesDialog {
+        let model = AppModel.shared
+        guard model.gatewayConnected else {
+            throw ACIntentError.message("空调网关连接中断，请稍后重试")
+        }
+
+        let targetDeviceIds: [String]
+        let scopeName: String
+        if let name = deviceName, !name.isEmpty && !name.contains("全") && !name.contains("所有") {
+            if let dev = model.allUnifiedDevices.first(where: { $0.name.contains(name) }) {
+                targetDeviceIds = [dev.id]
+                scopeName = "「\(dev.name)」"
+            } else {
+                throw ACIntentError.message("未找到名称包含「\(name)」的空调设备")
+            }
+        } else if let menuId = model.menuBarDeviceId, let dev = model.allUnifiedDevices.first(where: { $0.id == menuId }) {
+            targetDeviceIds = [dev.id]
+            scopeName = "「\(dev.name)」"
+        } else {
+            let controllable = model.allUnifiedDevices.filter { model.reachability(for: $0.id).isControllable }
+            guard !controllable.isEmpty else {
+                throw ACIntentError.message("未发现可控制的就绪空调设备")
+            }
+            targetDeviceIds = controllable.map(\.id)
+            scopeName = targetDeviceIds.count > 1 ? "全屋 \(targetDeviceIds.count) 台空调" : "空调"
+        }
+
+        let attrVal = AttrValue.bool(powerOn)
+        guard let valJSON = ScheduledAction.valueJSON(attrVal) else {
+            throw ACIntentError.message("参数构造失败")
+        }
+
+        let actionDesc = powerOn ? "开机" : "关机"
+
+        // 1. 倒计时任务分支
+        if let mins = countdownMinutes, mins > 0 {
+            let fireDate = Date().addingTimeInterval(TimeInterval(mins * 60))
+            let timeDesc = (mins >= 60 && mins % 60 == 0) ? "\(mins / 60) 小时" : "\(mins) 分钟"
+            let actionName = "\(timeDesc)后\(actionDesc)"
+
+            for devId in targetDeviceIds {
+                let devName = model.allUnifiedDevices.first(where: { $0.id == devId })?.name ?? "空调"
+                let action = ScheduledAction(
+                    name: "「\(devName)」\(actionName)",
+                    deviceId: devId,
+                    attrName: "onOffStatus",
+                    attrDesc: "开关",
+                    attrValueJSON: valJSON,
+                    fireDate: fireDate,
+                    repeatsDaily: false,
+                    repeatWeekdays: [],
+                    enabled: true
+                )
+                model.addScheduledAction(action)
+            }
+            return .result(dialog: "已为\(scopeName)设定 \(timeDesc) 后\(actionDesc)")
+        }
+
+        // 2. 指定时间或每天重复定时任务分支
+        let calendar = Calendar.current
+        let (hour, minute): (Int, Int) = {
+            if let tStr = timeString {
+                let parts = tStr.split(separator: ":").compactMap { Int($0) }
+                if parts.count >= 2 && parts[0] >= 0 && parts[0] <= 23 && parts[1] >= 0 && parts[1] < 60 {
+                    return (parts[0], parts[1])
+                }
+            }
+            // 默认晚 22:00
+            return (22, 0)
+        }()
+
+        let fireDate = AppModel.initialFireDate(forHour: hour, minute: minute, weekdays: repeatsDaily ? [] : [], calendar: calendar)
+        let timeStr = String(format: "%02d:%02d", hour, minute)
+        let repeatPrefix = repeatsDaily ? "每天 " : ""
+        let actionName = "\(repeatPrefix)\(timeStr) \(actionDesc)"
+
+        for devId in targetDeviceIds {
+            let devName = model.allUnifiedDevices.first(where: { $0.id == devId })?.name ?? "空调"
+            let action = ScheduledAction(
+                name: "「\(devName)」\(actionName)",
+                deviceId: devId,
+                attrName: "onOffStatus",
+                attrDesc: "开关",
+                attrValueJSON: valJSON,
+                fireDate: fireDate,
+                repeatsDaily: repeatsDaily,
+                repeatWeekdays: [],
+                enabled: true
+            )
+            model.addScheduledAction(action)
+        }
+
+        return .result(dialog: "已为\(scopeName)设定 \(repeatPrefix)\(timeStr) \(actionDesc)")
+    }
+}
+
 // MARK: - 快捷指令库入口
 
 struct ACAppShortcuts: AppShortcutsProvider {
@@ -690,6 +808,19 @@ struct ACAppShortcuts: AppShortcutsProvider {
                     shortTitle: "取消定时",
                     systemImageName: "xmark.circle"
                 ),
+                AppShortcut(
+                    intent: ScheduleACPowerIntent(),
+                    phrases: [
+                        "用 \(.applicationName) 定时关机",
+                        "用 \(.applicationName) 倒计时关机",
+                        "用 \(.applicationName) 每天定时关机",
+                        "\(.applicationName) 定时关机",
+                        "\(.applicationName) 倒计时关机",
+                        "\(.applicationName) 每天定时关机",
+                    ],
+                    shortTitle: "设置定时",
+                    systemImageName: "clock.badge.checkmark"
+                ),
             ]
         } else {
             return [
@@ -807,6 +938,14 @@ struct ACAppShortcuts: AppShortcutsProvider {
                     phrases: [
                         "用 \(.applicationName) 取消定时",
                         "用 \(.applicationName) 取消所有定时",
+                    ]
+                ),
+                AppShortcut(
+                    intent: ScheduleACPowerIntent(),
+                    phrases: [
+                        "用 \(.applicationName) 定时关机",
+                        "用 \(.applicationName) 倒计时关机",
+                        "用 \(.applicationName) 每天定时关机",
                     ]
                 ),
             ]

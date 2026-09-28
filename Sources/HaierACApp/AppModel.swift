@@ -844,7 +844,9 @@ final class AppModel: ObservableObject {
                         modeFactor = 1.00 // 稳态平衡
                     }
                 } else {
-                    modeFactor = 1.00
+                    // 无室温传感器基准工况：根据设定目标温度判定偏向制冷还是制热 (v1.9.56 闭环热物理对称)
+                    // 当 targetTemp <= 25.0 时按夏季偏冷工况采用 1.20；当 targetTemp > 25.0 时按冬季偏热工况采用 1.10
+                    modeFactor = targetTemp <= 25.0 ? 1.20 : 1.10
                 }
             }
         } else {
@@ -1322,13 +1324,45 @@ final class AppModel: ObservableObject {
     }
 
     /// 计算 after 之后（不含 after）第一个匹配 weekdays 的时刻，保留原 fireDate 的时:分
-    private static func nextFireDate(after date: Date, weekdays: [Int], calendar: Calendar) -> Date {
+    static func nextFireDate(after date: Date, weekdays: [Int], calendar: Calendar) -> Date {
         let fire = date
         var candidate = calendar.date(byAdding: .day, value: 1, to: fire) ?? fire.addingTimeInterval(86400)
         let maxAttempts = 14  // 星期集合最多覆盖 7 天，14 次必然命中
         for _ in 0..<maxAttempts {
             let weekday = calendar.component(.weekday, from: candidate)
             if weekdays.contains(weekday) {
+                return candidate
+            }
+            candidate = calendar.date(byAdding: .day, value: 1, to: candidate) ?? candidate.addingTimeInterval(86400)
+        }
+        return candidate
+    }
+
+    /// 计算指定钟点与星期周期的初始触发时刻 (v1.9.56)
+    static func initialFireDate(forHour hour: Int, minute: Int, weekdays: [Int], calendar: Calendar = .current) -> Date {
+        var components = calendar.dateComponents([.year, .month, .day], from: Date())
+        components.hour = hour
+        components.minute = minute
+        components.second = 0
+        guard var targetDate = calendar.date(from: components) else {
+            return Date().addingTimeInterval(3600)
+        }
+        if weekdays.isEmpty || weekdays.count == 7 {
+            // 每天重复
+            if targetDate <= Date() {
+                targetDate = calendar.date(byAdding: .day, value: 1, to: targetDate) ?? targetDate
+            }
+            return targetDate
+        }
+        let now = Date()
+        let todayWeekday = calendar.component(.weekday, from: now)
+        if weekdays.contains(todayWeekday) && targetDate > now {
+            return targetDate
+        }
+        var candidate = calendar.date(byAdding: .day, value: 1, to: targetDate) ?? targetDate.addingTimeInterval(86400)
+        for _ in 0..<14 {
+            let wd = calendar.component(.weekday, from: candidate)
+            if weekdays.contains(wd) {
                 return candidate
             }
             candidate = calendar.date(byAdding: .day, value: 1, to: candidate) ?? candidate.addingTimeInterval(86400)

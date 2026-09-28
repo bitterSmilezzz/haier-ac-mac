@@ -6,6 +6,21 @@ A native SwiftUI app to control Haier / Leader (统帅) smart air conditioners o
 
 ## Features
 
+- 🏷 **Natural Language Repeating Cycle Scheduling (Daily/Weekdays/Weekend), Siri Shortcuts Scheduling Closure, macOS Status Bar Quick Shutdown Countdown & Auto-Mode Thermodynamic Symmetry (v1.9.56)**:
+  - ⏱️ **Natural Language "每天/天天/工作日/周末/按星期" Repeating Cycle Scheduling Full-Stack Closure (`VoiceCommandParser` / `VoiceCapsuleWindowController` / `VoiceCommandParserTests`)**:
+    - **Eradication of Repeating Schedules Being Handled as One-Time Tasks & Deleted Upon First Execution**: Permanently resolved the critical defect where spoken recurring schedules (e.g. "每天晚上10点关机", "天天早上8点开空调", "工作日早上7点开机", "周末上午9点开空调", "周一到周五早上7点开机", "周六周日晚上11点关空调") were previously parsed only as single-shot `.schedulePower`, with `repeatsDaily` and `repeatWeekdays` hardcoded to `false` and `[]`, causing recurring requests to be permanently deleted after firing once;
+    - **Introduced `scheduleRepeatPower` Command & Weekday Matrix**: Accurately recognizes "每天/天天/每日/每晚/每早" (`repeatsDaily = true`), "工作日/平时/周一到周五" (`repeatWeekdays = [2,3,4,5,6]`), and "周末/双休/周六周日" (`repeatWeekdays = [1,7]`); calculates initial trigger times via `AppModel.initialFireDate` across single-device, whole-house, and multi-device dispatching, ensuring perpetual seamless cycle recurrence;
+    - **Deep-Night "每晚" Normalization & Negation Guard**: Corrected "每晚11点" time detection into 23:00 PM (preventing it from defaulting to 11:00 AM), with strict negation interceptors against accidental trigger phrases ("千万别每天定时开机", "不要工作日定时关机").
+  - 🎙️ **Siri Shortcuts & AppIntents Schedule Automation Closure (`AppIntents.swift`)**:
+    - Added `ScheduleACPowerIntent` supporting both countdown duration (e.g. 30, 60 minutes) and specific clock times (e.g. 22:00) with daily repeat option (`repeatsDaily: Bool`), targeted by device name or applied whole-house;
+    - Registered intuitive phrases in `ACAppShortcuts` ("用海尔空调定时关机", "用海尔空调倒计时关机", "用海尔空调每天定时关机", "海尔空调定时关机"), closing the gap where Siri previously could only cancel schedules but not create them.
+  - 🍱 **macOS Native Status Bar Quick Shutdown Countdown & Schedule Experience Upgrade (`StatusItemController`)**:
+    - **Dedicated "⚡️ 快捷关机倒计时" Submenu**: Added quick presets ("⏱ 30 分钟后关机", "⏱ 1 小时后关机", "⏱ 2 小时后关机", "⏱ 晨间过渡关机 (45分钟)") accessible directly under "⏱ 计划调度" in both active and idle states, offering 1-click scheduling without opening the window;
+    - **Deduplication & Recurring Cycle Visualization**: Eliminated duplicate device name prefixes in scheduled task items (`⏱ 客厅: 「客厅」22:00 关机`), and injected cycle tags (`[每天]`, `[工作日]`, `[周末]`) along with next execution timestamps in details submenus.
+  - 🍃 **Auto Mode (.auto) Sensor-Free Thermodynamic Symmetry Alignment (`AppModel.calculateFilterWearFactor`)**:
+    - In `calculateFilterWearFactor`, resolved the issue where auto mode defaulted to `1.00` steady-state whenever `indoorTemp == nil`;
+    - Intelligently balances cooling vs. heating bias based on `targetTemp`: applies `1.20` for summer cooling bias ($T \le 25^\circ\text{C}$) and `1.10` for winter heating bias ($T > 25^\circ\text{C}$), achieving 100% thermodynamic symmetry with `EnergyAnalyticsEngine`.
+
 - 🏷 **Cross-Day Clock Schedule Power On/Off & Deep-Night Normalization, Siri Shortcuts Schedule Management, macOS Status Bar Granular Task Control & Filter Dynamics (v1.9.55)**:
   - ⏱️ **Natural Language "明天/明早/明晚/次日/后天" Cross-Day Absolute Clock Scheduling & Deep-Night Normalization (`VoiceCommandParser` / `VoiceCapsuleWindowController` / `VoiceCommandParserTests`)**:
     - **Eradication of Accidental Same-Day Scheduling for Spoken Cross-Day Clock Times**: Permanently fixed the critical bug where daytime commands like "明天晚上10点关机" or "明晚10点关机" previously evaluated target hour 22:00 as greater than the current hour, causing the legacy check `targetDate <= Date()` to evaluate to false and mistakenly schedule the action for *tonight* instead of *tomorrow night*; fully introduced explicit cross-day date calculations across single-device, whole-house, and multi-device dispatching;

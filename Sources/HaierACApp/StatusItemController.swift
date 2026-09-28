@@ -902,15 +902,41 @@ final class StatusItemController: NSObject {
         menu.setSubmenu(filterMenu, for: filterParentItem)
         menu.addItem(filterParentItem)
 
-        // 计划调度与定时任务感知 (v1.9.54, v1.9.55 支持单项查看与快速取消)
+        // 计划调度与定时任务感知 (v1.9.54, v1.9.55 支持单项查看与快速取消, v1.9.56 消除设备名重复/增设周期重复感知与快捷关机倒计时)
         let activeSchedules = model.scheduledActions
+        let scheduleMenu = NSMenu()
+        scheduleMenu.autoenablesItems = false
+
+        // 快捷关机倒计时独立子菜单
+        let quickCountdownMenu = NSMenu()
+        quickCountdownMenu.autoenablesItems = false
+        let countdownPresets: [(title: String, mins: Int)] = [
+            ("⏱ 30 分钟后关机", 30),
+            ("⏱ 1 小时后关机", 60),
+            ("⏱ 2 小时后关机", 120),
+            ("⏱ 晨间过渡关机 (45分钟)", 45)
+        ]
+        for preset in countdownPresets {
+            let pItem = NSMenuItem(title: preset.title, action: #selector(quickCountdownFromMenu(_:)), keyEquivalent: "")
+            pItem.target = self
+            pItem.representedObject = preset.mins
+            quickCountdownMenu.addItem(pItem)
+        }
+        let quickCountdownParent = NSMenuItem(title: "⚡️ 快捷关机倒计时...", action: nil, keyEquivalent: "")
+        scheduleMenu.setSubmenu(quickCountdownMenu, for: quickCountdownParent)
+        scheduleMenu.addItem(quickCountdownParent)
+        scheduleMenu.addItem(.separator())
+
         if !activeSchedules.isEmpty {
-            let scheduleMenu = NSMenu()
-            scheduleMenu.autoenablesItems = false
             for action in activeSchedules {
                 let devName = model.allUnifiedDevices.first(where: { $0.id == action.deviceId })?.name ?? "空调"
                 let timeStr = DateFormatter.localizedString(from: action.fireDate, dateStyle: .none, timeStyle: .short)
-                let item = NSMenuItem(title: "⏱ \(devName): \(action.name) (\(timeStr))", action: nil, keyEquivalent: "")
+                var cleanActionName = action.name
+                if cleanActionName.hasPrefix("「\(devName)」") {
+                    cleanActionName = String(cleanActionName.dropFirst("「\(devName)」".count))
+                }
+                let repeatTag = action.repeatLabel.map { " [\($0)]" } ?? ""
+                let item = NSMenuItem(title: "⏱ \(devName): \(cleanActionName) (\(timeStr))\(repeatTag)", action: nil, keyEquivalent: "")
 
                 let singleTaskMenu = NSMenu()
                 singleTaskMenu.autoenablesItems = false
@@ -920,9 +946,15 @@ final class StatusItemController: NSObject {
                 singleTaskMenu.addItem(devInfoItem)
 
                 let fullTimeStr = DateFormatter.localizedString(from: action.fireDate, dateStyle: .medium, timeStyle: .medium)
-                let timeInfoItem = NSMenuItem(title: "执行时间: \(fullTimeStr)", action: nil, keyEquivalent: "")
+                let timeInfoItem = NSMenuItem(title: "下次执行: \(fullTimeStr)", action: nil, keyEquivalent: "")
                 timeInfoItem.isEnabled = false
                 singleTaskMenu.addItem(timeInfoItem)
+
+                if let rep = action.repeatLabel {
+                    let repeatInfoItem = NSMenuItem(title: "周期重复: \(rep)", action: nil, keyEquivalent: "")
+                    repeatInfoItem.isEnabled = false
+                    singleTaskMenu.addItem(repeatInfoItem)
+                }
 
                 singleTaskMenu.addItem(.separator())
 
@@ -951,9 +983,13 @@ final class StatusItemController: NSObject {
             menu.setSubmenu(scheduleMenu, for: scheduleParentItem)
             menu.addItem(scheduleParentItem)
         } else {
-            let noScheduleItem = NSMenuItem(title: "⏱ 计划调度 (当前无计划任务)", action: nil, keyEquivalent: "")
-            noScheduleItem.isEnabled = false
-            menu.addItem(noScheduleItem)
+            let noScheduleInfo = NSMenuItem(title: "当前无生效中的计划任务", action: nil, keyEquivalent: "")
+            noScheduleInfo.isEnabled = false
+            scheduleMenu.addItem(noScheduleInfo)
+
+            let scheduleParentItem = NSMenuItem(title: "⏱ 计划调度 (无生效任务)...", action: nil, keyEquivalent: "")
+            menu.setSubmenu(scheduleMenu, for: scheduleParentItem)
+            menu.addItem(scheduleParentItem)
         }
 
         menu.addItem(.separator())
@@ -1232,6 +1268,41 @@ final class StatusItemController: NSObject {
             model.operationNotice = AppModel.OperationNotice(text: "🗑 已取消计划任务「\(action.name)」", isError: false)
             refreshTemperature()
         }
+    }
+
+    @objc private func quickCountdownFromMenu(_ sender: NSMenuItem) {
+        guard let minutes = sender.representedObject as? Int, minutes > 0 else { return }
+        let targetDevices: [AppModel.UnifiedDevice] = {
+            if let primaryId = primaryDeviceId, let dev = model.allUnifiedDevices.first(where: { $0.id == primaryId }) {
+                return [dev]
+            }
+            return model.allUnifiedDevices.filter { model.reachability(for: $0.id).isControllable }
+        }()
+        guard !targetDevices.isEmpty else {
+            model.operationNotice = AppModel.OperationNotice(text: "未检测到可控制的空调设备", isError: true)
+            return
+        }
+        let fireDate = Date().addingTimeInterval(TimeInterval(minutes * 60))
+        let timeDesc = (minutes >= 60 && minutes % 60 == 0) ? "\(minutes / 60) 小时" : "\(minutes) 分钟"
+        guard let valJSON = ScheduledAction.valueJSON(.bool(false)) else { return }
+
+        for dev in targetDevices {
+            let action = ScheduledAction(
+                name: "「\(dev.name)」\(timeDesc)后关机",
+                deviceId: dev.id,
+                attrName: "onOffStatus",
+                attrDesc: "开关",
+                attrValueJSON: valJSON,
+                fireDate: fireDate,
+                repeatsDaily: false,
+                repeatWeekdays: [],
+                enabled: true
+            )
+            model.addScheduledAction(action)
+        }
+        let scope = targetDevices.count > 1 ? "全屋 \(targetDevices.count) 台空调" : "「\(targetDevices[0].name)」"
+        model.operationNotice = AppModel.OperationNotice(text: "⏱ 已为\(scope)设定 \(timeDesc) 后自动关机", isError: false)
+        refreshTemperature()
     }
 
     @objc private func setAllWindSpeedFromMenu(_ sender: NSMenuItem) {
