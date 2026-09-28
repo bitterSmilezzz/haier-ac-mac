@@ -772,10 +772,19 @@ final class AppModel: ObservableObject {
         if let modeCode = ACModeCode.match(from: mode) {
             switch modeCode {
             case .cooling:
+                // 酷暑高温大温差重载冷凝与强对流微粒捕获动力学 (v1.9.54)
+                // 典型变频空调制冷热力学：室内温度过高（indoor >= 30°C）或大温差降温（diff >= 5°C）时，
+                // 蒸发器冷凝水析出量达到峰值且室内风机处于超高风量吞吐，翅片水膜与高速通量导致微粒沉降捕获率剧增；
+                // 动态分配 modeFactor = 1.45（与极潮湿除湿工况达成热物理对称）；常规降温为 1.30；恒温维持为 1.15
                 if let indoor = indoorTemp, indoor > targetTemp {
-                    modeFactor = 1.35
+                    let diff = indoor - targetTemp
+                    if diff >= 5.0 || indoor >= 30.0 {
+                        modeFactor = 1.45
+                    } else {
+                        modeFactor = 1.30
+                    }
                 } else {
-                    modeFactor = 1.20
+                    modeFactor = 1.15
                 }
             case .dehumidify:
                 // 除湿冷凝水膜表面张力微粒捕获与结块动力学 (v1.9.53)：
@@ -807,9 +816,15 @@ final class AppModel: ObservableObject {
             case .fan:
                 modeFactor = 0.85
             case .auto:
+                // 自动模式：全气候双向热力与气动力学对称 (v1.9.54)
                 if let indoor = indoorTemp {
                     if indoor > targetTemp {
-                        modeFactor = 1.25 // 自动制冷冷凝结露
+                        let diff = indoor - targetTemp
+                        if diff >= 5.0 || indoor >= 30.0 {
+                            modeFactor = 1.35 // 自动酷暑大温差制冷强通量
+                        } else {
+                            modeFactor = 1.25 // 自动常规制冷冷凝结露
+                        }
                     } else if indoor < targetTemp {
                         let diff = targetTemp - indoor
                         if diff >= 5.0 || indoor <= 12.0 {

@@ -47,6 +47,7 @@ final class StatusItemController: NSObject {
             model.$activeSleepSession.map { _ in () }.eraseToAnyPublisher(),
             model.$gatewayConnected.map { _ in () }.eraseToAnyPublisher(),
             model.$filterAccumulatedMinutes.map { _ in () }.eraseToAnyPublisher(),
+            model.$scheduledActions.map { _ in () }.eraseToAnyPublisher(),
             EnergyAnalyticsEngine.shared.$currentInstantaneousPower.map { _ in () }.eraseToAnyPublisher(),
             AmbientSoundEngine.shared.$isPlaying.map { _ in () }.eraseToAnyPublisher()
         )
@@ -229,6 +230,11 @@ final class StatusItemController: NSObject {
             tooltipParts.append("🎵 助眠白噪音播放中 (\(model.sleepAmbientSoundType.displayName))")
         }
 
+        if !model.scheduledActions.isEmpty {
+            let activeCount = model.scheduledActions.count
+            tooltipParts.append("⏱ 计划调度: \(activeCount) 个定时/倒计时任务生效中")
+        }
+
         let lowCleanDevices = allDevices.compactMap { dev -> (name: String, pct: Int)? in
             let pct = model.filterCleanlinessPercentage(for: dev.id)
             return pct <= 30 ? (dev.name, pct) : nil
@@ -368,8 +374,21 @@ final class StatusItemController: NSObject {
             autoAllItem.isEnabled = hasControllable
             menu.addItem(autoAllItem)
 
-            // 全屋统一相对调温 (v1.9.35, v1.9.36 闭环 CR P2-3 增设 16/30°C 极值边界判定, v1.9.42 补齐运行台数精准反馈, v1.9.52 增加 0.5°C 高精微调矩阵)
-            let runningCountDesc = !onDevices.isEmpty ? " (\(onDevices.count)台运行中)" : " (当前均未开机)"
+            // 全屋统一相对调温 (v1.9.35, v1.9.36 闭环 CR P2-3 增设 16/30°C 极值边界判定, v1.9.42 补齐运行台数精准反馈, v1.9.52 增加 0.5°C 高精微调矩阵, v1.9.54 全景感知当前基准温阶)
+            let allTemps = onDevices.compactMap { model.attribute("targetTemperature", deviceId: $0.id)?.doubleValue }
+            let allTempsDesc: String = {
+                guard !allTemps.isEmpty else { return "" }
+                let minT = allTemps.min()!
+                let maxT = allTemps.max()!
+                let minStr = minT.truncatingRemainder(dividingBy: 1.0) == 0 ? "\(Int(minT))" : String(format: "%.1f", minT)
+                if minT == maxT {
+                    return " · 均设 \(minStr)°C"
+                } else {
+                    let maxStr = maxT.truncatingRemainder(dividingBy: 1.0) == 0 ? "\(Int(maxT))" : String(format: "%.1f", maxT)
+                    return " · 当前 \(minStr)~\(maxStr)°C"
+                }
+            }()
+            let runningCountDesc = !onDevices.isEmpty ? " (\(onDevices.count)台运行中\(allTempsDesc))" : " (当前均未开机)"
             let canStepUpAll = model.gatewayConnected && onDevices.contains { dev in
                 let curTemp = model.attribute("targetTemperature", deviceId: dev.id)?.doubleValue ?? 26.0
                 return curTemp < 30.0
@@ -883,6 +902,36 @@ final class StatusItemController: NSObject {
         menu.setSubmenu(filterMenu, for: filterParentItem)
         menu.addItem(filterParentItem)
 
+        // 计划调度与定时任务感知 (v1.9.54)
+        let activeSchedules = model.scheduledActions
+        if !activeSchedules.isEmpty {
+            let scheduleMenu = NSMenu()
+            scheduleMenu.autoenablesItems = false
+            for action in activeSchedules {
+                let devName = model.allUnifiedDevices.first(where: { $0.id == action.deviceId })?.name ?? "空调"
+                let timeStr = DateFormatter.localizedString(from: action.fireDate, dateStyle: .none, timeStyle: .short)
+                let item = NSMenuItem(title: "⏱ \(devName): \(action.name) (\(timeStr))", action: nil, keyEquivalent: "")
+                item.isEnabled = false
+                scheduleMenu.addItem(item)
+            }
+            scheduleMenu.addItem(.separator())
+            let cancelAllItem = NSMenuItem(
+                title: "🗑 取消全屋所有定时与倒计时",
+                action: #selector(cancelAllSchedulesFromMenu),
+                keyEquivalent: ""
+            )
+            cancelAllItem.target = self
+            scheduleMenu.addItem(cancelAllItem)
+
+            let scheduleParentItem = NSMenuItem(title: "⏱ 计划调度 (\(activeSchedules.count) 个任务生效中)...", action: nil, keyEquivalent: "")
+            menu.setSubmenu(scheduleMenu, for: scheduleParentItem)
+            menu.addItem(scheduleParentItem)
+        } else {
+            let noScheduleItem = NSMenuItem(title: "⏱ 计划调度 (当前无计划任务)", action: nil, keyEquivalent: "")
+            noScheduleItem.isEnabled = false
+            menu.addItem(noScheduleItem)
+        }
+
         menu.addItem(.separator())
 
         let launchItem = NSMenuItem(title: model.launchAtLogin ? "开机自启：开" : "开机自启：关", action: #selector(toggleLaunchAtLogin), keyEquivalent: "")
@@ -1142,6 +1191,13 @@ final class StatusItemController: NSObject {
             model.resetAllFilterMaintenance()
         }
         refreshTemperature()
+    }
+
+    @objc private func cancelAllSchedulesFromMenu() {
+        let count = model.cancelAllSchedules()
+        if count > 0 {
+            refreshTemperature()
+        }
     }
 
     @objc private func setAllWindSpeedFromMenu(_ sender: NSMenuItem) {

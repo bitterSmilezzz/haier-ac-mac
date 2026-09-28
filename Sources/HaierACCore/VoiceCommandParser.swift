@@ -857,8 +857,11 @@ public struct VoiceCommandParser {
         if text.contains("不要") || text.contains("别") || text.contains("不用") || text.contains("暂不") {
             return nil
         }
-        // 优先匹配带明确方向与幅度的口令（如“太冷了调高两度”、“升温2度”、“暖和一点”、“暖一点”、“更热一点”、“降温两度”、“凉快一点”、“凉快点”、“更冷一点”） (v1.9.50)
-        let warmerKeywords = ["高", "升", "加", "热一点", "热点", "更热", "暖和一点", "暖和点", "暖和些", "暖一点", "暖点", "暖些"]
+        // 优先匹配带明确方向与幅度的口令（如“太冷了调高两度”、“升温2度”、“上调1度”、“往上调半度”、“降温两度”、“下调一度”、“往下调半度”） (v1.9.50, v1.9.54)
+        let warmerKeywords = [
+            "高", "升", "加", "热一点", "热点", "更热", "暖和一点", "暖和点", "暖和些", "暖一点", "暖点", "暖些",
+            "上调", "往上", "向上", "调上"
+        ]
         if warmerKeywords.contains(where: { text.contains($0) }) {
             let delta = extractNumber(from: text) ?? 1.0
             let validDelta = (delta > 0 && delta <= 5) ? delta : 1.0
@@ -868,7 +871,10 @@ public struct VoiceCommandParser {
             )
         }
 
-        let coolerKeywords = ["低", "降", "减", "冷一点", "冷点", "更冷", "冷些", "凉一点", "凉点", "更凉", "凉些", "凉快一点", "凉快点", "凉快些"]
+        let coolerKeywords = [
+            "低", "降", "减", "冷一点", "冷点", "更冷", "冷些", "凉一点", "凉点", "更凉", "凉些", "凉快一点", "凉快点", "凉快些",
+            "下调", "往下", "向下", "调下"
+        ]
         if coolerKeywords.contains(where: { text.contains($0) }) {
             let delta = extractNumber(from: text) ?? 1.0
             let validDelta = (delta > 0 && delta <= 5) ? delta : 1.0

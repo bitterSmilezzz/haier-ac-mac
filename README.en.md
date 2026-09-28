@@ -6,6 +6,19 @@ A native SwiftUI app to control Haier / Leader (统帅) smart air conditioners o
 
 ## Features
 
+- 🏷 **Natural Language "Up/Down" Relative Stepping Closure, Scorching Summer Cooling Filter Aerodynamics & Status Bar Schedule Perception (v1.9.54)**:
+  - ⏱️ **Natural Language "上调/下调/往上/往下/向上/向下" Relative Temperature Stepping Closure (`VoiceCommandParser` / `VoiceCommandParserTests` / `AppIntents`)**:
+    - **Thoroughly Closed High-Frequency Colloquial Stepping Gap**: Permanently resolved the critical bug where common daily voice commands such as "上调一度", "上调1度", "上调两度", "上调2度", "上调半度", "上调0.5度", "上调零点五度", "往上调1度", "往上调半度", "向上调一度", "向上调0.5度", "温度上调1度", "下调一度", "下调1度", "下调两度", "下调2度", "下调半度", "下调0.5度", "下调零点五度", "往下调1度", "往下调半度", "向下调一度", "向下调0.5度", and "温度下调1度" were previously dropped because directional keywords only matched "升/高/降/低", omitting "上调/下调/往上/往下/向上/向下";
+    - **Whole-House Multi-Device Coordination**: Full support for whole-house relative stepping phrases ("全屋上调一度", "全屋上调半度", "全屋下调一度", "全屋下调半度");
+    - **Siri Shortcuts Integration**: Added "用海尔空调上调温度" and "用海尔空调下调温度" to `ACAppShortcuts`, expanding Siri voice control capabilities;
+    - **Structured Negation Defense**: Extended negation action guard to strictly disallow accidental triggers ("不要上调", "别下调", "千万别往上调").
+  - 🍃 **Scorching Summer Cooling Aerodynamic Filter Wear & Thermodynamic Symmetry (`AppModel.calculateFilterWearFactor`)**:
+    - Grounded in fluid mechanics and coil condensation physics: under severe summer cooling loads ($T \ge 30.0^\circ\text{C}$ or $\Delta T \ge 5.0^\circ\text{C}$), evaporator condensation and cross-flow fan throughput reach maximum design capacity, accelerating particulate entrapment;
+    - Dynamically increased the heavy cooling wear factor to 1.45 (achieving thermal symmetry with high-humidity dehumidification), setting moderate cooling to 1.30 and steady-state maintenance to 1.15; aligned auto mode cooling to 1.35 factor, achieving 100% thermodynamic symmetry with inverter energy simulations.
+  - 🍱 **macOS Native Status Bar Full Schedule Perception & Transparent Temperature Benchmarks (`StatusItemController`)**:
+    - **Active Schedule Perception & One-Click Cancellation**: Added reactive `model.$scheduledActions` state awareness; hover tooltip displays active timers, and right-click context menu features a dedicated "⏱ 计划调度" section listing each scheduled task's target device and fire date, accompanied by a "🗑 取消全屋所有定时与倒计时" quick action;
+    - **Transparent Whole-House Stepping Benchmarks**: Enriched whole-house 1°C and 0.5°C step items with current target temperature benchmarks ("均设 26°C" for uniform settings, "当前 24~26°C" for dispersed settings), providing crystal-clear state transparency.
+
 - 🏷 **Chinese Compound Number Decimal Parsing & Clock Schedule Conflict Closure, Siri Shortcuts High-Precision Relative Stepping, High-Humidity Dehumidification Condensate Filter Dynamics & Status Bar 0.5°C Matrix Synchronization (v1.9.53)**:
   - ⏱️ **Natural Language Chinese Compound Number Decimal Parsing & Erroneous Clock Schedule Guard (`VoiceCommandParser` / `VoiceCommandParserTests`)**:
     - **Eradication of Accidental Midnight/Evening Scheduling for Chinese Compound Decimals**: Completely resolved the critical bug where high-frequency spoken commands like "开到二十点五", "开二十点五", "打开二十点五", "全屋开到二十点五", "全屋开二十点五", "空调开到二十点五", "制冷开到二十点五", "开到十八点五", "开到十九点五", "开到二十一点五", "开到二十二点五", and "开到二十三点五" previously suffered from inverted execution order where `compoundPattern` ran after `decimalPointPattern`, outputting broken intermediate tokens like "20点5" and "18点5"; `parseScheduleTime` subsequently matched 20 and 18 as valid clock hours and erroneously queued power-on schedules at 20:05 and 18:05 PM;

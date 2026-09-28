@@ -1478,6 +1478,112 @@ final class VoiceCommandParserTests: XCTestCase {
         XCTAssertEqual(c16?.command, .setTemperature(20.5))
     }
 
+    // MARK: - 上调与下调自然语言相对调温测试 (v1.9.54)
+
+    func testUpDownRelativeTemperatureParsing() {
+        // 1. 上调单机相对调温
+        let u1 = VoiceCommandParser.parse("上调一度")
+        XCTAssertEqual(u1?.command, .adjustTemperature(delta: 1.0))
+        XCTAssertEqual(u1?.displayText, "升温 1°C")
+
+        let u2 = VoiceCommandParser.parse("上调1度")
+        XCTAssertEqual(u2?.command, .adjustTemperature(delta: 1.0))
+
+        let u3 = VoiceCommandParser.parse("上调两度")
+        XCTAssertEqual(u3?.command, .adjustTemperature(delta: 2.0))
+        XCTAssertEqual(u3?.displayText, "升温 2°C")
+
+        let u4 = VoiceCommandParser.parse("上调2度")
+        XCTAssertEqual(u4?.command, .adjustTemperature(delta: 2.0))
+
+        let u5 = VoiceCommandParser.parse("上调半度")
+        XCTAssertEqual(u5?.command, .adjustTemperature(delta: 0.5))
+        XCTAssertEqual(u5?.displayText, "升温 0.5°C")
+
+        let u6 = VoiceCommandParser.parse("上调0.5度")
+        XCTAssertEqual(u6?.command, .adjustTemperature(delta: 0.5))
+
+        let u7 = VoiceCommandParser.parse("上调零点五度")
+        XCTAssertEqual(u7?.command, .adjustTemperature(delta: 0.5))
+
+        let u8 = VoiceCommandParser.parse("往上调1度")
+        XCTAssertEqual(u8?.command, .adjustTemperature(delta: 1.0))
+
+        let u9 = VoiceCommandParser.parse("往上调半度")
+        XCTAssertEqual(u9?.command, .adjustTemperature(delta: 0.5))
+
+        let u10 = VoiceCommandParser.parse("向上调一度")
+        XCTAssertEqual(u10?.command, .adjustTemperature(delta: 1.0))
+
+        let u11 = VoiceCommandParser.parse("向上调0.5度")
+        XCTAssertEqual(u11?.command, .adjustTemperature(delta: 0.5))
+
+        let u12 = VoiceCommandParser.parse("温度上调1度")
+        XCTAssertEqual(u12?.command, .adjustTemperature(delta: 1.0))
+
+        // 2. 下调单机相对调温
+        let d1 = VoiceCommandParser.parse("下调一度")
+        XCTAssertEqual(d1?.command, .adjustTemperature(delta: -1.0))
+        XCTAssertEqual(d1?.displayText, "降温 1°C")
+
+        let d2 = VoiceCommandParser.parse("下调1度")
+        XCTAssertEqual(d2?.command, .adjustTemperature(delta: -1.0))
+
+        let d3 = VoiceCommandParser.parse("下调两度")
+        XCTAssertEqual(d3?.command, .adjustTemperature(delta: -2.0))
+        XCTAssertEqual(d3?.displayText, "降温 2°C")
+
+        let d4 = VoiceCommandParser.parse("下调2度")
+        XCTAssertEqual(d4?.command, .adjustTemperature(delta: -2.0))
+
+        let d5 = VoiceCommandParser.parse("下调半度")
+        XCTAssertEqual(d5?.command, .adjustTemperature(delta: -0.5))
+        XCTAssertEqual(d5?.displayText, "降温 0.5°C")
+
+        let d6 = VoiceCommandParser.parse("下调0.5度")
+        XCTAssertEqual(d6?.command, .adjustTemperature(delta: -0.5))
+
+        let d7 = VoiceCommandParser.parse("下调零点五度")
+        XCTAssertEqual(d7?.command, .adjustTemperature(delta: -0.5))
+
+        let d8 = VoiceCommandParser.parse("往下调1度")
+        XCTAssertEqual(d8?.command, .adjustTemperature(delta: -1.0))
+
+        let d9 = VoiceCommandParser.parse("往下调半度")
+        XCTAssertEqual(d9?.command, .adjustTemperature(delta: -0.5))
+
+        let d10 = VoiceCommandParser.parse("向下调一度")
+        XCTAssertEqual(d10?.command, .adjustTemperature(delta: -1.0))
+
+        let d11 = VoiceCommandParser.parse("向下调0.5度")
+        XCTAssertEqual(d11?.command, .adjustTemperature(delta: -0.5))
+
+        let d12 = VoiceCommandParser.parse("温度下调1度")
+        XCTAssertEqual(d12?.command, .adjustTemperature(delta: -1.0))
+
+        // 3. 全屋协同上调与下调
+        let au1 = VoiceCommandParser.parse("全屋上调一度")
+        XCTAssertEqual(au1?.command, .adjustTemperatureAll(delta: 1.0))
+        XCTAssertEqual(au1?.displayText, "全屋升温 1°C")
+
+        let au2 = VoiceCommandParser.parse("全屋上调半度")
+        XCTAssertEqual(au2?.command, .adjustTemperatureAll(delta: 0.5))
+        XCTAssertEqual(au2?.displayText, "全屋升温 0.5°C")
+
+        let ad1 = VoiceCommandParser.parse("全屋下调一度")
+        XCTAssertEqual(ad1?.command, .adjustTemperatureAll(delta: -1.0))
+        XCTAssertEqual(ad1?.displayText, "全屋降温 1°C")
+
+        let ad2 = VoiceCommandParser.parse("全屋下调半度")
+        XCTAssertEqual(ad2?.command, .adjustTemperatureAll(delta: -0.5))
+        XCTAssertEqual(ad2?.displayText, "全屋降温 0.5°C")
+
+        // 4. 否定意图安全防护
+        XCTAssertNil(VoiceCommandParser.parse("不要上调"))
+        XCTAssertNil(VoiceCommandParser.parse("别下调"))
+        XCTAssertNil(VoiceCommandParser.parse("千万别往上调"))
+    }
+
     // MARK: - 无效输入测试
 
     func testInvalidCommands() {

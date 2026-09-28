@@ -635,8 +635,12 @@ struct ACAppShortcuts: AppShortcutsProvider {
                         "用 \(.applicationName) 降低温度",
                         "用 \(.applicationName) 升温",
                         "用 \(.applicationName) 降温",
+                        "用 \(.applicationName) 上调温度",
+                        "用 \(.applicationName) 下调温度",
                         "\(.applicationName) 调高温度",
                         "\(.applicationName) 调低温度",
+                        "\(.applicationName) 上调温度",
+                        "\(.applicationName) 下调温度",
                     ],
                     shortTitle: "微调温度",
                     systemImageName: "thermometer.high"
@@ -666,6 +670,8 @@ struct ACAppShortcuts: AppShortcutsProvider {
                         "用 \(.applicationName) 降低温度",
                         "用 \(.applicationName) 升温",
                         "用 \(.applicationName) 降温",
+                        "用 \(.applicationName) 上调温度",
+                        "用 \(.applicationName) 下调温度",
                     ]
                 ),
                 AppShortcut(
