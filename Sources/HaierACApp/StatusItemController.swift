@@ -257,12 +257,12 @@ final class StatusItemController: NSObject {
     private func formatDisplayWindSpeed(_ raw: String?) -> String {
         guard let raw = raw?.lowercased() else { return "自动风" }
         if raw.contains("强") || raw.contains("turbo") || raw.contains("超强") || raw.contains("最大") ||
-           raw.contains("3档") || raw.contains("三档") || raw == "3" { return "强劲风" }
-        if raw.contains("高") || raw.contains("high") || raw.contains("大风") || raw.contains("大") { return "高风" }
+           raw.contains("3档") || raw.contains("三档") || raw == "3" || raw.contains("极速") { return "强劲风" }
+        if raw.contains("高") || raw.contains("high") || raw.contains("大风") || raw.contains("大") || raw.contains("高速") { return "高风" }
         if raw.contains("中") || raw.contains("medium") || raw.contains("mid") ||
-           raw.contains("2档") || raw.contains("二档") || raw.contains("两档") || raw == "2" { return "中风" }
+           raw.contains("2档") || raw.contains("二档") || raw.contains("两档") || raw == "2" || raw.contains("中速") { return "中风" }
         if raw.contains("低") || raw.contains("low") ||
-           raw.contains("1档") || raw.contains("一档") || raw == "1" || raw.contains("小风") { return "低风" }
+           raw.contains("1档") || raw.contains("一档") || raw == "1" || raw.contains("小风") || raw.contains("低速") { return "低风" }
         if raw.contains("微") || raw.contains("静") || raw.contains("quiet") || raw.contains("mute") || raw.contains("micro") || raw.contains("柔") { return "微风" }
         return "自动风"
     }
@@ -902,7 +902,7 @@ final class StatusItemController: NSObject {
         menu.setSubmenu(filterMenu, for: filterParentItem)
         menu.addItem(filterParentItem)
 
-        // 计划调度与定时任务感知 (v1.9.54)
+        // 计划调度与定时任务感知 (v1.9.54, v1.9.55 支持单项查看与快速取消)
         let activeSchedules = model.scheduledActions
         if !activeSchedules.isEmpty {
             let scheduleMenu = NSMenu()
@@ -911,7 +911,31 @@ final class StatusItemController: NSObject {
                 let devName = model.allUnifiedDevices.first(where: { $0.id == action.deviceId })?.name ?? "空调"
                 let timeStr = DateFormatter.localizedString(from: action.fireDate, dateStyle: .none, timeStyle: .short)
                 let item = NSMenuItem(title: "⏱ \(devName): \(action.name) (\(timeStr))", action: nil, keyEquivalent: "")
-                item.isEnabled = false
+
+                let singleTaskMenu = NSMenu()
+                singleTaskMenu.autoenablesItems = false
+
+                let devInfoItem = NSMenuItem(title: "空调设备: \(devName)", action: nil, keyEquivalent: "")
+                devInfoItem.isEnabled = false
+                singleTaskMenu.addItem(devInfoItem)
+
+                let fullTimeStr = DateFormatter.localizedString(from: action.fireDate, dateStyle: .medium, timeStyle: .medium)
+                let timeInfoItem = NSMenuItem(title: "执行时间: \(fullTimeStr)", action: nil, keyEquivalent: "")
+                timeInfoItem.isEnabled = false
+                singleTaskMenu.addItem(timeInfoItem)
+
+                singleTaskMenu.addItem(.separator())
+
+                let cancelSingleItem = NSMenuItem(
+                    title: "❌ 取消该定时任务",
+                    action: #selector(cancelSingleScheduleFromMenu(_:)),
+                    keyEquivalent: ""
+                )
+                cancelSingleItem.target = self
+                cancelSingleItem.representedObject = action.id.uuidString
+                singleTaskMenu.addItem(cancelSingleItem)
+
+                scheduleMenu.setSubmenu(singleTaskMenu, for: item)
                 scheduleMenu.addItem(item)
             }
             scheduleMenu.addItem(.separator())
@@ -1196,6 +1220,16 @@ final class StatusItemController: NSObject {
     @objc private func cancelAllSchedulesFromMenu() {
         let count = model.cancelAllSchedules()
         if count > 0 {
+            refreshTemperature()
+        }
+    }
+
+    @objc private func cancelSingleScheduleFromMenu(_ sender: NSMenuItem) {
+        guard let idStr = sender.representedObject as? String,
+              let uuid = UUID(uuidString: idStr) else { return }
+        if let action = model.scheduledActions.first(where: { $0.id == uuid }) {
+            model.removeScheduledAction(action)
+            model.operationNotice = AppModel.OperationNotice(text: "🗑 已取消计划任务「\(action.name)」", isError: false)
             refreshTemperature()
         }
     }

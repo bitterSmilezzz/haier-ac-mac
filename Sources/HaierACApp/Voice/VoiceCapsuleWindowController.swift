@@ -497,11 +497,18 @@ public final class VoiceCapsuleWindowController: NSObject, NSWindowDelegate {
                     scheduleAutoDismiss(delay: 2.0)
                     return
                 }
-                if targetDate <= Date() {
+                let isExplicitTomorrow = spokenText.contains("明天") || spokenText.contains("明早") || spokenText.contains("明晚") || spokenText.contains("次日") || spokenText.contains("明儿")
+                let isExplicitDayAfter = spokenText.contains("大后天") ? 3 : (spokenText.contains("后天") ? 2 : 0)
+                if isExplicitDayAfter > 0 {
+                    targetDate = calendar.date(byAdding: .day, value: isExplicitDayAfter, to: targetDate) ?? targetDate
+                } else if isExplicitTomorrow {
+                    targetDate = calendar.date(byAdding: .day, value: 1, to: targetDate) ?? targetDate
+                } else if targetDate <= Date() {
                     targetDate = calendar.date(byAdding: .day, value: 1, to: targetDate) ?? targetDate
                 }
                 let timeStr = String(format: "%02d:%02d", hour, minute)
-                let actionName = "\(timeStr) \(on ? "开机" : "关机")"
+                let dayPrefix = isExplicitDayAfter == 3 ? "大后天 " : (isExplicitDayAfter == 2 ? "后天 " : (isExplicitTomorrow ? "明天 " : ""))
+                let actionName = "\(dayPrefix)\(timeStr) \(on ? "开机" : "关机")"
                 let attrVal = AttrValue.bool(on)
                 guard let valJSON = ScheduledAction.valueJSON(attrVal) else {
                     VoiceControlManager.shared.markFailed("参数构造失败")
@@ -730,12 +737,19 @@ public final class VoiceCapsuleWindowController: NSObject, NSWindowDelegate {
                 scheduleAutoDismiss(delay: 2.0)
                 return
             }
-            if targetDate <= Date() {
+            let isExplicitTomorrow = spokenText.contains("明天") || spokenText.contains("明早") || spokenText.contains("明晚") || spokenText.contains("次日") || spokenText.contains("明儿")
+            let isExplicitDayAfter = spokenText.contains("大后天") ? 3 : (spokenText.contains("后天") ? 2 : 0)
+            if isExplicitDayAfter > 0 {
+                targetDate = calendar.date(byAdding: .day, value: isExplicitDayAfter, to: targetDate) ?? targetDate
+            } else if isExplicitTomorrow {
+                targetDate = calendar.date(byAdding: .day, value: 1, to: targetDate) ?? targetDate
+            } else if targetDate <= Date() {
                 // 如果今天此时刻已过，顺延至明天
                 targetDate = calendar.date(byAdding: .day, value: 1, to: targetDate) ?? targetDate
             }
             let timeStr = String(format: "%02d:%02d", hour, minute)
-            let actionName = "\(timeStr) \(on ? "开机" : "关机")"
+            let dayPrefix = isExplicitDayAfter == 3 ? "大后天 " : (isExplicitDayAfter == 2 ? "后天 " : (isExplicitTomorrow ? "明天 " : ""))
+            let actionName = "\(dayPrefix)\(timeStr) \(on ? "开机" : "关机")"
             let attrVal = AttrValue.bool(on)
             guard let valJSON = ScheduledAction.valueJSON(attrVal) else {
                 VoiceControlManager.shared.markFailed("参数构造失败")
@@ -1010,11 +1024,18 @@ public final class VoiceCapsuleWindowController: NSObject, NSWindowDelegate {
                 scheduleAutoDismiss(delay: 2.0)
                 return
             }
-            if targetDate <= Date() {
+            let isExplicitTomorrow = spokenText.contains("明天") || spokenText.contains("明早") || spokenText.contains("明晚") || spokenText.contains("次日") || spokenText.contains("明儿")
+            let isExplicitDayAfter = spokenText.contains("大后天") ? 3 : (spokenText.contains("后天") ? 2 : 0)
+            if isExplicitDayAfter > 0 {
+                targetDate = calendar.date(byAdding: .day, value: isExplicitDayAfter, to: targetDate) ?? targetDate
+            } else if isExplicitTomorrow {
+                targetDate = calendar.date(byAdding: .day, value: 1, to: targetDate) ?? targetDate
+            } else if targetDate <= Date() {
                 targetDate = calendar.date(byAdding: .day, value: 1, to: targetDate) ?? targetDate
             }
             let timeStr = String(format: "%02d:%02d", hour, minute)
-            let actionName = "\(timeStr) \(on ? "开机" : "关机")"
+            let dayPrefix = isExplicitDayAfter == 3 ? "大后天 " : (isExplicitDayAfter == 2 ? "后天 " : (isExplicitTomorrow ? "明天 " : ""))
+            let actionName = "\(dayPrefix)\(timeStr) \(on ? "开机" : "关机")"
             let attrVal = AttrValue.bool(on)
             guard let valJSON = ScheduledAction.valueJSON(attrVal) else {
                 VoiceControlManager.shared.markFailed("参数构造失败")

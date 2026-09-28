@@ -272,6 +272,12 @@ public struct VoiceCommandParser {
     }
 
     private static func isCancelSchedule(_ text: String) -> Bool {
+        // 若包含明确动作谓词且为否定动作（如“别定时开机”、“不要定时关机”、“千万别定时开”），属于动作否定拦截，严禁误判为取消定时 (v1.9.55)
+        if (text.contains("开") || text.contains("关") || text.contains("停") || text.contains("启动")) &&
+           (text.contains("别") || text.contains("不要") || text.contains("不用") || text.contains("千万") || containsNegativeAction(text)) &&
+           !text.contains("取消") && !text.contains("清除") && !text.contains("删除") && !text.contains("撤销") {
+            return false
+        }
         let cancelKeywords = ["取消定时", "取消倒计时", "关闭定时", "清除定时", "删除定时", "取消预约", "别定了", "别定时", "不要定时", "不用定时"]
         if cancelKeywords.contains(where: { text.contains($0) }) {
             return true
@@ -285,6 +291,7 @@ public struct VoiceCommandParser {
     }
 
     private static func parseScheduleOrCountdown(_ text: String) -> VoiceParseResult? {
+        guard !containsNegativeAction(text) else { return nil }
         let isAll = isAllDeviceScope(text)
 
         // 1. 优先判断指定具体钟点定时（如“晚上10点关机”、“明早7点开空调”、“差半小时八点关机”、“十点差五分关机”）
@@ -294,7 +301,17 @@ public struct VoiceCommandParser {
             let isPowerOn = text.contains("开") && !text.contains("关") && !text.contains("停")
             let actionStr = isPowerOn ? "开机" : "关机"
             let timeStr = String(format: "%02d:%02d", time.hour, time.minute)
-            let display = isAll ? "定时全屋在 \(timeStr) \(actionStr)" : "定时在 \(timeStr) \(actionStr)"
+            let dayDesc: String = {
+                if text.contains("明天") || text.contains("明早") || text.contains("明晚") || text.contains("次日") || text.contains("明儿") {
+                    return "明天 "
+                } else if text.contains("大后天") {
+                    return "大后天 "
+                } else if text.contains("后天") {
+                    return "后天 "
+                }
+                return ""
+            }()
+            let display = isAll ? "定时全屋在 \(dayDesc)\(timeStr) \(actionStr)" : "定时在 \(dayDesc)\(timeStr) \(actionStr)"
             return VoiceParseResult(
                 command: .schedulePower(hour: time.hour, minute: time.minute, power: isPowerOn),
                 displayText: display
@@ -387,8 +404,9 @@ public struct VoiceCommandParser {
             }
         }
 
-        // 默认“定时关机”/“定时关空调” -> 默认 60 分钟
-        if text.contains("定时关") || text.contains("倒计时关") {
+        // 默认“定时关机”/“定时关空调”/“定时开机”/“倒计时开机” -> 默认 60 分钟 (v1.9.55 闭环开关机对称性)
+        if text.contains("定时关") || text.contains("倒计时关") || text.contains("预约关") ||
+           text.contains("定时开") || text.contains("倒计时开") || text.contains("预约开") {
             return 60
         }
 
@@ -506,7 +524,7 @@ public struct VoiceCommandParser {
             }
         }
 
-        // 5. 钟点时段与时态校准 (v1.9.48 彻底根除午夜/零点误为正午及中午11点误为深夜23点缺陷)
+        // 5. 钟点时段与时态校准 (v1.9.48 彻底根除午夜/零点误为正午及中午11点误为深夜23点缺陷, v1.9.55 规范半夜/午夜9~11点深宵时区)
         if finalHour == 12 {
             if isNightMidnight {
                 // “晚上12点”、“半夜12点”、“午夜12点”、“凌晨12点”均代表午夜 00:00
@@ -517,6 +535,9 @@ public struct VoiceCommandParser {
             finalHour = 0
         } else if finalHour > 0 && finalHour < 12 {
             if isAfternoonPM || (normalized.contains("晚上") || normalized.contains("今晚") || normalized.contains("明晚") || normalized.contains("夜里") || normalized.contains("傍晚")) {
+                finalHour += 12
+            } else if (normalized.contains("半夜") || normalized.contains("午夜")) && finalHour >= 9 {
+                // 口语“半夜9/10/11点”或“午夜9/10/11点”归入深夜时段 21:00 ~ 23:00 (v1.9.55)
                 finalHour += 12
             } else if isNoon && finalHour <= 5 {
                 // 中午 1 点、2 点等午后时段

@@ -485,6 +485,40 @@ struct ResetFilterMaintenanceIntent: AppIntent {
     }
 }
 
+// MARK: - 取消计划调度任务 (v1.9.55)
+
+struct CancelACSchedulesIntent: AppIntent {
+    static var title: LocalizedStringResource = "取消空调定时"
+    static var description = IntentDescription("取消海尔空调正在生效的定时或倒计时任务", categoryName: "空调控制")
+
+    @Parameter(title: "设备名称", description: "可选；留空则取消全屋所有定时任务，指定名称则取消该设备任务")
+    var deviceName: String?
+
+    @MainActor
+    func perform() async throws -> some IntentResult & ProvidesDialog {
+        let model = AppModel.shared
+        if let name = deviceName, !name.isEmpty && !name.contains("全") && !name.contains("所有") {
+            guard let deviceId = resolveDeviceId(named: name) else {
+                throw ACIntentError.message("未找到指定名称的空调设备")
+            }
+            let devName = model.allUnifiedDevices.first(where: { $0.id == deviceId })?.name ?? "目标空调"
+            let count = model.cancelSchedules(for: [deviceId])
+            if count > 0 {
+                return .result(dialog: "已为您取消「\(devName)」的 \(count) 个定时任务")
+            } else {
+                return .result(dialog: "「\(devName)」当前没有正在运行的定时任务")
+            }
+        } else {
+            let count = model.cancelAllSchedules()
+            if count > 0 {
+                return .result(dialog: "已为您取消全屋所有定时与倒计时任务（共 \(count) 个）")
+            } else {
+                return .result(dialog: "全屋当前没有正在运行的定时任务")
+            }
+        }
+    }
+}
+
 // MARK: - 快捷指令库入口
 
 struct ACAppShortcuts: AppShortcutsProvider {
@@ -645,6 +679,17 @@ struct ACAppShortcuts: AppShortcutsProvider {
                     shortTitle: "微调温度",
                     systemImageName: "thermometer.high"
                 ),
+                AppShortcut(
+                    intent: CancelACSchedulesIntent(),
+                    phrases: [
+                        "用 \(.applicationName) 取消定时",
+                        "用 \(.applicationName) 取消所有定时",
+                        "\(.applicationName) 取消定时",
+                        "取消全屋定时 \(.applicationName)",
+                    ],
+                    shortTitle: "取消定时",
+                    systemImageName: "xmark.circle"
+                ),
             ]
         } else {
             return [
@@ -755,6 +800,13 @@ struct ACAppShortcuts: AppShortcutsProvider {
                     phrases: [
                         "用 \(.applicationName) 调节风速",
                         "用 \(.applicationName) 设置风速",
+                    ]
+                ),
+                AppShortcut(
+                    intent: CancelACSchedulesIntent(),
+                    phrases: [
+                        "用 \(.applicationName) 取消定时",
+                        "用 \(.applicationName) 取消所有定时",
                     ]
                 ),
             ]

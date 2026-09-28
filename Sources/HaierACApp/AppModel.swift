@@ -776,15 +776,19 @@ final class AppModel: ObservableObject {
                 // 典型变频空调制冷热力学：室内温度过高（indoor >= 30°C）或大温差降温（diff >= 5°C）时，
                 // 蒸发器冷凝水析出量达到峰值且室内风机处于超高风量吞吐，翅片水膜与高速通量导致微粒沉降捕获率剧增；
                 // 动态分配 modeFactor = 1.45（与极潮湿除湿工况达成热物理对称）；常规降温为 1.30；恒温维持为 1.15
-                if let indoor = indoorTemp, indoor > targetTemp {
-                    let diff = indoor - targetTemp
-                    if diff >= 5.0 || indoor >= 30.0 {
-                        modeFactor = 1.45
+                if let indoor = indoorTemp {
+                    if indoor > targetTemp {
+                        let diff = indoor - targetTemp
+                        if diff >= 5.0 || indoor >= 30.0 {
+                            modeFactor = 1.45
+                        } else {
+                            modeFactor = 1.30
+                        }
                     } else {
-                        modeFactor = 1.30
+                        modeFactor = 1.15
                     }
                 } else {
-                    modeFactor = 1.15
+                    modeFactor = 1.30 // 无室温传感器基准降温工况，消除盲目套用维持态导致负荷低估 (v1.9.55)
                 }
             case .dehumidify:
                 // 除湿冷凝水膜表面张力微粒捕获与结块动力学 (v1.9.53)：
@@ -803,15 +807,19 @@ final class AppModel: ObservableObject {
                     modeFactor = 1.30
                 }
             case .heating:
-                if let indoor = indoorTemp, targetTemp > indoor {
-                    let diff = targetTemp - indoor
-                    if diff >= 5.0 || indoor <= 12.0 {
-                        modeFactor = 1.25 // 大温差强对流与PTC热对流微粒热泳沉积加速 (v1.9.52)
+                if let indoor = indoorTemp {
+                    if targetTemp > indoor {
+                        let diff = targetTemp - indoor
+                        if diff >= 5.0 || indoor <= 12.0 {
+                            modeFactor = 1.25 // 大温差强对流与PTC热对流微粒热泳沉积加速 (v1.9.52)
+                        } else {
+                            modeFactor = 1.15 // 常规升温对流附着 (v1.9.52)
+                        }
                     } else {
-                        modeFactor = 1.15 // 常规升温对流附着 (v1.9.52)
+                        modeFactor = 1.05 // 恒温微载维持
                     }
                 } else {
-                    modeFactor = 1.05 // 恒温微载维持
+                    modeFactor = 1.15 // 无室温传感器基准升温工况 (v1.9.55)
                 }
             case .fan:
                 modeFactor = 0.85

@@ -1584,6 +1584,76 @@ final class VoiceCommandParserTests: XCTestCase {
         XCTAssertNil(VoiceCommandParser.parse("千万别往上调"))
     }
 
+    // MARK: - 跨日定时与深宵钟点解析测试 (v1.9.55)
+
+    func testCrossDayAndMidnightScheduleParsing() {
+        // 1. 跨日钟点定时与显式日期感知
+        let t1 = VoiceCommandParser.parse("明天晚上10点关机")
+        XCTAssertEqual(t1?.command, .schedulePower(hour: 22, minute: 0, power: false))
+        XCTAssertEqual(t1?.displayText, "定时在 明天 22:00 关机")
+
+        let t2 = VoiceCommandParser.parse("明早7点开空调")
+        XCTAssertEqual(t2?.command, .schedulePower(hour: 7, minute: 0, power: true))
+        XCTAssertEqual(t2?.displayText, "定时在 明天 07:00 开机")
+
+        let t3 = VoiceCommandParser.parse("明晚8点开机")
+        XCTAssertEqual(t3?.command, .schedulePower(hour: 20, minute: 0, power: true))
+        XCTAssertEqual(t3?.displayText, "定时在 明天 20:00 开机")
+
+        let t4 = VoiceCommandParser.parse("全屋明天早上8点开机")
+        XCTAssertEqual(t4?.command, .schedulePower(hour: 8, minute: 0, power: true))
+        XCTAssertEqual(t4?.displayText, "定时全屋在 明天 08:00 开机")
+
+        let t5 = VoiceCommandParser.parse("后天晚上9点关机")
+        XCTAssertEqual(t5?.command, .schedulePower(hour: 21, minute: 0, power: false))
+        XCTAssertEqual(t5?.displayText, "定时在 后天 21:00 关机")
+
+        // 2. 深宵 9~11 点时区精准规整与凌晨时段保持
+        let m1 = VoiceCommandParser.parse("半夜10点关机")
+        XCTAssertEqual(m1?.command, .schedulePower(hour: 22, minute: 0, power: false))
+        XCTAssertEqual(m1?.displayText, "定时在 22:00 关机")
+
+        let m2 = VoiceCommandParser.parse("半夜11点关空调")
+        XCTAssertEqual(m2?.command, .schedulePower(hour: 23, minute: 0, power: false))
+        XCTAssertEqual(m2?.displayText, "定时在 23:00 关机")
+
+        let m3 = VoiceCommandParser.parse("午夜11点关机")
+        XCTAssertEqual(m3?.command, .schedulePower(hour: 23, minute: 0, power: false))
+        XCTAssertEqual(m3?.displayText, "定时在 23:00 关机")
+
+        let m4 = VoiceCommandParser.parse("半夜1点关机")
+        XCTAssertEqual(m4?.command, .schedulePower(hour: 1, minute: 0, power: false))
+        XCTAssertEqual(m4?.displayText, "定时在 01:00 关机")
+
+        let m5 = VoiceCommandParser.parse("半夜2点开机")
+        XCTAssertEqual(m5?.command, .schedulePower(hour: 2, minute: 0, power: true))
+        XCTAssertEqual(m5?.displayText, "定时在 02:00 开机")
+
+        // 3. 定时开关机 60 分钟默认对称性
+        let c1 = VoiceCommandParser.parse("定时关机")
+        XCTAssertEqual(c1?.command, .countdownPower(minutes: 60, power: false))
+        XCTAssertEqual(c1?.displayText, "设定 1 小时后关机")
+
+        let c2 = VoiceCommandParser.parse("倒计时关机")
+        XCTAssertEqual(c2?.command, .countdownPower(minutes: 60, power: false))
+
+        let c3 = VoiceCommandParser.parse("定时开机")
+        XCTAssertEqual(c3?.command, .countdownPower(minutes: 60, power: true))
+        XCTAssertEqual(c3?.displayText, "设定 1 小时后开机")
+
+        let c4 = VoiceCommandParser.parse("倒计时开机")
+        XCTAssertEqual(c4?.command, .countdownPower(minutes: 60, power: true))
+        XCTAssertEqual(c4?.displayText, "设定 1 小时后开机")
+
+        let c5 = VoiceCommandParser.parse("全屋定时开机")
+        XCTAssertEqual(c5?.command, .countdownPower(minutes: 60, power: true))
+        XCTAssertEqual(c5?.displayText, "全屋设定 1 小时后开机")
+
+        // 4. 否定意图防误触
+        XCTAssertNil(VoiceCommandParser.parse("千万别定时开机"))
+        XCTAssertNil(VoiceCommandParser.parse("不要定时关机"))
+    }
+
     // MARK: - 无效输入测试
 
     func testInvalidCommands() {

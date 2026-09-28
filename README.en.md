@@ -6,6 +6,20 @@ A native SwiftUI app to control Haier / Leader (统帅) smart air conditioners o
 
 ## Features
 
+- 🏷 **Cross-Day Clock Schedule Power On/Off & Deep-Night Normalization, Siri Shortcuts Schedule Management, macOS Status Bar Granular Task Control & Filter Dynamics (v1.9.55)**:
+  - ⏱️ **Natural Language "明天/明早/明晚/次日/后天" Cross-Day Absolute Clock Scheduling & Deep-Night Normalization (`VoiceCommandParser` / `VoiceCapsuleWindowController` / `VoiceCommandParserTests`)**:
+    - **Eradication of Accidental Same-Day Scheduling for Spoken Cross-Day Clock Times**: Permanently fixed the critical bug where daytime commands like "明天晚上10点关机" or "明晚10点关机" previously evaluated target hour 22:00 as greater than the current hour, causing the legacy check `targetDate <= Date()` to evaluate to false and mistakenly schedule the action for *tonight* instead of *tomorrow night*; fully introduced explicit cross-day date calculations across single-device, whole-house, and multi-device dispatching;
+    - **Deep-Night 9~11 PM Period Normalization & Early Morning Preservation**: Fixed colloquial "半夜9/10/11点" and "午夜11点" misclassification into morning hours by properly normalizing them to 21:00 ~ 23:00 PM while cleanly preserving early-morning "半夜1点/2点" at 01:00/02:00 AM;
+    - **Symmetric 60-Minute Default Duration for Power-On Scheduling & Negation Guard**: Extended the default 60-minute duration fallback from power-off to power-on commands ("定时开机", "倒计时开机", "预约开机"), achieving complete semantic symmetry; added strict negation guards against scheduling requests ("千万别定时开机", "不要定时关机").
+  - 🎙️ **Siri Shortcuts & AppIntents Schedule Management Integration (`AppIntents.swift`)**:
+    - Introduced `CancelACSchedulesIntent` ("取消空调定时"), supporting targeted cancellation by device name or clearing all active scheduled actions across the home;
+    - Registered intuitive phrases in `ACAppShortcuts` ("用海尔空调取消定时", "用海尔空调取消所有定时", "取消全屋定时海尔空调"), integrating seamlessly with macOS Shortcuts automation.
+  - 🍱 **macOS Native Status Bar Granular Schedule Management & Complete Wind Speed Alignment (`StatusItemController`)**:
+    - Upgraded each scheduled action in the status bar "⏱ 计划调度" section into an interactive submenu displaying device name, exact execution time, and an individual "❌ 取消该定时任务" action alongside "🗑 取消全屋所有定时与倒计时";
+    - Aligned `formatDisplayWindSpeed` with "极速/高速/中速/低速" aliases, achieving 100% enum consistency across filter aerodynamics and the energy analytics engine.
+  - 🍃 **Aerodynamic Filter Wear Sensor-Free Mode Normalization (`AppModel.calculateFilterWearFactor`)**:
+    - Explicitly distinguished between steady-state maintenance mode and missing indoor temperature sensor conditions: when `indoorTemp == nil`, defaults to standard cooling load `1.30` and heating load `1.15`, eliminating systematic filter load underestimation caused by falling into lowest maintenance baselines.
+
 - 🏷 **Natural Language "Up/Down" Relative Stepping Closure, Scorching Summer Cooling Filter Aerodynamics & Status Bar Schedule Perception (v1.9.54)**:
   - ⏱️ **Natural Language "上调/下调/往上/往下/向上/向下" Relative Temperature Stepping Closure (`VoiceCommandParser` / `VoiceCommandParserTests` / `AppIntents`)**:
     - **Thoroughly Closed High-Frequency Colloquial Stepping Gap**: Permanently resolved the critical bug where common daily voice commands such as "上调一度", "上调1度", "上调两度", "上调2度", "上调半度", "上调0.5度", "上调零点五度", "往上调1度", "往上调半度", "向上调一度", "向上调0.5度", "温度上调1度", "下调一度", "下调1度", "下调两度", "下调2度", "下调半度", "下调0.5度", "下调零点五度", "往下调1度", "往下调半度", "向下调一度", "向下调0.5度", and "温度下调1度" were previously dropped because directional keywords only matched "升/高/降/低", omitting "上调/下调/往上/往下/向上/向下";
