@@ -1068,6 +1068,29 @@ final class StatusItemController: NSObject {
                     cancelItem.representedObject = action.id.uuidString
                     singleMenu.addItem(cancelItem)
 
+                    // 动态检测同频批次兄弟任务并提供一键协同管理 (v1.9.69)
+                    let siblingActions = model.scheduledActions.filter {
+                        abs($0.fireDate.timeIntervalSince(action.fireDate)) <= 2.0 &&
+                        $0.attrName == action.attrName &&
+                        $0.attrValueJSON == action.attrValueJSON &&
+                        $0.repeatsDaily == action.repeatsDaily &&
+                        $0.repeatWeekdays == action.repeatWeekdays
+                    }
+                    if siblingActions.count > 1 {
+                        singleMenu.addItem(.separator())
+                        let anySiblingEnabled = siblingActions.contains(where: \.enabled)
+                        let syncToggleTitle = anySiblingEnabled ? "⏸ 同步暂停此批任务 (\(siblingActions.count) 台)" : "▶️ 同步恢复此批任务 (\(siblingActions.count) 台)"
+                        let syncToggleItem = NSMenuItem(title: syncToggleTitle, action: #selector(toggleSiblingSchedulesFromMenu(_:)), keyEquivalent: "")
+                        syncToggleItem.target = self
+                        syncToggleItem.representedObject = siblingActions.map(\.id.uuidString)
+                        singleMenu.addItem(syncToggleItem)
+
+                        let syncCancelItem = NSMenuItem(title: "❌ 同步取消此批任务 (\(siblingActions.count) 台)", action: #selector(cancelSiblingSchedulesFromMenu(_:)), keyEquivalent: "")
+                        syncCancelItem.target = self
+                        syncCancelItem.representedObject = siblingActions.map(\.id.uuidString)
+                        singleMenu.addItem(syncCancelItem)
+                    }
+
                     devScheduleMenu.setSubmenu(singleMenu, for: sItem)
                     devScheduleMenu.addItem(sItem)
                 }
@@ -1272,6 +1295,37 @@ final class StatusItemController: NSObject {
                 cancelSingleItem.target = self
                 cancelSingleItem.representedObject = action.id.uuidString
                 singleTaskMenu.addItem(cancelSingleItem)
+
+                // 动态检测同频批次兄弟任务并提供一键协同管理 (v1.9.69)
+                let siblingActions = activeSchedules.filter {
+                    abs($0.fireDate.timeIntervalSince(action.fireDate)) <= 2.0 &&
+                    $0.attrName == action.attrName &&
+                    $0.attrValueJSON == action.attrValueJSON &&
+                    $0.repeatsDaily == action.repeatsDaily &&
+                    $0.repeatWeekdays == action.repeatWeekdays
+                }
+                if siblingActions.count > 1 {
+                    singleTaskMenu.addItem(.separator())
+                    let anySiblingEnabled = siblingActions.contains(where: \.enabled)
+                    let syncToggleTitle = anySiblingEnabled ? "⏸ 同步暂停此批任务 (\(siblingActions.count) 台)" : "▶️ 同步恢复此批任务 (\(siblingActions.count) 台)"
+                    let syncToggleItem = NSMenuItem(
+                        title: syncToggleTitle,
+                        action: #selector(toggleSiblingSchedulesFromMenu(_:)),
+                        keyEquivalent: ""
+                    )
+                    syncToggleItem.target = self
+                    syncToggleItem.representedObject = siblingActions.map(\.id.uuidString)
+                    singleTaskMenu.addItem(syncToggleItem)
+
+                    let syncCancelItem = NSMenuItem(
+                        title: "❌ 同步取消此批任务 (\(siblingActions.count) 台)",
+                        action: #selector(cancelSiblingSchedulesFromMenu(_:)),
+                        keyEquivalent: ""
+                    )
+                    syncCancelItem.target = self
+                    syncCancelItem.representedObject = siblingActions.map(\.id.uuidString)
+                    singleTaskMenu.addItem(syncCancelItem)
+                }
 
                 scheduleMenu.setSubmenu(singleTaskMenu, for: item)
                 scheduleMenu.addItem(item)
@@ -1635,6 +1689,37 @@ final class StatusItemController: NSObject {
         }
     }
 
+    @objc private func toggleSiblingSchedulesFromMenu(_ sender: NSMenuItem) {
+        guard let idStrs = sender.representedObject as? [String] else { return }
+        let uuids = Set(idStrs.compactMap { UUID(uuidString: $0) })
+        let targets = model.scheduledActions.filter { uuids.contains($0.id) }
+        guard !targets.isEmpty else { return }
+        let anyEnabled = targets.contains(where: \.enabled)
+        let newEnabled = !anyEnabled
+        var modified = 0
+        for action in targets {
+            var updated = action
+            updated.enabled = newEnabled
+            model.updateScheduledAction(updated)
+            modified += 1
+        }
+        let actionDesc = newEnabled ? "恢复" : "暂停"
+        model.operationNotice = AppModel.OperationNotice(text: "\(newEnabled ? "▶️" : "⏸") 已\(actionDesc)同频批次任务（共 \(modified) 台空调）", isError: false)
+        refreshTemperature()
+    }
+
+    @objc private func cancelSiblingSchedulesFromMenu(_ sender: NSMenuItem) {
+        guard let idStrs = sender.representedObject as? [String] else { return }
+        let uuids = Set(idStrs.compactMap { UUID(uuidString: $0) })
+        let targets = model.scheduledActions.filter { uuids.contains($0.id) }
+        guard !targets.isEmpty else { return }
+        for action in targets {
+            model.removeScheduledAction(action)
+        }
+        model.operationNotice = AppModel.OperationNotice(text: "🗑 已同步取消同频批次任务（共 \(targets.count) 台空调）", isError: false)
+        refreshTemperature()
+    }
+
     @objc private func pauseDeviceSchedulesFromMenu(_ sender: NSMenuItem) {
         guard let devId = sender.representedObject as? String else { return }
         let count = model.setScheduledActionsEnabled(for: devId, enabled: false)
@@ -1798,7 +1883,7 @@ final class StatusItemController: NSObject {
         }
     }
 
-    /// 智能提取计划调度或倒计时任务的干净动作谓词（根除如“将在 18 分钟后30 分钟后关机”的历史口语重复语病与钟点/周期前缀残留） (v1.9.66, v1.9.67, v1.9.68)
+    /// 智能提取计划调度或倒计时任务的干净动作谓词（以硬件底层真实布尔载荷权威裁决开关机，消除“开关”双词倒置开机意图缺陷，并提炼温阶/模式及清洗冗余前缀与重复周期标签） (v1.9.66, v1.9.67, v1.9.68, v1.9.69)
     private static func extractPlanActionVerb(from action: ScheduledAction, devName: String) -> String {
         var name = action.name
         if !devName.isEmpty && name.hasPrefix("「\(devName)」") {
@@ -1808,8 +1893,11 @@ final class StatusItemController: NSObject {
         }
         name = name.trimmingCharacters(in: .whitespacesAndNewlines)
 
-        // 1. 如果是开关机属性，精准提炼为纯净动作动词（彻底根除时间/周期前缀残留语病）
+        // 1. 如果是开关机属性，以实际动作布尔负载为首要权威判定（彻底杜绝包含“开关”等词导致开机被反向识别为关机）
         if action.attrName == "onOffStatus" {
+            if let boolVal = action.attrValue?.boolValue {
+                return boolVal ? "开机" : "关机"
+            }
             if name.contains("关机") || name.contains("关空调") || name.contains("关闭") {
                 return "关机"
             }
@@ -1819,10 +1907,30 @@ final class StatusItemController: NSObject {
             return (action.attrValue == .bool(true)) ? "开机" : "关机"
         }
 
-        // 2. 其他任务类型（自清洁/睡眠曲线/自定义调温等）：清洗前置时间与周期前缀
-        if let prefixRegex = try? NSRegularExpression(pattern: #"^(?:(?:明天|后天|大后天|次日|工作日|平时|周末|双休|每天|周[一二三四五六日天0-7至到\-~、\s]+|每周[一二三四五六日天0-7、\s]+)\s*)*(?:\d{1,2}:\d{2}(?::\d{2})?\s*)*(?:\d+\s*(?:分钟|小时|钟头)后|晨间过渡(?:关机)?\s*)*"#) {
+        // 2. 目标温度属性：提炼精准目标温阶（如“设定温度 26°C”）
+        if action.attrName == "targetTemperature" {
+            if let d = action.attrValue?.doubleValue {
+                let tempStr = (d.truncatingRemainder(dividingBy: 1.0) == 0) ? "\(Int(d))°C" : String(format: "%.1f°C", d)
+                return "设定温度 \(tempStr)"
+            }
+        }
+
+        // 3. 运行模式属性：提炼具体模式切换
+        if action.attrName == "operationMode" {
+            if let raw = action.attrValue?.stringValue, let code = ACModeCode.match(from: raw) {
+                return "切换\(code.desc)"
+            }
+        }
+
+        // 4. 其他任务类型（自清洁/睡眠曲线/自定义调温等）：清洗前置时间与周期前缀及冗余前缀
+        if let prefixRegex = try? NSRegularExpression(pattern: #"^(?:(?:定时|预约)?(?:全屋)?(?:在)?\s*)*(?:(?:明天|后天|大后天|次日|工作日|平时|周末|双休|每天|周[一二三四五六日天0-7至到\-~、\s]+|每周[一二三四五六日天0-7、\s]+)\s*)*(?:\d{1,2}:\d{2}(?::\d{2})?\s*)*(?:\d+\s*(?:分钟|小时|钟头)后|晨间过渡(?:关机)?\s*)*"#) {
             let range = NSRange(name.startIndex..<name.endIndex, in: name)
             name = prefixRegex.stringByReplacingMatches(in: name, options: [], range: range, withTemplate: "")
+        }
+        // 清洗末尾附带的周期重复后缀（如“（工作日）”、“（每天）”），防止与菜单后续追加的周期标签形成双重重复
+        if let suffixRegex = try? NSRegularExpression(pattern: #"\s*[(（](?:每天|工作日|平时|周末|双休|周[一二三四五六日天至到\-~、\s]+)[)）]\s*$"#) {
+            let range = NSRange(name.startIndex..<name.endIndex, in: name)
+            name = suffixRegex.stringByReplacingMatches(in: name, options: [], range: range, withTemplate: "")
         }
         name = name.trimmingCharacters(in: .whitespacesAndNewlines)
         if name.isEmpty {

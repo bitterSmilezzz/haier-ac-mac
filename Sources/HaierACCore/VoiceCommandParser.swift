@@ -468,9 +468,9 @@ public struct VoiceCommandParser {
         return try? NSRegularExpression(pattern: pattern)
     }()
 
-    /// 匹配排除型否定星期口语模式（如“除了周末每天晚上10点关机”、“除周末外每天早8点开机”、“除了工作日每天晚上11点关空调”、“除了周日每天早8点开机”、“除周一外每天晚10点关机”） (v1.9.68)
+    /// 匹配排除型否定星期口语模式（如“除了周末每天晚上10点关机”、“除周末外每天早8点开机”、“除了工作日每天晚上11点关空调”、“除了周日每天早8点开机”、“除周一外每天晚10点关机”、“工作日除了周三早8点开机”、“周一至周五除周二外晚10点关空调”） (v1.9.68, v1.9.69 补全限定基准集约束)
     private static let exclusionRepeatRegex: NSRegularExpression? = {
-        let pattern = #"(?:除了|除)\s*([^，,。！？\s]+?)\s*(?:(?:之|以)?外)?(?=[，,。！？\s]|每天|天天|每日|每晚|每早|每晨|每夜|日日|\d|早|晚|夜|中|上|下|凌晨|午|点|时|:|$|开|关|停)"#
+        let pattern = #"(?:除了|除)\s*([^，,。！？\s]+?)\s*(?:(?:之|以)?外)?(?=[，,。！？\s]|工作日|平时|周末|双休|每天|天天|每日|每晚|每早|每晨|每夜|日日|\d|早|晚|夜|中|上|下|凌晨|午|点|时|:|$|开|关|停)"#
         return try? NSRegularExpression(pattern: pattern)
     }()
 
@@ -515,7 +515,30 @@ public struct VoiceCommandParser {
         return excluded.isEmpty ? nil : excluded
     }
 
-    /// 解析排除型周期语义并计算全周补集 (v1.9.68)
+    /// 从除外子句之外的文本中提取基准星期集合（Base Scope），若未指定则默认全周 7 天 (v1.9.69)
+    private static func extractBaseScopeWeekdays(from text: String) -> Set<Int>? {
+        let ns = text as NSString
+        let fullRange = NSRange(location: 0, length: ns.length)
+        if let regex = repeatWeekdayRangeRegex,
+           let match = regex.firstMatch(in: text, options: [], range: fullRange),
+           match.numberOfRanges >= 3 {
+            let sStr = ns.substring(with: match.range(at: 1))
+            let eStr = ns.substring(with: match.range(at: 2))
+            if let sCh = sStr.first, let sWd = chineseDayCharToWeekday(sCh),
+               let eCh = eStr.first, let eWd = chineseDayCharToWeekday(eCh) {
+                return Set(generateWeeklyRange(start: sWd, end: eWd))
+            }
+        }
+        if text.contains("工作日") || text.contains("平时") {
+            return [2, 3, 4, 5, 6]
+        }
+        if text.contains("周末") || text.contains("双休") {
+            return [1, 7]
+        }
+        return nil
+    }
+
+    /// 解析排除型周期语义并计算指定基准集合或全周的补集 (v1.9.68, v1.9.69 闭环限定基准范围约束)
     private static func parseExclusionRepeatWeekdays(_ text: String) -> (weekdays: [Int], label: String)? {
         let ns = text as NSString
         guard let regex = exclusionRepeatRegex,
@@ -527,9 +550,11 @@ public struct VoiceCommandParser {
         guard let excluded = extractExcludedDays(from: target) else {
             return nil
         }
-        let fullWeek: Set<Int> = [1, 2, 3, 4, 5, 6, 7]
-        let remaining = fullWeek.subtracting(excluded)
-        guard !remaining.isEmpty && remaining.count < 7 else {
+        // 剥离排除子句，解析上下文中的限定基准集（如“工作日除了周三”的基准集为“工作日”，“周末除周日外”的基准集为“周末”）
+        let remainingText = ns.replacingCharacters(in: match.range, with: " ")
+        let baseScope = extractBaseScopeWeekdays(from: remainingText) ?? Set([1, 2, 3, 4, 5, 6, 7])
+        let remaining = baseScope.subtracting(excluded)
+        guard !remaining.isEmpty && remaining.count < baseScope.count else {
             return nil
         }
         let sorted = Array(remaining).sorted()

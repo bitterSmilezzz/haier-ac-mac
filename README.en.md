@@ -6,6 +6,18 @@ A native SwiftUI app to control Haier / Leader (统帅) smart air conditioners o
 
 ## Features
 
+- 🏷 **Restricted Base Scope Exclusion Weekday Schedule Engine, Status Bar Action Verb Hardware Bool Decision & Sync Batch Control, and Auto Heating Electrostatic Dynamics (v1.9.69)**:
+  - ⏱️ **Natural Language Restricted Base Scope Exclusion Schedule Engine (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)**:
+    - **Eradication of Restricted Scope Exclusion Flaw**: Fixed a critical defect where exclusion parsing rigidly defaulted the universal set to 7 days, introducing `extractBaseScopeWeekdays` to dynamically detect explicit base scopes (e.g. "工作日除了周三每天早上8点开机" -> `[2, 3, 5, 6]` Mon/Tue/Thu/Fri; "周末除周日外早8点开机" -> `[7]` Sat; "工作日除周五外每天晚10点关空调" -> `[2, 3, 4, 5]` Mon-Thu), preventing accidental weekend or weekday activation;
+    - **Lookahead & Word Order Boundary Protection**: Added `工作日|平时|周末|双休` into lookahead assertions in `exclusionRepeatRegex` to prevent swallowing trailing context in forward word orders like "除了周三工作日每天早8点开机";
+    - **Rigorous Test Coverage**: Added 7 new end-to-end unit test assertions in `VoiceCommandParserTests`, 100% PASS.
+  - 🍱 **macOS Status Bar Action Verb Authoritative Bool Payload & Sync Sibling Batch Management (`StatusItemController.swift` / `Models.swift`)**:
+    - **Hardware-Level Bool Priority**: Added `boolValue` and `doubleValue` to `AttrValue` and prioritized the real hardware payload in `extractPlanActionVerb`, eliminating false "power-off" displays for power-on tasks containing the "开关" substring;
+    - **Submenu Action Verb Refinement & Redundancy Removal**: Added exact temperature labels ("设定温度 26°C") and mode labels ("切换制冷"), while scrubbing redundant trailing cycle tags to eradicate duplicate parentheses like "设定温度（工作日） (14:30) [工作日]";
+    - **Synchronized Sibling Multi-Device Task Control**: Automatically detects synchronized co-scheduled actions across multiple devices and adds "⏸ 同步暂停此批任务 (N 台) / ▶️ 同步恢复此批任务 (N 台)" and "❌ 同步取消此批任务 (N 台)" in submenu.
+  - 🍃 **Thermodynamic Heating Phase Alignment in Auto Mode (`AppModel.calculateFilterWearFactor`)**:
+    - **Physical Phase Coherence**: Unified low-humidity winter electrostatic adhesion modeling (RH < 35% damping 1.00 ~ 1.12) to include `.auto` mode with heating bias (`indoor < targetTemp`), eliminating improper cooling-mode dry discounts during winter heating.
+
 - 🏷 **Negative Exclusion Weekday Schedule Engine, macOS Status Bar Action Verb Sanitization & Jitter Elimination, and Dry Heating Electrostatic Dynamics (v1.9.68)**:
   - ⏱️ **Natural Language Exclusion-Based Repeating Schedule Engine (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)**:
     - **Eradication of Inverted Logic Flaw**: Fixed a critical defect where exclusion commands such as "除了周末每天晚上10点关机" (every night except weekends) or "除了工作日每天晚上11点关空调" previously short-circuited on the substring "周末/工作日" and erroneously configured the opposite schedule;

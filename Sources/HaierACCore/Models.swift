@@ -44,6 +44,28 @@ public enum AttrValue: Hashable {
         case .null: return NSNull()
         }
     }
+
+    public var boolValue: Bool? {
+        switch self {
+        case .bool(let b): return b
+        case .string(let s):
+            let lower = s.lowercased()
+            if lower == "true" || lower == "1" { return true }
+            if lower == "false" || lower == "0" { return false }
+            return nil
+        case .int(let i): return i != 0
+        default: return nil
+        }
+    }
+
+    public var doubleValue: Double? {
+        switch self {
+        case .double(let d): return d
+        case .int(let i): return Double(i)
+        case .string(let s): return Double(s)
+        default: return nil
+        }
+    }
 }
 
 public struct TokenInfo: Codable {

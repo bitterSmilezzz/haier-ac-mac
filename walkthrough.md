@@ -1,36 +1,51 @@
-# Haier AC Mac v1.9.68 发布与巡检演进报告
+# Haier AC Mac v1.9.69 发布与巡检演进报告
 
 ## 1. 概述与版本定位
-- **版本号**：`v1.9.68`
-- **发版主题**：闭环自然语言排除型否定星期周期调度引擎、macOS 状态栏动作谓词多维智能清洗与同频多机防抖及冬季制热低湿静电吸附动力学
+- **版本号**：`v1.9.69`
+- **发版主题**：闭环自然语言排除型否定星期限定基准集调度引擎、macOS 状态栏动作谓词真实布尔裁决与同频多机协同批处理及自动模式制热静电吸附动力学
 - **核心目标与架构演进**：
-  1. **自然语言排除型否定星期周期调度通用引擎 (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)**：
-     - **彻底根除反向语义逻辑颠倒缺陷**：针对“除了周末每天晚上10点关机”、“除周末外每天早8点开机”、“除了工作日每天晚上11点关空调”等高频生活口语，彻底修复旧版中因命中“周末/工作日”子串而直接短路并反向误设为“周末/工作日”的严重逻辑颠倒；
-     - **全场景排除模式与全周智能补集计算**：引入 `exclusionRepeatRegex` 与 `parseExclusionRepeatWeekdays` 引擎，全量覆盖“除了周末” -> `[2, 3, 4, 5, 6]`（工作日）、“除了工作日” -> `[1, 7]`（周末）、“除了周日/除周日外” -> `[2, 3, 4, 5, 6, 7]`（周一至周六）、“除周一外” -> `[1, 3, 4, 5, 6, 7]`（周二至周日）、“除周六周日外” -> `[2, 3, 4, 5, 6]`（工作日）、“除了周一至周五” -> `[1, 7]`（周末）及“除周一和周三外”等复杂多星期组合；
-     - **后置排除子句自适应解析**：完美支持后置排除语法（如“每天晚10点关机除了周末”、“晚10点关机除周日外”）；
-     - **严密测试断言守护**：在 `VoiceCommandParserTests` 中新增 `testExclusionRepeatWeekdays`，包含 16 组端到端排除周期调度断言，100% 验证 PASS。
-  2. **macOS 原生状态栏动作谓词多维智能去重清洗与同频多机防抖 (`StatusItemController.swift`)**：
-     - **Tooltip 动作谓词多维度清洗与语病根除**：重构 `extractPlanActionVerb`，全面清洗天前缀（明天/后天/大后天/次日）、周期标签（工作日/周末/每天/周X）以及钟点时间前缀（`\d{1,2}:\d{2}`），彻底纠正历史遗留的“将在 30 分钟后22:00 关机 (22:00)”生硬口吃语病，自然输出“将在 30 分钟后关机 (22:00)”；
-     - **设备计划菜单项钟点重复彻底消除**：在单设备计划调度二级菜单及多设备计划调度列表中，菜单条目标题统一接入 `extractPlanActionVerb`，彻底消除原“⏱ 22:00 关机 (22:00，剩余 15 分钟)”中双重时间重叠问题，优雅呈现为“⏱ 关机 (22:00，剩余 15 分钟)”与“⏱ 客厅: 关机 (22:00，剩余 15 分钟)”；
-     - **同频多设备倒计时 Tooltip 防抖**：在多设备同频计划聚合时，严格遵照设备列表原始顺序过滤输出，彻底杜绝 `Set` 遍历无序导致的“「客厅」、「主卧」”与“「主卧」、「客厅」”随机视觉抖动。
-  3. **冬季制热极低湿度静电吸附物理动力学模型 (`AppModel.calculateFilterWearFactor`)**：
-     - **微粒物理吸附自洽**：针对冬季制热工况（`.heating`），换热器高温烘烤虽无凝结水膜，但在寒冬低湿干燥工况（RH < 35%）下，化纤滤网极易产生静电积聚（静电驻极效应），加速对细微干燥浮尘颗粒的吸附截留；
-     - 引入连续平滑静电吸附阻尼插值（1.00 ~ 1.12），消除简单套用制冷减免带来的物理失真，达成全季节全气候微粒物理自洽。
+  1. **自然语言限定基准集排除型星期周期调度通用引擎 (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)**：
+     - **彻底解决限定基准集排除反向失真缺陷**：突破以往全集死板绑定为全周 7 天的限制，新增 `extractBaseScopeWeekdays` 引擎。针对“工作日除了周三每天早上8点开机”、“工作日除周五外每天晚10点关空调”、“周末除周日外早8点开机”、“周一到周五除了周二早8点开机”等生活高频复合场景，精准提取限定基准范围并求差集（如“工作日除周三” -> `[2, 3, 5, 6]` 周一、二、四、五；“周末除周日” -> `[7]` 周六；“工作日除周五” -> `[2, 3, 4, 5]` 周一至周四），彻底消除以往在周末非工作日或工作日误开空调的严重逻辑失真；
+     - **语序与前瞻断言边界强化**：强化 `exclusionRepeatRegex` 前瞻断言，加入 `工作日|平时|周末|双休`，杜绝“除了周三工作日每天早8点开机”等前置语序将后续限定词错误吞噬；
+     - **严密测试断言守护**：在 `VoiceCommandParserTests` 中扩充 7 组端到端限定基准集排除周期调度测试用例，100% 验证 PASS。
+  2. **macOS 原生状态栏动作谓词真实布尔裁决与同频多机任务协同批处理 (`StatusItemController.swift` / `Models.swift`)**：
+     - **开关机权威布尔负载优先裁决**：在 `AttrValue` 中补齐 `boolValue` 与 `doubleValue` 计算属性；在 `extractPlanActionVerb` 中优先以硬件真实下发的布尔值判断开机与关机，彻底根除“开关”、“开关机”中包含“关机”子串导致开机任务被反向显示为关机的严重倒置问题；
+     - **高精温阶与模式动作提炼及双重括号语病清除**：支持 `targetTemperature` 精准输出“设定温度 26°C”、`operationMode` 输出“切换制冷”，并彻底清洗末尾自带的“（工作日）”等冗余后缀，杜绝菜单生成如“设定温度（工作日） (14:30) [工作日]”的双重重复语病；
+     - **同频多机任务协同批量管理**：智能探测属于同一时间、同属性、同重复规则的同频兄弟任务（数量 > 1），在二级菜单中新增「⏸ 同步暂停此批任务 (N 台) / ▶️ 同步恢复此批任务 (N 台)」与「❌ 同步取消此批任务 (N 台)」，无需清空全屋所有定时即可一键管理整屋协同任务。
+  3. **自动模式制热偏置冬季低湿静电吸附物理动力学相态统一 (`AppModel.calculateFilterWearFactor`)**：
+     - **物理相态严密自洽**：提炼 `isHeatingPhysicalState`，将自动模式（`.auto`）下的制热升温偏置（`indoor < targetTemp` 或缺省时 `targetTemp > 25.0`）与冬季制热低湿静电驻极吸附模型（RH < 35% 时 1.00 ~ 1.12 阻尼插值）完全打通，根除原代码误将自动模式制热应用制冷干燥减免的物理相态不自洽缺陷。
 
 ---
 
 ## 2. 关键架构变更与代码实现
 
-### 2.1 排除型否定星期周期调度通用引擎
-- **`VoiceCommandParser.swift` 排除语法捕获与全周补集状态机**：
+### 2.1 限定基准范围排除型周期调度通用引擎
+- **`VoiceCommandParser.swift` 基准集提取与精确差集运算**：
   ```swift
-  /// 匹配排除型否定星期口语模式
-  private static let exclusionRepeatRegex: NSRegularExpression? = {
-      let pattern = #"(?:除了|除)\s*([^，,。！？\s]+?)\s*(?:(?:之|以)?外)?(?=[，,。！？\s]|每天|天天|每日|每晚|每早|每晨|每夜|日日|\d|早|晚|夜|中|上|下|凌晨|午|点|时|:|$|开|关|停)"#
-      return try? NSRegularExpression(pattern: pattern)
-  }()
+  /// 从除外子句之外的文本中提取基准星期集合（Base Scope），若未指定则默认全周 7 天 (v1.9.69)
+  private static func extractBaseScopeWeekdays(from text: String) -> Set<Int>? {
+      let ns = text as NSString
+      let fullRange = NSRange(location: 0, length: ns.length)
+      if let regex = repeatWeekdayRangeRegex,
+         let match = regex.firstMatch(in: text, options: [], range: fullRange),
+         match.numberOfRanges >= 3 {
+          let sStr = ns.substring(with: match.range(at: 1))
+          let eStr = ns.substring(with: match.range(at: 2))
+          if let sCh = sStr.first, let sWd = chineseDayCharToWeekday(sCh),
+             let eCh = eStr.first, let eWd = chineseDayCharToWeekday(eCh) {
+              return Set(generateWeeklyRange(start: sWd, end: eWd))
+          }
+      }
+      if text.contains("工作日") || text.contains("平时") {
+          return [2, 3, 4, 5, 6]
+      }
+      if text.contains("周末") || text.contains("双休") {
+          return [1, 7]
+      }
+      return nil
+  }
 
-  /// 解析排除型周期语义并计算全周补集
+  /// 解析排除型周期语义并计算指定基准集合或全周的补集 (v1.9.68, v1.9.69 闭环限定基准范围约束)
   private static func parseExclusionRepeatWeekdays(_ text: String) -> (weekdays: [Int], label: String)? {
       let ns = text as NSString
       guard let regex = exclusionRepeatRegex,
@@ -42,9 +57,11 @@
       guard let excluded = extractExcludedDays(from: target) else {
           return nil
       }
-      let fullWeek: Set<Int> = [1, 2, 3, 4, 5, 6, 7]
-      let remaining = fullWeek.subtracting(excluded)
-      guard !remaining.isEmpty && remaining.count < 7 else {
+      // 剥离排除子句，解析上下文中的限定基准集（如“工作日除了周三”的基准集为“工作日”，“周末除周日外”的基准集为“周末”）
+      let remainingText = ns.replacingCharacters(in: match.range, with: " ")
+      let baseScope = extractBaseScopeWeekdays(from: remainingText) ?? Set([1, 2, 3, 4, 5, 6, 7])
+      let remaining = baseScope.subtracting(excluded)
+      guard !remaining.isEmpty && remaining.count < baseScope.count else {
           return nil
       }
       let sorted = Array(remaining).sorted()
@@ -53,60 +70,82 @@
   }
   ```
 
-- **置顶于 `parseRepeatWeekdays` 第 0 步拦截**：
+### 2.2 macOS 状态栏动作谓词真实布尔裁决与同频多机协同批处理
+- **`StatusItemController.swift` 动作提炼引擎硬件布尔裁决与精准动作映射**：
   ```swift
-  // 0. 排除型否定星期周期优先解析（如“除了周末每天晚上10点关机”、“除周末外每天早8点开机”、“除了工作日每天晚上11点关空调”）
-  if let exclusionResult = parseExclusionRepeatWeekdays(text) {
-      return exclusionResult
+  // 1. 如果是开关机属性，以实际动作布尔负载为首要权威判定（彻底杜绝包含“开关”等词导致开机被反向识别为关机）
+  if action.attrName == "onOffStatus" {
+      if let boolVal = action.attrValue?.boolValue {
+          return boolVal ? "开机" : "关机"
+      }
+      if name.contains("关机") || name.contains("关空调") || name.contains("关闭") {
+          return "关机"
+      }
+      if name.contains("开机") || name.contains("开空调") || name.contains("开启") || name.contains("打开") {
+          return "开机"
+      }
+      return (action.attrValue == .bool(true)) ? "开机" : "关机"
+  }
+
+  // 2. 目标温度属性：提炼精准目标温阶（如“设定温度 26°C”）
+  if action.attrName == "targetTemperature" {
+      if let d = action.attrValue?.doubleValue {
+          let tempStr = (d.truncatingRemainder(dividingBy: 1.0) == 0) ? "\(Int(d))°C" : String(format: "%.1f°C", d)
+          return "设定温度 \(tempStr)"
+      }
+  }
+
+  // 3. 运行模式属性：提炼具体模式切换
+  if action.attrName == "operationMode" {
+      if let raw = action.attrValue?.stringValue, let code = ACModeCode.match(from: raw) {
+          return "切换\(code.desc)"
+      }
   }
   ```
 
-### 2.2 macOS 状态栏动作谓词多维度智能去重清洗与防抖
-- **`StatusItemController.swift` 动作提炼引擎多维前缀清洗**：
+- **同频兄弟任务智能探测与批量管理**：
   ```swift
-  private static func extractPlanActionVerb(from action: ScheduledAction, devName: String) -> String {
-      var name = action.name
-      if !devName.isEmpty && name.hasPrefix("「\(devName)」") {
-          name = String(name.dropFirst("「\(devName)」".count))
-      } else if let match = name.range(of: #"^「.+?」"#, options: .regularExpression) {
-          name.removeSubrange(match)
-      }
-      name = name.trimmingCharacters(in: .whitespacesAndNewlines)
+  let siblingActions = model.scheduledActions.filter {
+      abs($0.fireDate.timeIntervalSince(action.fireDate)) <= 2.0 &&
+      $0.attrName == action.attrName &&
+      $0.attrValueJSON == action.attrValueJSON &&
+      $0.repeatsDaily == action.repeatsDaily &&
+      $0.repeatWeekdays == action.repeatWeekdays
+  }
+  if siblingActions.count > 1 {
+      singleMenu.addItem(.separator())
+      let anySiblingEnabled = siblingActions.contains(where: \.enabled)
+      let syncToggleTitle = anySiblingEnabled ? "⏸ 同步暂停此批任务 (\(siblingActions.count) 台)" : "▶️ 同步恢复此批任务 (\(siblingActions.count) 台)"
+      let syncToggleItem = NSMenuItem(title: syncToggleTitle, action: #selector(toggleSiblingSchedulesFromMenu(_:)), keyEquivalent: "")
+      syncToggleItem.target = self
+      syncToggleItem.representedObject = siblingActions.map(\.id.uuidString)
+      singleMenu.addItem(syncToggleItem)
 
-      // 1. 如果是开关机属性，精准提炼为纯净动作谓词（彻底根除时间/周期前缀残留语病）
-      if action.attrName == "onOffStatus" {
-          if name.contains("关机") || name.contains("关空调") || name.contains("关闭") {
-              return "关机"
-          }
-          if name.contains("开机") || name.contains("开空调") || name.contains("开启") || name.contains("打开") {
-              return "开机"
-          }
-          return (action.attrValue == .bool(true)) ? "开机" : "关机"
-      }
-
-      // 2. 其他任务类型（自清洁/睡眠曲线/自定义调温等）：清洗前置时间与周期前缀
-      if let prefixRegex = try? NSRegularExpression(pattern: #"^(?:(?:明天|后天|大后天|次日|工作日|平时|周末|双休|每天|周[一二三四五六日天0-7至到\-~、\s]+|每周[一二三四五六日天0-7、\s]+)\s*)*(?:\d{1,2}:\d{2}(?::\d{2})?\s*)*(?:\d+\s*(?:分钟|小时|钟头)后|晨间过渡(?:关机)?\s*)*"#) {
-          let range = NSRange(name.startIndex..<name.endIndex, in: name)
-          name = prefixRegex.stringByReplacingMatches(in: name, options: [], range: range, withTemplate: "")
-      }
-      name = name.trimmingCharacters(in: .whitespacesAndNewlines)
-      return name.isEmpty ? "执行任务" : name
+      let syncCancelItem = NSMenuItem(title: "❌ 同步取消此批任务 (\(siblingActions.count) 台)", action: #selector(cancelSiblingSchedulesFromMenu(_:)), keyEquivalent: "")
+      syncCancelItem.target = self
+      syncCancelItem.representedObject = siblingActions.map(\.id.uuidString)
+      singleMenu.addItem(syncCancelItem)
   }
   ```
 
-- **Tooltip 设备列表保持确定性顺序**：
-  ```swift
-  let matchingDevices = allDevices.filter { devIds.contains($0.id) }
-  targetDeviceDesc = matchingDevices.map { "「\($0.name)」" }.joined(separator: "、")
-  ```
-
-### 2.3 冬季制热低湿静电吸附物理动力学模型
-- **`AppModel.swift` 制热静电模型引入**：
+### 2.3 自动模式制热偏置冬季低湿静电吸附物理动力学相态统一
+- **`AppModel.swift` 制热静电模型与自动模式热力学相态对齐**：
   ```swift
   } else if hum < 45.0 {
-      if modeCode == .heating {
-          // 制热工况：换热器高温无凝结水膜；但在冬季低湿干燥环境（RH < 35%）下，化纤滤网极易产生静电积聚（静电驻极效应），加速对细微干燥扬尘与浮尘的静电吸附截留；
-          // 采用连续平滑静电吸附阻尼插值 (1.00 ~ 1.12)，消除简单套用制冷减免带来的物理失真 (v1.9.68)
+      let isHeatingPhysicalState: Bool = {
+          if modeCode == .heating { return true }
+          if modeCode == .auto {
+              if let indoor = indoorTemp {
+                  return indoor < targetTemp
+              } else {
+                  return targetTemp > 25.0
+              }
+          }
+          return false
+      }()
+      if isHeatingPhysicalState {
+          // 制热工况（含自动模式制热偏置）：换热器高温无凝结水膜；但在冬季低湿干燥环境（RH < 35%）下，化纤滤网极易产生静电积聚（静电驻极效应），加速对细微干燥扬尘与浮尘的静电吸附截留；
+          // 采用连续平滑静电吸附阻尼插值 (1.00 ~ 1.12)，消除简单套用制冷减免带来的物理失真 (v1.9.68, v1.9.69 补全自动模式制热偏置相态统一)
           if hum < 35.0 {
               let progress = max(0.0, (35.0 - hum) / 20.0)
               humidityFactor = 1.00 + (min(1.0, progress) * 0.12)
@@ -124,28 +163,21 @@
 
 ## 3. 验证与测试闭环
 - **单元测试断言覆盖**：
-  - 在 `VoiceCommandParserTests.swift` 中新增 `testExclusionRepeatWeekdays`，16 组断言 100% PASS：
-    1. “除了周末每天晚上10点关机” -> `[2, 3, 4, 5, 6]`、工作日 22:00:00 ✅
-    2. “除周末外每天早8点开机” -> `[2, 3, 4, 5, 6]`、工作日 08:00:00 ✅
-    3. “除周末以外早8点开机” -> `[2, 3, 4, 5, 6]`、工作日 08:00:00 ✅
-    4. “除了工作日每天晚上11点关空调” -> `[1, 7]`、周末 23:00:00 ✅
-    5. “除工作日外每天晚上11点关空调” -> `[1, 7]`、周末 23:00:00 ✅
-    6. “除了周日每天早8点开机” -> `[2, 3, 4, 5, 6, 7]`、周一至周六 08:00:00 ✅
-    7. “除周日外每天早8点开机” -> `[2, 3, 4, 5, 6, 7]`、周一至周六 08:00:00 ✅
-    8. “除周日以外每天晚上10点关机” -> `[2, 3, 4, 5, 6, 7]`、周一至周六 22:00:00 ✅
-    9. “除了周六周日每天早7点开机” -> `[2, 3, 4, 5, 6]`、工作日 07:00:00 ✅
-    10. “除周六和周日外每天早7点开机” -> `[2, 3, 4, 5, 6]`、工作日 07:00:00 ✅
-    11. “除了周一至周五每天晚10点关机” -> `[1, 7]`、周末 22:00:00 ✅
-    12. “除周一和周三外每天晚10点关机” -> `[1, 3, 5, 6, 7]`、每周日、二、四、五、六 22:00:00 ✅
-    13. “除周一外每天晚10点关机” -> `[1, 3, 4, 5, 6, 7]`、周二至周日 22:00:00 ✅
-    14. “除了周一每天晚上10点关机” -> `[1, 3, 4, 5, 6, 7]`、周二至周日 22:00:00 ✅
-    15. “每天晚10点关机除了周末” -> `[2, 3, 4, 5, 6]`、工作日 22:00:00 ✅
-    16. “晚10点关机除周日外” -> `[2, 3, 4, 5, 6, 7]`、周一至周六 22:00:00 ✅
+  - 在 `VoiceCommandParserTests.swift` 中运行测试，所有断言 100% PASS：
+    1. “工作日除了周三每天早上8点开机” -> `[2, 3, 5, 6]`、每周一、二、四、五 08:00:00 ✅
+    2. “工作日除周五外每天晚10点关空调” -> `[2, 3, 4, 5]`、周一至周四 22:00:00 ✅
+    3. “周末除周日外早8点开机” -> `[7]`、每周六 08:00:00 ✅
+    4. “周一到周五除了周二早8点开机” -> `[2, 4, 5, 6]`、每周一、三、四、五 08:00:00 ✅
+    5. “除了周三工作日每天早8点开机” -> `[2, 3, 5, 6]`、每周一、二、四、五 08:00:00 ✅
+    6. “工作日每天晚10点关空调除周五外” -> `[2, 3, 4, 5]`、周一至周四 22:00:00 ✅
+    7. “工作日除周二和周四外每天早8点开机” -> `[2, 4, 6]`、每周一、三、五 08:00:00 ✅
+    8. 原有 16 组全周排除断言（如“除了周末”、“除周日外”、“每天晚10点关机除了周末”）全部 100% 保持兼容通过 ✅
+    9. `AttrValue.boolValue` 与 `AttrValue.doubleValue` 编解码及类型映射测试全部通过 ✅
 - **本地编译与打包校验**：
   - `SDKROOT=/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk swift build` 0 警告 0 错误编译通过；
-  - `./build_app.sh 1.9.68` 构建成功：
+  - `./build_app.sh 1.9.69` 构建成功：
     - `dist/HaierAC.app` (含 `HaierACWidget.appex` 小组件扩展)
-    - `dist/HaierAC-v1.9.68-macOS.zip` (大小: 2.8M)
-    - SHA256 校验和：`16cffa0a680ddf37d1052fed2a3d32031de2c2e63f77aca66f6af89414060b21`
+    - `dist/HaierAC-v1.9.69-macOS.zip` (大小: 2.8M)
+    - SHA256 校验和：`3e28b44f3b783a5242291da1169ed5b3221d4fba472408aee2c0581c8bbbc93c`
 - **安全敏感数据审查**：
   - 严密审查无任何个人手机号、真实密码、私有 API Key 或敏感隐私数据外泄。

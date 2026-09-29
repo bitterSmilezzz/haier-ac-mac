@@ -2383,6 +2383,28 @@ final class VoiceCommandParserTests: XCTestCase {
 
         let postSun = VoiceCommandParser.parse("晚10点关机除周日外")
         XCTAssertEqual(postSun?.command, .scheduleRepeatPower(hour: 22, minute: 0, power: false, repeatWeekdays: [2, 3, 4, 5, 6, 7], repeatLabel: "周一至周六"))
+
+        // 4. 限定基准范围排除（如“工作日除了周三”、“工作日除周五外”、“周末除周日外”、“周一至周五除了周二”） (v1.9.69 彻底闭环基准范围排除语义防线)
+        let exWorkWed = VoiceCommandParser.parse("工作日除了周三每天早上8点开机")
+        XCTAssertEqual(exWorkWed?.command, .scheduleRepeatPower(hour: 8, minute: 0, power: true, repeatWeekdays: [2, 3, 5, 6], repeatLabel: "每周一、二、四、五"))
+
+        let exWorkFri = VoiceCommandParser.parse("工作日除周五外每天晚10点关空调")
+        XCTAssertEqual(exWorkFri?.command, .scheduleRepeatPower(hour: 22, minute: 0, power: false, repeatWeekdays: [2, 3, 4, 5], repeatLabel: "周一至周四"))
+
+        let exWeekendSun = VoiceCommandParser.parse("周末除周日外早8点开机")
+        XCTAssertEqual(exWeekendSun?.command, .scheduleRepeatPower(hour: 8, minute: 0, power: true, repeatWeekdays: [7], repeatLabel: "每周六"))
+
+        let exRangeTue = VoiceCommandParser.parse("周一到周五除了周二早8点开机")
+        XCTAssertEqual(exRangeTue?.command, .scheduleRepeatPower(hour: 8, minute: 0, power: true, repeatWeekdays: [2, 4, 5, 6], repeatLabel: "每周一、三、四、五"))
+
+        let exPreWorkWed = VoiceCommandParser.parse("除了周三工作日每天早8点开机")
+        XCTAssertEqual(exPreWorkWed?.command, .scheduleRepeatPower(hour: 8, minute: 0, power: true, repeatWeekdays: [2, 3, 5, 6], repeatLabel: "每周一、二、四、五"))
+
+        let exWorkPostFri = VoiceCommandParser.parse("工作日每天晚10点关空调除周五外")
+        XCTAssertEqual(exWorkPostFri?.command, .scheduleRepeatPower(hour: 22, minute: 0, power: false, repeatWeekdays: [2, 3, 4, 5], repeatLabel: "周一至周四"))
+
+        let exWorkTwoDays = VoiceCommandParser.parse("工作日除周二和周四外每天早8点开机")
+        XCTAssertEqual(exWorkTwoDays?.command, .scheduleRepeatPower(hour: 8, minute: 0, power: true, repeatWeekdays: [2, 4, 6], repeatLabel: "每周一、三、五"))
     }
 
     // MARK: - 无效输入测试
