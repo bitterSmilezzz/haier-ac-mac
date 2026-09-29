@@ -3380,6 +3380,25 @@ final class AppModel: ObservableObject {
         return setTemperature(deviceIds: nil, temperature: temperature)
     }
 
+    /// 归一化风速标准名称 (v1.9.47 支持一至四档/1~4档/低中高极速/静音等全量别名, v1.9.81 补齐 4 档/5 档/暴风全量映射, v1.9.82 提炼公共标准化函数)
+    public static func normalizeWindSpeed(_ speedName: String) -> String {
+        if speedName.contains("微") || speedName.contains("低") || speedName.contains("静") ||
+           speedName.contains("柔") || speedName.contains("小") || speedName.contains("1") || speedName.contains("一") {
+            return "微风"
+        }
+        if speedName.contains("中") || speedName.contains("2") || speedName.contains("二") || speedName.contains("两") {
+            return "中风"
+        }
+        if speedName.contains("强") || speedName.contains("高") || speedName.contains("大") ||
+           speedName.contains("极") || speedName.contains("暴") ||
+           speedName.contains("3") || speedName.contains("三") ||
+           speedName.contains("4") || speedName.contains("四") ||
+           speedName.contains("5") || speedName.contains("五") {
+            return "强劲"
+        }
+        return "自动"
+    }
+
     /// 批量/全屋风速调节：将目标设备集（若为 nil 则默认全屋）中所有可控空调设置为指定风速 (v1.9.41)
     @discardableResult
     public func setWindSpeed(deviceIds: [String]? = nil, speedName: String, autoPowerOn: Bool = false) -> Int {
@@ -3400,24 +3419,8 @@ final class AppModel: ObservableObject {
             }
         }
 
-        // 归一化风速标准名称 (v1.9.47 支持一至四档/1~4档/低中高极速/静音等全量别名, v1.9.81 补齐 4 档/5 档/暴风全量映射)
-        let normalizedSpeed: String = {
-            if speedName.contains("微") || speedName.contains("低") || speedName.contains("静") ||
-               speedName.contains("柔") || speedName.contains("小") || speedName.contains("1") || speedName.contains("一") {
-                return "微风"
-            }
-            if speedName.contains("中") || speedName.contains("2") || speedName.contains("二") || speedName.contains("两") {
-                return "中风"
-            }
-            if speedName.contains("强") || speedName.contains("高") || speedName.contains("大") ||
-               speedName.contains("极") || speedName.contains("暴") ||
-               speedName.contains("3") || speedName.contains("三") ||
-               speedName.contains("4") || speedName.contains("四") ||
-               speedName.contains("5") || speedName.contains("五") {
-                return "强劲"
-            }
-            return "自动"
-        }()
+        // 归一化风速标准名称 (v1.9.47 支持一至四档/1~4档/低中高极速/静音等全量别名, v1.9.81 补齐 4 档/5 档/暴风全量映射, v1.9.82 提炼公共标准化函数)
+        let normalizedSpeed = Self.normalizeWindSpeed(speedName)
 
         for devId in controllableIds {
             if let windAttr = attributes[devId]?["windSpeed"],

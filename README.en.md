@@ -6,6 +6,22 @@ A native SwiftUI app to control Haier / Leader (统帅) smart air conditioners o
 
 ## Features
 
+- 🏷 **CR Power Inversion Resolution, Status Bar Speed Checkmark Consistency & Pre-Midnight Colloquial Schedule Universal Engine (v1.9.82)**:
+  - ⚡️ **Fan Motor Electrodynamic Power Inversion Rectification (`EnergyAnalyticsEngine.swift`)**:
+    - **Eliminated 3-Speed vs 4-Speed Power Inversion**: Rectified the physical anomaly in `EnergyAnalyticsEngine.estimateInstantaneousPower` where Level 3 fan speed was grouped into the 180W tier while Level 4 returned only 110W. Aligned with modern inverter aerodynamic curves into a strictly monotonic energy ladder: Level 5/Storm 180W, Level 4/Turbo 140W, Level 3/High 100W, Level 2/Mid 65W, Level 1/Low 35W, Quiet/Micro 15W, in 100% harmony with `AppModel.swift` filter wear flux factors (1.85 / 1.50 / 1.35 / 1.00 / 0.80 / 0.60).
+  - 🍃 **Status Bar Fan Speed Checkmark State & Multi-Device Perception Alignment (`AppModel.swift` / `StatusItemController.swift`)**:
+    - **Public Standardized Normalization Engine (`AppModel.normalizeWindSpeed`)**: Abstracted localized speed parsing into a shared static method `AppModel.normalizeWindSpeed`, standardizing aliases across low/quiet/gentle (微风), mid (中风), high/turbo/storm (强劲), and auto;
+    - **100% Precise Menu Checkmark Selection**: Fixed missing checkmarks in `singleWindMenu` and `devWindMenu` where units reporting "1档", "低风", "静音", or "2档" showed no checkmark due to literal substring matching, adopting exact normalized equality `normCurWind == itemDef.val`;
+    - **Unified Whole-House Consistency**: Synchronized `allOnSameSpeed` to consume `AppModel.normalizeWindSpeed`, ensuring uniform checkmark state across all menus.
+  - 🍱 **macOS Status Bar Tooltip Wind Speed Display Accuracy (`StatusItemController.swift`)**:
+    - **Corrected 4-Speed, 5-Speed and Storm Displaying as [自动风]**: Extended `formatDisplayWindSpeed` to accurately recognize modern speed levels and output "暴风", "强劲风", and "高风", eliminating false "Auto" displays in menu bar tooltips.
+  - ⏱️ **Pre-Midnight Colloquial Phase Schedule Universal Engine & Dead Code Fix (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)**:
+    - **Dead Code Elimination**: Reordered idiomatic phrase substitution in `convertChineseNumbers` to ensure "三更半夜半" is normalized before "三更半夜", removing unreachable branches;
+    - **Pre-Midnight Lexicon Closure (前半夜 / 前半夜半)**: Full support for colloquial "前半夜" (pre-midnight, mapped to 22:00, perfectly pairing with "后半夜" 02:00) and half-hour "前半夜半" (22:30), covering single and repeating schedules ("每天前半夜关空调", "工作日前半夜关机");
+    - **Non-Immediate Power Guard Enforcement (`hasTimingOrCountdownIntent`)**: Injected "前半夜" into timing and nocturnal guards to strictly prevent accidental immediate power shutdowns; added 10 unit test assertions, 100% PASS.
+  - 🧼 **Code Smell Cleanup & Metric Reusability (`FilterCareSheet.swift`)**:
+    - Replaced 17 lines of duplicate attribute extraction in `FilterCareSheet.currentWearFactor` with direct invocation of `model.calculateCurrentFilterWearFactor(for: currentDeviceId)`.
+
 - 🏷 **Unified Colloquial Everyday Phase Schedule Engine, Full Power Protection & Variable-Speed Aerodynamic Alignment (v1.9.81)**:
   - ⏱️ **Natural Colloquial Standalone Phase Scheduling & Instant Power Protection (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)**:
     - **High-Frequency Spoken Phase Lexicon Coverage (After-Midnight, Midday/Noon, Deep Night, First Light)**: Fully embraced colloquial spoken terms across dialects—canonicalizing "晌午" (midday) to 12:00, "后半夜" (after-midnight) to 02:00, "三更半夜" (dead of night) to 00:00, and "天蒙蒙亮" (first light of dawn) to 06:00, eliminating schedule parsing gaps for casual voice commands;

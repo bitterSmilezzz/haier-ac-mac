@@ -31,22 +31,7 @@ struct FilterCareSheet: View {
     }
 
     private var currentWearFactor: Double {
-        let attrs = model.attributes[currentDeviceId] ?? [:]
-        let isPowerOn = attrs["onOffStatus"]?.boolValue ?? false
-        if !isPowerOn { return 1.0 }
-        let mode = attrs["operationMode"]?.stringValue ?? "0"
-        let targetTemp = attrs["targetTemperature"]?.doubleValue ?? 26.0
-        let indoorTemp = model.currentIndoorTemperature(for: currentDeviceId)
-        let indoorHum = AppModel.indoorHumidityAttribute(in: attrs)?.doubleValue
-        let windSpeed = attrs["windSpeed"]?.stringValue ?? "微风"
-        return model.calculateFilterWearFactor(
-            mode: mode,
-            targetTemp: targetTemp,
-            indoorTemp: indoorTemp,
-            indoorHumidity: indoorHum,
-            windSpeed: windSpeed,
-            deviceId: currentDeviceId
-        )
+        model.calculateCurrentFilterWearFactor(for: currentDeviceId)
     }
 
     var body: some View {

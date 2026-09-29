@@ -240,15 +240,17 @@ public final class EnergyAnalyticsEngine: ObservableObject {
         let windOffset: Double = {
             let wind = windSpeed?.lowercased()
             if let wind = wind {
-                if wind.contains("强") || wind.contains("turbo") || wind.contains("超强") || wind.contains("最大") ||
-                   wind.contains("3档") || wind.contains("三档") || wind == "3" ||
-                   wind.contains("5档") || wind.contains("五档") || wind == "5" ||
-                   wind.contains("极速") || wind.contains("高速") || wind.contains("暴风") {
+                if wind.contains("暴") || wind.contains("5档") || wind.contains("五档") || wind == "5" ||
+                   wind.contains("超强") || wind.contains("最大") || wind.contains("极速") {
                     return 180.0
                 }
-                if wind.contains("高") || wind.contains("high") || wind.contains("大风") || wind.contains("大") ||
-                   wind.contains("4档") || wind.contains("四档") || wind == "4" {
-                    return 110.0
+                if wind.contains("4档") || wind.contains("四档") || wind == "4" ||
+                   wind.contains("强") || wind.contains("turbo") || wind.contains("高速") {
+                    return 140.0
+                }
+                if wind.contains("3档") || wind.contains("三档") || wind == "3" ||
+                   wind.contains("高") || wind.contains("high") || wind.contains("大风") || wind.contains("大") {
+                    return 100.0
                 }
                 if wind.contains("中") || wind.contains("medium") || wind.contains("mid") ||
                    wind.contains("2档") || wind.contains("二档") || wind.contains("两档") || wind == "2" || wind.contains("中速") {

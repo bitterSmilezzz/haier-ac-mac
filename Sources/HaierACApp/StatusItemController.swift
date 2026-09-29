@@ -304,14 +304,29 @@ final class StatusItemController: NSObject {
 
     private func formatDisplayWindSpeed(_ raw: String?) -> String {
         guard let raw = raw?.lowercased() else { return "自动风" }
-        if raw.contains("强") || raw.contains("turbo") || raw.contains("超强") || raw.contains("最大") ||
-           raw.contains("3档") || raw.contains("三档") || raw == "3" || raw.contains("极速") { return "强劲风" }
-        if raw.contains("高") || raw.contains("high") || raw.contains("大风") || raw.contains("大") || raw.contains("高速") { return "高风" }
+        if raw.contains("暴") || raw.contains("5档") || raw.contains("五档") || raw == "5" ||
+           raw.contains("超强") || raw.contains("最大") || raw.contains("极速") {
+            return "暴风"
+        }
+        if raw.contains("4档") || raw.contains("四档") || raw == "4" ||
+           raw.contains("强") || raw.contains("turbo") || raw.contains("高速") {
+            return "强劲风"
+        }
+        if raw.contains("3档") || raw.contains("三档") || raw == "3" ||
+           raw.contains("高") || raw.contains("high") || raw.contains("大风") || raw.contains("大") {
+            return "高风"
+        }
         if raw.contains("中") || raw.contains("medium") || raw.contains("mid") ||
-           raw.contains("2档") || raw.contains("二档") || raw.contains("两档") || raw == "2" || raw.contains("中速") { return "中风" }
+           raw.contains("2档") || raw.contains("二档") || raw.contains("两档") || raw == "2" || raw.contains("中速") {
+            return "中风"
+        }
         if raw.contains("低") || raw.contains("low") ||
-           raw.contains("1档") || raw.contains("一档") || raw == "1" || raw.contains("小风") || raw.contains("低速") { return "低风" }
-        if raw.contains("微") || raw.contains("静") || raw.contains("quiet") || raw.contains("mute") || raw.contains("micro") || raw.contains("柔") { return "微风" }
+           raw.contains("1档") || raw.contains("一档") || raw == "1" || raw.contains("小风") || raw.contains("低速") {
+            return "低风"
+        }
+        if raw.contains("微") || raw.contains("静") || raw.contains("quiet") || raw.contains("mute") || raw.contains("micro") || raw.contains("柔") {
+            return "微风"
+        }
         return "自动风"
     }
 
@@ -497,11 +512,7 @@ final class StatusItemController: NSObject {
                 guard !onDevices.isEmpty else { return nil }
                 let speeds = Set(onDevices.map { dev -> String in
                     let raw = model.attribute("windSpeed", deviceId: dev.id)?.stringValue ?? "微风"
-                    if raw.contains("微") || raw.contains("低") || raw.contains("静") || raw.contains("1") { return "微风" }
-                    if raw.contains("中") || raw.contains("2") { return "中风" }
-                    if raw.contains("强") || raw.contains("高") || raw.contains("大") || raw.contains("极") || raw.contains("暴") ||
-                       raw.contains("3") || raw.contains("4") || raw.contains("5") { return "强劲" }
-                    return "自动"
+                    return AppModel.normalizeWindSpeed(raw)
                 })
                 return speeds.count == 1 ? speeds.first : nil
             }()
@@ -763,14 +774,13 @@ final class StatusItemController: NSObject {
                 downItem.toolTip = "将「\(dev.name)」温度降低 1°C（下限 16°C）"
                 devSubmenu.addItem(downItem)
 
-                // 调节风速 (v1.9.46)
+                // 调节风速 (v1.9.46, v1.9.82 采用 AppModel.normalizeWindSpeed 统一高精识别勾选)
                 let curWind = model.attribute("windSpeed", deviceId: devId)?.stringValue ?? "微风"
+                let normCurWind = AppModel.normalizeWindSpeed(curWind)
                 let devWindMenu = NSMenu()
                 devWindMenu.autoenablesItems = false
                 for itemDef in windLevels {
-                    let isSelected = curWind.contains(itemDef.val) ||
-                                     (itemDef.val == "强劲" && (curWind.contains("强") || curWind.contains("高") || curWind.contains("极") || curWind.contains("暴") ||
-                                                               curWind.contains("3") || curWind.contains("4") || curWind.contains("5")))
+                    let isSelected = (normCurWind == itemDef.val)
                     let check = isSelected ? "✓ " : ""
                     let item = NSMenuItem(title: "\(check)\(itemDef.title)", action: #selector(setDeviceWindSpeedFromMenu(_:)), keyEquivalent: "")
                     item.target = self
@@ -1069,8 +1079,9 @@ final class StatusItemController: NSObject {
             stepDownItem.toolTip = "将「\(dev.name)」温度降低 1°C（下限 16°C）"
             menu.addItem(stepDownItem)
 
-            // 调节风速 (v1.9.46)
+            // 调节风速 (v1.9.46, v1.9.82 采用 AppModel.normalizeWindSpeed 统一高精识别勾选)
             let curWind = model.attribute("windSpeed", deviceId: dev.id)?.stringValue ?? "微风"
+            let normCurWind = AppModel.normalizeWindSpeed(curWind)
             let singleWindLevels: [(val: String, title: String)] = [
                 ("微风", "🍃 微风 (静音舒适)"),
                 ("中风", "🍃 中风 (适中循环)"),
@@ -1080,9 +1091,7 @@ final class StatusItemController: NSObject {
             let singleWindMenu = NSMenu()
             singleWindMenu.autoenablesItems = false
             for itemDef in singleWindLevels {
-                let isSelected = curWind.contains(itemDef.val) ||
-                                 (itemDef.val == "强劲" && (curWind.contains("强") || curWind.contains("高") || curWind.contains("极") || curWind.contains("暴") ||
-                                                           curWind.contains("3") || curWind.contains("4") || curWind.contains("5")))
+                let isSelected = (normCurWind == itemDef.val)
                 let check = isSelected ? "✓ " : ""
                 let item = NSMenuItem(title: "\(check)\(itemDef.title)", action: #selector(setPrimaryWindSpeedFromMenu(_:)), keyEquivalent: "")
                 item.target = self
