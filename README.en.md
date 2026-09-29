@@ -6,6 +6,21 @@ A native SwiftUI app to control Haier / Leader (统帅) smart air conditioners o
 
 ## Features
 
+- 🏷 **CR Inverter Multi-Speed Semantic Alignment, Deep Night Phase Power Protection & macOS Status Bar Coordination Refactor (v1.9.83)**:
+  - ⏱️ **Deep Night / All Night Spoken Phase Scheduling & Accidental Power Protection (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)**:
+    - **Nocturnal Spoken Phase Lexicon Closure (深宵 / 通宵 / 夜深)**: Added full schedule parsing for casual late-night terms without clock numbers, canonicalizing "深宵", "通宵", and "夜深" to 23:00 (e.g., "深宵关空调", "深宵开机", "通宵关机", "通宵开空调", "夜深关空调", "夜深开机");
+    - **Spoken Half-Hour Normalization**: Added "深宵半" (23:30), "通宵半" (23:30), and "夜深半" (23:30) to `convertChineseNumbers`, completing late-night colloquial timing;
+    - **Accidental Power Protection Guard Enforcement (`hasTimePhase` / `hasTimingOrCountdownIntent`)**: Injected "深宵", "通宵", and "夜深" into phase detection and non-immediate power guards, strictly preventing casual late-night schedules from accidentally triggering immediate shutdowns or turn-ons;
+    - **Unit Test Coverage**: Added 100% test assertions covering single, repeating, and half-hour schedules alongside strict anti-misoperation assertions.
+  - 🍃 **Variable-Speed Multi-Gear Voice Normalization & Cross-Layer Physical Alignment (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)**:
+    - **Eliminated 4-Speed Auto Fallback Defect**: Rectified legacy logic that incorrectly mapped "4档", "四档", "第四档", "风速4" to "自动" (Auto), bringing it into 100% harmony with `AppModel.normalizeWindSpeed`, `EnergyAnalyticsEngine` (140W turbo), and filter wear models;
+    - **Full Coverage for Inverter High-Speed Gearing (Level 4, Level 5, Storm, Max)**: Normalized all high-speed and storm voice commands to "强劲" (Turbo), keeping "自动" strictly reserved for actual Auto/Smart mode phrases;
+    - **Test Coverage**: Added test assertions for single and whole-house multi-gear speed voice commands.
+  - 🍱 **macOS Status Bar Wind Speed Coordination & Standby Protection Refactor (`StatusItemController.swift`)**:
+    - **Eliminated Temperature Semantic Pollution**: Replaced the previous temperature range display in the whole-house wind speed menu (`🍃 全屋风速协同 (2台运行中 · 当前 24~26°C)...`) with a dedicated `windRunningDesc` reflecting active wind speed levels (e.g., `🍃 全屋风速协同 (2台运行中 · 当前微风)...`);
+    - **Whole-House Coordination Target & Guard**: Whole-house wind speed menu items are disabled when all ACs are powered off (`isEnabled = model.gatewayConnected && !onDevices.isEmpty`), with tooltips detailing active controlled units, and `setAllWindSpeedFromMenu` only targets running units without disturbing standby devices;
+    - **Device Submenu Standby Protection**: Individual device wind speed submenus are now disabled when powered off (`isEnabled = isControllable && isPowerOn`) with explicit standby tooltips, eliminating protocol noise.
+
 - 🏷 **CR Power Inversion Resolution, Status Bar Speed Checkmark Consistency & Pre-Midnight Colloquial Schedule Universal Engine (v1.9.82)**:
   - ⚡️ **Fan Motor Electrodynamic Power Inversion Rectification (`EnergyAnalyticsEngine.swift`)**:
     - **Eliminated 3-Speed vs 4-Speed Power Inversion**: Rectified the physical anomaly in `EnergyAnalyticsEngine.estimateInstantaneousPower` where Level 3 fan speed was grouped into the 180W tier while Level 4 returned only 110W. Aligned with modern inverter aerodynamic curves into a strictly monotonic energy ladder: Level 5/Storm 180W, Level 4/Turbo 140W, Level 3/High 100W, Level 2/Mid 65W, Level 1/Low 35W, Quiet/Micro 15W, in 100% harmony with `AppModel.swift` filter wear flux factors (1.85 / 1.50 / 1.35 / 1.00 / 0.80 / 0.60).

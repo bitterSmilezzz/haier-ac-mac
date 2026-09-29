@@ -1349,6 +1349,7 @@ public struct VoiceCommandParser {
                            normalized.contains("大晚上") ||
                            normalized.contains("深夜") || normalized.contains("半夜") || normalized.contains("大半夜") ||
                            normalized.contains("前半夜") || normalized.contains("后半夜") || normalized.contains("三更半夜") ||
+                           normalized.contains("深宵") || normalized.contains("通宵") || normalized.contains("夜深") ||
                            normalized.contains("凌晨") ||
                            normalized.contains("白天") || normalized.contains("日间") || normalized.contains("白昼") ||
                            normalized.contains("明天") || normalized.contains("后天") || normalized.contains("大后天") ||
@@ -1637,6 +1638,7 @@ public struct VoiceCommandParser {
            text.contains("晚上") || text.contains("今晚") || text.contains("明晚") || text.contains("晚间") ||
            text.contains("入夜") || text.contains("夜间") || text.contains("夜里") || text.contains("大晚上") ||
            text.contains("深夜") || text.contains("半夜") || text.contains("大半夜") || text.contains("前半夜") || text.contains("后半夜") || text.contains("三更半夜") ||
+           text.contains("深宵") || text.contains("通宵") || text.contains("夜深") ||
            text.contains("凌晨") ||
            text.contains("白天") || text.contains("日间") || text.contains("白昼") ||
            text.contains("明天") || text.contains("后天") || text.contains("大后天") || text.contains("次日") ||
@@ -2066,20 +2068,26 @@ public struct VoiceCommandParser {
         }
         let isAll = isAllDeviceScope(text)
         let matched: (speed: String, desc: String)? = {
-            // 1. 自动风档位 (v1.9.47 支持 4档/四档/智能风等别名)
+            // 1. 自动风档位 (v1.9.83 严格限定智能/自动/自适应风速，杜绝将 4 档机械割裂误判为自动风)
             if text.contains("自动风") || text.contains("风速自动") || text.contains("自动风速") ||
-               text.contains("四档") || text.contains("4档") || text.contains("第4档") || text.contains("第四档") ||
-               text.contains("风速4") || text.contains("风速四") || text.contains("智能风") {
+               text.contains("智能风") || text.contains("自适应风") || text.contains("智能风速") ||
+               text.contains("自适应风速") || text.contains("自动档") || text.contains("自动档位") {
                 return ("自动", "自动风速")
             }
-            // 2. 强劲 / 高风 / 3档 / 开大风 (v1.9.47 覆盖动词间隔与档位口语，如“把风开大/风调大点/三档风”)
-            if text.contains("大风") || text.contains("风大") || text.contains("强劲") || text.contains("高风") ||
+            // 2. 强劲 / 暴风 / 5档 / 4档 / 3档 / 高风 / 大风 (v1.9.47, v1.9.83 全量对齐变频大档位动力学，支持4档、5档与暴风极速)
+            if text.contains("暴风") || text.contains("超强") || text.contains("极速") ||
+               text.contains("五档") || text.contains("5档") || text.contains("第5档") || text.contains("第五档") ||
+               text.contains("风速5") || text.contains("风速五") ||
+               text.contains("四档") || text.contains("4档") || text.contains("第4档") || text.contains("第四档") ||
+               text.contains("风速4") || text.contains("风速四") ||
+               text.contains("大风") || text.contains("风大") || text.contains("强劲") || text.contains("高风") ||
                text.contains("最大风") || text.contains("最大") || text.contains("调大风") || text.contains("风速大") ||
-               text.contains("高速风") || text.contains("开到最大") || text.contains("强风") || text.contains("极速") ||
+               text.contains("高速风") || text.contains("开到最大") || text.contains("强风") ||
                text.contains("三档") || text.contains("3档") || text.contains("第3档") || text.contains("第三档") ||
                text.contains("风速3") || text.contains("风速三") || text.contains("高档") || text.contains("风速调大") ||
                text.contains("风开大") || text.contains("把风开大") || text.contains("风调大") || text.contains("风大点") ||
-               text.contains("调大风速") || text.contains("开大风速") || text.contains("吹大风") {
+               text.contains("调大风速") || text.contains("开大风速") || text.contains("吹大风") ||
+               text.contains("吹暴风") || text.contains("吹强风") {
                 return ("强劲", "强劲风速")
             }
             // 3. 微风 / 柔风 / 1档 / 静音 / 开小风 (v1.9.47 覆盖动词间隔与档位口语，如“把风开小/风调小点/一档风”)
@@ -2090,7 +2098,7 @@ public struct VoiceCommandParser {
                text.contains("风速1") || text.contains("风速一") || text.contains("低档") || text.contains("慢速") ||
                text.contains("风速调小") || text.contains("风开小") || text.contains("把风开小") || text.contains("风调小") ||
                text.contains("风小点") || text.contains("调小风速") || text.contains("开小风速") || text.contains("吹微风") ||
-               text.contains("吹小风") {
+               text.contains("吹小风") || text.contains("轻风") {
                 return ("微风", "微风模式")
             }
             // 4. 中风 / 适中 / 2档 (v1.9.47 支持 2档/二档/两档/中档等别名)
@@ -2248,6 +2256,9 @@ public struct VoiceCommandParser {
         str = str.replacingOccurrences(of: "半夜半", with: "半夜11点30分")
         str = str.replacingOccurrences(of: "大半夜半", with: "大半夜11点30分")
         str = str.replacingOccurrences(of: "凌晨半", with: "凌晨5点30分")
+        str = str.replacingOccurrences(of: "深宵半", with: "深宵11点30分")
+        str = str.replacingOccurrences(of: "通宵半", with: "通宵11点30分")
+        str = str.replacingOccurrences(of: "夜深半", with: "夜深11点30分")
         str = str.replacingOccurrences(of: "点半", with: "点30分")
         str = str.replacingOccurrences(of: "时半", with: "点30分")
         str = str.replacingOccurrences(of: "一刻钟", with: "15分钟")
