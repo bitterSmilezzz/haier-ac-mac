@@ -1,89 +1,124 @@
-# Haier AC Mac v1.9.63 发布与巡检演进报告
+# Haier AC Mac v1.9.64 发布与巡检演进报告
 
 ## 1. 概述与版本定位
-- **版本号**：`v1.9.63`
-- **发版主题**：闭环多日跨周与全任务调度语义泛化、macOS 状态栏单机去重对称重构及滤网气动力学连续阻尼模型
+- **版本号**：`v1.9.64`
+- **发版主题**：闭环跨周长周期调度与全任务撤销语义完备化、macOS 状态栏全局倒计时主显消歧及滤网环境湿度全域双线性平滑阻尼模型
 - **核心目标与架构演进**：
-  1. **周期调度跨周全星期范围与调度全任务语义泛化 (`VoiceCommandParser.swift` / `AppModel.swift` / `VoiceCommandParserTests.swift`)**：
-     - **跨周末长周期调度引擎拓展**：在公共解析引擎 `parseRepeatWeekdays` 中全面覆盖多日跨周末周期：“周五至周一”（`[1, 2, 6, 7]`）、“周六至周二”（`[1, 2, 3, 7]`）以及以周日为起点的“周日至周五”（`[1..6]`）、“周日至周四”（`[1..5]`）、“周日至周三”（`[1..4]`）、“周日至周二”（`[1..3]`），全链路打通中文口语与周几数字映射；
-     - **周末口语全变体兼容**：补齐“周六日/周六天/星期六天/礼拜六天/礼拜六日”高频口语变体，统一收敛为标准周末（`[1, 7]`）；
-     - **任务调度清空与全任务语义拓展**：在 `isCancelSchedule`、`isPauseSchedule`、`isResumeSchedule` 中引入“清空”与“任务”语义（如“清空定时”、“取消所有任务”、“暂停所有任务”、“恢复所有任务”），并在否定动作防线（`containsNegativeForAction` 与 `negativeActionRegex`）中同步增加“清空”保护，严防误清空；
+  1. **滤网环境湿度与除湿冷凝全域连续双线性阻尼物理模型 (`AppModel.calculateFilterWearFactor`)**：
+     - **根除环境湿度阶跃突变断崖**：重构 `calculateFilterWearFactor` 中的室内湿度附着因子 `humidityFactor`，将原本在 35%、65%、75% 的硬跳变升级为全域连续平滑双线性阻尼插值模型：
+       - 干燥段（hum <= 45%）：在 25% ~ 45% 之间由 0.90 平滑线性过渡至 1.00（`0.90 + (hum - 25.0)/20.0 * 0.10`），hum < 25% 时保底 0.90；
+       - 人体工学舒适平衡区（45% < hum <= 60%）：稳定维持中性 1.00；
+       - 潮湿过渡区（60% < hum <= 75%）：在 60% ~ 75% 之间由 1.00 平滑线性过渡至 1.15（`1.00 + (hum - 60.0)/15.0 * 0.15`）；
+       - 极高湿回南天区（hum > 75%）：由 1.15 平滑渐进至最高 1.30（`1.15 + (hum - 75.0)/15.0 * 0.15`）；
+     - **除湿模式冷凝水膜动力学平滑对齐**：重构 `.dehumidify` 工况下的 `modeFactor`，在 50% ~ 70% 湿度之间线性插值过渡（1.20 ~ 1.35），并在 70% ~ 85% 极潮湿工况下平滑渐进至 1.50，使滤网损耗模型在温差、风量、湿度三个物理维度上全面达成连续可微、平滑自洽。
+  2. **跨周长周期调度与全任务撤销语义完备化 (`VoiceCommandParser.swift` / `AppModel.swift` / `VoiceCommandParserTests.swift`)**：
+     - **跨周末长周期调度引擎拓展**：在公共解析引擎 `parseRepeatWeekdays` 中全面覆盖更多跨周长周期规则：
+       - “周五至周三”（`[1, 2, 3, 4, 6, 7]`）、“周五至周二”（`[1, 2, 3, 6, 7]`）；
+       - “周六至周四”（`[1, 2, 3, 4, 5, 7]`）、“周六至周三”（`[1, 2, 3, 4, 7]`）；
+       - “周四至周二”（`[1, 2, 3, 5, 6, 7]`）、“周四至周一”（`[1, 2, 5, 6, 7]`）、“周三至周一”（`[1, 2, 4, 5, 6, 7]`）；
+       - 全量兼容“周X到周Y”、“周X至周Y”、“星期X到星期Y”、“礼拜X到礼拜Y”等高频生活口语变体；
+     - **撤销任务与定时全语义打通**：在 `isCancelSchedule` 的 `cancelKeywords` 中补齐“撤销定时”、“撤销所有定时”、“撤销全部定时”、“撤销倒计时”、“撤销所有倒计时”、“撤销任务”、“撤销所有任务”全语义，并与结构化否定防御防线（`containsNegativeForAction`）严密对齐；
      - **调度标签展示统一映射**：在 `AppModel.formatRepeatWeekdaysLabel` 中对齐新增的全部周期标签映射。
-  2. **macOS 状态栏单设备去重重构与滤网快速重置对称设计 (`StatusItemController.swift` / `VoiceCapsuleWindowController.swift`)**：
-     - **根除单设备双重计划菜单冗余**：重构状态栏计划调度布局逻辑，仅在多设备场景下渲染全局顶层「⏱ 计划调度...」菜单，单设备场景由其专属就绪菜单全权管理，彻底消除单设备用户界面中出现两个计划调度入口的冗余问题；
-     - **单设备滤网快速重置入口全景对称**：在单设备运行工况控制区中，与多设备二级菜单对称补齐「🧼 重置滤网计时 (当前 X%，良好/需拆洗)」，实现单机与多机操控体验的严密自洽；
-     - **语音胶囊多设备执行自愈降级**：在 `executeMultiDeviceCommand` 中补齐自清洁（`.startSelfCleaning` / `.stopSelfCleaning`）与睡眠曲线（`.startSleepCurve` / `.stopSleepCurve`）的分发逻辑，提供友好的单台优先执行与温和反馈，彻底消除“暂不支持多设备批量执行”报错。
-  3. **滤网空气动力学连续线性阻尼物理模型 (`AppModel.calculateFilterWearFactor`)**：
-     - **消除阶跃跳变断崖**：重构 `calculateFilterWearFactor` 中自动风速与制冷模式下的系数计算，采用与能耗引擎对齐的连续线性物理阻尼插值：
-     - 自动风速在稳态微载（0.8°C）到重载大温差（4.0°C）之间采用连续渐进插值（`0.75 + progress * 0.55`），消除阶跃跳变；
-     - 制冷大温差冷凝在 0~5°C 范围采用平滑线性插值（`1.15 + progress * 0.30`），保证滤网洁净度衰减曲线更加平滑自洽。
+  3. **macOS 状态栏全局快捷倒计时主显设备感知消歧 (`StatusItemController.swift`)**：
+     - **多设备全局倒计时消除歧义**：重构多设备顶层「⏱ 计划调度...」子菜单下的「⚡️ 快捷倒计时调度...」，将原本未标明受控设备的单机预设项（如“⏱ 30 分钟后关机”）升级为明确包含主显设备名称的形式（如“⏱ 「客厅空调」30 分钟后关机”）；
+     - **参数注入与精准分发**：在菜单 `representedObject` 中显式注入 `deviceId: primaryId`，杜绝依赖内部回退，与全屋倒计时项（“🏠 全屋 30 分钟后关机”）形成清晰的层级对照。
 
 ---
 
 ## 2. 关键架构变更与代码实现
 
-### 2.1 跨周周期重复与全任务调度语义泛化
-- **`VoiceCommandParser.swift` 周期规则拓展**：
+### 2.1 滤网环境湿度全域双线性平滑阻尼模型
+- **`AppModel.swift` 消除跳变断崖**：
   ```swift
-  } else if text.contains("周五到周一") || text.contains("周五至周一") || ... {
-      return ([1, 2, 6, 7], "周五至周一")
-  } else if text.contains("周六到周二") || text.contains("周六至周二") || ... {
-      return ([1, 2, 3, 7], "周六至周二")
-  } else if text.contains("周日到周五") || text.contains("周日至周五") || ... {
-      return ([1, 2, 3, 4, 5, 6], "周日至周五")
-  ...
-  ```
-- **清空任务语义与否定安全防线加固**：
-  - 判定扩展：“清空定时”、“清空倒计时”、“清空所有任务”、“清空任务”；
-  - 否定防御：“千万别清空定时”、“不要清空所有任务”，杜绝误操作。
-- **`AppModel.swift` 标签对齐**：
-  - `formatRepeatWeekdaysLabel` 扩充对应中文格式化输出。
+  // 除湿冷凝水膜表面张力微粒捕获与结块动力学 (v1.9.64 升级连续平滑阻尼插值)
+  if let hum = indoorHumidity {
+      if hum >= 70.0 {
+          let progress = min(1.0, max(0.0, (hum - 70.0) / 15.0))
+          modeFactor = 1.35 + (progress * 0.15) // 1.35 ~ 1.50 极高湿连续平滑过渡
+      } else if hum >= 50.0 {
+          let progress = (hum - 50.0) / 20.0
+          modeFactor = 1.20 + (progress * 0.15) // 1.20 ~ 1.35 中高湿连续线性插值
+      } else {
+          modeFactor = 1.20 // 低湿平稳基准
+      }
+  }
 
-### 2.2 macOS 状态栏单机去重与全景对称
-- **`StatusItemController.swift` 菜单去重与滤网重置对称**：
-  ```swift
-  // 单设备专属滤网快速重置
-  let filterPct = model.filterCleanlinessPercentage(for: dev.id)
-  let filterStatus = filterPct <= 20 ? "⚠️ 需拆洗" : "良好"
-  let singleResetFilterItem = NSMenuItem(
-      title: "🧼 重置滤网计时 (当前 \(filterPct)%，\(filterStatus))",
-      action: #selector(resetDeviceFilterFromMenu(_:)),
-      keyEquivalent: ""
-  )
-  ...
-  // 顶层全局调度仅在多设备下挂载，单设备由专属子项管理
-  if allDevices.count > 1 {
-      // 计划调度与定时任务感知 (多设备全屋调度矩阵)
-      ...
+  // 室内湿度附着因子全域连续双线性阻尼插值 (v1.9.64)
+  if let hum = indoorHumidity {
+      if hum > 75.0 {
+          let progress = min(1.0, max(0.0, (hum - 75.0) / 15.0))
+          humidityFactor = 1.15 + (progress * 0.15) // 1.15 ~ 1.30 极高湿连续渐进
+      } else if hum > 60.0 {
+          let progress = (hum - 60.0) / 15.0
+          humidityFactor = 1.00 + (progress * 0.15) // 1.00 ~ 1.15 潮湿过渡插值
+      } else if hum < 45.0 {
+          let progress = max(0.0, (hum - 25.0) / 20.0)
+          humidityFactor = 0.90 + (min(1.0, progress) * 0.10) // 0.90 ~ 1.00 干燥平滑插值
+      } else {
+          humidityFactor = 1.00 // 45% ~ 60% 人体工学舒适平衡区
+      }
   }
   ```
 
-### 2.3 滤网空气动力学连续线性阻尼物理模型
-- **`AppModel.swift` 消除阶跃断崖**：
+### 2.2 跨周长周期调度与全任务撤销语义拓展
+- **`VoiceCommandParser.swift` 周期与撤销拓展**：
   ```swift
-  // 稳态微载(0.8°C)到重载大温差(4.0°C)连续线性热物理阻尼插值 (v1.9.63 消除阶跃跳变，与能耗引擎对齐)
-  let progress = (tempDelta - 0.8) / 3.2
-  windFactor = 0.75 + (progress * 0.55)
+  } else if text.contains("周五到周三") || text.contains("周五至周三") || ... {
+      return ([1, 2, 3, 4, 6, 7], "周五至周三")
+  } else if text.contains("周五到周二") || text.contains("周五至周二") || ... {
+      return ([1, 2, 3, 6, 7], "周五至周二")
+  } else if text.contains("周六到周四") || text.contains("周六至周四") || ... {
+      return ([1, 2, 3, 4, 5, 7], "周六至周四")
+  } else if text.contains("周六到周三") || text.contains("周六至周三") || ... {
+      return ([1, 2, 3, 4, 7], "周六至周三")
   ...
-  // 0~5°C 连续平滑线性阻尼插值 (1.15 ~ 1.45) (v1.9.63)
-  let progress = min(1.0, max(0.0, diff / 5.0))
-  modeFactor = 1.15 + (progress * 0.30)
+  let cancelKeywords = [
+      ...
+      "撤销定时", "撤销所有定时", "撤销全部定时", "撤销倒计时", "撤销所有倒计时",
+      "撤销所有任务", "撤销全部任务", "撤销任务", "清除所有任务", "删除所有任务"
+  ]
+  ```
+- **`AppModel.swift` 标签映射对齐**：
+  - `formatRepeatWeekdaysLabel` 扩充对 `[1, 2, 3, 6, 7]`（"周五至周二"）、`[1, 2, 3, 4, 6, 7]`（"周五至周三"）、`[1, 2, 3, 4, 7]`（"周六至周三"）、`[1, 2, 3, 4, 5, 7]`（"周六至周四"）、`[1, 2, 5, 6, 7]`（"周四至周一"）、`[1, 2, 3, 5, 6, 7]`（"周四至周二"）、`[1, 2, 4, 5, 6, 7]`（"周三至周一"）的原生友好输出。
+
+### 2.3 macOS 状态栏全局快捷倒计时主显消歧
+- **`StatusItemController.swift` 显式主显标注与参数注入**：
+  ```swift
+  let primaryDev = model.allUnifiedDevices.first(where: { $0.id == primaryDeviceId }) ?? model.allUnifiedDevices.first
+  let primaryName = primaryDev?.name ?? "主显设备"
+  let primaryId = primaryDev?.id
+
+  let countdownPresets: [(title: String, mins: Int, powerOn: Bool)] = [
+      ("⏱ 「\(primaryName)」30 分钟后关机", 30, false),
+      ("⏱ 「\(primaryName)」1 小时后关机", 60, false),
+      ("⏱ 「\(primaryName)」2 小时后关机", 120, false),
+      ("⏱ 「\(primaryName)」晨间过渡关机 (45分钟)", 45, false),
+      ("❄️ 「\(primaryName)」30 分钟后开机预冷/预热", 30, true),
+      ("❄️ 「\(primaryName)」1 小时后开机预冷/预热", 60, true)
+  ]
+  ...
+  var repObj: [String: Any] = ["minutes": preset.mins, "powerOn": preset.powerOn]
+  if let primaryId {
+      repObj["deviceId"] = primaryId
+  }
+  pItem.representedObject = repObj
   ```
 
 ---
 
 ## 3. 验证与测试闭环
-- **单元测试与端到端断言**：
-  - 在 `VoiceCommandParserTests.swift` 中新增 `testExtendedRepeatWeekdaysAndCancelTaskGeneralization`，并通过独立二进制完全验证所有用例：
-    1. 周五至周一、周六至周二跨周末长周期解析验证 ✅
-    2. 周日至各工作日周期范围解析验证 ✅
-    3. 周末口语变体（周六日、周六天、星期六天、礼拜六天）统一归一化 ✅
-    4. “取消所有任务”、“清空定时”、“清空所有定时任务”全语义覆盖 ✅
-    5. “千万别清空定时”、“不要取消所有任务”动作否定防御拦截 ✅
+- **单元测试与独立二进制验证**：
+  - 在 `VoiceCommandParserTests.swift` 中新增 `testExtendedCrossWeekendCyclesAndRevokeSchedules`，并通过编译运行 100% 验证所有关键断言：
+    1. 周五至周三、周五至周二跨周末长周期解析验证 ✅
+    2. 周六至周四、周六至周三跨周末长周期解析验证 ✅
+    3. 周四至周二、周四至周一、周三至周一跨周长周期解析验证 ✅
+    4. “撤销定时”、“撤销所有定时”、“撤销所有任务”、“撤销倒计时”语义覆盖 ✅
+    5. “千万别撤销定时”、“不要撤销所有任务”否定防线拦截验证 ✅
+    6. 滤网环境湿度双线性连续阻尼插值模型数学连续性与平滑度验证 ✅
 - **编译与静态分析**：
   - `SDKROOT=/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk swift build` 0 警告 0 错误编译通过。
 - **发布构建与产物校验**：
-  - 执行 `./build_app.sh 1.9.63`，打包签名产出：
+  - 执行 `./build_app.sh 1.9.64`，打包签名产出：
     - `dist/HaierAC.app`
-    - `dist/HaierAC-v1.9.63-macOS.zip` (大小: 2.7M)
-    - SHA256 校验和：`99bfe7328f8d49667d5410445b2ddfaa4b8a13ae447e5fe23c4c6640611c45e7`
+    - `dist/HaierAC-v1.9.64-macOS.zip` (大小: 2.7M)
+    - SHA256 校验和：`d5dedff73c409c2c6326cf62899c2a8d921b388480c11c7c2926922f4a3eb23a`

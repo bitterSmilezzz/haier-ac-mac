@@ -806,20 +806,22 @@ final class AppModel: ObservableObject {
                     modeFactor = 1.30 // 无室温传感器基准降温工况，消除盲目套用维持态导致负荷低估 (v1.9.55)
                 }
             case .dehumidify:
-                // 除湿冷凝水膜表面张力微粒捕获与结块动力学 (v1.9.53)：
-                // 在极潮湿环境（RH >= 75% 如梅雨/回南天工况）下，蒸发器翅片与滤网网眼析水冷凝液膜急剧增厚，
-                // 水膜表面张力促使尘螨与浮尘颗粒吸湿膨胀并黏附结块阻塞网孔，滤网负荷因子由固定 1.30 提升至 1.45；
-                // 适度湿度（55% <= RH < 75%）为 1.30；低湿平稳运行（RH < 55%）为 1.20
+                // 除湿冷凝水膜表面张力微粒捕获与结块动力学 (v1.9.53, v1.9.64 升级连续平滑阻尼插值)：
+                // 在极潮湿环境（RH >= 70% 如梅雨/回南天工况）下，蒸发器翅片与滤网网眼析水冷凝液膜急剧增厚，
+                // 水膜表面张力促使尘螨与浮尘颗粒吸湿膨胀并黏附结块阻塞网孔，滤网负荷因子由 1.35 平滑渐进至 1.50；
+                // 中高湿度（50% <= RH < 70%）在 1.20 ~ 1.35 之间连续线性插值；低湿平稳运行（RH < 50%）为 1.20 基准
                 if let hum = indoorHumidity {
-                    if hum >= 75.0 {
-                        modeFactor = 1.45
-                    } else if hum >= 55.0 {
-                        modeFactor = 1.30
+                    if hum >= 70.0 {
+                        let progress = min(1.0, max(0.0, (hum - 70.0) / 15.0))
+                        modeFactor = 1.35 + (progress * 0.15) // 1.35 ~ 1.50 极高湿连续平滑过渡
+                    } else if hum >= 50.0 {
+                        let progress = (hum - 50.0) / 20.0
+                        modeFactor = 1.20 + (progress * 0.15) // 1.20 ~ 1.35 中高湿连续线性插值
                     } else {
-                        modeFactor = 1.20
+                        modeFactor = 1.20 // 低湿平稳基准
                     }
                 } else {
-                    modeFactor = 1.30
+                    modeFactor = 1.30 // 无湿度传感器基准
                 }
             case .heating:
                 if let indoor = indoorTemp {
@@ -875,17 +877,20 @@ final class AppModel: ObservableObject {
             modeFactor = 1.00 // 无法识别模式时回归中性基准 1.00，消除虚标高估
         }
 
-        // 3. 室内湿度附着因子（高湿环境下颗粒物吸水膨胀并易附着在翅片与滤网网孔表面）
+        // 3. 室内湿度附着因子（高湿环境下颗粒物吸水膨胀并易附着在翅片与滤网网孔表面，v1.9.64 全域连续双线性阻尼插值）
         let humidityFactor: Double
         if let hum = indoorHumidity {
-            if hum >= 75.0 {
-                humidityFactor = 1.25
-            } else if hum >= 65.0 {
-                humidityFactor = 1.12
-            } else if hum <= 35.0 {
-                humidityFactor = 0.95
+            if hum > 75.0 {
+                let progress = min(1.0, max(0.0, (hum - 75.0) / 15.0))
+                humidityFactor = 1.15 + (progress * 0.15) // 1.15 ~ 1.30 极高湿连续渐进
+            } else if hum > 60.0 {
+                let progress = (hum - 60.0) / 15.0
+                humidityFactor = 1.00 + (progress * 0.15) // 1.00 ~ 1.15 潮湿过渡插值
+            } else if hum < 45.0 {
+                let progress = max(0.0, (hum - 25.0) / 20.0)
+                humidityFactor = 0.90 + (min(1.0, progress) * 0.10) // 0.90 ~ 1.00 干燥平滑插值
             } else {
-                humidityFactor = 1.00
+                humidityFactor = 1.00 // 45% ~ 60% 人体工学舒适平衡区
             }
         } else {
             humidityFactor = 1.00
@@ -1375,6 +1380,13 @@ final class AppModel: ObservableObject {
         if sorted == [1, 2] { return "周日至周一" }
         if sorted == [1, 2, 6, 7] { return "周五至周一" }
         if sorted == [1, 2, 3, 7] { return "周六至周二" }
+        if sorted == [1, 2, 3, 4, 7] { return "周六至周三" }
+        if sorted == [1, 2, 3, 4, 5, 7] { return "周六至周四" }
+        if sorted == [1, 2, 3, 6, 7] { return "周五至周二" }
+        if sorted == [1, 2, 3, 4, 6, 7] { return "周五至周三" }
+        if sorted == [1, 2, 5, 6, 7] { return "周四至周一" }
+        if sorted == [1, 2, 3, 5, 6, 7] { return "周四至周二" }
+        if sorted == [1, 2, 4, 5, 6, 7] { return "周三至周一" }
         if sorted == [1, 2, 3, 4, 5, 6] { return "周日至周五" }
         if sorted == [1, 2, 3, 4, 5] { return "周日至周四" }
         if sorted == [1, 2, 3, 4] { return "周日至周三" }

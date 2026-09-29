@@ -1139,47 +1139,55 @@ final class StatusItemController: NSObject {
         let scheduleMenu = NSMenu()
         scheduleMenu.autoenablesItems = false
 
-        // 快捷倒计时独立子菜单 (v1.9.56, v1.9.57 增加全屋统一倒计时与开机预冷/预热倒计时)
+        // 快捷倒计时独立子菜单 (v1.9.56, v1.9.57 增加全屋统一倒计时与开机预冷/预热倒计时, v1.9.64 明确主显设备归属消除歧义)
         let quickCountdownMenu = NSMenu()
         quickCountdownMenu.autoenablesItems = false
+
+        let primaryDev = model.allUnifiedDevices.first(where: { $0.id == primaryDeviceId }) ?? model.allUnifiedDevices.first
+        let primaryName = primaryDev?.name ?? "主显设备"
+        let primaryId = primaryDev?.id
+
         let countdownPresets: [(title: String, mins: Int, powerOn: Bool)] = [
-            ("⏱ 30 分钟后关机", 30, false),
-            ("⏱ 1 小时后关机", 60, false),
-            ("⏱ 2 小时后关机", 120, false),
-            ("⏱ 晨间过渡关机 (45分钟)", 45, false),
-            ("❄️ 30 分钟后开机预冷/预热", 30, true),
-            ("❄️ 1 小时后开机预冷/预热", 60, true)
+            ("⏱ 「\(primaryName)」30 分钟后关机", 30, false),
+            ("⏱ 「\(primaryName)」1 小时后关机", 60, false),
+            ("⏱ 「\(primaryName)」2 小时后关机", 120, false),
+            ("⏱ 「\(primaryName)」晨间过渡关机 (45分钟)", 45, false),
+            ("❄️ 「\(primaryName)」30 分钟后开机预冷/预热", 30, true),
+            ("❄️ 「\(primaryName)」1 小时后开机预冷/预热", 60, true)
         ]
         for preset in countdownPresets {
             let pItem = NSMenuItem(title: preset.title, action: #selector(quickCountdownFromMenu(_:)), keyEquivalent: "")
             pItem.target = self
-            pItem.representedObject = ["minutes": preset.mins, "powerOn": preset.powerOn] as [String: Any]
+            var repObj: [String: Any] = ["minutes": preset.mins, "powerOn": preset.powerOn]
+            if let primaryId {
+                repObj["deviceId"] = primaryId
+            }
+            pItem.representedObject = repObj
             quickCountdownMenu.addItem(pItem)
         }
-        if allDevices.count > 1 {
-            quickCountdownMenu.addItem(.separator())
-            let allOffPresets: [(title: String, mins: Int)] = [
-                ("🏠 全屋 30 分钟后关机", 30),
-                ("🏠 全屋 1 小时后关机", 60),
-                ("🏠 全屋 2 小时后关机", 120)
-            ]
-            for p in allOffPresets {
-                let pItem = NSMenuItem(title: p.title, action: #selector(quickCountdownFromMenu(_:)), keyEquivalent: "")
-                pItem.target = self
-                pItem.representedObject = ["minutes": p.mins, "powerOn": false, "all": true] as [String: Any]
-                quickCountdownMenu.addItem(pItem)
-            }
-            let allOnPresets: [(title: String, mins: Int)] = [
-                ("❄️ 全屋 30 分钟后开机预冷/预热", 30),
-                ("❄️ 全屋 1 小时后开机预冷/预热", 60),
-                ("❄️ 全屋 2 小时后开机预冷/预热", 120)
-            ]
-            for p in allOnPresets {
-                let pItem = NSMenuItem(title: p.title, action: #selector(quickCountdownFromMenu(_:)), keyEquivalent: "")
-                pItem.target = self
-                pItem.representedObject = ["minutes": p.mins, "powerOn": true, "all": true] as [String: Any]
-                quickCountdownMenu.addItem(pItem)
-            }
+
+        quickCountdownMenu.addItem(.separator())
+        let allOffPresets: [(title: String, mins: Int)] = [
+            ("🏠 全屋 30 分钟后关机", 30),
+            ("🏠 全屋 1 小时后关机", 60),
+            ("🏠 全屋 2 小时后关机", 120)
+        ]
+        for p in allOffPresets {
+            let pItem = NSMenuItem(title: p.title, action: #selector(quickCountdownFromMenu(_:)), keyEquivalent: "")
+            pItem.target = self
+            pItem.representedObject = ["minutes": p.mins, "powerOn": false, "all": true] as [String: Any]
+            quickCountdownMenu.addItem(pItem)
+        }
+        let allOnPresets: [(title: String, mins: Int)] = [
+            ("❄️ 全屋 30 分钟后开机预冷/预热", 30),
+            ("❄️ 全屋 1 小时后开机预冷/预热", 60),
+            ("❄️ 全屋 2 小时后开机预冷/预热", 120)
+        ]
+        for p in allOnPresets {
+            let pItem = NSMenuItem(title: p.title, action: #selector(quickCountdownFromMenu(_:)), keyEquivalent: "")
+            pItem.target = self
+            pItem.representedObject = ["minutes": p.mins, "powerOn": true, "all": true] as [String: Any]
+            quickCountdownMenu.addItem(pItem)
         }
         let quickCountdownParent = NSMenuItem(title: "⚡️ 快捷倒计时调度...", action: nil, keyEquivalent: "")
         scheduleMenu.setSubmenu(quickCountdownMenu, for: quickCountdownParent)

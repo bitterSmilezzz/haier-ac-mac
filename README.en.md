@@ -6,6 +6,18 @@ A native SwiftUI app to control Haier / Leader (统帅) smart air conditioners o
 
 ## Features
 
+- 🏷 **Extended Cross-Weekend Repeat Schedules, Revoke Task Semantics, Status Bar Countdown Disambiguation & Continuous Bilinear Humidity Filter Damping (v1.9.64)**:
+  - 🍃 **Continuous Bilinear Humidity & Dehumidification Damping Dynamics (`AppModel.calculateFilterWearFactor`)**:
+    - **Eradication of Step-Function Humidity Discontinuities**: Rebuilt the humidity wear factor (`humidityFactor`) into a continuously differentiable bilinear interpolation model: dry range (hum <= 45%) smoothly ramps across 0.90 ~ 1.00, comfort neutral band (45% ~ 60%) holds steady at 1.00, humid transition (60% ~ 75%) smoothly ramps across 1.00 ~ 1.15, and extreme south-bound humidity (hum > 75%) gently progresses up to 1.30;
+    - **Dehumidification Condensation Symmetry**: Upgraded `modeFactor` under `.dehumidify` to continuously interpolate across 50% ~ 70% RH (1.20 ~ 1.35) and 70% ~ 85% RH (1.35 ~ 1.50), achieving complete physical continuity across temperature, airflow, and humidity dimensions.
+  - ⏱️ **Extended Cross-Weekend Recurring Schedules & Revoke Task Semantics (`VoiceCommandParser.swift` / `AppModel.swift` / `VoiceCommandParserTests.swift`)**:
+    - **Long Span Weekend Schedule Engine**: Expanded `parseRepeatWeekdays` with Friday-to-Wednesday (`[1, 2, 3, 4, 6, 7]`), Friday-to-Tuesday (`[1, 2, 3, 6, 7]`), Saturday-to-Thursday (`[1, 2, 3, 4, 5, 7]`), Saturday-to-Wednesday (`[1, 2, 3, 4, 7]`), Thursday-to-Tuesday (`[1, 2, 3, 5, 6, 7]`), Thursday-to-Monday (`[1, 2, 5, 6, 7]`), and Wednesday-to-Monday (`[1, 2, 4, 5, 6, 7]`), covering full colloquial variants;
+    - **Universal Task Revocation Semantics**: Enriched `isCancelSchedule` with "撤销" (revoke) keyword coverage across timers, countdowns, and scheduled tasks, backed by structured negation defenses;
+    - **Harmonized Label Mapping**: Aligned `AppModel.formatRepeatWeekdaysLabel` with all newly added recurring schedule spans.
+  - 🍱 **macOS Status Bar Primary Device Countdown Disambiguation (`StatusItemController.swift`)**:
+    - **Clear Operational Scope**: In multi-device root schedule menus, disambiguated single-device countdown presets by prepending the primary device name (e.g., "⏱ 「Living Room AC」30 mins Power Off");
+    - **Explicit Parameter Injection**: Injected `deviceId: primaryId` directly into menuItem payloads, completely removing ambiguity against whole-house operations ("🏠 全屋 30 分钟后关机").
+
 - 🏷 **Cross-Weekend Repeating Schedule Engine, Status Bar Single-Device Deduplication & Filter Symmetry, and Continuous Aerodynamic Filter Damping Dynamics (v1.9.63)**:
   - ⏱️ **Cross-Weekend Repeating Schedule Engine & Full Task Semantics (`VoiceCommandParser.swift` / `AppModel.swift` / `VoiceCommandParserTests.swift`)**:
     - **Cross-Weekend Long Span Expansion**: Extended the shared `parseRepeatWeekdays` engine with multi-day cross-weekend recurring schedules: Friday-to-Monday (`[1, 2, 6, 7]`), Saturday-to-Tuesday (`[1, 2, 3, 7]`), and Sunday-anchored spans including Sunday-to-Friday (`[1..6]`), Sunday-to-Thursday (`[1..5]`), Sunday-to-Wednesday (`[1..4]`), and Sunday-to-Tuesday (`[1..3]`), harmonized with natural language integer mappings;

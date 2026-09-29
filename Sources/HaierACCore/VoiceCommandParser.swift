@@ -313,7 +313,9 @@ public struct VoiceCommandParser {
         let cancelKeywords = [
             "取消定时", "取消倒计时", "关闭定时", "清除定时", "删除定时", "取消预约", "别定了", "别定时", "不要定时", "不用定时",
             "清空定时", "清空所有定时", "清空全部定时", "清空倒计时", "清空所有倒计时",
-            "取消所有任务", "取消全部任务", "清空所有任务", "清空全部任务", "取消任务", "清空任务"
+            "取消所有任务", "取消全部任务", "清空所有任务", "清空全部任务", "取消任务", "清空任务",
+            "撤销定时", "撤销所有定时", "撤销全部定时", "撤销倒计时", "撤销所有倒计时",
+            "撤销所有任务", "撤销全部任务", "撤销任务", "清除所有任务", "删除所有任务"
         ]
         if cancelKeywords.contains(where: { text.contains($0) }) {
             return true
@@ -478,12 +480,26 @@ public struct VoiceCommandParser {
             return ([1, 5, 6, 7], "周四至周日")
         } else if text.contains("周五到周日") || text.contains("周五至周日") || text.contains("星期五到星期天") || text.contains("星期五至星期天") || text.contains("星期五到星期日") || text.contains("星期五至星期日") || text.contains("礼拜五到礼拜天") || text.contains("礼拜五至礼拜天") || text.contains("礼拜五到礼拜日") || text.contains("礼拜五至礼拜日") || text.contains("周五周六周日") || text.contains("周五周六周天") || text.contains("周末三天") {
             return ([1, 6, 7], "周五至周日")
+        } else if text.contains("周五到周三") || text.contains("周五至周三") || text.contains("星期五到星期三") || text.contains("星期五至星期三") || text.contains("礼拜五到星期三") || text.contains("礼拜五至星期三") || text.contains("礼拜五到礼拜三") || text.contains("礼拜五至礼拜三") {
+            return ([1, 2, 3, 4, 6, 7], "周五至周三")
+        } else if text.contains("周五到周二") || text.contains("周五至周二") || text.contains("星期五到星期二") || text.contains("星期五至星期二") || text.contains("礼拜五到星期二") || text.contains("礼拜五至星期二") || text.contains("礼拜五到礼拜二") || text.contains("礼拜五至礼拜二") {
+            return ([1, 2, 3, 6, 7], "周五至周二")
         } else if text.contains("周五到周一") || text.contains("周五至周一") || text.contains("星期五到星期一") || text.contains("星期五至星期一") || text.contains("礼拜五到星期一") || text.contains("礼拜五至星期一") || text.contains("礼拜五到礼拜一") || text.contains("礼拜五至礼拜一") {
             return ([1, 2, 6, 7], "周五至周一")
+        } else if text.contains("周六到周四") || text.contains("周六至周四") || text.contains("星期六到星期四") || text.contains("星期六至星期四") || text.contains("礼拜六到星期四") || text.contains("礼拜六至星期四") || text.contains("礼拜六到礼拜四") || text.contains("礼拜六至礼拜四") {
+            return ([1, 2, 3, 4, 5, 7], "周六至周四")
+        } else if text.contains("周六到周三") || text.contains("周六至周三") || text.contains("星期六到星期三") || text.contains("星期六至星期三") || text.contains("礼拜六到星期三") || text.contains("礼拜六至星期三") || text.contains("礼拜六到礼拜三") || text.contains("礼拜六至礼拜三") {
+            return ([1, 2, 3, 4, 7], "周六至周三")
         } else if text.contains("周六到周二") || text.contains("周六至周二") || text.contains("星期六到星期二") || text.contains("星期六至星期二") || text.contains("礼拜六到星期二") || text.contains("礼拜六至星期二") {
             return ([1, 2, 3, 7], "周六至周二")
         } else if text.contains("周六到周一") || text.contains("周六至周一") || text.contains("星期六到星期一") || text.contains("星期六至星期一") || text.contains("礼拜六到星期一") || text.contains("礼拜六至星期一") {
             return ([1, 2, 7], "周六至周一")
+        } else if text.contains("周四到周二") || text.contains("周四至周二") || text.contains("星期四到星期二") || text.contains("星期四至星期二") || text.contains("礼拜四到星期二") || text.contains("礼拜四至星期二") || text.contains("礼拜四到礼拜二") || text.contains("礼拜四至礼拜二") {
+            return ([1, 2, 3, 5, 6, 7], "周四至周二")
+        } else if text.contains("周四到周一") || text.contains("周四至周一") || text.contains("星期四到星期一") || text.contains("星期四至星期一") || text.contains("礼拜四到星期一") || text.contains("礼拜四至星期一") || text.contains("礼拜四到礼拜一") || text.contains("礼拜四至礼拜一") {
+            return ([1, 2, 5, 6, 7], "周四至周一")
+        } else if text.contains("周三到周一") || text.contains("周三至周一") || text.contains("星期三到星期一") || text.contains("星期三至星期一") || text.contains("礼拜三到星期一") || text.contains("礼拜三至星期一") || text.contains("礼拜三到礼拜一") || text.contains("礼拜三至礼拜一") {
+            return ([1, 2, 4, 5, 6, 7], "周三至周一")
         } else if text.contains("周日到周五") || text.contains("周日至周五") || text.contains("周天到周五") || text.contains("周天至周五") || text.contains("星期天到星期五") || text.contains("星期天至星期五") || text.contains("星期日到星期五") || text.contains("星期日至星期五") || text.contains("礼拜天到星期五") || text.contains("礼拜天至星期五") || text.contains("礼拜日到星期五") || text.contains("礼拜日至星期五") {
             return ([1, 2, 3, 4, 5, 6], "周日至周五")
         } else if text.contains("周日到周四") || text.contains("周日至周四") || text.contains("周天到周四") || text.contains("周天至周四") || text.contains("星期天到星期四") || text.contains("星期天至星期四") || text.contains("星期日到星期四") || text.contains("星期日至星期四") || text.contains("礼拜天到星期四") || text.contains("礼拜天至星期四") || text.contains("礼拜日到星期四") || text.contains("礼拜日至星期四") {

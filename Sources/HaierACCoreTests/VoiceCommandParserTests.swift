@@ -2148,6 +2148,54 @@ final class VoiceCommandParserTests: XCTestCase {
         XCTAssertNil(negative2)
     }
 
+    // MARK: - 跨周长周期与撤销任务语义完备化测试 (v1.9.64)
+
+    func testExtendedCrossWeekendCyclesAndRevokeSchedules() {
+        // 1. 周五至周三、周五至周二跨周末长周期
+        let friWed = VoiceCommandParser.parse("周五至周三晚上10点关空调")
+        XCTAssertEqual(friWed?.command, .scheduleRepeatPower(hour: 22, minute: 0, power: false, repeatWeekdays: [1, 2, 3, 4, 6, 7], repeatLabel: "周五至周三"))
+
+        let friTue = VoiceCommandParser.parse("星期五到星期二早上8点开机")
+        XCTAssertEqual(friTue?.command, .scheduleRepeatPower(hour: 8, minute: 0, power: true, repeatWeekdays: [1, 2, 3, 6, 7], repeatLabel: "周五至周二"))
+
+        // 2. 周六至周四、周六至周三跨周末长周期
+        let satThu = VoiceCommandParser.parse("周六至周四晚上11点关空调")
+        XCTAssertEqual(satThu?.command, .scheduleRepeatPower(hour: 23, minute: 0, power: false, repeatWeekdays: [1, 2, 3, 4, 5, 7], repeatLabel: "周六至周四"))
+
+        let satWed = VoiceCommandParser.parse("礼拜六到礼拜三早上9点开空调")
+        XCTAssertEqual(satWed?.command, .scheduleRepeatPower(hour: 9, minute: 0, power: true, repeatWeekdays: [1, 2, 3, 4, 7], repeatLabel: "周六至周三"))
+
+        // 3. 周四至周二、周四至周一、周三至周一跨周长周期
+        let thuTue = VoiceCommandParser.parse("周四到周二早上7点开机")
+        XCTAssertEqual(thuTue?.command, .scheduleRepeatPower(hour: 7, minute: 0, power: true, repeatWeekdays: [1, 2, 3, 5, 6, 7], repeatLabel: "周四至周二"))
+
+        let thuMon = VoiceCommandParser.parse("星期四至星期一晚上10点关空调")
+        XCTAssertEqual(thuMon?.command, .scheduleRepeatPower(hour: 22, minute: 0, power: false, repeatWeekdays: [1, 2, 5, 6, 7], repeatLabel: "周四至周一"))
+
+        let wedMon = VoiceCommandParser.parse("礼拜三到礼拜一早上8点开机")
+        XCTAssertEqual(wedMon?.command, .scheduleRepeatPower(hour: 8, minute: 0, power: true, repeatWeekdays: [1, 2, 4, 5, 6, 7], repeatLabel: "周三至周一"))
+
+        // 4. 撤销定时与任务全语义覆盖
+        let revoke1 = VoiceCommandParser.parse("撤销定时")
+        XCTAssertEqual(revoke1?.command, .cancelSchedules)
+
+        let revoke2 = VoiceCommandParser.parse("撤销所有定时")
+        XCTAssertEqual(revoke2?.command, .cancelSchedulesAll)
+
+        let revoke3 = VoiceCommandParser.parse("撤销所有任务")
+        XCTAssertEqual(revoke3?.command, .cancelSchedulesAll)
+
+        let revoke4 = VoiceCommandParser.parse("撤销倒计时")
+        XCTAssertEqual(revoke4?.command, .cancelSchedules)
+
+        // 5. 否定防线拦截撤销指令
+        let negativeRevoke1 = VoiceCommandParser.parse("千万别撤销定时")
+        XCTAssertNil(negativeRevoke1)
+
+        let negativeRevoke2 = VoiceCommandParser.parse("不要撤销所有任务")
+        XCTAssertNil(negativeRevoke2)
+    }
+
     // MARK: - 无效输入测试
 
     func testInvalidCommands() {
