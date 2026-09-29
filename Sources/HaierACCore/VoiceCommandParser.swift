@@ -486,9 +486,27 @@ public struct VoiceCommandParser {
         return try? NSRegularExpression(pattern: pattern)
     }()
 
+    /// 匹配离散星期在先、连续区间居中、离散星期在后的反向夹心复合口语（如“周一、周三至周五以及周日”、“周日和周二至周四以及周六”、“周二和周四到周五加周日”） (v1.9.75)
+    private static let multiDaysWithRangeAndMultiDaysRegex: NSRegularExpression? = {
+        let pattern = #"((?:(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)?([一二三四五六日天1-7])[、,，和与及跟以及还有或者或加/／\s]*)+)\s*(?:[、,，和与及跟以及还有或者或加/／\s]+)\s*(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])\s*(?:[、,，和与及跟以及还有或者或加/／\s]+)\s*(?!(?:每天|天天|每日|每晚|每早|每晨|每夜|日日))((?:(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)?([一二三四五六日天1-7])[、,，和与及跟以及还有或者或加/／\s]*)+)"#
+        return try? NSRegularExpression(pattern: pattern)
+    }()
+
     /// 匹配三连续区间大一统复合口语（如“周一至周二、周四至周五和周六至周日”、“周一到周二、周三到周四以及周五到周六”） (v1.9.74)
     private static let triRangeRepeatRegex: NSRegularExpression? = {
         let pattern = #"(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])\s*(?:[、,，和与及跟以及还有或者或加/／\s]+)\s*(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])\s*(?:[、,，和与及跟以及还有或者或加/／\s]+)\s*(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])"#
+        return try? NSRegularExpression(pattern: pattern)
+    }()
+
+    /// 匹配三连续区间附加多个离散星期复合口语（如“周一至周二、周四至周五、周六至周日和周三”） (v1.9.75)
+    private static let triRangeWithMultiDaysRegex: NSRegularExpression? = {
+        let pattern = #"(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])\s*(?:[、,，和与及跟以及还有或者或加/／\s]+)\s*(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])\s*(?:[、,，和与及跟以及还有或者或加/／\s]+)\s*(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])\s*(?:[、,，和与及跟以及还有或者或加/／\s]+)\s*(?!(?:每天|天天|每日|每晚|每早|每晨|每夜|日日))((?:(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)?([一二三四五六日天1-7])[、,，和与及跟以及还有或者或加/／\s]*)+)"#
+        return try? NSRegularExpression(pattern: pattern)
+    }()
+
+    /// 匹配多个离散星期在先、三连续区间在后复合口语（如“周日和周一至周二、周四至周五以及周六至周日”） (v1.9.75)
+    private static let multiDaysWithTriRangeRegex: NSRegularExpression? = {
+        let pattern = #"((?:(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)?([一二三四五六日天1-7])[、,，和与及跟以及还有或者或加/／\s]*)+)\s*(?:[、,，和与及跟以及还有或者或加/／\s]+)\s*(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])\s*(?:[、,，和与及跟以及还有或者或加/／\s]+)\s*(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])\s*(?:[、,，和与及跟以及还有或者或加/／\s]+)\s*(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])"#
         return try? NSRegularExpression(pattern: pattern)
     }()
 
@@ -735,6 +753,66 @@ public struct VoiceCommandParser {
         let nsString = text as NSString
         let fullRange = NSRange(location: 0, length: nsString.length)
 
+        // 0.001 三连续区间附加多个离散星期复合口语（如“周一至周二、周四至周五、周六至周日和周三”） (v1.9.75)
+        if let regex = triRangeWithMultiDaysRegex,
+           let match = regex.firstMatch(in: text, options: [], range: fullRange),
+           match.numberOfRanges >= 8 {
+            let s1 = nsString.substring(with: match.range(at: 1))
+            let e1 = nsString.substring(with: match.range(at: 2))
+            let s2 = nsString.substring(with: match.range(at: 3))
+            let e2 = nsString.substring(with: match.range(at: 4))
+            let s3 = nsString.substring(with: match.range(at: 5))
+            let e3 = nsString.substring(with: match.range(at: 6))
+            let multi = nsString.substring(with: match.range(at: 7))
+            if let s1Ch = s1.first, let s1Wd = chineseDayCharToWeekday(s1Ch),
+               let e1Ch = e1.first, let e1Wd = chineseDayCharToWeekday(e1Ch),
+               let s2Ch = s2.first, let s2Wd = chineseDayCharToWeekday(s2Ch),
+               let e2Ch = e2.first, let e2Wd = chineseDayCharToWeekday(e2Ch),
+               let s3Ch = s3.first, let s3Wd = chineseDayCharToWeekday(s3Ch),
+               let e3Ch = e3.first, let e3Wd = chineseDayCharToWeekday(e3Ch) {
+                var days = Set(generateWeeklyRange(start: s1Wd, end: e1Wd))
+                days.formUnion(generateWeeklyRange(start: s2Wd, end: e2Wd))
+                days.formUnion(generateWeeklyRange(start: s3Wd, end: e3Wd))
+                for ch in multi {
+                    if let wd = chineseDayCharToWeekday(ch) {
+                        days.insert(wd)
+                    }
+                }
+                let sorted = days.sorted()
+                return (sorted, formatWeekdayLabel(from: sorted))
+            }
+        }
+
+        // 0.002 多个离散星期在先、三连续区间在后复合口语（如“周日和周一至周二、周四至周五以及周六至周日”） (v1.9.75)
+        if let regex = multiDaysWithTriRangeRegex,
+           let match = regex.firstMatch(in: text, options: [], range: fullRange),
+           match.numberOfRanges >= 9 {
+            let multi = nsString.substring(with: match.range(at: 1))
+            let s1 = nsString.substring(with: match.range(at: 3))
+            let e1 = nsString.substring(with: match.range(at: 4))
+            let s2 = nsString.substring(with: match.range(at: 5))
+            let e2 = nsString.substring(with: match.range(at: 6))
+            let s3 = nsString.substring(with: match.range(at: 7))
+            let e3 = nsString.substring(with: match.range(at: 8))
+            if let s1Ch = s1.first, let s1Wd = chineseDayCharToWeekday(s1Ch),
+               let e1Ch = e1.first, let e1Wd = chineseDayCharToWeekday(e1Ch),
+               let s2Ch = s2.first, let s2Wd = chineseDayCharToWeekday(s2Ch),
+               let e2Ch = e2.first, let e2Wd = chineseDayCharToWeekday(e2Ch),
+               let s3Ch = s3.first, let s3Wd = chineseDayCharToWeekday(s3Ch),
+               let e3Ch = e3.first, let e3Wd = chineseDayCharToWeekday(e3Ch) {
+                var days = Set(generateWeeklyRange(start: s1Wd, end: e1Wd))
+                days.formUnion(generateWeeklyRange(start: s2Wd, end: e2Wd))
+                days.formUnion(generateWeeklyRange(start: s3Wd, end: e3Wd))
+                for ch in multi {
+                    if let wd = chineseDayCharToWeekday(ch) {
+                        days.insert(wd)
+                    }
+                }
+                let sorted = days.sorted()
+                return (sorted, formatWeekdayLabel(from: sorted))
+            }
+        }
+
         // 0.0 三连续区间大一统复合口语（如“周一至周二、周四至周五和周六至周日”、“周一到周二、周三到周四以及周五到周六”） (v1.9.74)
         if let regex = triRangeRepeatRegex,
            let match = regex.firstMatch(in: text, options: [], range: fullRange),
@@ -775,6 +853,32 @@ public struct VoiceCommandParser {
                 var days = Set(generateWeeklyRange(start: s1Wd, end: e1Wd))
                 days.formUnion(generateWeeklyRange(start: s2Wd, end: e2Wd))
                 for ch in multi {
+                    if let wd = chineseDayCharToWeekday(ch) {
+                        days.insert(wd)
+                    }
+                }
+                let sorted = days.sorted()
+                return (sorted, formatWeekdayLabel(from: sorted))
+            }
+        }
+
+        // 0.06 离散星期在先、连续区间居中、离散星期在后反向夹心复合口语（如“周一、周三至周五以及周日”、“周日和周二至周四以及周六”、“周二和周四到周五加周日”） (v1.9.75)
+        if let regex = multiDaysWithRangeAndMultiDaysRegex,
+           let match = regex.firstMatch(in: text, options: [], range: fullRange),
+           match.numberOfRanges >= 6 {
+            let multi1 = nsString.substring(with: match.range(at: 1))
+            let s = nsString.substring(with: match.range(at: 3))
+            let e = nsString.substring(with: match.range(at: 4))
+            let multi2 = nsString.substring(with: match.range(at: 5))
+            if let sCh = s.first, let sWd = chineseDayCharToWeekday(sCh),
+               let eCh = e.first, let eWd = chineseDayCharToWeekday(eCh) {
+                var days = Set(generateWeeklyRange(start: sWd, end: eWd))
+                for ch in multi1 {
+                    if let wd = chineseDayCharToWeekday(ch) {
+                        days.insert(wd)
+                    }
+                }
+                for ch in multi2 {
                     if let wd = chineseDayCharToWeekday(ch) {
                         days.insert(wd)
                     }

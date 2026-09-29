@@ -6,6 +6,19 @@ A native SwiftUI app to control Haier / Leader (统帅) smart air conditioners o
 
 ## Features
 
+- 🏷 **Unified Reverse-Sandwich & Multi-Range Schedule Engine, Status Bar Synchronized Sibling Transparency & Per-Device Filter Care Matrix (v1.9.75)**:
+  - ⏱️ **Natural Language Reverse-Sandwich & Multi-Range Compound Schedule Engine (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)**:
+    - **Reverse-Sandwich Composite Parsing (`multiDaysWithRangeAndMultiDaysRegex`)**: Added a dedicated reverse-sandwich regex engine for "Discrete Weekdays + Continuous Range + Discrete Weekdays" expressions (e.g., "Monday, Wed–Fri and Sunday at 8 AM", "Sunday and Tue–Thu plus Saturday at 8 AM", "Tuesday and Thu–Fri plus Sunday at 8 AM"), eliminating logic defects where trailing discrete days were previously silently dropped, accurately computing the full union set;
+    - **Tri-Range with Multi-Discrete Weekdays (`triRangeWithMultiDaysRegex`)**: Supported "Three Continuous Ranges + Discrete Days" (e.g., "Mon–Tue, Thu–Fri, Sat–Sun and Wednesday at 8 AM"), integrating four non-contiguous intervals into full 7-day schedules;
+    - **Leading Discrete Weekdays with Tri-Range (`multiDaysWithTriRangeRegex`)**: Added support for "Discrete Days + Three Continuous Ranges" (e.g., "Sunday and Mon–Tue, Thu–Fri and Sat–Sun at 8 AM"), smoothly uniting discrete and circular ranges;
+    - **100% Test Coverage**: Added 6 new end-to-end unit test assertions in `VoiceCommandParserTests`, 100% PASS.
+  - 🍱 **macOS Status Bar Synchronized Sibling Transparency & Per-Device Filter Care Matrix (`StatusItemController.swift`)**:
+    - **Sibling Schedule Associated Devices Header & Tooltip Transparency**: Added a dedicated header `👥 协同设备: 客厅、主卧...` inside task inspection submenus and populated full device names into the tooltips of "⏸ 同步暂停此批任务" and "❌ 同步取消此批任务";
+    - **Precise Sibling Action Toast Notifications**: Refactored `toggleSiblingSchedulesFromMenu` and `cancelSiblingSchedulesFromMenu` to explicitly list all affected air conditioner names in the feedback toast;
+    - **Per-Device Filter Maintenance Menu Matrix**: In the top-level "Filter Care & Self-Cleaning" menu, dynamically displayed each air conditioner's live cleanliness percentage and a direct reset action (`🧼 重置「设备名」滤网计时 (当前 XX%)`), allowing instant single-device maintenance without deep menu navigation.
+  - ⚡️ **Intelligent System Notification Aggregation for Concurrent Scheduled Actions (`AppModel.swift`)**:
+    - **Batch Notification Aggregation (`postAggregatedScheduledNotifications`)**: Grouped due actions firing at the same second by identical attribute and value, consolidating multiple banner notifications and sound alerts into a single comprehensive notification (e.g., "定时批次任务已协同执行 (3 台)：已对 客厅、主卧、次卧 执行 开机"), eliminating notification spam and chime stacking.
+
 - 🏷 **Unified Tri-Range & Sandwich Interval Schedule Engine, Status Bar Full-Hierarchy Synchronized Batch Control & Filter History Device-Minutes Adaptive Calibration (v1.9.74)**:
   - ⏱️ **Natural Language Tri-Range & Sandwich Interval Compound Schedule Engine (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)**:
     - **Tri-Continuous Range Composite Parsing (`triRangeRepeatRegex`)**: Introduced a dedicated tri-range engine to seamlessly parse complex shift patterns (e.g. "Mon–Tue, Thu–Fri and Sat–Sun at 8 AM", "Mon–Tue, Wed–Thu and Fri–Sat at 8 AM"), merging three continuous intervals into unified circular sets;

@@ -1111,6 +1111,15 @@ final class StatusItemController: NSObject {
             let resetAllFilterItem = NSMenuItem(title: "🧼 一键重置全屋滤网计时 (恢复100%)", action: #selector(resetAllFiltersFromMenu), keyEquivalent: "")
             resetAllFilterItem.target = self
             filterMenu.addItem(resetAllFilterItem)
+
+            filterMenu.addItem(.separator())
+            for dev in allDevices {
+                let cleanPct = model.filterCleanlinessPercentage(for: dev.id)
+                let item = NSMenuItem(title: "🧼 重置「\(dev.name)」滤网计时 (当前 \(cleanPct)%)", action: #selector(resetDeviceFilterFromMenu(_:)), keyEquivalent: "")
+                item.target = self
+                item.representedObject = dev.id
+                filterMenu.addItem(item)
+            }
         } else if let dev = allDevices.first {
             let resetItem = NSMenuItem(title: "🧼 重置「\(dev.name)」滤网计时 (恢复100%)", action: #selector(resetPrimaryFilterFromMenu), keyEquivalent: "")
             resetItem.target = self
@@ -1565,21 +1574,30 @@ final class StatusItemController: NSObject {
         let newEnabled = !anyEnabled
         let modified = model.setScheduledActionsEnabled(ids: uuids, enabled: newEnabled)
         let actionDesc = newEnabled ? "恢复" : "暂停"
-        model.operationNotice = AppModel.OperationNotice(text: "\(newEnabled ? "▶️" : "⏸") 已\(actionDesc)同频批次任务（共 \(modified) 台空调）", isError: false)
+        let devNames = targets.compactMap { act in
+            model.allUnifiedDevices.first(where: { $0.id == act.deviceId })?.name
+        }
+        let devListDesc = devNames.isEmpty ? "" : "（\(devNames.joined(separator: "、"))）"
+        model.operationNotice = AppModel.OperationNotice(text: "\(newEnabled ? "▶️" : "⏸") 已\(actionDesc)同频批次任务\(devListDesc)（共 \(modified) 台空调）", isError: false)
         refreshTemperature()
     }
 
     @objc private func cancelSiblingSchedulesFromMenu(_ sender: NSMenuItem) {
         guard let idStrs = sender.representedObject as? [String] else { return }
         let uuids = Set(idStrs.compactMap { UUID(uuidString: $0) })
+        let targets = model.scheduledActions.filter { uuids.contains($0.id) }
+        let devNames = targets.compactMap { act in
+            model.allUnifiedDevices.first(where: { $0.id == act.deviceId })?.name
+        }
+        let devListDesc = devNames.isEmpty ? "" : "（\(devNames.joined(separator: "、"))）"
         let removed = model.removeScheduledActions(ids: uuids)
         if removed > 0 {
-            model.operationNotice = AppModel.OperationNotice(text: "🗑 已同步取消同频批次任务（共 \(removed) 台空调）", isError: false)
+            model.operationNotice = AppModel.OperationNotice(text: "🗑 已同步取消同频批次任务\(devListDesc)（共 \(removed) 台空调）", isError: false)
             refreshTemperature()
         }
     }
 
-    /// 构建单个计划任务的管理子菜单（设备归属、下次执行时间、周期重复标签、暂停/恢复、取消、同频兄弟任务协同） (v1.9.74 统一状态栏全层级计划调度子菜单逻辑与补全多设备子菜单同频批处理能力)
+    /// 构建单个计划任务的管理子菜单（设备归属、下次执行时间、周期重复标签、暂停/恢复、取消、同频兄弟任务协同） (v1.9.74 统一状态栏全层级计划调度子菜单逻辑与补全多设备子菜单同频批处理能力, v1.9.75 增强可视化列表与穿透悬浮感知)
     private func buildSingleScheduleMenu(action: ScheduledAction, allSchedules: [ScheduledAction], showDevName: String? = nil) -> NSMenu {
         let singleMenu = NSMenu()
         singleMenu.autoenablesItems = false
@@ -1614,20 +1632,30 @@ final class StatusItemController: NSObject {
         cancelItem.representedObject = action.id.uuidString
         singleMenu.addItem(cancelItem)
 
-        // 动态检测同频批次兄弟任务并提供一键协同管理 (v1.9.69, v1.9.70, v1.9.74 补全多设备子菜单全层级对称)
+        // 动态检测同频批次兄弟任务并提供一键协同管理 (v1.9.69, v1.9.70, v1.9.74 补全多设备子菜单全层级对称, v1.9.75 增强可视化列表与穿透悬浮感知)
         let siblingActions = allSchedules.filter { StatusItemController.isSiblingSchedule($0, action) }
         if siblingActions.count > 1 {
             singleMenu.addItem(.separator())
+            let siblingDevNames = siblingActions.compactMap { act in
+                self.model.allUnifiedDevices.first(where: { $0.id == act.deviceId })?.name
+            }
+            let devListStr = siblingDevNames.isEmpty ? "\(siblingActions.count) 台设备" : siblingDevNames.joined(separator: "、")
+            let infoItem = NSMenuItem(title: "👥 协同设备: \(devListStr)", action: nil, keyEquivalent: "")
+            infoItem.isEnabled = false
+            singleMenu.addItem(infoItem)
+
             let anySiblingEnabled = siblingActions.contains(where: \.enabled)
             let syncToggleTitle = anySiblingEnabled ? "⏸ 同步暂停此批任务 (\(siblingActions.count) 台)" : "▶️ 同步恢复此批任务 (\(siblingActions.count) 台)"
             let syncToggleItem = NSMenuItem(title: syncToggleTitle, action: #selector(toggleSiblingSchedulesFromMenu(_:)), keyEquivalent: "")
             syncToggleItem.target = self
             syncToggleItem.representedObject = siblingActions.map(\.id.uuidString)
+            syncToggleItem.toolTip = "协同管理同频批次空调：\(devListStr)"
             singleMenu.addItem(syncToggleItem)
 
             let syncCancelItem = NSMenuItem(title: "❌ 同步取消此批任务 (\(siblingActions.count) 台)", action: #selector(cancelSiblingSchedulesFromMenu(_:)), keyEquivalent: "")
             syncCancelItem.target = self
             syncCancelItem.representedObject = siblingActions.map(\.id.uuidString)
+            syncCancelItem.toolTip = "取消同频批次空调任务：\(devListStr)"
             singleMenu.addItem(syncCancelItem)
         }
 

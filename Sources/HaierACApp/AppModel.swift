@@ -1513,8 +1513,6 @@ final class AppModel: ObservableObject {
             AppLog.log("调度触发: \(action.name) -> \(action.deviceId).\(action.attrName)=\(value.stringValue)")
             // 静默下发（不走操作反馈 toast，避免批量触发刷屏）
             gatewayHandle?.sendControl(deviceId: action.deviceId, attributes: [action.attrName: value.jsonValue], completion: nil)
-            // 系统通知：让用户知道定时任务已执行（即使 App 在后台）
-            Self.postScheduledActionNotification(action)
 
             guard let idx = scheduledActions.firstIndex(where: { $0.id == action.id }) else { continue }
 
@@ -1533,6 +1531,9 @@ final class AppModel: ObservableObject {
                 scheduledActions.removeAll { $0.id == action.id }  // 一次性任务：触发后删除
             }
         }
+        // 智能聚合系统通知：同频同动作批次合并下发，避免多设备同时触发时弹窗与提示音刷屏 (v1.9.75)
+        postAggregatedScheduledNotifications(due)
+
         wakeScheduler()  // 顺延/删除后重新计算休眠时间
     }
 
@@ -2428,6 +2429,47 @@ final class AppModel: ObservableObject {
             trigger: nil  // 立即发送
         )
         center.add(request)
+    }
+
+    /// 智能聚合定时任务系统通知：按动作属性与动作值分组，同频多机合并单条通知，避免弹窗与提示音刷屏 (v1.9.75)
+    private func postAggregatedScheduledNotifications(_ dueActions: [ScheduledAction]) {
+        guard !dueActions.isEmpty else { return }
+        let center = UNUserNotificationCenter.current()
+        var grouped: [String: [ScheduledAction]] = [:]
+        for action in dueActions {
+            let key = "\(action.attrName):\(action.attrValue?.stringValue ?? "")"
+            grouped[key, default: []].append(action)
+        }
+
+        for (_, actions) in grouped {
+            let content = UNMutableNotificationContent()
+            content.sound = .default
+            if actions.count == 1, let action = actions.first {
+                content.title = "定时任务已执行"
+                content.body = "\(action.name)（\(action.attrDesc)）"
+                let request = UNNotificationRequest(
+                    identifier: "scheduled-\(action.id.uuidString)",
+                    content: content,
+                    trigger: nil
+                )
+                center.add(request)
+            } else {
+                let devNames = actions.compactMap { act in
+                    self.allUnifiedDevices.first(where: { $0.id == act.deviceId })?.name
+                }
+                let devList = devNames.isEmpty ? "\(actions.count) 台空调" : devNames.joined(separator: "、")
+                let sampleAction = actions[0]
+                content.title = "定时批次任务已协同执行 (\(actions.count) 台)"
+                content.body = "已对 \(devList) 执行 \(sampleAction.attrDesc)"
+                let batchId = actions.map(\.id.uuidString).joined(separator: "-")
+                let request = UNNotificationRequest(
+                    identifier: "scheduled-batch-\(batchId.prefix(64))",
+                    content: content,
+                    trigger: nil
+                )
+                center.add(request)
+            }
+        }
     }
 
     // MARK: - 温度历史曲线（v1.8）

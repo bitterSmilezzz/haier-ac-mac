@@ -2560,6 +2560,25 @@ final class VoiceCommandParserTests: XCTestCase {
 
         let exCompactDiscrete5 = VoiceCommandParser.parse("周一周三、周五和周日每天早8点开机")
         XCTAssertEqual(exCompactDiscrete5?.command, .scheduleRepeatPower(hour: 8, minute: 0, power: true, repeatWeekdays: [1, 2, 4, 6], repeatLabel: "每周日、一、三、五"))
+
+        // 10. 反向夹心（离散在先、连续居中、离散在后）与三区间多离散大一统调度 (v1.9.75)
+        let exRevSandwich1 = VoiceCommandParser.parse("周一、周三至周五以及周日每天早8点开机")
+        XCTAssertEqual(exRevSandwich1?.command, .scheduleRepeatPower(hour: 8, minute: 0, power: true, repeatWeekdays: [1, 2, 4, 5, 6], repeatLabel: "每周日、一、三、四、五"))
+
+        let exRevSandwich2 = VoiceCommandParser.parse("周日和周二至周四以及周六每天早8点开机")
+        XCTAssertEqual(exRevSandwich2?.command, .scheduleRepeatPower(hour: 8, minute: 0, power: true, repeatWeekdays: [1, 3, 4, 5, 7], repeatLabel: "每周日、二、三、四、六"))
+
+        let exRevSandwich3 = VoiceCommandParser.parse("周二和周四到周五加周日每天早8点开机")
+        XCTAssertEqual(exRevSandwich3?.command, .scheduleRepeatPower(hour: 8, minute: 0, power: true, repeatWeekdays: [1, 3, 5, 6], repeatLabel: "每周日、二、四、五"))
+
+        let exRevSandwich4 = VoiceCommandParser.parse("周一、周二和周四至周五还有周六周日每天早8点开机")
+        XCTAssertEqual(exRevSandwich4?.command, .scheduleRepeatPower(hour: 8, minute: 0, power: true, repeatWeekdays: [1, 2, 3, 5, 6, 7], repeatLabel: "周四至周二"))
+
+        let exTriRangeMulti1 = VoiceCommandParser.parse("周一至周二、周四至周五、周六至周日和周三每天早8点开机")
+        XCTAssertEqual(exTriRangeMulti1?.command, .scheduleRepeatPower(hour: 8, minute: 0, power: true, repeatWeekdays: [1, 2, 3, 4, 5, 6, 7], repeatLabel: "周一至周日"))
+
+        let exMultiTriRange1 = VoiceCommandParser.parse("周日和周一至周二、周四至周五以及周六至周日每天早8点开机")
+        XCTAssertEqual(exMultiTriRange1?.command, .scheduleRepeatPower(hour: 8, minute: 0, power: true, repeatWeekdays: [1, 2, 3, 5, 6, 7], repeatLabel: "周四至周二"))
     }
 
     // MARK: - 无效输入测试
