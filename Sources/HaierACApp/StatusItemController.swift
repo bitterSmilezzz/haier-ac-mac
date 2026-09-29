@@ -1135,6 +1135,11 @@ final class StatusItemController: NSObject {
 
         let filterParentItem = NSMenuItem(title: filterTitle, action: #selector(openFilterCare), keyEquivalent: "")
         filterParentItem.target = self
+        if allDevices.count > 1 {
+            filterParentItem.toolTip = allDevicesFilterSummaryTooltip()
+        } else if let dev = allDevices.first {
+            filterParentItem.toolTip = filterMaintenanceTooltip(for: dev.id, deviceName: dev.name)
+        }
         menu.setSubmenu(filterMenu, for: filterParentItem)
         menu.addItem(filterParentItem)
 
@@ -1195,6 +1200,7 @@ final class StatusItemController: NSObject {
             quickCountdownMenu.addItem(pItem)
         }
         let quickCountdownParent = NSMenuItem(title: "⚡️ 快捷倒计时调度...", action: nil, keyEquivalent: "")
+        quickCountdownParent.toolTip = "提供 30/45/60/120 分钟单机与全屋关机/开机预冷预热快捷倒计时"
         scheduleMenu.setSubmenu(quickCountdownMenu, for: quickCountdownParent)
         scheduleMenu.addItem(quickCountdownParent)
         scheduleMenu.addItem(.separator())
@@ -1225,6 +1231,7 @@ final class StatusItemController: NSObject {
                     keyEquivalent: ""
                 )
                 pauseAllItem.target = self
+                pauseAllItem.toolTip = "一键暂停全屋 \(enabledCount) 个已生效的计划调度任务"
                 scheduleMenu.addItem(pauseAllItem)
             }
             if pausedCount > 0 {
@@ -1234,6 +1241,7 @@ final class StatusItemController: NSObject {
                     keyEquivalent: ""
                 )
                 resumeAllItem.target = self
+                resumeAllItem.toolTip = "一键恢复全屋 \(pausedCount) 个已暂停的计划调度任务"
                 scheduleMenu.addItem(resumeAllItem)
             }
 
@@ -1243,6 +1251,7 @@ final class StatusItemController: NSObject {
                 keyEquivalent: ""
             )
             cancelAllItem.target = self
+            cancelAllItem.toolTip = "一键撤销并清空全屋所有空调的定时与倒计时任务"
             scheduleMenu.addItem(cancelAllItem)
 
             let scheduleParentTitle: String
@@ -1254,6 +1263,9 @@ final class StatusItemController: NSObject {
                 scheduleParentTitle = "⏱ 计划调度 (\(enabledCount) 生效 / \(pausedCount) 暂停)..."
             }
             let scheduleParentItem = NSMenuItem(title: scheduleParentTitle, action: nil, keyEquivalent: "")
+            let affectedDevices = Set(activeSchedules.map(\.deviceId)).compactMap { id in model.allUnifiedDevices.first(where: { $0.id == id })?.name }
+            let devSummary = affectedDevices.isEmpty ? "\(activeSchedules.count) 个任务" : affectedDevices.joined(separator: "、")
+            scheduleParentItem.toolTip = "【全屋计划调度全景】\n• 生效中任务：\(enabledCount) 个\n• 已暂停任务：\(pausedCount) 个\n• 纳管设备：\(devSummary)\n展开子菜单可查看下次执行时间、单任务管理或全屋批量协同管理"
             menu.setSubmenu(scheduleMenu, for: scheduleParentItem)
             menu.addItem(scheduleParentItem)
         } else {
@@ -1262,6 +1274,7 @@ final class StatusItemController: NSObject {
             scheduleMenu.addItem(noScheduleInfo)
 
             let scheduleParentItem = NSMenuItem(title: "⏱ 计划调度 (无生效任务)...", action: nil, keyEquivalent: "")
+            scheduleParentItem.toolTip = "当前全屋无正在生效或暂停的计划调度任务，可在快捷倒计时或语音/主界面中随时添加"
             menu.setSubmenu(scheduleMenu, for: scheduleParentItem)
             menu.addItem(scheduleParentItem)
         }
@@ -1686,6 +1699,25 @@ final class StatusItemController: NSObject {
         } else {
             return abs(a.fireDate.timeIntervalSince(b.fireDate)) <= 5.0
         }
+    }
+
+    /// 生成全屋所有空调滤网运行与健康保养状态全景悬浮感知提示 (v1.9.77)
+    private func allDevicesFilterSummaryTooltip() -> String {
+        let allDevices = model.allUnifiedDevices
+        guard !allDevices.isEmpty else { return "暂无已绑定空调设备" }
+        var lines: [String] = []
+        lines.append("【全屋空调滤网健康全景】")
+        for dev in allDevices {
+            let cleanPct = model.filterCleanlinessPercentage(for: dev.id)
+            let accMins = model.filterAccumulatedMinutes(for: dev.id)
+            let accHours = accMins / 60
+            let remHours = max(0, AppModel.filterServiceLifeMinutes - accMins) / 60
+            let isProtected = model.isSelfCleaningProtectionActive(for: dev.id)
+            let protectTag = isProtected ? " ✨[自清洁保护期]" : ""
+            lines.append("• \(dev.name)：洁净度 \(cleanPct)%，累计 \(accHours)h (建议保养剩余约 \(remHours)h)\(protectTag)")
+        }
+        lines.append("展开子菜单可进行单台或全屋一键滤网重置与深度保养")
+        return lines.joined(separator: "\n")
     }
 
     /// 生成单台空调滤网运行与健康保养悬浮感知提示 (v1.9.76)

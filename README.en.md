@@ -6,6 +6,16 @@ A native SwiftUI app to control Haier / Leader (统帅) smart air conditioners o
 
 ## Features
 
+- 🏷 **Nocturnal, Dawn & Midday Full-Phase Disambiguation & Autonomous Single-Phase Schedule Engine, Status Bar Full-Spectrum Hover Dashboard & Multi-Device Filter Health Matrix (v1.9.77)**:
+  - ⏱️ **Natural Language Nocturnal, Midnight & Midday Full-Phase Autonomous Schedule Engine (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)**:
+    - **Nocturnal & Midnight Lexicon Universal Coverage**: Systematically integrated "深宵" (deep night), "子夜" (midnight/witching hour), "通宵" (all night), and "入夜" (nightfall). Completely resolved defects where "子夜12点" and "深宵12点" lost nocturnal tense and were incorrectly preserved as 12:00 PM noon instead of 00:00 midnight;
+    - **Bi-directional Disambiguation for Deep Night vs. Post-Midnight Dawn**: Deeply integrated into `isNocturnal` checks. For hours 6~11 (e.g. "深宵10点开空调", "子夜11点关空调"), the engine correctly resolves to evening hours 22:00 / 23:00; while for hours 1~5 (e.g. "深宵1点关空调", "子夜2点开机", "通宵1点开机"), it precisely retains the post-midnight hours 01:00 / 02:00 AM without shifting to afternoon 13:00 / 14:00;
+    - **Single-Phase Word Schedule Engine**: Eliminated the legacy constraint requiring "点/时/:" characters in schedule commands. Fully supported high-frequency colloquial phrases without explicit hour words (e.g., "午夜关机", "午夜关空调", "子夜关空调", "子夜开机", "正午开机", "正午关空调", "明天午夜关机", "每周五午夜关机", "全屋子夜关空调"), adaptively mapping "午夜/子夜" to 00:00 and "正午" to 12:00, preventing dangerous misfires into instant power operations;
+    - **100% Test Coverage**: Added 16 new end-to-end unit test assertions in `VoiceCommandParserTests`, 100% PASS.
+  - 🍱 **macOS Status Bar Full-Spectrum Task Hover Dashboard & Filter Health Matrix (`StatusItemController.swift`)**:
+    - **Multi-Device & Single-Device Filter Health Hover Dashboard (`allDevicesFilterSummaryTooltip`)**: Embedded a native macOS hover dashboard onto the top-level "Filter Care & Self-Cleaning" menu item. Multi-device users can hover to instantly inspect every air conditioner's cleanliness percentage, accumulated operating hours, remaining service life, and 56°C evaporator self-cleaning antibacterial protection indicator (✨);
+    - **Schedule Matrix & Quick Countdown Hover Transparency**: Added rich hover tooltips to the top-level "⏱ Schedules" menu item, summarizing active tasks, paused tasks, and managed devices; added native tooltips to "⚡️ Quick Countdowns...", "⏸ Pause All Schedules", "▶️ Resume All Schedules", and "🗑 Cancel All Schedules".
+
 - 🏷 **Nocturnal & Dawn Natural Language Time Disambiguation, Status Bar Full-Spectrum Task Hover Perception & Multi-Device Filter Health Insights (v1.9.76)**:
   - ⏱️ **Natural Language Nocturnal, Dawn & Midnight Time Disambiguation Universal Engine (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)**:
     - **Early Morning Nocturnal Normalization (01:00 ~ 05:00)**: Completely fixed a critical logic bug where nocturnal prefixes ("夜里") were unconditionally routed to the `+12` PM adder. Colloquial commands like "夜里1点", "夜里2点", "夜里3点", "夜里4点", "夜里5点" represent early AM / dawn hours (01:00 ~ 05:00) and are now accurately preserved as AM instead of erroneously shifting to 13:00 ~ 17:00 in the afternoon;
