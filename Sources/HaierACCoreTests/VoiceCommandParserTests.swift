@@ -2245,6 +2245,46 @@ final class VoiceCommandParserTests: XCTestCase {
         XCTAssertEqual(wedMon?.command, .scheduleRepeatPower(hour: 8, minute: 0, power: true, repeatWeekdays: [1, 2, 4, 5, 6, 7], repeatLabel: "周三至周一"))
     }
 
+    func testDiscreteAndMixedRepeatWeekdays() {
+        // 1. 口语离散多星期复合解析测试 (v1.9.66)
+        let monWed = VoiceCommandParser.parse("周一和周三晚10点关机")
+        XCTAssertEqual(monWed?.command, .scheduleRepeatPower(hour: 22, minute: 0, power: false, repeatWeekdays: [2, 4], repeatLabel: "每周一、三"))
+
+        let tueThuSat = VoiceCommandParser.parse("周二、周四与周六早上8点开机")
+        XCTAssertEqual(tueThuSat?.command, .scheduleRepeatPower(hour: 8, minute: 0, power: true, repeatWeekdays: [3, 5, 7], repeatLabel: "每周二、四、六"))
+
+        let monFri = VoiceCommandParser.parse("周一及周五早晨7点开空调")
+        XCTAssertEqual(monFri?.command, .scheduleRepeatPower(hour: 7, minute: 0, power: true, repeatWeekdays: [2, 6], repeatLabel: "每周一、五"))
+
+        let tueThu = VoiceCommandParser.parse("星期二和星期四晚上11点关空调")
+        XCTAssertEqual(tueThu?.command, .scheduleRepeatPower(hour: 23, minute: 0, power: false, repeatWeekdays: [3, 5], repeatLabel: "每周二、四"))
+
+        let friWed = VoiceCommandParser.parse("礼拜一跟礼拜五早上8点开机")
+        XCTAssertEqual(friWed?.command, .scheduleRepeatPower(hour: 8, minute: 0, power: true, repeatWeekdays: [2, 6], repeatLabel: "每周一、五"))
+
+        let fengMonThu = VoiceCommandParser.parse("逢周一和周四下午2点开机")
+        XCTAssertEqual(fengMonThu?.command, .scheduleRepeatPower(hour: 14, minute: 0, power: true, repeatWeekdays: [2, 5], repeatLabel: "每周一、四"))
+
+        let monWedFriCompact = VoiceCommandParser.parse("周一三五早上7点开空调")
+        XCTAssertEqual(monWedFriCompact?.command, .scheduleRepeatPower(hour: 7, minute: 0, power: true, repeatWeekdays: [2, 4, 6], repeatLabel: "每周一、三、五"))
+
+        let tueThuCompact = VoiceCommandParser.parse("周二四晚10点关机")
+        XCTAssertEqual(tueThuCompact?.command, .scheduleRepeatPower(hour: 22, minute: 0, power: false, repeatWeekdays: [3, 5], repeatLabel: "每周二、四"))
+
+        // 2. 破折号、波浪号与阿拉伯数字复合语法测试
+        let hyphenWork = VoiceCommandParser.parse("周一-周五早上8点开机")
+        XCTAssertEqual(hyphenWork?.command, .scheduleRepeatPower(hour: 8, minute: 0, power: true, repeatWeekdays: [2, 3, 4, 5, 6], repeatLabel: "工作日"))
+
+        let tildeWork = VoiceCommandParser.parse("周一~五晚10点关机")
+        XCTAssertEqual(tildeWork?.command, .scheduleRepeatPower(hour: 22, minute: 0, power: false, repeatWeekdays: [2, 3, 4, 5, 6], repeatLabel: "工作日"))
+
+        let numWork1 = VoiceCommandParser.parse("周1到5早8点开机")
+        XCTAssertEqual(numWork1?.command, .scheduleRepeatPower(hour: 8, minute: 0, power: true, repeatWeekdays: [2, 3, 4, 5, 6], repeatLabel: "工作日"))
+
+        let numWork2 = VoiceCommandParser.parse("周1至周5晚上10点关机")
+        XCTAssertEqual(numWork2?.command, .scheduleRepeatPower(hour: 22, minute: 0, power: false, repeatWeekdays: [2, 3, 4, 5, 6], repeatLabel: "工作日"))
+    }
+
     // MARK: - 无效输入测试
 
     func testInvalidCommands() {

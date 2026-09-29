@@ -6,6 +6,19 @@ A native SwiftUI app to control Haier / Leader (统帅) smart air conditioners o
 
 ## Features
 
+- 🏷 **Universal Discrete & Continuous Recurring Schedule Engine, macOS Status Bar Countdown Symmetry & Tooltip Stutter Eradication, and Dehumidify Thermodynamic Decoupling (v1.9.66)**:
+  - ⏱️ **Universal Discrete & Mixed Weekday Repeating Schedule Parser (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)**:
+    - **Beyond Fixed Presets & Single Spans**: Breakthrough support for discrete weekday enumerations and mixed syntactic conjunctions (e.g., "和", "与", "及", "跟", "以及", commas, and whitespace);
+    - **Colloquial Disjunctive & Conjunctive Syntax**: Accurately recognizes spoken phrases such as "周一和周三晚10点关机", "周二、周四与周六早上8点开机", "周一及周五早晨7点开空调", "星期二和星期四晚上11点关空调", "礼拜一跟礼拜五早上8点开机", "逢周一和周四下午2点开机", as well as compact abbreviations like "周一三五", "周二四";
+    - **Punctuation & Numeric Support**: Full support for hyphens and tildes ("周一-周五", "周一~五") and Arabic numerals ("周1到5", "周1至周5");
+    - **Intelligent Normalized Semantic Labels**: Formats extracted sets into canonical, human-friendly labels ("工作日", "周末", "每周一、三", "每周二、四、六", etc.);
+    - **Comprehensive Test Suite**: Added `testDiscreteAndMixedRepeatWeekdays` with 12 end-to-end discrete and mixed permutation test cases with 100% pass rate.
+  - 🍱 **macOS Status Bar Countdown Symmetry & Tooltip Stutter Eradication (`StatusItemController.swift`)**:
+    - **Eradication of Duplicate Duration Stutter in Hover Tooltip**: Introduced `extractPlanActionVerb` to cleanly strip historical countdown prefixes (such as "30 分钟后", "1 小时后", "晨间过渡"), correcting awkward messages like "将在 18 分钟后30 分钟后关机" to fluent "将在 18 分钟后关机 (10:35)";
+    - **Multi-Device Matrix Cascaded Schedule Symmetry**: In multi-device cascaded submenus, injected real-time human-readable remaining time into task titles and detail items (`，剩余 X 分钟` / ` (剩余 X 分钟)`), achieving seamless symmetry across single-device, multi-device, and whole-house views.
+  - 🍃 **Dehumidify Filter Wear Thermodynamic Decoupling (`AppModel.calculateFilterWearFactor`)**:
+    - **Eliminating Double Counting of Environmental Humidity**: Under `.dehumidify` mode, surface water-film tension and particulate adhesion are already comprehensively modeled within `modeFactor`; `humidityFactor` is now locked to neutral baseline 1.00, eliminating exponential double counting and preventing exaggerated filter wear during plum rain / humid seasons.
+
 - 🏷 **Spoken Ellipsis Recurring Schedule Universal Circular Parser Engine, macOS Status Bar Real-Time Countdown & High-Precision Disambiguation, and Continuous Bilinear Thermal Filter Damping Dynamics (v1.9.65)**:
   - ⏱️ **Universal Circular Natural Language Repeating Schedule Parser with Colloquial Ellipsis Support (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)**:
     - **Overcoming Substring Limits**: Solved the long-standing limitation where omitting the second weekday prefix in spoken Chinese (e.g., "周一至五早晨7点开机", "周一到五晚10点关机", "周五至日自动开机", "周五到天开机", "周六至二关机", "周日至五开空调") resulted in `nil` or misparsed commands;

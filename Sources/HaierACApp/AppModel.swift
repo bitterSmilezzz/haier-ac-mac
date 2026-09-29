@@ -899,9 +899,15 @@ final class AppModel: ObservableObject {
             modeFactor = 1.00 // 无法识别模式时回归中性基准 1.00，消除虚标高估
         }
 
-        // 3. 室内湿度附着因子（高湿环境下颗粒物吸水膨胀并易附着在翅片与滤网网孔表面，v1.9.64 全域连续双线性阻尼插值）
+        // 3. 室内湿度附着因子（高湿环境下颗粒物吸水膨胀并易附着在翅片与滤网网孔表面，v1.9.64 全域连续双线性阻尼插值, v1.9.66 除湿工况热物理动力学解耦）
         let humidityFactor: Double
-        if let hum = indoorHumidity {
+        let isDehumidifyMode = (ACModeCode.match(from: mode) == .dehumidify)
+        if isDehumidifyMode {
+            // 除湿工况热物理动力学解耦 (v1.9.66):
+            // 在 .dehumidify 工况下，蒸发器表面冷凝水膜厚度与粉尘黏结效应已在 modeFactor 中以高精连续阻尼插值完成自洽建模；
+            // 此处 humidityFactor 保持中性基准 1.00，彻底消除对环境湿度的二次重复计算与指数级过度放大，保持全气候模型严谨自洽。
+            humidityFactor = 1.00
+        } else if let hum = indoorHumidity {
             if hum > 75.0 {
                 let progress = min(1.0, max(0.0, (hum - 75.0) / 15.0))
                 humidityFactor = 1.15 + (progress * 0.15) // 1.15 ~ 1.30 极高湿连续渐进

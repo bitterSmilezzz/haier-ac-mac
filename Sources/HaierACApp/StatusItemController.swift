@@ -150,11 +150,8 @@ final class StatusItemController: NSObject {
                 }
             }()
             let timeStr = DateFormatter.localizedString(from: nextAction.fireDate, dateStyle: .none, timeStyle: .short)
-            var cleanName = nextAction.name
-            if cleanName.hasPrefix("「\(devName)」") {
-                cleanName = String(cleanName.dropFirst("「\(devName)」".count))
-            }
-            tooltipParts.append("⏱ 最近计划: 「\(devName)」将在 \(remDesc)后\(cleanName) (\(timeStr))")
+            let actionVerb = Self.extractPlanActionVerb(from: nextAction, devName: devName)
+            tooltipParts.append("⏱ 最近计划: 「\(devName)」将在 \(remDesc)后\(actionVerb) (\(timeStr))")
         }
 
         let primaryTargetId = model.primaryDeviceId
@@ -757,12 +754,14 @@ final class StatusItemController: NSObject {
                         }
                         let repeatTag = action.repeatLabel.map { " [\($0)]" } ?? ""
                         let statusTag = action.enabled ? "" : " [已暂停]"
-                        let sItem = NSMenuItem(title: "⏱ \(cleanActionName) (\(timeStr))\(repeatTag)\(statusTag)", action: nil, keyEquivalent: "")
+                        let remainingDesc = action.enabled ? "，\(Self.formatRemainingTime(fireDate: action.fireDate))" : ""
+                        let sItem = NSMenuItem(title: "⏱ \(cleanActionName) (\(timeStr)\(remainingDesc))\(repeatTag)\(statusTag)", action: nil, keyEquivalent: "")
 
                         let singleMenu = NSMenu()
                         singleMenu.autoenablesItems = false
                         let fullTimeStr = DateFormatter.localizedString(from: action.fireDate, dateStyle: .medium, timeStyle: .medium)
-                        let timeInfo = NSMenuItem(title: "下次执行: \(fullTimeStr)", action: nil, keyEquivalent: "")
+                        let remInfo = action.enabled ? " (\(Self.formatRemainingTime(fireDate: action.fireDate)))" : ""
+                        let timeInfo = NSMenuItem(title: "下次执行: \(fullTimeStr)\(remInfo)", action: nil, keyEquivalent: "")
                         timeInfo.isEnabled = false
                         singleMenu.addItem(timeInfo)
 
@@ -1782,6 +1781,28 @@ final class StatusItemController: NSObject {
             let d = diff / 86400
             return "\(d) 天后"
         }
+    }
+
+    /// 智能提取计划调度或倒计时任务的干净动作谓词（根除如“将在 18 分钟后30 分钟后关机”的历史口语重复语病） (v1.9.66)
+    private static func extractPlanActionVerb(from action: ScheduledAction, devName: String) -> String {
+        var name = action.name
+        if name.hasPrefix("「\(devName)」") {
+            name = String(name.dropFirst("「\(devName)」".count))
+        }
+        // 清除开头的历史持续时间前缀，如 "30 分钟后"、"1 小时后"、"晨间过渡" 等
+        if let regex = try? NSRegularExpression(pattern: #"^(?:\d+\s*(?:分钟|小时|钟头)后|晨间过渡(?:关机)?)"#) {
+            let range = NSRange(name.startIndex..<name.endIndex, in: name)
+            name = regex.stringByReplacingMatches(in: name, options: [], range: range, withTemplate: "")
+        }
+        name = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        if name.isEmpty {
+            // 依据属性与值智能兜底
+            if action.attrName == "onOffStatus" {
+                return (action.attrValue == .bool(true)) ? "开机" : "关机"
+            }
+            return "执行任务"
+        }
+        return name
     }
 
     @objc private func quitApp() {
