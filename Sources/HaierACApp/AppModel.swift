@@ -663,6 +663,28 @@ final class AppModel: ObservableObject {
         operationNotice = OperationNotice(text: "🧼 \(devName) 滤网运行计时已重置，洁净度恢复 100%", isError: false)
     }
 
+    /// 批量重置指定设备的滤网保养计时 (v1.9.73)
+    @discardableResult
+    func resetFilterMaintenance(deviceIds: [String]) -> Int {
+        guard !deviceIds.isEmpty else { return 0 }
+        let primaryId = primaryDeviceId ?? ""
+        var count = 0
+        for id in deviceIds {
+            deviceFilterMinutes[id] = 0
+            deviceFilterCleanedDates[id] = Date()
+            deviceFilterAlertDates[id] = nil
+            if id == primaryId {
+                filterAccumulatedMinutes = 0
+                lastFilterCleanedDate = Date()
+            }
+            count += 1
+        }
+        let matchingNames = allUnifiedDevices.filter { deviceIds.contains($0.id) }.map { "「\($0.name)」" }.joined(separator: "、")
+        let desc = matchingNames.isEmpty ? "\(count) 台空调" : matchingNames
+        operationNotice = OperationNotice(text: "🧼 已重置 \(desc) 滤网运行计时，洁净度恢复 100%", isError: false)
+        return count
+    }
+
     /// 重置全屋所有空调滤网保养计时 (v1.9.45)
     func resetAllFilterMaintenance() {
         for dev in allUnifiedDevices {

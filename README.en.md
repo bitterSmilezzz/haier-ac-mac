@@ -6,6 +6,19 @@ A native SwiftUI app to control Haier / Leader (统帅) smart air conditioners o
 
 ## Features
 
+- 🏷 **Unified Leading-Discrete & Compound Multi-Range Schedule Engine, Status Bar Action Verb Deduplication & Multi-Device Filter Maintenance Batch Reset (v1.9.73)**:
+  - ⏱️ **Natural Language Leading-Discrete & Compound Multi-Range Schedule Universal Engine (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)**:
+    - **Leading Discrete Weekdays + Continuous Range Fusion**: Added `multiDaysWithRangeRegex` to eliminate defects where leading discrete weekdays (e.g., "Friday and Mon–Wed at 8 AM", "Sunday and Mon–Thu at 8 AM", "Friday, Sunday and Mon–Wed at 8 AM") were previously silently ignored and dropped, accurately uniting discrete weekdays with ranges into canonical recurring tags;
+    - **Dual Continuous Range with Multi-Discrete Weekdays Dual-Direction Support**: Introduced `dualRangeWithMultiDaysRegex` (dual range + multi days, e.g. "Mon–Wed, Fri–Sat and Sunday at 8 AM") and `multiDaysWithDualRangeRegex` (multi days + dual range, e.g. "Sunday and Mon–Wed, Fri–Sat at 8 AM") to realize order-independent parsing;
+    - **Discrete Multi-Weekdays & Core Keyword Bi-directional Alignment**: Added `multiDaysWithKeywordRegex` (multi days first, e.g. "Sat, Sun and Workdays") and `keywordWithMultiDaysRegex` (keyword first, e.g. "Weekend and Tue, Thu"), completing full permutation support;
+    - **100% Test Coverage**: Added 14 new end-to-end unit test assertions in `VoiceCommandParserTests`, 100% PASS.
+  - 🍱 **macOS Status Bar Action Verb Deduplication & Regex Sanitation (`StatusItemController.swift`)**:
+    - **Per-Device Schedule Submenu Action Verb Deduplication**: Refactored submenu title generation to invoke `Self.extractPlanActionVerb(from: action, devName: dev.name)`, completely stripping embedded countdowns, clock-times, and cycle prefixes/suffixes to avoid double parentheses or duplicate action clauses (e.g. eliminating "⏱ 周五至周日 08:00 开机 (08:00，剩余 2天) [周五至周日]" down to clean "⏱ 开机 (08:00，剩余 2天) [周五至周日]");
+    - **Regex Boundary Expansion**: Extended `schedulePrefixRegex` conjunction set with `[、,，和与及跟以及还有或者或加/／\s]+` and enriched `scheduleSuffixRegex` with `周` character, square brackets `[` `]`, and optional `(?:每)?` prefix.
+  - ⚡️ **Multi-Device Filter Maintenance Atomic Batch Reset API & Voice Capsule Upgrade (`AppModel.swift` / `VoiceCapsuleWindowController.swift`)**:
+    - **Atomic Batch Filter Reset API (`resetFilterMaintenance`)**: Introduced an atomic reset API in `AppModel` to zero filter operating hours across multiple or all devices in a single transaction with automatic disk persistence, UI refresh, and accurate count feedback;
+    - **Voice Capsule Multi-Device Alignment**: Integrated the new API into `VoiceCapsuleWindowController.executeMultiDeviceCommand` for seamless whole-house or multi-device filter maintenance voice commands.
+
 - 🏷 **Unified Dual-Range & Compound Weekday Schedule Engine, Status Bar High-Precision Repeat Tags & Atomic Batch Scheduler Registration (v1.9.72)**:
   - ⏱️ **Natural Language Dual-Range & Compound Weekday Schedule Universal Engine (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)**:
     - **Dual Continuous Range Seamless Parsing**: Added `rangeWithRangeRegex` to recognize dual-interval recurring expressions such as "Mon–Wed and Fri–Sun at 8 AM" or "Tue–Thu and Sat–Sun at 8 AM", merging circular ranges into clean unified sets (e.g. `[1, 2, 3, 4, 6, 7]` -> "周五至周三");

@@ -764,14 +764,11 @@ final class StatusItemController: NSObject {
                 if !devSchedules.isEmpty {
                     for action in devSchedules {
                         let timeStr = DateFormatter.localizedString(from: action.fireDate, dateStyle: .none, timeStyle: .short)
-                        var cleanActionName = action.name
-                        if cleanActionName.hasPrefix("「\(dev.name)」") {
-                            cleanActionName = String(cleanActionName.dropFirst("「\(dev.name)」".count))
-                        }
+                        let actionVerb = Self.extractPlanActionVerb(from: action, devName: dev.name)
                         let repeatTag = action.repeatLabel.map { " [\($0)]" } ?? ""
                         let statusTag = action.enabled ? "" : " [已暂停]"
                         let remainingDesc = action.enabled ? "，\(Self.formatRemainingTime(fireDate: action.fireDate))" : ""
-                        let sItem = NSMenuItem(title: "⏱ \(cleanActionName) (\(timeStr)\(remainingDesc))\(repeatTag)\(statusTag)", action: nil, keyEquivalent: "")
+                        let sItem = NSMenuItem(title: "⏱ \(actionVerb) (\(timeStr)\(remainingDesc))\(repeatTag)\(statusTag)", action: nil, keyEquivalent: "")
 
                         let singleMenu = NSMenu()
                         singleMenu.autoenablesItems = false
@@ -1897,12 +1894,12 @@ final class StatusItemController: NSObject {
     }
 
     private static let schedulePrefixRegex: NSRegularExpression? = {
-        let pattern = #"^(?:(?:定时|预约)?(?:全屋)?(?:在)?\s*)*(?:(?:明天|后天|大后天|次日|工作日|平时|周末三天|周末|双休|单休|每天|周[一二三四五六日天0-7至到\-~、\s]+|每周[一二三四五六日天0-7、\s]+)\s*)*(?:\d{1,2}:\d{2}(?::\d{2})?\s*)*(?:\d+\s*(?:分钟|小时|钟头)后|晨间过渡(?:关机)?\s*)*"#
+        let pattern = #"^(?:(?:定时|预约)?(?:全屋)?(?:在)?\s*)*(?:(?:明天|后天|大后天|次日|工作日|平时|周末三天|周末|双休|单休|每天|周[一二三四五六日天0-7周至到\-~、\s]+|每周[一二三四五六日天0-7、\s]+|[、,，和与及跟以及还有或者或加/／\s]+)\s*)*(?:\d{1,2}:\d{2}(?::\d{2})?\s*)*(?:\d+\s*(?:分钟|小时|钟头)后|晨间过渡(?:关机)?\s*)*"#
         return try? NSRegularExpression(pattern: pattern)
     }()
 
     private static let scheduleSuffixRegex: NSRegularExpression? = {
-        let pattern = #"\s*[(（](?:每天|工作日|平时|周末三天|周末|双休|单休|周[一二三四五六日天至到\-~、\s]+)[)）]\s*$"#
+        let pattern = #"\s*(?:\(|（|\[)(?:每天|工作日|平时|周末三天|周末|双休|单休|(?:每)?周[一二三四五六日天周至到\-~、\s]+)(?:\)|）|\])\s*$"#
         return try? NSRegularExpression(pattern: pattern)
     }()
 

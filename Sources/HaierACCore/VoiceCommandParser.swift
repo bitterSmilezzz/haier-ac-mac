@@ -468,6 +468,36 @@ public struct VoiceCommandParser {
         return try? NSRegularExpression(pattern: pattern)
     }()
 
+    /// 匹配离散星期在前、连续区间在后复合口语（如“周五和周一至周三”、“周日以及周一至周四”、“周五周日和周一至周三”、“周五、周六和周一至周三”、“周一和周五至周日”） (v1.9.73)
+    private static let multiDaysWithRangeRegex: NSRegularExpression? = {
+        let pattern = #"((?:(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)?([一二三四五六日天1-7])[、,，和与及跟以及还有或者或加/／\s]*)+)\s*(?:[、,，和与及跟以及还有或者或加/／\s]+)\s*(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])"#
+        return try? NSRegularExpression(pattern: pattern)
+    }()
+
+    /// 匹配双连续区间附加多个离散星期复合口语（如“周一至周三、周五至周六和周日”、“周一到周二和周四到周五以及周日”） (v1.9.73)
+    private static let dualRangeWithMultiDaysRegex: NSRegularExpression? = {
+        let pattern = #"(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])\s*(?:[、,，和与及跟以及还有或者或加/／\s]+)\s*(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])\s*(?:[、,，和与及跟以及还有或者或加/／\s]+)\s*(?!(?:每天|天天|每日|每晚|每早|每晨|每夜|日日))((?:(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)?([一二三四五六日天1-7])[、,，和与及跟以及还有或者或加/／\s]*)+)"#
+        return try? NSRegularExpression(pattern: pattern)
+    }()
+
+    /// 匹配多个离散星期在前、双连续区间在后复合口语（如“周日和周一至周三以及周五至周六”、“周日加周一至周二加周四至周五”） (v1.9.73)
+    private static let multiDaysWithDualRangeRegex: NSRegularExpression? = {
+        let pattern = #"((?:(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)?([一二三四五六日天1-7])[、,，和与及跟以及还有或者或加/／\s]*)+)\s*(?:[、,，和与及跟以及还有或者或加/／\s]+)\s*(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])\s*(?:[、,，和与及跟以及还有或者或加/／\s]+)\s*(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])"#
+        return try? NSRegularExpression(pattern: pattern)
+    }()
+
+    /// 匹配多个离散星期在前、核心关键词在后口语（如“周六周日和工作日”、“周二周四和周末”、“周五和周日加工作日”） (v1.9.73)
+    private static let multiDaysWithKeywordRegex: NSRegularExpression? = {
+        let pattern = #"((?:(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)?([一二三四五六日天1-7])[、,，和与及跟以及还有或者或加/／\s]*)+)\s*(?:[、,，和与及跟以及还有或者或加/／\s]+)\s*(工作日|平时|周末|双休|单休|周末三天)"#
+        return try? NSRegularExpression(pattern: pattern)
+    }()
+
+    /// 匹配核心关键词在前、多个离散星期在后口语（如“工作日和周六周日”、“周末和周二周四”、“周末加周三、周五”） (v1.9.73)
+    private static let keywordWithMultiDaysRegex: NSRegularExpression? = {
+        let pattern = #"(工作日|平时|周末|双休|单休|周末三天)\s*(?:[、,，和与及跟以及还有或者或加/／\s]+)\s*(?!(?:每天|天天|每日|每晚|每早|每晨|每夜|日日))((?:(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)?([一二三四五六日天1-7])[、,，和与及跟以及还有或者或加/／\s]*)+)"#
+        return try? NSRegularExpression(pattern: pattern)
+    }()
+
     /// 兼容单个离散附加星期正则 (v1.9.67, v1.9.70)
     private static let rangeWithExtraDaysRegex: NSRegularExpression? = {
         let pattern = #"(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])\s*(?:[、,，和与及跟以及还有或者或加/／\s]+)\s*(?!(?:每天|天天|每日|每晚|每早|每晨|每夜|日日))(?:(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)?([一二三四五六日天1-7]))"#
@@ -693,6 +723,56 @@ public struct VoiceCommandParser {
         let nsString = text as NSString
         let fullRange = NSRange(location: 0, length: nsString.length)
 
+        // 0.1 双连续区间附加多个离散星期（如“周一至周三、周五至周六和周日”、“周一到周二和周四到周五以及周日”） (v1.9.73)
+        if let regex = dualRangeWithMultiDaysRegex,
+           let match = regex.firstMatch(in: text, options: [], range: fullRange),
+           match.numberOfRanges >= 6 {
+            let s1 = nsString.substring(with: match.range(at: 1))
+            let e1 = nsString.substring(with: match.range(at: 2))
+            let s2 = nsString.substring(with: match.range(at: 3))
+            let e2 = nsString.substring(with: match.range(at: 4))
+            let multi = nsString.substring(with: match.range(at: 5))
+            if let s1Ch = s1.first, let s1Wd = chineseDayCharToWeekday(s1Ch),
+               let e1Ch = e1.first, let e1Wd = chineseDayCharToWeekday(e1Ch),
+               let s2Ch = s2.first, let s2Wd = chineseDayCharToWeekday(s2Ch),
+               let e2Ch = e2.first, let e2Wd = chineseDayCharToWeekday(e2Ch) {
+                var days = Set(generateWeeklyRange(start: s1Wd, end: e1Wd))
+                days.formUnion(generateWeeklyRange(start: s2Wd, end: e2Wd))
+                for ch in multi {
+                    if let wd = chineseDayCharToWeekday(ch) {
+                        days.insert(wd)
+                    }
+                }
+                let sorted = days.sorted()
+                return (sorted, formatWeekdayLabel(from: sorted))
+            }
+        }
+
+        // 0.2 多个离散星期在前、双连续区间在后（如“周日和周一至周三以及周五至周六”、“周日加周一至周二加周四至周五”） (v1.9.73)
+        if let regex = multiDaysWithDualRangeRegex,
+           let match = regex.firstMatch(in: text, options: [], range: fullRange),
+           match.numberOfRanges >= 7 {
+            let multi = nsString.substring(with: match.range(at: 1))
+            let s1 = nsString.substring(with: match.range(at: 3))
+            let e1 = nsString.substring(with: match.range(at: 4))
+            let s2 = nsString.substring(with: match.range(at: 5))
+            let e2 = nsString.substring(with: match.range(at: 6))
+            if let s1Ch = s1.first, let s1Wd = chineseDayCharToWeekday(s1Ch),
+               let e1Ch = e1.first, let e1Wd = chineseDayCharToWeekday(e1Ch),
+               let s2Ch = s2.first, let s2Wd = chineseDayCharToWeekday(s2Ch),
+               let e2Ch = e2.first, let e2Wd = chineseDayCharToWeekday(e2Ch) {
+                var days = Set(generateWeeklyRange(start: s1Wd, end: e1Wd))
+                days.formUnion(generateWeeklyRange(start: s2Wd, end: e2Wd))
+                for ch in multi {
+                    if let wd = chineseDayCharToWeekday(ch) {
+                        days.insert(wd)
+                    }
+                }
+                let sorted = days.sorted()
+                return (sorted, formatWeekdayLabel(from: sorted))
+            }
+        }
+
         // 1. 双连续区间复合语义匹配（如“周一至周三和周五至周日”、“周一到周三以及周五到天”、“周二至周四和周六至周日”）(v1.9.72)
         if let regex = rangeWithRangeRegex,
            let match = regex.firstMatch(in: text, options: [], range: fullRange),
@@ -780,6 +860,83 @@ public struct VoiceCommandParser {
                     let sorted = days.sorted()
                     return (sorted, formatWeekdayLabel(from: sorted))
                 }
+            }
+        }
+
+        // 4.1 多个离散星期在前 + 连续区间在后（如“周五和周一至周三”、“周日以及周一至周四”、“周五周日和周一至周三”、“周五、周六和周一至周三”、“周一和周五至周日”）(v1.9.73)
+        if let regex = multiDaysWithRangeRegex,
+           let match = regex.firstMatch(in: text, options: [], range: fullRange),
+           match.numberOfRanges >= 5 {
+            let multiStr = nsString.substring(with: match.range(at: 1))
+            let startStr = nsString.substring(with: match.range(at: 3))
+            let endStr = nsString.substring(with: match.range(at: 4))
+            if let sChar = startStr.first, let sWd = chineseDayCharToWeekday(sChar),
+               let eChar = endStr.first, let eWd = chineseDayCharToWeekday(eChar) {
+                var days = Set<Int>()
+                for ch in multiStr {
+                    if let wd = chineseDayCharToWeekday(ch) {
+                        days.insert(wd)
+                    }
+                }
+                days.formUnion(generateWeeklyRange(start: sWd, end: eWd))
+                if !days.isEmpty {
+                    let sorted = days.sorted()
+                    return (sorted, formatWeekdayLabel(from: sorted))
+                }
+            }
+        }
+
+        // 4.2 多个离散星期在前 + 核心关键词在后（如“周六周日和工作日”、“周二周四和周末”、“周五和周日加工作日”）(v1.9.73)
+        if let regex = multiDaysWithKeywordRegex,
+           let match = regex.firstMatch(in: text, options: [], range: fullRange),
+           match.numberOfRanges >= 4 {
+            let multiStr = nsString.substring(with: match.range(at: 1))
+            let kw = nsString.substring(with: match.range(at: 3))
+            var days = Set<Int>()
+            if kw == "工作日" || kw == "平时" {
+                days.formUnion([2, 3, 4, 5, 6])
+            } else if kw == "周末" || kw == "双休" {
+                days.formUnion([1, 7])
+            } else if kw == "单休" {
+                days.formUnion([2, 3, 4, 5, 6, 7])
+            } else if kw == "周末三天" {
+                days.formUnion([1, 6, 7])
+            }
+            for ch in multiStr {
+                if let wd = chineseDayCharToWeekday(ch) {
+                    days.insert(wd)
+                }
+            }
+            if !days.isEmpty {
+                let sorted = days.sorted()
+                return (sorted, formatWeekdayLabel(from: sorted))
+            }
+        }
+
+        // 4.3 核心关键词在前 + 多个离散星期在后（如“工作日和周六周日”、“周末和周二周四”、“周末加周三、周五”）(v1.9.73)
+        if let regex = keywordWithMultiDaysRegex,
+           let match = regex.firstMatch(in: text, options: [], range: fullRange),
+           match.numberOfRanges >= 3 {
+            let kw = nsString.substring(with: match.range(at: 1))
+            let multiStr = nsString.substring(with: match.range(at: 2))
+            var days = Set<Int>()
+            if kw == "工作日" || kw == "平时" {
+                days.formUnion([2, 3, 4, 5, 6])
+            } else if kw == "周末" || kw == "双休" {
+                days.formUnion([1, 7])
+            } else if kw == "单休" {
+                days.formUnion([2, 3, 4, 5, 6, 7])
+            } else if kw == "周末三天" {
+                days.formUnion([1, 6, 7])
+            }
+            for ch in multiStr {
+                if let wd = chineseDayCharToWeekday(ch) {
+                    days.insert(wd)
+                }
+            }
+            if !days.isEmpty {
+                let sorted = days.sorted()
+                return (sorted, formatWeekdayLabel(from: sorted))
             }
         }
 

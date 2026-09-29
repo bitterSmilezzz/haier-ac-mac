@@ -1005,9 +1005,7 @@ public final class VoiceCapsuleWindowController: NSObject, NSWindowDelegate {
             VoiceControlManager.shared.markSuccess(summaries.joined(separator: "；"))
 
         case .resetFilterMaintenance:
-            for dev in targetDevices {
-                model.resetFilterMaintenance(for: dev.id)
-            }
+            model.resetFilterMaintenance(deviceIds: ids)
             VoiceControlManager.shared.markSuccess("已重置\(prefix)滤网保养计时，洁净度恢复 100%")
 
         case .setTemperature(let temp):
