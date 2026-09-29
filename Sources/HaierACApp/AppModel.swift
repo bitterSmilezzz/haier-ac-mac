@@ -729,10 +729,18 @@ final class AppModel: ObservableObject {
         let dailyMinutes: Double
         let isHistorical: Bool
         if activeRecords.count >= 3 {
-            // 优先采用真实设备机时 totalDeviceMinutes 计算多设备日均负载，消除以墙钟时间估算的系统性偏差 (v1.9.46)
-            let avgDeviceMins = Double(activeRecords.map { $0.totalDeviceMinutes > 0 ? $0.totalDeviceMinutes : $0.totalMinutes }.reduce(0, +)) / Double(activeRecords.count)
+            // 优先采用真实设备机时 totalDeviceMinutes 计算多设备日均负载，消除以墙钟时间估算的系统性偏差 (v1.9.46, v1.9.74 新老历史数据量纲自适应平滑加权)
             let devCount = max(1, allUnifiedDevices.count)
-            dailyMinutes = max(30.0, avgDeviceMins / Double(devCount))
+            let totalDevMinsSum = activeRecords.reduce(0.0) { sum, record in
+                if record.totalDeviceMinutes > 0 {
+                    return sum + (Double(record.totalDeviceMinutes) / Double(devCount))
+                } else {
+                    // 老版本历史记录无 totalDeviceMinutes 时，墙钟 totalMinutes 为并发运行基准，不重复除以设备数
+                    return sum + Double(record.totalMinutes)
+                }
+            }
+            let avgDeviceMins = totalDevMinsSum / Double(activeRecords.count)
+            dailyMinutes = max(30.0, avgDeviceMins)
             isHistorical = true
         } else {
             dailyMinutes = 6.0 * 60.0 // 标准默认 6 小时/天

@@ -6,6 +6,18 @@ A native SwiftUI app to control Haier / Leader (统帅) smart air conditioners o
 
 ## Features
 
+- 🏷 **Unified Tri-Range & Sandwich Interval Schedule Engine, Status Bar Full-Hierarchy Synchronized Batch Control & Filter History Device-Minutes Adaptive Calibration (v1.9.74)**:
+  - ⏱️ **Natural Language Tri-Range & Sandwich Interval Compound Schedule Engine (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)**:
+    - **Tri-Continuous Range Composite Parsing (`triRangeRepeatRegex`)**: Introduced a dedicated tri-range engine to seamlessly parse complex shift patterns (e.g. "Mon–Tue, Thu–Fri and Sat–Sun at 8 AM", "Mon–Tue, Wed–Thu and Fri–Sat at 8 AM"), merging three continuous intervals into unified circular sets;
+    - **Sandwich Interval with Embedded Discrete Weekdays (`rangeWithMultiDaysAndRangeRegex`)**: Added support for Range + Discrete + Range expressions (e.g. "Mon–Wed, Fri and Sat–Sun at 8 AM", "Mon–Tue, Thu and Sat–Sun at 8 AM", "Mon–Wed plus Fri plus Sat–Sun at 8 AM"), resolving previous truncation and partial match defects;
+    - **Compact No-Delimiter Discrete Weekday Support (`discreteWeekdaysRegex`)**: Upgraded discrete weekday regex to natively support colloquial Chinese expressions without commas or spaces (e.g. "周一周三和周五周日", "周一周三周五", "周二周四周六", "周一周二和周四周五"), completely preventing leading and trailing weekday items from being silently dropped;
+    - **100% Test Coverage**: Added 10 new end-to-end test cases in `VoiceCommandParserTests`, all assertions 100% PASS.
+  - 🍱 **macOS Status Bar Full-Hierarchy Synchronized Batch Control & Unified Menu Builder (`StatusItemController.swift`)**:
+    - **Unified Single-Task Submenu Builder (`buildSingleScheduleMenu`)**: Extracted a centralized builder for task inspection and action items, eliminating over 70 lines of duplicate menu assembly code;
+    - **Multi-Device Submenu Batch Synchronized Action Alignment**: Added missing "⏸ Pause Batch (N devices)" and "❌ Cancel Batch (N devices)" actions to multi-device `devSubmenu` items, achieving 100% full-hierarchy symmetry across single-device mode, per-device submenus, and the global schedule matrix.
+  - ⚡️ **Filter Remaining Days Dimensional Adaptive Historical Calibration (`AppModel.swift`)**:
+    - **New/Legacy History Dimension-Adaptive Smoothing**: Enhanced `estimatedFilterRemainingDays` to distinguish between `totalDeviceMinutes` (device-sum minutes divided by device count) and legacy `totalMinutes` (concurrent wall-clock minutes not divided by device count), preventing legacy records from skewing daily usage downwards and inflating remaining days.
+
 - 🏷 **Unified Leading-Discrete & Compound Multi-Range Schedule Engine, Status Bar Action Verb Deduplication & Multi-Device Filter Maintenance Batch Reset (v1.9.73)**:
   - ⏱️ **Natural Language Leading-Discrete & Compound Multi-Range Schedule Universal Engine (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)**:
     - **Leading Discrete Weekdays + Continuous Range Fusion**: Added `multiDaysWithRangeRegex` to eliminate defects where leading discrete weekdays (e.g., "Friday and Mon–Wed at 8 AM", "Sunday and Mon–Thu at 8 AM", "Friday, Sunday and Mon–Wed at 8 AM") were previously silently ignored and dropped, accurately uniting discrete weekdays with ranges into canonical recurring tags;

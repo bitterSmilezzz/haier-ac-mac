@@ -770,32 +770,7 @@ final class StatusItemController: NSObject {
                         let remainingDesc = action.enabled ? "，\(Self.formatRemainingTime(fireDate: action.fireDate))" : ""
                         let sItem = NSMenuItem(title: "⏱ \(actionVerb) (\(timeStr)\(remainingDesc))\(repeatTag)\(statusTag)", action: nil, keyEquivalent: "")
 
-                        let singleMenu = NSMenu()
-                        singleMenu.autoenablesItems = false
-                        let fullTimeStr = DateFormatter.localizedString(from: action.fireDate, dateStyle: .medium, timeStyle: .medium)
-                        let remInfo = action.enabled ? " (\(Self.formatRemainingTime(fireDate: action.fireDate)))" : ""
-                        let timeInfo = NSMenuItem(title: "下次执行: \(fullTimeStr)\(remInfo)", action: nil, keyEquivalent: "")
-                        timeInfo.isEnabled = false
-                        singleMenu.addItem(timeInfo)
-
-                        if let rep = action.repeatLabel {
-                            let repInfo = NSMenuItem(title: "周期重复: \(rep)", action: nil, keyEquivalent: "")
-                            repInfo.isEnabled = false
-                            singleMenu.addItem(repInfo)
-                        }
-                        singleMenu.addItem(.separator())
-
-                        let toggleTitle = action.enabled ? "⏸ 暂停此任务" : "▶️ 恢复此任务"
-                        let toggleItem = NSMenuItem(title: toggleTitle, action: #selector(toggleSingleScheduleEnabledFromMenu(_:)), keyEquivalent: "")
-                        toggleItem.target = self
-                        toggleItem.representedObject = action.id.uuidString
-                        singleMenu.addItem(toggleItem)
-
-                        let cancelItem = NSMenuItem(title: "❌ 取消该任务", action: #selector(cancelSingleScheduleFromMenu(_:)), keyEquivalent: "")
-                        cancelItem.target = self
-                        cancelItem.representedObject = action.id.uuidString
-                        singleMenu.addItem(cancelItem)
-
+                        let singleMenu = buildSingleScheduleMenu(action: action, allSchedules: model.scheduledActions)
                         devScheduleMenu.setSubmenu(singleMenu, for: sItem)
                         devScheduleMenu.addItem(sItem)
                     }
@@ -1052,49 +1027,7 @@ final class StatusItemController: NSObject {
                     let remainingDesc = action.enabled ? "，\(Self.formatRemainingTime(fireDate: action.fireDate))" : ""
                     let sItem = NSMenuItem(title: "⏱ \(cleanActionName) (\(timeStr)\(remainingDesc))\(repeatTag)\(statusTag)", action: nil, keyEquivalent: "")
 
-                    let singleMenu = NSMenu()
-                    singleMenu.autoenablesItems = false
-                    let fullTimeStr = DateFormatter.localizedString(from: action.fireDate, dateStyle: .medium, timeStyle: .medium)
-                    let remInfo = action.enabled ? " (\(Self.formatRemainingTime(fireDate: action.fireDate)))" : ""
-                    let timeInfo = NSMenuItem(title: "下次执行: \(fullTimeStr)\(remInfo)", action: nil, keyEquivalent: "")
-                    timeInfo.isEnabled = false
-                    singleMenu.addItem(timeInfo)
-
-                    if let rep = action.repeatLabel {
-                        let repInfo = NSMenuItem(title: "周期重复: \(rep)", action: nil, keyEquivalent: "")
-                        repInfo.isEnabled = false
-                        singleMenu.addItem(repInfo)
-                    }
-                    singleMenu.addItem(.separator())
-
-                    let toggleTitle = action.enabled ? "⏸ 暂停此任务" : "▶️ 恢复此任务"
-                    let toggleItem = NSMenuItem(title: toggleTitle, action: #selector(toggleSingleScheduleEnabledFromMenu(_:)), keyEquivalent: "")
-                    toggleItem.target = self
-                    toggleItem.representedObject = action.id.uuidString
-                    singleMenu.addItem(toggleItem)
-
-                    let cancelItem = NSMenuItem(title: "❌ 取消该任务", action: #selector(cancelSingleScheduleFromMenu(_:)), keyEquivalent: "")
-                    cancelItem.target = self
-                    cancelItem.representedObject = action.id.uuidString
-                    singleMenu.addItem(cancelItem)
-
-                    // 动态检测同频批次兄弟任务并提供一键协同管理 (v1.9.69, v1.9.70 升级无序集合与自然周期同频判定)
-                    let siblingActions = model.scheduledActions.filter { StatusItemController.isSiblingSchedule($0, action) }
-                    if siblingActions.count > 1 {
-                        singleMenu.addItem(.separator())
-                        let anySiblingEnabled = siblingActions.contains(where: \.enabled)
-                        let syncToggleTitle = anySiblingEnabled ? "⏸ 同步暂停此批任务 (\(siblingActions.count) 台)" : "▶️ 同步恢复此批任务 (\(siblingActions.count) 台)"
-                        let syncToggleItem = NSMenuItem(title: syncToggleTitle, action: #selector(toggleSiblingSchedulesFromMenu(_:)), keyEquivalent: "")
-                        syncToggleItem.target = self
-                        syncToggleItem.representedObject = siblingActions.map(\.id.uuidString)
-                        singleMenu.addItem(syncToggleItem)
-
-                        let syncCancelItem = NSMenuItem(title: "❌ 同步取消此批任务 (\(siblingActions.count) 台)", action: #selector(cancelSiblingSchedulesFromMenu(_:)), keyEquivalent: "")
-                        syncCancelItem.target = self
-                        syncCancelItem.representedObject = siblingActions.map(\.id.uuidString)
-                        singleMenu.addItem(syncCancelItem)
-                    }
-
+                    let singleMenu = buildSingleScheduleMenu(action: action, allSchedules: model.scheduledActions)
                     devScheduleMenu.setSubmenu(singleMenu, for: sItem)
                     devScheduleMenu.addItem(sItem)
                 }
@@ -1260,71 +1193,7 @@ final class StatusItemController: NSObject {
                 let remainingDesc = action.enabled ? "，\(Self.formatRemainingTime(fireDate: action.fireDate))" : ""
                 let item = NSMenuItem(title: "⏱ \(devName): \(cleanActionName) (\(timeStr)\(remainingDesc))\(repeatTag)\(statusTag)", action: nil, keyEquivalent: "")
 
-                let singleTaskMenu = NSMenu()
-                singleTaskMenu.autoenablesItems = false
-
-                let devInfoItem = NSMenuItem(title: "空调设备: \(devName)", action: nil, keyEquivalent: "")
-                devInfoItem.isEnabled = false
-                singleTaskMenu.addItem(devInfoItem)
-
-                let fullTimeStr = DateFormatter.localizedString(from: action.fireDate, dateStyle: .medium, timeStyle: .medium)
-                let remInfo = action.enabled ? " (\(Self.formatRemainingTime(fireDate: action.fireDate)))" : ""
-                let timeInfoItem = NSMenuItem(title: "下次执行: \(fullTimeStr)\(remInfo)", action: nil, keyEquivalent: "")
-                timeInfoItem.isEnabled = false
-                singleTaskMenu.addItem(timeInfoItem)
-
-                if let rep = action.repeatLabel {
-                    let repeatInfoItem = NSMenuItem(title: "周期重复: \(rep)", action: nil, keyEquivalent: "")
-                    repeatInfoItem.isEnabled = false
-                    singleTaskMenu.addItem(repeatInfoItem)
-                }
-
-                singleTaskMenu.addItem(.separator())
-
-                let toggleEnabledTitle = action.enabled ? "⏸ 暂停此定时任务" : "▶️ 恢复此定时任务"
-                let toggleEnabledItem = NSMenuItem(
-                    title: toggleEnabledTitle,
-                    action: #selector(toggleSingleScheduleEnabledFromMenu(_:)),
-                    keyEquivalent: ""
-                )
-                toggleEnabledItem.target = self
-                toggleEnabledItem.representedObject = action.id.uuidString
-                singleTaskMenu.addItem(toggleEnabledItem)
-
-                let cancelSingleItem = NSMenuItem(
-                    title: "❌ 取消该定时任务",
-                    action: #selector(cancelSingleScheduleFromMenu(_:)),
-                    keyEquivalent: ""
-                )
-                cancelSingleItem.target = self
-                cancelSingleItem.representedObject = action.id.uuidString
-                singleTaskMenu.addItem(cancelSingleItem)
-
-                // 动态检测同频批次兄弟任务并提供一键协同管理 (v1.9.69, v1.9.70 升级无序集合与自然周期同频判定)
-                let siblingActions = activeSchedules.filter { StatusItemController.isSiblingSchedule($0, action) }
-                if siblingActions.count > 1 {
-                    singleTaskMenu.addItem(.separator())
-                    let anySiblingEnabled = siblingActions.contains(where: \.enabled)
-                    let syncToggleTitle = anySiblingEnabled ? "⏸ 同步暂停此批任务 (\(siblingActions.count) 台)" : "▶️ 同步恢复此批任务 (\(siblingActions.count) 台)"
-                    let syncToggleItem = NSMenuItem(
-                        title: syncToggleTitle,
-                        action: #selector(toggleSiblingSchedulesFromMenu(_:)),
-                        keyEquivalent: ""
-                    )
-                    syncToggleItem.target = self
-                    syncToggleItem.representedObject = siblingActions.map(\.id.uuidString)
-                    singleTaskMenu.addItem(syncToggleItem)
-
-                    let syncCancelItem = NSMenuItem(
-                        title: "❌ 同步取消此批任务 (\(siblingActions.count) 台)",
-                        action: #selector(cancelSiblingSchedulesFromMenu(_:)),
-                        keyEquivalent: ""
-                    )
-                    syncCancelItem.target = self
-                    syncCancelItem.representedObject = siblingActions.map(\.id.uuidString)
-                    singleTaskMenu.addItem(syncCancelItem)
-                }
-
+                let singleTaskMenu = buildSingleScheduleMenu(action: action, allSchedules: activeSchedules, showDevName: devName)
                 scheduleMenu.setSubmenu(singleTaskMenu, for: item)
                 scheduleMenu.addItem(item)
             }
@@ -1708,6 +1577,61 @@ final class StatusItemController: NSObject {
             model.operationNotice = AppModel.OperationNotice(text: "🗑 已同步取消同频批次任务（共 \(removed) 台空调）", isError: false)
             refreshTemperature()
         }
+    }
+
+    /// 构建单个计划任务的管理子菜单（设备归属、下次执行时间、周期重复标签、暂停/恢复、取消、同频兄弟任务协同） (v1.9.74 统一状态栏全层级计划调度子菜单逻辑与补全多设备子菜单同频批处理能力)
+    private func buildSingleScheduleMenu(action: ScheduledAction, allSchedules: [ScheduledAction], showDevName: String? = nil) -> NSMenu {
+        let singleMenu = NSMenu()
+        singleMenu.autoenablesItems = false
+
+        if let devName = showDevName, !devName.isEmpty {
+            let devInfoItem = NSMenuItem(title: "空调设备: \(devName)", action: nil, keyEquivalent: "")
+            devInfoItem.isEnabled = false
+            singleMenu.addItem(devInfoItem)
+        }
+
+        let fullTimeStr = DateFormatter.localizedString(from: action.fireDate, dateStyle: .medium, timeStyle: .medium)
+        let remInfo = action.enabled ? " (\(Self.formatRemainingTime(fireDate: action.fireDate)))" : ""
+        let timeInfo = NSMenuItem(title: "下次执行: \(fullTimeStr)\(remInfo)", action: nil, keyEquivalent: "")
+        timeInfo.isEnabled = false
+        singleMenu.addItem(timeInfo)
+
+        if let rep = action.repeatLabel {
+            let repInfo = NSMenuItem(title: "周期重复: \(rep)", action: nil, keyEquivalent: "")
+            repInfo.isEnabled = false
+            singleMenu.addItem(repInfo)
+        }
+        singleMenu.addItem(.separator())
+
+        let toggleTitle = action.enabled ? "⏸ 暂停此任务" : "▶️ 恢复此任务"
+        let toggleItem = NSMenuItem(title: toggleTitle, action: #selector(toggleSingleScheduleEnabledFromMenu(_:)), keyEquivalent: "")
+        toggleItem.target = self
+        toggleItem.representedObject = action.id.uuidString
+        singleMenu.addItem(toggleItem)
+
+        let cancelItem = NSMenuItem(title: "❌ 取消该任务", action: #selector(cancelSingleScheduleFromMenu(_:)), keyEquivalent: "")
+        cancelItem.target = self
+        cancelItem.representedObject = action.id.uuidString
+        singleMenu.addItem(cancelItem)
+
+        // 动态检测同频批次兄弟任务并提供一键协同管理 (v1.9.69, v1.9.70, v1.9.74 补全多设备子菜单全层级对称)
+        let siblingActions = allSchedules.filter { StatusItemController.isSiblingSchedule($0, action) }
+        if siblingActions.count > 1 {
+            singleMenu.addItem(.separator())
+            let anySiblingEnabled = siblingActions.contains(where: \.enabled)
+            let syncToggleTitle = anySiblingEnabled ? "⏸ 同步暂停此批任务 (\(siblingActions.count) 台)" : "▶️ 同步恢复此批任务 (\(siblingActions.count) 台)"
+            let syncToggleItem = NSMenuItem(title: syncToggleTitle, action: #selector(toggleSiblingSchedulesFromMenu(_:)), keyEquivalent: "")
+            syncToggleItem.target = self
+            syncToggleItem.representedObject = siblingActions.map(\.id.uuidString)
+            singleMenu.addItem(syncToggleItem)
+
+            let syncCancelItem = NSMenuItem(title: "❌ 同步取消此批任务 (\(siblingActions.count) 台)", action: #selector(cancelSiblingSchedulesFromMenu(_:)), keyEquivalent: "")
+            syncCancelItem.target = self
+            syncCancelItem.representedObject = siblingActions.map(\.id.uuidString)
+            singleMenu.addItem(syncCancelItem)
+        }
+
+        return singleMenu
     }
 
     /// 判定两个计划调度任务是否属于同一时间、同一属性、同一动作值且同一重复规则的同频协同任务 (v1.9.70 升级无序集合比对与周期跨天智能同频判定)
