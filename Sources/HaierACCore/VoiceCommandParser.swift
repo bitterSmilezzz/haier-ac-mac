@@ -1337,8 +1337,10 @@ public struct VoiceCommandParser {
         let hasColloquialEvening = (normalized.range(of: #"晚\s*\d+"#, options: .regularExpression) != nil)
         let isNightMidnight = normalized.contains("晚上") || normalized.contains("今晚") ||
                               normalized.contains("明晚") || normalized.contains("每晚") ||
-                              normalized.contains("夜里") || normalized.contains("半夜") ||
-                              normalized.contains("午夜") || normalized.contains("凌晨") ||
+                              normalized.contains("晚间") || normalized.contains("夜里") ||
+                              normalized.contains("半夜") || normalized.contains("午夜") ||
+                              normalized.contains("深夜") || normalized.contains("夜间") ||
+                              normalized.contains("夜深") || normalized.contains("凌晨") ||
                               hasColloquialEvening
         let isAfternoonPM = normalized.contains("下午") || normalized.contains("傍晚") || normalized.contains("午后")
         let isNoon = normalized.contains("中午")
@@ -1439,24 +1441,44 @@ public struct VoiceCommandParser {
             }
         }
 
-        // 5. 钟点时段与时态校准 (v1.9.48 彻底根除午夜/零点误为正午及中午11点误为深夜23点缺陷, v1.9.55 规范半夜/午夜9~11点深宵时区)
+        // 5. 钟点时段与时态校准 (v1.9.48 彻底根除午夜/零点误为正午及中午11点误为深夜23点缺陷, v1.9.55 规范半夜/午夜9~11点深宵时区, v1.9.76 闭环深宵/夜里/半夜/子夜/凌晨自然语言口语时段精准消歧)
         if finalHour == 12 {
             if isNightMidnight {
-                // “晚上12点”、“半夜12点”、“午夜12点”、“凌晨12点”均代表午夜 00:00
+                // “晚上12点”、“半夜12点”、“午夜12点”、“凌晨12点”、“深夜12点”均代表午夜 00:00
                 finalHour = 0
             }
         } else if finalHour == 0 {
             // 明确的“零点/0点/0时”，无论前缀如何，恒定为 00:xx，严禁累加 12
             finalHour = 0
         } else if finalHour > 0 && finalHour < 12 {
-            if isAfternoonPM || hasColloquialEvening || (normalized.contains("晚上") || normalized.contains("今晚") || normalized.contains("明晚") || normalized.contains("每晚") || normalized.contains("夜里") || normalized.contains("傍晚")) {
-                finalHour += 12
-            } else if (normalized.contains("半夜") || normalized.contains("午夜")) && finalHour >= 9 {
-                // 口语“半夜9/10/11点”或“午夜9/10/11点”归入深夜时段 21:00 ~ 23:00 (v1.9.55)
+            let isNocturnal = normalized.contains("夜里") || normalized.contains("半夜") ||
+                              normalized.contains("午夜") || normalized.contains("深夜") ||
+                              normalized.contains("夜间") || normalized.contains("夜深") ||
+                              normalized.contains("入夜")
+            let isEveningStandard = normalized.contains("晚上") || normalized.contains("今晚") ||
+                                    normalized.contains("明晚") || normalized.contains("每晚") ||
+                                    normalized.contains("晚间") || hasColloquialEvening
+
+            if isAfternoonPM {
+                // 下午、傍晚、午后 1~11 点 -> 13:00 ~ 23:00
                 finalHour += 12
             } else if isNoon && finalHour <= 5 {
-                // 中午 1 点、2 点等午后时段
+                // 中午 1 点、2 点等午后时段 -> 13:00 ~ 17:00
                 finalHour += 12
+            } else if isNocturnal {
+                // 深夜/半夜/午夜/夜里/夜间：
+                // 6~11 点属于傍晚/入夜/深宵时段（如“夜里7点”=19:00、“夜里8点”=20:00、“半夜10点”=22:00、“深夜11点”=23:00）累加 12
+                // 1~5 点属于后半夜/黎明子夜时段（如“夜里1点”=01:00、“半夜2点”=02:00、“深夜3点”=03:00），保持 01:00 ~ 05:00，严禁累加 12 误判为下午 (v1.9.76)
+                if finalHour >= 6 {
+                    finalHour += 12
+                }
+            } else if isEveningStandard {
+                // 晚上/今晚/明晚/每晚/晚间：
+                // 6~11 点属于标准晚间（如“晚上8点”=20:00、“晚上11点”=23:00）累加 12
+                // 1~5 点口语表达习惯（如“晚上1点睡/明晚2点关机”实际指后半夜 01:00/02:00），保持 01:00 ~ 05:00，绝非下午 13:00/14:00 (v1.9.76)
+                if finalHour >= 6 {
+                    finalHour += 12
+                }
             }
         }
 

@@ -6,6 +6,17 @@ A native SwiftUI app to control Haier / Leader (统帅) smart air conditioners o
 
 ## Features
 
+- 🏷 **Nocturnal & Dawn Natural Language Time Disambiguation, Status Bar Full-Spectrum Task Hover Perception & Multi-Device Filter Health Insights (v1.9.76)**:
+  - ⏱️ **Natural Language Nocturnal, Dawn & Midnight Time Disambiguation Universal Engine (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)**:
+    - **Early Morning Nocturnal Normalization (01:00 ~ 05:00)**: Completely fixed a critical logic bug where nocturnal prefixes ("夜里") were unconditionally routed to the `+12` PM adder. Colloquial commands like "夜里1点", "夜里2点", "夜里3点", "夜里4点", "夜里5点" represent early AM / dawn hours (01:00 ~ 05:00) and are now accurately preserved as AM instead of erroneously shifting to 13:00 ~ 17:00 in the afternoon;
+    - **Deep Night & Evening Time Alignment (19:00 ~ 23:00)**: Fully supported modifiers like "深夜", "夜间", "夜深", and "入夜". When specified with hours 6~11 (e.g. "深夜10点关机", "深夜11点关空调", "夜里10点关机"), the engine intelligently recognizes evening/night hours (22:00 / 23:00), resolving previous defects where "深夜10点" lost its nocturnal tense and fell back to 10:00 AM;
+    - **Colloquial "晚上1点/2点" Post-Midnight Correction**: Handled common Chinese colloquial expressions referring to post-midnight sleeping/turning off as "晚上1点/2点", correctly mapping them to 01:00 / 02:00 instead of 13:00 / 14:00;
+    - **100% Test Coverage**: Added 9 new end-to-end unit test assertions in `VoiceCommandParserTests` covering nocturnal and post-midnight time patterns, 100% PASS.
+  - 🍱 **macOS Status Bar Full-Spectrum Task Hover Perception & Filter Health Insights (`StatusItemController.swift`)**:
+    - **Transparent Task Tooltip Perception (`scheduleItemTooltip`)**: Embedded rich, contextual hover tooltips into all schedule menu items across the status bar hierarchy (global schedule matrix, per-device submenus, and single-device menu). Tooltips immediately identify sibling synchronized devices ("同频批次任务（共 N 台设备：客厅、主卧...）") or provide exact trigger timestamps and target devices for single tasks;
+    - **Multi-Device Filter Health & Run Time Hover Insights (`filterMaintenanceTooltip`)**: Equipped all filter reset options across the menu hierarchy with structured tooltips displaying current cleanliness percentage, accumulated operating hours/minutes, remaining recommended life, and 56°C self-cleaning antibacterial protection state;
+    - **Clear Intent Feedback for Whole-House Filter Reset**: Added explanatory tooltip to the whole-house filter reset item, explicitly confirming that all air conditioner run-timers will be zeroed to restore 100% cleanliness.
+
 - 🏷 **Unified Reverse-Sandwich & Multi-Range Schedule Engine, Status Bar Synchronized Sibling Transparency & Per-Device Filter Care Matrix (v1.9.75)**:
   - ⏱️ **Natural Language Reverse-Sandwich & Multi-Range Compound Schedule Engine (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)**:
     - **Reverse-Sandwich Composite Parsing (`multiDaysWithRangeAndMultiDaysRegex`)**: Added a dedicated reverse-sandwich regex engine for "Discrete Weekdays + Continuous Range + Discrete Weekdays" expressions (e.g., "Monday, Wed–Fri and Sunday at 8 AM", "Sunday and Tue–Thu plus Saturday at 8 AM", "Tuesday and Thu–Fri plus Sunday at 8 AM"), eliminating logic defects where trailing discrete days were previously silently dropped, accurately computing the full union set;

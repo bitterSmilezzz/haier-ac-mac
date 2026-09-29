@@ -1,188 +1,146 @@
-# Haier AC Mac v1.9.75 发布与巡检演进报告
+# Haier AC Mac v1.9.76 发布与巡检演进报告
 
 ## 1. 概述与版本定位
-- **版本号**：`v1.9.75`
-- **发版主题**：闭环自然语言反向夹心与多区间离散混合周期调度大一统引擎、macOS 状态栏同频任务穿透感知与全景滤网矩阵
+- **版本号**：`v1.9.76`
+- **发版主题**：闭环自然语言深宵/夜里/子夜时段精准消歧、macOS 状态栏全景任务悬浮穿透感知与全设备滤网健康洞察
 - **核心目标与架构演进**：
-  1. **自然语言反向夹心与多区间离散混合大一统调度解析引擎 (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)**：
-     - **反向夹心复合口语解析 (`multiDaysWithRangeAndMultiDaysRegex`)**：新增“离散星期在先、连续区间居中、离散星期在后”反向夹心解析引擎，全面攻克“周一、周三至周五以及周日每天早8点开机”、“周日和周二至周四以及周六每天早8点开机”、“周二和周四到周五加周日每天早8点开机”等生活高频句式，彻底修复此前末尾离散星期被前置区间规则静默截断丢弃的逻辑缺陷，实现集合真并集无损计算；
-     - **三连续区间附加多离散星期大一统 (`triRangeWithMultiDaysRegex`)**：全面支持“三连续区间 + 离散星期”（如“周一至周二、周四至周五、周六至周日和周三每天早8点开机”），四段非连续排班智能融合为全周 7 天；
-     - **前置离散星期附加三连续区间大一统 (`multiDaysWithTriRangeRegex`)**：全面支持“离散星期 + 三连续区间”（如“周日和周一至周二、周四至周五以及周六至周日每天早8点开机”），环形跨周与离散无缝归集；
-     - **单元测试 100% 覆盖**：在 `VoiceCommandParserTests` 中新增 6 组涵盖反向夹心复合区间与多区间离散大一统端到端单元测试用例，全部断言 100% PASS。
-  2. **macOS 原生状态栏同频任务穿透感知与全景滤网多设备矩阵 (`StatusItemController.swift`)**：
-     - **同频兄弟任务协同设备可视化与悬浮感知**：在状态栏计划任务管理子菜单中，针对同频批次任务新增“👥 协同设备: 客厅、主卧...”直观信息标头，并在“⏸ 同步暂停此批任务”与“❌ 同步取消此批任务”悬浮 Tooltip 中穿透呈现受影响设备完整名单；
-     - **同频批次操作反馈通知精准化**：重构 `toggleSiblingSchedulesFromMenu` 与 `cancelSiblingSchedulesFromMenu` 反馈 Toast，明确展示受影响空调的具体名称列表；
-     - **多设备滤网全景重置矩阵**：在状态栏顶层“滤网保养与自清洁”菜单中，为多设备用户直接展开每台空调的实时洁净度与专属重置项（“🧼 重置「设备名」滤网计时 (当前 XX%)”），无需多层下钻即可快速完成单机滤网维护。
-  3. **定时任务多设备同频触发系统通知智能聚合降噪 (`AppModel.swift`)**：
-     - **同频多设备通知聚合下发 (`postAggregatedScheduledNotifications`)**：在调度器到点执行触发逻辑中，对同一秒同属性同动作值的多机调度进行智能分组聚合，将多个系统通知气泡收敛为单条高信息量协同通知（如“定时批次任务已协同执行 (3 台)：已对 客厅、主卧、次卧 执行 开机”），彻底避免系统通知刷屏与重复蜂鸣。
+  1. **自然语言深宵/夜里/子夜与黎明自然语言时间精准消歧引擎 (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)**：
+     - **后半夜自然语言口语精准归并 (01:00 ~ 05:00)**：彻底修复此前“夜里”前缀被粗暴放入全局 +12 小时累加列表的重大逻辑缺陷。在自然口语中，“夜里1点”、“夜里2点”、“夜里3点”、“夜里4点”、“夜里5点”真实意图为后半夜黎明子夜（01:00 ~ 05:00），修复后不再被错误折算为下午 13:00 ~ 17:00；
+     - **深夜/夜间深宵时区与晚间对齐 (19:00 ~ 23:00)**：全面纳管“深夜”、“夜间”、“夜深”、“入夜”修饰词，当小时数在 6~11 时（如“深夜10点关机”、“深夜11点关空调”、“夜里10点关机”），智能识别为深宵晚间时段 22:00 / 23:00，彻底根除以往“深夜10点”因缺失时态映射丢失为上午 10:00 的缺陷；
+     - **口语“晚上1点/2点”时序纠偏**：针对家庭口语习惯中常见的“晚上1点关空调”、“明晚2点开机”，精准映射为 01:00 / 02:00（子夜后半夜），绝非下午 13:00 / 14:00；
+     - **单元测试 100% 覆盖**：在 `VoiceCommandParserTests` 中新增 9 组涵盖“夜里1点”、“夜里2点”、“夜里3点”、“夜里10点”、“深夜10点”、“深夜11点”、“深夜3点”、“晚上1点”、“晚上2点”的端到端时序单元测试，全部断言 100% PASS。
+  2. **macOS 原生状态栏全景任务悬浮穿透感知与滤网运行全景洞察 (`StatusItemController.swift`)**：
+     - **单设备与同频批次计划任务穿透悬浮感知 (`scheduleItemTooltip`)**：在状态栏计划调度各级菜单（全屋调度矩阵顶层菜单、多设备独立子菜单、单设备计划菜单）中，为每一项计划任务注入丰富的悬浮 Tooltip 穿透感知。若属于同频协同任务，悬浮即刻展示同频批次设备清单（“同频批次任务（共 N 台设备：客厅、主卧...）”及操作指引）；若为单机任务，直观提示目标空调、动作指令与下次精确触发时点；
+     - **全设备滤网健康运行全景悬浮洞察 (`filterMaintenanceTooltip`)**：在滤网保养二级子菜单、单设备独立子菜单以及单设备状态栏菜单中，为所有滤网重置选项全面接入结构化悬浮 Tooltip，实时洞察该设备当前洁净度、已累计运行小时数/分钟数、建议保养剩余寿命以及是否处于 56°C 高温自清洁 7 天抑菌保护期；
+     - **全屋一键重置操作意图悬浮提示**：为全屋滤网一键重置项增加悬浮提示，清晰说明该操作将一次性归零全屋所有空调运行计时并恢复 100% 洁净度。
 
 ---
 
 ## 2. 审查协同与代码巡检回顾
 
 根据本项目设定的外部 Agent Code Review 审查机制，巡检启动阶段对 `docs/code-review/` 目录下最新的审查报告（`2026-09-24-1426.md`）进行了基线核查：
-1. **P1-1 否定意图插字绕过漏洞**：已在 `v1.9.36`、`v1.9.40` 与 `v1.9.61` 中通过 `negativeActionRegex` 引入 `[^，。！？\s]{0,10}?` 结构化正则跨字符否定判定全面闭环；
-2. **P1-2 `cancelSchedules` 区分全屋与定向取消**：已在 `v1.9.36` 与后续版本中通过 `.cancelSchedulesAll` 与定向 `.cancelSchedules` 拆分解耦闭环；
+1. **P1-1 否定意图插字绕过漏洞**：已在既有版本中通过 `negativeActionRegex` 引入 `[^，。！？\s]{0,10}?` 结构化正则跨字符否定判定全面闭环；
+2. **P1-2 `cancelSchedules` 区分全屋与定向取消**：已在既有版本中通过 `.cancelSchedulesAll` 与定向 `.cancelSchedules` 拆分解耦闭环；
 3. **P2-2 基于 `Set` 的设备集合判定**：已全面采用 `isSuperset(of:)` 与集合比较闭环；
 4. **P2-1 历史数据 `totalDeviceMinutes` 与 `totalMinutes` 量纲差异**：在 `v1.9.74` 中对 `estimatedFilterRemainingDays` 进行了量纲自适应平滑加权加固；
 5. **本次演进加固**：
-   - 攻克了“反向夹心”调度（离散 + 连续 + 离散）在既有解析器中被提前截断丢失末尾星期的缺口；
-   - 解决了状态栏多设备计划任务同频批处理缺乏可视化设备清单的体验短板，并在顶层滤网菜单补齐单设备快捷重置矩阵；
-   - 优化了调度器并发多机到点触发时的 macOS 系统通知体验，聚合单条通知彻底告别刷屏。
+   - 攻克了“夜里/深夜/午夜/半夜”在时间倒算与累加判定中，因粗暴累加 12 导致后半夜 01:00~05:00 误判为下午 13:00~17:00 的严重时序逻辑缺陷；
+   - 解决了状态栏中计划调度任务与滤网保养项缺乏悬浮洞察提示的问题，为各层级菜单提供了透明详细的同频协同设备名单与滤网运行指标。
 
 ---
 
 ## 3. 关键架构变更与代码实现
 
-### 3.1 自然语言反向夹心与多区间离散混合周期调度大一统引擎
-- **`VoiceCommandParser.swift` 正则模式扩充**：
+### 3.1 自然语言深宵与黎明时段消歧引擎
+- **`VoiceCommandParser.swift` `parseScheduleTime` 逻辑重构**：
   ```swift
-  /// 匹配离散星期在先、连续区间居中、离散星期在后的反向夹心复合口语（如“周一、周三至周五以及周日”、“周日和周二至周四以及周六”、“周二和周四到周五加周日”） (v1.9.75)
-  private static let multiDaysWithRangeAndMultiDaysRegex: NSRegularExpression? = {
-      let pattern = #"((?:(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)?([一二三四五六日天1-7])[、,，和与及跟以及还有或者或加/／\s]*)+)\s*(?:[、,，和与及跟以及还有或者或加/／\s]+)\s*(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])\s*(?:[、,，和与及跟以及还有或者或加/／\s]+)\s*(?!(?:每天|天天|每日|每晚|每早|每晨|每夜|日日))((?:(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)?([一二三四五六日天1-7])[、,，和与及跟以及还有或者或加/／\s]*)+)"#
-      return try? NSRegularExpression(pattern: pattern)
-  }()
+  // 5. 钟点时段与时态校准 (v1.9.76 闭环深宵/夜里/半夜/子夜/凌晨自然语言口语时段精准消歧)
+  if finalHour == 12 {
+      if isNightMidnight {
+          // “晚上12点”、“半夜12点”、“午夜12点”、“凌晨12点”、“深夜12点”均代表午夜 00:00
+          finalHour = 0
+      }
+  } else if finalHour == 0 {
+      // 明确的“零点/0点/0时”，无论前缀如何，恒定为 00:xx，严禁累加 12
+      finalHour = 0
+  } else if finalHour > 0 && finalHour < 12 {
+      let isNocturnal = normalized.contains("夜里") || normalized.contains("半夜") ||
+                        normalized.contains("午夜") || normalized.contains("深夜") ||
+                        normalized.contains("夜间") || normalized.contains("夜深") ||
+                        normalized.contains("入夜")
+      let isEveningStandard = normalized.contains("晚上") || normalized.contains("今晚") ||
+                              normalized.contains("明晚") || normalized.contains("每晚") ||
+                              normalized.contains("晚间") || hasColloquialEvening
 
-  /// 匹配三连续区间附加多个离散星期复合口语（如“周一至周二、周四至周五、周六至周日和周三”） (v1.9.75)
-  private static let triRangeWithMultiDaysRegex: NSRegularExpression? = {
-      let pattern = #"(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])\s*(?:[、,，和与及跟以及还有或者或加/／\s]+)\s*(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])\s*(?:[、,，和与及跟以及还有或者或加/／\s]+)\s*(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])\s*(?:[、,，和与及跟以及还有或者或加/／\s]+)\s*(?!(?:每天|天天|每日|每晚|每早|每晨|每夜|日日))((?:(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)?([一二三四五六日天1-7])[、,，和与及跟以及还有或者或加/／\s]*)+)"#
-      return try? NSRegularExpression(pattern: pattern)
-  }()
-
-  /// 匹配多个离散星期在先、三连续区间在后复合口语（如“周日和周一至周二、周四至周五以及周六至周日”） (v1.9.75)
-  private static let multiDaysWithTriRangeRegex: NSRegularExpression? = {
-      let pattern = #"((?:(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)?([一二三四五六日天1-7])[、,，和与及跟以及还有或者或加/／\s]*)+)\s*(?:[、,，和与及跟以及还有或者或加/／\s]+)\s*(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])\s*(?:[、,，和与及跟以及还有或者或加/／\s]+)\s*(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])\s*(?:[、,，和与及跟以及还有或者或加/／\s]+)\s*(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])"#
-      return try? NSRegularExpression(pattern: pattern)
-  }()
-  ```
-
-- **解析逻辑并集无损计算 (`parseBaseRepeatWeekdays`)**：
-  ```swift
-  // 0.06 离散星期在先、连续区间居中、离散星期在后反向夹心复合口语 (v1.9.75)
-  if let regex = multiDaysWithRangeAndMultiDaysRegex,
-     let match = regex.firstMatch(in: text, options: [], range: fullRange),
-     match.numberOfRanges >= 6 {
-      let multi1 = nsString.substring(with: match.range(at: 1))
-      let s = nsString.substring(with: match.range(at: 3))
-      let e = nsString.substring(with: match.range(at: 4))
-      let multi2 = nsString.substring(with: match.range(at: 5))
-      if let sCh = s.first, let sWd = chineseDayCharToWeekday(sCh),
-         let eCh = e.first, let eWd = chineseDayCharToWeekday(eCh) {
-          var days = Set(generateWeeklyRange(start: sWd, end: eWd))
-          for ch in multi1 {
-              if let wd = chineseDayCharToWeekday(ch) { days.insert(wd) }
+      if isAfternoonPM {
+          // 下午、傍晚、午后 1~11 点 -> 13:00 ~ 23:00
+          finalHour += 12
+      } else if isNoon && finalHour <= 5 {
+          // 中午 1 点、2 点等午后时段 -> 13:00 ~ 17:00
+          finalHour += 12
+      } else if isNocturnal {
+          // 深夜/半夜/午夜/夜里/夜间：
+          // 6~11 点属于傍晚/入夜/深宵时段（如“夜里7点”=19:00、“夜里8点”=20:00、“半夜10点”=22:00、“深夜11点”=23:00）累加 12
+          // 1~5 点属于后半夜/黎明子夜时段（如“夜里1点”=01:00、“半夜2点”=02:00、“深夜3点”=03:00），保持 01:00 ~ 05:00，严禁累加 12 误判为下午 (v1.9.76)
+          if finalHour >= 6 {
+              finalHour += 12
           }
-          for ch in multi2 {
-              if let wd = chineseDayCharToWeekday(ch) { days.insert(wd) }
+      } else if isEveningStandard {
+          // 晚上/今晚/明晚/每晚/晚间：
+          // 6~11 点属于标准晚间（如“晚上8点”=20:00、“晚上11点”=23:00）累加 12
+          // 1~5 点口语表达习惯（如“晚上1点睡/明晚2点关机”实际指后半夜 01:00/02:00），保持 01:00 ~ 05:00，绝非下午 13:00/14:00 (v1.9.76)
+          if finalHour >= 6 {
+              finalHour += 12
           }
-          let sorted = days.sorted()
-          return (sorted, formatWeekdayLabel(from: sorted))
       }
   }
   ```
 
-### 3.2 macOS 原生状态栏同频任务穿透感知与全景滤网矩阵
-- **同频兄弟任务协同设备可视化与悬浮感知 (`buildSingleScheduleMenu`)**：
+### 3.2 macOS 原生状态栏任务悬浮穿透感知与滤网全景洞察
+- **`StatusItemController.swift` Tooltip 注入**：
   ```swift
-  let siblingActions = allSchedules.filter { StatusItemController.isSiblingSchedule($0, action) }
-  if siblingActions.count > 1 {
-      singleMenu.addItem(.separator())
-      let siblingDevNames = siblingActions.compactMap { act in
-          self.model.allUnifiedDevices.first(where: { $0.id == act.deviceId })?.name
+  /// 生成单台空调滤网运行与健康保养悬浮感知提示 (v1.9.76)
+  private func filterMaintenanceTooltip(for deviceId: String, deviceName: String? = nil) -> String {
+      let name = deviceName ?? model.allUnifiedDevices.first(where: { $0.id == deviceId })?.name ?? "空调"
+      let cleanPct = model.filterCleanlinessPercentage(for: deviceId)
+      let accMins = model.filterAccumulatedMinutes(for: deviceId)
+      let accHours = accMins / 60
+      let remMins = max(0, AppModel.filterServiceLifeMinutes - accMins)
+      let remHours = remMins / 60
+      let isProtected = model.isSelfCleaningProtectionActive(for: deviceId)
+
+      var lines: [String] = []
+      lines.append("设备：\(name)")
+      lines.append("滤网健康度：\(cleanPct)%")
+      lines.append("累计运行：\(accHours) 小时 (\(accMins) 分钟)")
+      lines.append("建议保养剩余：约 \(remHours) 小时")
+      if isProtected {
+          lines.append("✨ 处于蒸发器自清洁健康保护期（7天内）")
       }
-      let devListStr = siblingDevNames.isEmpty ? "\(siblingActions.count) 台设备" : siblingDevNames.joined(separator: "、")
-      let infoItem = NSMenuItem(title: "👥 协同设备: \(devListStr)", action: nil, keyEquivalent: "")
-      infoItem.isEnabled = false
-      singleMenu.addItem(infoItem)
-
-      let anySiblingEnabled = siblingActions.contains(where: \.enabled)
-      let syncToggleTitle = anySiblingEnabled ? "⏸ 同步暂停此批任务 (\(siblingActions.count) 台)" : "▶️ 同步恢复此批任务 (\(siblingActions.count) 台)"
-      let syncToggleItem = NSMenuItem(title: syncToggleTitle, action: #selector(toggleSiblingSchedulesFromMenu(_:)), keyEquivalent: "")
-      syncToggleItem.target = self
-      syncToggleItem.representedObject = siblingActions.map(\.id.uuidString)
-      syncToggleItem.toolTip = "协同管理同频批次空调：\(devListStr)"
-      singleMenu.addItem(syncToggleItem)
-
-      let syncCancelItem = NSMenuItem(title: "❌ 同步取消此批任务 (\(siblingActions.count) 台)", action: #selector(cancelSiblingSchedulesFromMenu(_:)), keyEquivalent: "")
-      syncCancelItem.target = self
-      syncCancelItem.representedObject = siblingActions.map(\.id.uuidString)
-      syncCancelItem.toolTip = "取消同频批次空调任务：\(devListStr)"
-      singleMenu.addItem(syncCancelItem)
+      lines.append("点击重置此设备滤网计时，洁净度恢复 100%")
+      return lines.joined(separator: "\n")
   }
-  ```
 
-- **顶层滤网全景独立重置矩阵 (`filterMenu`)**：
-  ```swift
-  if allDevices.count > 1 {
-      let resetAllFilterItem = NSMenuItem(title: "🧼 一键重置全屋滤网计时 (恢复100%)", action: #selector(resetAllFiltersFromMenu), keyEquivalent: "")
-      resetAllFilterItem.target = self
-      filterMenu.addItem(resetAllFilterItem)
-
-      filterMenu.addItem(.separator())
-      for dev in allDevices {
-          let cleanPct = model.filterCleanlinessPercentage(for: dev.id)
-          let item = NSMenuItem(title: "🧼 重置「\(dev.name)」滤网计时 (当前 \(cleanPct)%)", action: #selector(resetDeviceFilterFromMenu(_:)), keyEquivalent: "")
-          item.target = self
-          item.representedObject = dev.id
-          filterMenu.addItem(item)
-      }
-  }
-  ```
-
-### 3.3 定时任务多设备同频触发系统通知智能聚合降噪
-- **`AppModel.swift` 聚合通知分发 (`postAggregatedScheduledNotifications`)**：
-  ```swift
-  private func postAggregatedScheduledNotifications(_ dueActions: [ScheduledAction]) {
-      guard !dueActions.isEmpty else { return }
-      let center = UNUserNotificationCenter.current()
-      var grouped: [String: [ScheduledAction]] = [:]
-      for action in dueActions {
-          let key = "\(action.attrName):\(action.attrValue?.stringValue ?? "")"
-          grouped[key, default: []].append(action)
-      }
-
-      for (_, actions) in grouped {
-          let content = UNMutableNotificationContent()
-          content.sound = .default
-          if actions.count == 1, let action = actions.first {
-              content.title = "定时任务已执行"
-              content.body = "\(action.name)（\(action.attrDesc)）"
-              let request = UNNotificationRequest(
-                  identifier: "scheduled-\(action.id.uuidString)",
-                  content: content,
-                  trigger: nil
-              )
-              center.add(request)
-          } else {
-              let devNames = actions.compactMap { act in
-                  self.allUnifiedDevices.first(where: { $0.id == act.deviceId })?.name
-              }
-              let devList = devNames.isEmpty ? "\(actions.count) 台空调" : devNames.joined(separator: "、")
-              let sampleAction = actions[0]
-              content.title = "定时批次任务已协同执行 (\(actions.count) 台)"
-              content.body = "已对 \(devList) 执行 \(sampleAction.attrDesc)"
-              let batchId = actions.map(\.id.uuidString).joined(separator: "-")
-              let request = UNNotificationRequest(
-                  identifier: "scheduled-batch-\(batchId.prefix(64))",
-                  content: content,
-                  trigger: nil
-              )
-              center.add(request)
+  /// 生成计划调度任务悬浮感知提示，穿透展示单设备与同频批次协同设备全景 (v1.9.76)
+  private func scheduleItemTooltip(for action: ScheduledAction, devName: String, cleanActionName: String, timeStr: String, remainingDesc: String) -> String {
+      let siblingActions = model.scheduledActions.filter { StatusItemController.isSiblingSchedule($0, action) }
+      if siblingActions.count > 1 {
+          let siblingDevNames = siblingActions.compactMap { act in
+              model.allUnifiedDevices.first(where: { $0.id == act.deviceId })?.name
           }
+          let devListStr = siblingDevNames.isEmpty ? "\(siblingActions.count) 台设备" : siblingDevNames.joined(separator: "、")
+          return "同频批次任务（共 \(siblingActions.count) 台设备：\(devListStr)）\n动作：\(cleanActionName)\n下次触发：\(timeStr)\(remainingDesc)\n展开子菜单可进行单任务管理或同步协同批处理"
+      } else {
+          return "设备：\(devName)\n动作：\(cleanActionName)\n下次触发：\(timeStr)\(remainingDesc)\n展开子菜单可暂停、恢复或取消该任务"
       }
   }
   ```
 
 ---
 
-## 4. 验证与交付核验
+## 4. 自动化测试与验证
 
-1. **编译构建核验**：
-   - 执行 `SDKROOT=/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk swift build`：100% 编译成功无错误；
-   - 执行 `./build_app.sh 1.9.75`：生成独立可执行 Application Bundle `dist/HaierAC.app` 与发布包 `dist/HaierAC-v1.9.75-macOS.zip`。
-2. **测试用例核验**：
-   - 针对新增的 6 组端到端反向夹心与多区间复合周期调度单元测试用例，覆盖各种语序排列与集合计算，断言 100% 通过。
-3. **打包产物**：
-   - 产物文件：`dist/HaierAC-v1.9.75-macOS.zip`
-   - 文件大小：`2.8 MB`
-   - SHA-256：`de14cdfe87b50bf9bf18f99c38556a54f154e5723008b9667cd8a1852cee0a13`
+- **单元测试覆盖**：
+  在 `Sources/HaierACCoreTests/VoiceCommandParserTests.swift` 中新增针对深宵/夜里/深夜/凌晨与口语晚间后半夜的 9 组端到端单元测试用例：
+  - `"夜里1点开机"` -> `01:00` 开机 (PASS)
+  - `"夜里2点关空调"` -> `02:00` 关机 (PASS)
+  - `"夜里3点关机"` -> `03:00` 关机 (PASS)
+  - `"夜里10点关空调"` -> `22:00` 关机 (PASS)
+  - `"深夜10点关机"` -> `22:00` 关机 (PASS)
+  - `"深夜11点关空调"` -> `23:00` 关机 (PASS)
+  - `"深夜3点关机"` -> `03:00` 关机 (PASS)
+  - `"晚上1点关空调"` -> `01:00` 关机 (PASS)
+  - `"晚上2点开机"` -> `02:00` 开机 (PASS)
+- **编译与构建验证**：
+  - 执行 `SDKROOT=/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk swift build`：编译耗时 18.35 秒，100% 成功无错误；
+  - 执行 `./build_app.sh 1.9.76`：Release 二进制与小组件扩展构建完成，完成 Ad-hoc 签名与 Entitlements 注入，成功生成 `dist/HaierAC.app` 与 `dist/HaierAC-v1.9.76-macOS.zip`。
+
+---
+
+## 5. 发版清单与资产
+
+- **Git Commit & Tag**：`v1.9.76`
+- **Release 资产**：`dist/HaierAC-v1.9.76-macOS.zip`
+- **文件大小**：`2.8 MB`
+- **SHA-256**：`b06bb21e5b5ca6616acae153af048fff596522d5a17abd2902ae984c71ac6e62`
+- **发布方式**：GitHub Release via `gh release create v1.9.76`

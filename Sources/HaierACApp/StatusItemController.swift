@@ -720,7 +720,7 @@ final class StatusItemController: NSObject {
                 devSubmenu.setSubmenu(devWindMenu, for: devWindParentItem)
                 devSubmenu.addItem(devWindParentItem)
 
-                // 滤网洁净度与快速重置 (v1.9.45)
+                // 滤网洁净度与快速重置 (v1.9.45, v1.9.76 增加全景悬浮感知提示)
                 let filterPct = model.filterCleanlinessPercentage(for: devId)
                 let filterStatus = filterPct <= 20 ? "⚠️ 需拆洗" : "良好"
                 let resetFilterItem = NSMenuItem(
@@ -730,6 +730,7 @@ final class StatusItemController: NSObject {
                 )
                 resetFilterItem.target = self
                 resetFilterItem.representedObject = devId
+                resetFilterItem.toolTip = filterMaintenanceTooltip(for: devId, deviceName: dev.name)
                 devSubmenu.addItem(resetFilterItem)
 
                 // 单设备快捷倒计时调度 (v1.9.57)
@@ -769,6 +770,7 @@ final class StatusItemController: NSObject {
                         let statusTag = action.enabled ? "" : " [已暂停]"
                         let remainingDesc = action.enabled ? "，\(Self.formatRemainingTime(fireDate: action.fireDate))" : ""
                         let sItem = NSMenuItem(title: "⏱ \(actionVerb) (\(timeStr)\(remainingDesc))\(repeatTag)\(statusTag)", action: nil, keyEquivalent: "")
+                        sItem.toolTip = scheduleItemTooltip(for: action, devName: dev.name, cleanActionName: actionVerb, timeStr: timeStr, remainingDesc: remainingDesc)
 
                         let singleMenu = buildSingleScheduleMenu(action: action, allSchedules: model.scheduledActions)
                         devScheduleMenu.setSubmenu(singleMenu, for: sItem)
@@ -977,7 +979,7 @@ final class StatusItemController: NSObject {
             menu.setSubmenu(singleWindMenu, for: singleWindItem)
             menu.addItem(singleWindItem)
 
-            // 滤网洁净度与快速重置 (v1.9.63 单设备与多设备矩阵全景对称)
+            // 滤网洁净度与快速重置 (v1.9.63 单设备与多设备矩阵全景对称, v1.9.76 增加全景悬浮感知提示)
             let filterPct = model.filterCleanlinessPercentage(for: dev.id)
             let filterStatus = filterPct <= 20 ? "⚠️ 需拆洗" : "良好"
             let singleResetFilterItem = NSMenuItem(
@@ -987,6 +989,7 @@ final class StatusItemController: NSObject {
             )
             singleResetFilterItem.target = self
             singleResetFilterItem.representedObject = dev.id
+            singleResetFilterItem.toolTip = filterMaintenanceTooltip(for: dev.id, deviceName: dev.name)
             menu.addItem(singleResetFilterItem)
 
             // 单设备快捷倒计时调度 (v1.9.62 单设备与多设备矩阵全景对称)
@@ -1026,6 +1029,7 @@ final class StatusItemController: NSObject {
                     let statusTag = action.enabled ? "" : " [已暂停]"
                     let remainingDesc = action.enabled ? "，\(Self.formatRemainingTime(fireDate: action.fireDate))" : ""
                     let sItem = NSMenuItem(title: "⏱ \(cleanActionName) (\(timeStr)\(remainingDesc))\(repeatTag)\(statusTag)", action: nil, keyEquivalent: "")
+                    sItem.toolTip = scheduleItemTooltip(for: action, devName: dev.name, cleanActionName: cleanActionName, timeStr: timeStr, remainingDesc: remainingDesc)
 
                     let singleMenu = buildSingleScheduleMenu(action: action, allSchedules: model.scheduledActions)
                     devScheduleMenu.setSubmenu(singleMenu, for: sItem)
@@ -1110,6 +1114,7 @@ final class StatusItemController: NSObject {
         if allDevices.count > 1 {
             let resetAllFilterItem = NSMenuItem(title: "🧼 一键重置全屋滤网计时 (恢复100%)", action: #selector(resetAllFiltersFromMenu), keyEquivalent: "")
             resetAllFilterItem.target = self
+            resetAllFilterItem.toolTip = "一键将全屋 \(allDevices.count) 台空调的滤网累计机时归零并恢复 100% 洁净度"
             filterMenu.addItem(resetAllFilterItem)
 
             filterMenu.addItem(.separator())
@@ -1118,11 +1123,13 @@ final class StatusItemController: NSObject {
                 let item = NSMenuItem(title: "🧼 重置「\(dev.name)」滤网计时 (当前 \(cleanPct)%)", action: #selector(resetDeviceFilterFromMenu(_:)), keyEquivalent: "")
                 item.target = self
                 item.representedObject = dev.id
+                item.toolTip = filterMaintenanceTooltip(for: dev.id, deviceName: dev.name)
                 filterMenu.addItem(item)
             }
         } else if let dev = allDevices.first {
             let resetItem = NSMenuItem(title: "🧼 重置「\(dev.name)」滤网计时 (恢复100%)", action: #selector(resetPrimaryFilterFromMenu), keyEquivalent: "")
             resetItem.target = self
+            resetItem.toolTip = filterMaintenanceTooltip(for: dev.id, deviceName: dev.name)
             filterMenu.addItem(resetItem)
         }
 
@@ -1201,6 +1208,7 @@ final class StatusItemController: NSObject {
                 let statusTag = action.enabled ? "" : " [已暂停]"
                 let remainingDesc = action.enabled ? "，\(Self.formatRemainingTime(fireDate: action.fireDate))" : ""
                 let item = NSMenuItem(title: "⏱ \(devName): \(cleanActionName) (\(timeStr)\(remainingDesc))\(repeatTag)\(statusTag)", action: nil, keyEquivalent: "")
+                item.toolTip = scheduleItemTooltip(for: action, devName: devName, cleanActionName: cleanActionName, timeStr: timeStr, remainingDesc: remainingDesc)
 
                 let singleTaskMenu = buildSingleScheduleMenu(action: action, allSchedules: activeSchedules, showDevName: devName)
                 scheduleMenu.setSubmenu(singleTaskMenu, for: item)
@@ -1677,6 +1685,42 @@ final class StatusItemController: NSObject {
             return hourA == hourB && minA == minB
         } else {
             return abs(a.fireDate.timeIntervalSince(b.fireDate)) <= 5.0
+        }
+    }
+
+    /// 生成单台空调滤网运行与健康保养悬浮感知提示 (v1.9.76)
+    private func filterMaintenanceTooltip(for deviceId: String, deviceName: String? = nil) -> String {
+        let name = deviceName ?? model.allUnifiedDevices.first(where: { $0.id == deviceId })?.name ?? "空调"
+        let cleanPct = model.filterCleanlinessPercentage(for: deviceId)
+        let accMins = model.filterAccumulatedMinutes(for: deviceId)
+        let accHours = accMins / 60
+        let remMins = max(0, AppModel.filterServiceLifeMinutes - accMins)
+        let remHours = remMins / 60
+        let isProtected = model.isSelfCleaningProtectionActive(for: deviceId)
+
+        var lines: [String] = []
+        lines.append("设备：\(name)")
+        lines.append("滤网健康度：\(cleanPct)%")
+        lines.append("累计运行：\(accHours) 小时 (\(accMins) 分钟)")
+        lines.append("建议保养剩余：约 \(remHours) 小时")
+        if isProtected {
+            lines.append("✨ 处于蒸发器自清洁健康保护期（7天内）")
+        }
+        lines.append("点击重置此设备滤网计时，洁净度恢复 100%")
+        return lines.joined(separator: "\n")
+    }
+
+    /// 生成计划调度任务悬浮感知提示，穿透展示单设备与同频批次协同设备全景 (v1.9.76)
+    private func scheduleItemTooltip(for action: ScheduledAction, devName: String, cleanActionName: String, timeStr: String, remainingDesc: String) -> String {
+        let siblingActions = model.scheduledActions.filter { StatusItemController.isSiblingSchedule($0, action) }
+        if siblingActions.count > 1 {
+            let siblingDevNames = siblingActions.compactMap { act in
+                model.allUnifiedDevices.first(where: { $0.id == act.deviceId })?.name
+            }
+            let devListStr = siblingDevNames.isEmpty ? "\(siblingActions.count) 台设备" : siblingDevNames.joined(separator: "、")
+            return "同频批次任务（共 \(siblingActions.count) 台设备：\(devListStr)）\n动作：\(cleanActionName)\n下次触发：\(timeStr)\(remainingDesc)\n展开子菜单可进行单任务管理或同步协同批处理"
+        } else {
+            return "设备：\(devName)\n动作：\(cleanActionName)\n下次触发：\(timeStr)\(remainingDesc)\n展开子菜单可暂停、恢复或取消该任务"
         }
     }
 
