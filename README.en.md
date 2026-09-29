@@ -6,6 +6,21 @@ A native SwiftUI app to control Haier / Leader (统帅) smart air conditioners o
 
 ## Features
 
+- 🏷 **Compound Continuous-Discrete Mixed Recurring Schedule Engine, Multi-Device Countdown Disambiguation & Aerodynamic Fan Thermodynamic Decoupling (v1.9.67)**:
+  - ⏱️ **Compound Continuous Spans & Discrete Mixed Recurring Schedule Engine (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift` / `AppModel.swift`)**:
+    - **Beyond Keyword Short-Circuiting**: Overhauled `parseRepeatWeekdays` state machine to eliminate premature returns when encountering "工作日/平时/周末", fully supporting keyword-plus-weekday combinations (e.g., "工作日和周六", "工作日及周日", "平时还有周六", "周末和周一");
+    - **Continuous Span Plus Discrete Weekday Conjunctions**: Deeply supports contiguous ranges conjoined with discrete days (e.g., "周一至周三以及周五", "周一到周四还有周六", "周二至周四和周六", "周日至周四以及周六");
+    - **Enriched Discrete Regex & Spoken Modifiers**: Upgraded `discreteWeekdaysRegex` to cover conjunctions such as "或者/或/还有/加" along with distributive prefixes like "每/每个/逢/每逢" (e.g., "每周一和每周三", "每个周二与每个周四");
+    - **Evening Time Colloquial Abbreviation Bug Eradication**: Fixed a subtle historical bug in `parseScheduleTime` where colloquial phrases like "晚10点关机" or "晚8点开机" failed to match the full word "晚上", causing 10:00 / 08:00 AM misinterpretation instead of 22:00 / 20:00;
+    - **Intelligent Circular Weekday Normalization & Code Deduplication**: Canonical formatting for complex sets ("工作日", "周末", "周一至周六", "周六至周一", etc.) and delegated `AppModel.formatRepeatWeekdaysLabel` entirely to `VoiceCommandParser.formatRepeatWeekdaysLabel`, eliminating 50+ lines of duplicate dead code;
+    - **Comprehensive Test Assertions**: Added `testCompoundRangeAndDiscreteRepeatWeekdays` with 14 end-to-end composite syntax test cases with 100% pass rate.
+  - 🍱 **macOS Status Bar Multi-Device Countdown Disambiguation & Long-Span Formatting (`StatusItemController.swift`)**:
+    - **Multi-Device Co-Execution Aggregation**: When multiple devices are scheduled within a 5-second execution window, the hover tooltip intelligently aggregates them into "全屋 N 台空调将在 X 分钟后关机" or "「客厅」、「主卧」将在 X 分钟后关机", eliminating confusion caused by single-device display;
+    - **Long-Span Human-Centric Time Formatting**: Introduced `formatRemainingTimeSpan` to present schedules exceeding 24 hours naturally as "X 天 Y 小时" instead of raw machine counts like "120 小时";
+    - **Enhanced Prefix Stripping Regex**: Enhanced `extractPlanActionVerb` with `^「.+?」` stripping, ensuring clean and fluent action descriptions during multi-device aggregation.
+  - 🍃 **Aerodynamic Fan Mode Filter Wear Thermodynamic Decoupling (`AppModel.calculateFilterWearFactor`)**:
+    - **Eliminating False High Humidity Wear Under Fan Operation**: Decoupled environmental humidity under `.fan` mode in `calculateFilterWearFactor`: because fan mode operates without phase-change condensation or thermal gradients, `humidityFactor` is locked to neutral baseline 1.00, preventing exaggerated filter wear calculations during high humidity seasons.
+
 - 🏷 **Universal Discrete & Continuous Recurring Schedule Engine, macOS Status Bar Countdown Symmetry & Tooltip Stutter Eradication, and Dehumidify Thermodynamic Decoupling (v1.9.66)**:
   - ⏱️ **Universal Discrete & Mixed Weekday Repeating Schedule Parser (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)**:
     - **Beyond Fixed Presets & Single Spans**: Breakthrough support for discrete weekday enumerations and mixed syntactic conjunctions (e.g., "和", "与", "及", "跟", "以及", commas, and whitespace);

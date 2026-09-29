@@ -444,9 +444,27 @@ public struct VoiceCommandParser {
         return try? NSRegularExpression(pattern: pattern)
     }()
 
-    /// 匹配离散多星期组合口语模式（如“周一和周三”、“周二、周四与周六”、“周一及周五”、“星期二和星期四”、“礼拜一跟礼拜五”、“周一三五”、“周二四六”、“周二四”） (v1.9.66)
+    /// 匹配连续区间附加离散星期复合口语（如“周一至周三以及周五”、“周一到周四还有周六”、“周一至五和周日”） (v1.9.67)
+    private static let rangeWithExtraDaysRegex: NSRegularExpression? = {
+        let pattern = #"(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])\s*(?:[、,，和与及跟以及还有或者或加/／\s]+)\s*(?:(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)?([一二三四五六日天1-7]))"#
+        return try? NSRegularExpression(pattern: pattern)
+    }()
+
+    /// 匹配核心关键词复合星期口语（如“工作日和周六”、“工作日及周日”、“工作日还有周六”、“工作日加周日”、“工作日加周末”、“周末和周一”、“周末以及周五”） (v1.9.67)
+    private static let keywordWithExtraDayRegex: NSRegularExpression? = {
+        let pattern = #"(工作日|平时|周末|双休)\s*(?:[、,，和与及跟以及还有或者或加/／\s]+)\s*(?:(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)?([一二三四五六日天1-7]|工作日|平时|周末|双休))"#
+        return try? NSRegularExpression(pattern: pattern)
+    }()
+
+    /// 匹配离散星期在前、核心关键词在后口语（如“周六和工作日”、“周一和周末”） (v1.9.67)
+    private static let extraDayWithKeywordRegex: NSRegularExpression? = {
+        let pattern = #"(?:(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7]))\s*(?:[、,，和与及跟以及还有或者或加/／\s]+)\s*(工作日|平时|周末|双休)"#
+        return try? NSRegularExpression(pattern: pattern)
+    }()
+
+    /// 匹配离散多星期组合口语模式（如“周一和周三”、“周二、周四与周六”、“周一及周五”、“星期二和星期四”、“礼拜一跟礼拜五”、“周一三五”、“周二四六”、“周二四”、“每周一和每周三”、“每个周二与每个周四”、“周一或者周四”、“周一还有周五”、“周一加周三”） (v1.9.66, v1.9.67)
     private static let discreteWeekdaysRegex: NSRegularExpression? = {
-        let pattern = #"(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])(?:[、,，和与及跟以及\s]+(?:(?:周|星期|礼拜)?([一二三四五六日天1-7])))+"#
+        let pattern = #"(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])(?:[、,，和与及跟以及还有或者或加/／\s]+(?:(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)?([一二三四五六日天1-7])))+"#
         return try? NSRegularExpression(pattern: pattern)
     }()
 
@@ -483,16 +501,22 @@ public struct VoiceCommandParser {
         return result.sorted()
     }
 
-    /// 智能归一化格式化星期列表为自然语言地道标签 (v1.9.66)
-    private static func formatWeekdayLabel(from weekdays: [Int], startWd: Int? = nil, endWd: Int? = nil) -> String {
-        if weekdays.isEmpty { return "每天" }
-        if weekdays.count == 7 { return "周一至周日" }
-        if weekdays == [2, 3, 4, 5, 6] { return "工作日" }
-        if weekdays == [1, 7] { return "周末" }
-        if weekdays == [1, 6, 7] { return "周五至周日" }
-        if weekdays == [2, 4, 6] { return "每周一、三、五" }
-        if weekdays == [3, 5, 7] { return "每周二、四、六" }
-        if weekdays == [3, 5] { return "每周二、四" }
+    /// 统一智能归一化格式化星期列表为自然语言地道标签 (v1.9.61, v1.9.66, v1.9.67)
+    public static func formatRepeatWeekdaysLabel(_ repeatWeekdays: [Int], startWd: Int? = nil, endWd: Int? = nil) -> String? {
+        guard !repeatWeekdays.isEmpty else { return nil }
+        let sorted = repeatWeekdays.sorted()
+        if sorted.count == 7 { return "周一至周日" }
+        if sorted == [2, 3, 4, 5, 6] { return "工作日" }
+        if sorted == [1, 7] { return "周末" }
+        if sorted == [1, 6, 7] { return "周五至周日" }
+        if sorted == [2, 4, 6] { return "每周一、三、五" }
+        if sorted == [3, 5, 7] { return "每周二、四、六" }
+        if sorted == [3, 5] { return "每周二、四" }
+        if sorted == [2, 4] { return "每周一、三" }
+        if sorted == [2, 5] { return "每周一、四" }
+        if sorted == [2, 6] { return "每周一、五" }
+        if sorted == [2, 3, 4, 5, 6, 7] { return "周一至周六" }
+        if sorted == [1, 2, 3, 4, 5, 6] { return "周日至周五" }
 
         let dayChars = ["日", "一", "二", "三", "四", "五", "六"] // 1=日, 2=一, ..., 7=六
 
@@ -503,23 +527,105 @@ public struct VoiceCommandParser {
             return "周\(sName)至周\(eName)"
         }
 
-        // 检查排序后的数组是否恰好构成一个非全周连续区间
-        if weekdays.count >= 2, let first = weekdays.first, let last = weekdays.last {
-            if generateWeeklyRange(start: first, end: last) == weekdays {
-                let sName = dayChars[max(0, min(first - 1, 6))]
-                let eName = dayChars[max(0, min(last - 1, 6))]
-                return "周\(sName)至周\(eName)"
+        // 环形连续区间智能探测：测试 7 种可能的起点，检查 sorted 是否恰好构成环形连续区间
+        if sorted.count >= 2 {
+            for startCandidate in 1...7 {
+                let startIndex = weekdayToWeeklyIndex(startCandidate)
+                let endIndex = (startIndex + sorted.count - 1) % 7
+                let endCandidate = weeklyIndexToWeekday(endIndex)
+                if generateWeeklyRange(start: startCandidate, end: endCandidate) == sorted {
+                    let sName = dayChars[max(0, min(startCandidate - 1, 6))]
+                    let eName = dayChars[max(0, min(endCandidate - 1, 6))]
+                    return "周\(sName)至周\(eName)"
+                }
             }
         }
 
+        // 单个星期
+        if sorted.count == 1, let d = sorted.first {
+            let sName = dayChars[max(0, min(d - 1, 6))]
+            return "每周\(sName)"
+        }
+
         // 离散多星期：生成“每周一、三”等
-        let names = weekdays.map { dayChars[max(0, min($0 - 1, 6))] }
+        let names = sorted.map { dayChars[max(0, min($0 - 1, 6))] }
         return "每周" + names.joined(separator: "、")
     }
 
-    /// 解析文本中的重复周期规则（涵盖周一至周日全周、工作日、周末、每天、单星期及自然语言口语全排列复合离散与连续星期）(v1.9.62 统一公共解析引擎, v1.9.65 升级口语省略语素通用环形范围解析引擎, v1.9.66 升级通用离散与连续全排列混合周期调度引擎)
+    /// 智能归一化格式化星期列表为自然语言地道标签（非可选重载）
+    private static func formatWeekdayLabel(from weekdays: [Int], startWd: Int? = nil, endWd: Int? = nil) -> String {
+        formatRepeatWeekdaysLabel(weekdays, startWd: startWd, endWd: endWd) ?? "每天"
+    }
+
+    /// 解析文本中的重复周期规则（涵盖周一至周日全周、工作日、周末、每天、单星期及自然语言口语全排列复合离散与连续星期）(v1.9.62 统一公共解析引擎, v1.9.65 升级口语省略语素通用环形范围解析引擎, v1.9.66 升级通用离散与连续全排列混合周期调度引擎, v1.9.67 升级复合连续区间与离散混合大一统引擎)
     public static func parseRepeatWeekdays(_ text: String) -> (weekdays: [Int], label: String)? {
-        // 1. 语义化核心短语优先识别
+        let nsString = text as NSString
+        let fullRange = NSRange(location: 0, length: nsString.length)
+
+        // 1. 复合语义优先匹配：区间 + 附加星期（如“周一至周三以及周五”、“周一到周四还有周六”、“周一至五和周日”）(v1.9.67)
+        if let regex = rangeWithExtraDaysRegex,
+           let match = regex.firstMatch(in: text, options: [], range: fullRange),
+           match.numberOfRanges >= 4 {
+            let startStr = nsString.substring(with: match.range(at: 1))
+            let endStr = nsString.substring(with: match.range(at: 2))
+            let extraStr = nsString.substring(with: match.range(at: 3))
+            if let sChar = startStr.first, let sWd = chineseDayCharToWeekday(sChar),
+               let eChar = endStr.first, let eWd = chineseDayCharToWeekday(eChar),
+               let exChar = extraStr.first, let exWd = chineseDayCharToWeekday(exChar) {
+                var days = Set(generateWeeklyRange(start: sWd, end: eWd))
+                days.insert(exWd)
+                let sorted = days.sorted()
+                return (sorted, formatWeekdayLabel(from: sorted))
+            }
+        }
+
+        // 2. 复合语义优先匹配：核心关键词 + 附加星期（如“工作日和周六”、“工作日及周日”、“工作日加周末”、“周末和周一”、“周末以及周五”）(v1.9.67)
+        if let regex = keywordWithExtraDayRegex,
+           let match = regex.firstMatch(in: text, options: [], range: fullRange),
+           match.numberOfRanges >= 3 {
+            let kw = nsString.substring(with: match.range(at: 1))
+            let extra = nsString.substring(with: match.range(at: 2))
+            var days = Set<Int>()
+            if kw == "工作日" || kw == "平时" {
+                days.formUnion([2, 3, 4, 5, 6])
+            } else if kw == "周末" || kw == "双休" {
+                days.formUnion([1, 7])
+            }
+            if extra == "工作日" || extra == "平时" {
+                days.formUnion([2, 3, 4, 5, 6])
+            } else if extra == "周末" || extra == "双休" {
+                days.formUnion([1, 7])
+            } else if let ch = extra.first, let wd = chineseDayCharToWeekday(ch) {
+                days.insert(wd)
+            }
+            if !days.isEmpty {
+                let sorted = days.sorted()
+                return (sorted, formatWeekdayLabel(from: sorted))
+            }
+        }
+
+        // 3. 复合语义优先匹配：附加星期在前 + 核心关键词在后（如“周六和工作日”、“周一和周末”）(v1.9.67)
+        if let regex = extraDayWithKeywordRegex,
+           let match = regex.firstMatch(in: text, options: [], range: fullRange),
+           match.numberOfRanges >= 3 {
+            let dayChar = nsString.substring(with: match.range(at: 1))
+            let kw = nsString.substring(with: match.range(at: 2))
+            var days = Set<Int>()
+            if let ch = dayChar.first, let wd = chineseDayCharToWeekday(ch) {
+                days.insert(wd)
+            }
+            if kw == "工作日" || kw == "平时" {
+                days.formUnion([2, 3, 4, 5, 6])
+            } else if kw == "周末" || kw == "双休" {
+                days.formUnion([1, 7])
+            }
+            if !days.isEmpty {
+                let sorted = days.sorted()
+                return (sorted, formatWeekdayLabel(from: sorted))
+            }
+        }
+
+        // 4. 语义化独立核心短语识别
         if text.contains("工作日") || text.contains("平时") {
             return ([2, 3, 4, 5, 6], "工作日")
         }
@@ -543,11 +649,9 @@ public struct VoiceCommandParser {
             return ([3, 5], "每周二、四")
         }
 
-        // 2. 通用自然语言连续星期环形范围解析（涵盖“周一至周五”、“周一至五”、“周五至日”、“周六至二”、“周日至五”、“周1到5”、“周一~周五”等所有组合）(v1.9.65, v1.9.66)
+        // 5. 通用自然语言连续星期环形范围解析（涵盖“周一至周五”、“周一至五”、“周五至日”、“周六至二”、“周日至五”、“周1到5”、“周一~周五”等所有组合）(v1.9.65, v1.9.66)
         if let regex = repeatWeekdayRangeRegex {
-            let nsString = text as NSString
-            let range = NSRange(location: 0, length: nsString.length)
-            if let match = regex.firstMatch(in: text, options: [], range: range),
+            if let match = regex.firstMatch(in: text, options: [], range: fullRange),
                match.numberOfRanges >= 3 {
                 let startStr = nsString.substring(with: match.range(at: 1))
                 let endStr = nsString.substring(with: match.range(at: 2))
@@ -560,11 +664,9 @@ public struct VoiceCommandParser {
             }
         }
 
-        // 3. 通用自然语言离散多星期复合解析（涵盖“周一和周三”、“周二、周四与周六”、“周一及周五”、“星期二和星期四”、“礼拜一跟礼拜五”等） (v1.9.66)
+        // 6. 通用自然语言离散多星期复合解析（涵盖“周一和周三”、“周二、周四与周六”、“周一及周五”、“星期二和星期四”、“礼拜一跟礼拜五”、“每周一和每周三”、“每个周二与每个周四”、“周一或者周四”、“周一还有周五”、“周一加周三”等） (v1.9.66, v1.9.67)
         if let regex = discreteWeekdaysRegex {
-            let nsString = text as NSString
-            let range = NSRange(location: 0, length: nsString.length)
-            if let match = regex.firstMatch(in: text, options: [], range: range) {
+            if let match = regex.firstMatch(in: text, options: [], range: fullRange) {
                 let matchText = nsString.substring(with: match.range)
                 var parsedDays = Set<Int>()
                 for ch in matchText {
@@ -580,7 +682,7 @@ public struct VoiceCommandParser {
             }
         }
 
-        // 4. 单星期与每天自然语言识别
+        // 7. 单星期与每天自然语言识别
         if text.contains("每周一") || text.contains("每个周一") || text.contains("每个星期一") || text.contains("每周星期一") || text.contains("逢周一") || text.contains("每逢周一") || text.contains("每逢星期一") || text.contains("逢星期一") || text.contains("每个礼拜一") || text.contains("每周礼拜一") || text.contains("逢礼拜一") || text.contains("每逢礼拜一") {
             return ([2], "每周一")
         } else if text.contains("每周二") || text.contains("每个周二") || text.contains("每个星期二") || text.contains("每周星期二") || text.contains("逢周二") || text.contains("每逢周二") || text.contains("每逢星期二") || text.contains("逢星期二") || text.contains("每个礼拜二") || text.contains("每周礼拜二") || text.contains("逢礼拜二") || text.contains("每逢礼拜二") {
@@ -674,10 +776,12 @@ public struct VoiceCommandParser {
             return nil
         }
 
+        let hasColloquialEvening = (normalized.range(of: #"晚\s*\d+"#, options: .regularExpression) != nil)
         let isNightMidnight = normalized.contains("晚上") || normalized.contains("今晚") ||
                               normalized.contains("明晚") || normalized.contains("每晚") ||
                               normalized.contains("夜里") || normalized.contains("半夜") ||
-                              normalized.contains("午夜") || normalized.contains("凌晨")
+                              normalized.contains("午夜") || normalized.contains("凌晨") ||
+                              hasColloquialEvening
         let isAfternoonPM = normalized.contains("下午") || normalized.contains("傍晚") || normalized.contains("午后")
         let isNoon = normalized.contains("中午")
 
@@ -787,7 +891,7 @@ public struct VoiceCommandParser {
             // 明确的“零点/0点/0时”，无论前缀如何，恒定为 00:xx，严禁累加 12
             finalHour = 0
         } else if finalHour > 0 && finalHour < 12 {
-            if isAfternoonPM || (normalized.contains("晚上") || normalized.contains("今晚") || normalized.contains("明晚") || normalized.contains("每晚") || normalized.contains("夜里") || normalized.contains("傍晚")) {
+            if isAfternoonPM || hasColloquialEvening || (normalized.contains("晚上") || normalized.contains("今晚") || normalized.contains("明晚") || normalized.contains("每晚") || normalized.contains("夜里") || normalized.contains("傍晚")) {
                 finalHour += 12
             } else if (normalized.contains("半夜") || normalized.contains("午夜")) && finalHour >= 9 {
                 // 口语“半夜9/10/11点”或“午夜9/10/11点”归入深夜时段 21:00 ~ 23:00 (v1.9.55)

@@ -130,28 +130,33 @@ final class StatusItemController: NSObject {
             }
         }
 
-        // 动态感知生效中且最近即将执行的定时与倒计时任务 (v1.9.65 毫秒级感知高精消歧)
+        // 动态感知生效中且最近即将执行的定时与倒计时任务 (v1.9.65 毫秒级感知高精消歧, v1.9.67 多机同频倒计时消歧与长周期智能格式化)
         let now = Date()
         let upcomingSchedules = model.scheduledActions
             .filter { $0.enabled && $0.fireDate > now }
             .sorted(by: { $0.fireDate < $1.fireDate })
-        if let nextAction = upcomingSchedules.first {
-            let devName = model.allUnifiedDevices.first(where: { $0.id == nextAction.deviceId })?.name ?? "空调"
-            let remSecs = Int(nextAction.fireDate.timeIntervalSince(now))
-            let remDesc: String = {
-                if remSecs < 60 {
-                    return "不到 1 分钟"
-                } else if remSecs < 3600 {
-                    return "\(remSecs / 60) 分钟"
-                } else {
-                    let h = remSecs / 3600
-                    let m = (remSecs % 3600) / 60
-                    return m > 0 ? "\(h) 小时 \(m) 分钟" : "\(h) 小时"
+        if let firstAction = upcomingSchedules.first {
+            let threshold = firstAction.fireDate.addingTimeInterval(5.0)
+            let sameTimeActions = upcomingSchedules.filter { $0.fireDate <= threshold }
+            let remSecs = Int(firstAction.fireDate.timeIntervalSince(now))
+            let remDesc = Self.formatRemainingTimeSpan(remSecs: remSecs)
+            let timeStr = DateFormatter.localizedString(from: firstAction.fireDate, dateStyle: .none, timeStyle: .short)
+            let actionVerb = Self.extractPlanActionVerb(from: firstAction, devName: "")
+
+            let targetDeviceDesc: String
+            let devIds = Set(sameTimeActions.map(\.deviceId))
+            if devIds.count >= allDevices.count && allDevices.count > 1 {
+                targetDeviceDesc = "全屋 \(allDevices.count) 台空调"
+            } else if devIds.count > 1 {
+                let names = devIds.compactMap { devId in
+                    allDevices.first(where: { $0.id == devId })?.name
                 }
-            }()
-            let timeStr = DateFormatter.localizedString(from: nextAction.fireDate, dateStyle: .none, timeStyle: .short)
-            let actionVerb = Self.extractPlanActionVerb(from: nextAction, devName: devName)
-            tooltipParts.append("⏱ 最近计划: 「\(devName)」将在 \(remDesc)后\(actionVerb) (\(timeStr))")
+                targetDeviceDesc = names.map { "「\($0)」" }.joined(separator: "、")
+            } else {
+                let devName = allDevices.first(where: { $0.id == firstAction.deviceId })?.name ?? "空调"
+                targetDeviceDesc = "「\(devName)」"
+            }
+            tooltipParts.append("⏱ 最近计划: \(targetDeviceDesc)将在 \(remDesc)后\(actionVerb) (\(timeStr))")
         }
 
         let primaryTargetId = model.primaryDeviceId
@@ -1764,7 +1769,24 @@ final class StatusItemController: NSObject {
         model.themeMode = mode
     }
 
-    /// 计算并格式化计划调度任务的实时剩余时间描述 (v1.9.65 毫秒级高精消歧)
+    /// 格式化时间跨度（用于 Tooltip 等语句流式表达） (v1.9.67)
+    private static func formatRemainingTimeSpan(remSecs: Int) -> String {
+        if remSecs < 60 {
+            return "不到 1 分钟"
+        } else if remSecs < 3600 {
+            return "\(remSecs / 60) 分钟"
+        } else if remSecs < 86400 {
+            let h = remSecs / 3600
+            let m = (remSecs % 3600) / 60
+            return m > 0 ? "\(h) 小时 \(m) 分钟" : "\(h) 小时"
+        } else {
+            let d = remSecs / 86400
+            let h = (remSecs % 86400) / 3600
+            return h > 0 ? "\(d) 天 \(h) 小时" : "\(d) 天"
+        }
+    }
+
+    /// 计算并格式化计划调度任务的实时剩余时间描述 (v1.9.65 毫秒级高精消歧, v1.9.67 长周期智能格式化)
     private static func formatRemainingTime(fireDate: Date, now: Date = Date()) -> String {
         let diff = Int(fireDate.timeIntervalSince(now))
         if diff <= 0 {
@@ -1779,15 +1801,18 @@ final class StatusItemController: NSObject {
             return m > 0 ? "剩余 \(h)小时\(m)分" : "剩余 \(h)小时"
         } else {
             let d = diff / 86400
-            return "\(d) 天后"
+            let h = (diff % 86400) / 3600
+            return h > 0 ? "剩余 \(d)天\(h)小时" : "剩余 \(d)天"
         }
     }
 
-    /// 智能提取计划调度或倒计时任务的干净动作谓词（根除如“将在 18 分钟后30 分钟后关机”的历史口语重复语病） (v1.9.66)
+    /// 智能提取计划调度或倒计时任务的干净动作谓词（根除如“将在 18 分钟后30 分钟后关机”的历史口语重复语病与多设备前缀残留） (v1.9.66, v1.9.67)
     private static func extractPlanActionVerb(from action: ScheduledAction, devName: String) -> String {
         var name = action.name
-        if name.hasPrefix("「\(devName)」") {
+        if !devName.isEmpty && name.hasPrefix("「\(devName)」") {
             name = String(name.dropFirst("「\(devName)」".count))
+        } else if let match = name.range(of: #"^「.+?」"#, options: .regularExpression) {
+            name.removeSubrange(match)
         }
         // 清除开头的历史持续时间前缀，如 "30 分钟后"、"1 小时后"、"晨间过渡" 等
         if let regex = try? NSRegularExpression(pattern: #"^(?:\d+\s*(?:分钟|小时|钟头)后|晨间过渡(?:关机)?)"#) {

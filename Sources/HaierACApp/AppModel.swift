@@ -899,13 +899,19 @@ final class AppModel: ObservableObject {
             modeFactor = 1.00 // 无法识别模式时回归中性基准 1.00，消除虚标高估
         }
 
-        // 3. 室内湿度附着因子（高湿环境下颗粒物吸水膨胀并易附着在翅片与滤网网孔表面，v1.9.64 全域连续双线性阻尼插值, v1.9.66 除湿工况热物理动力学解耦）
+        // 3. 室内湿度附着因子（高湿环境下颗粒物吸水膨胀并易附着在翅片与滤网网孔表面，v1.9.64 全域连续双线性阻尼插值, v1.9.66 除湿工况热物理动力学解耦, v1.9.67 送风工况干性过滤空气动力学热解耦）
         let humidityFactor: Double
-        let isDehumidifyMode = (ACModeCode.match(from: mode) == .dehumidify)
-        if isDehumidifyMode {
+        let modeCode = ACModeCode.match(from: mode)
+        if modeCode == .dehumidify {
             // 除湿工况热物理动力学解耦 (v1.9.66):
             // 在 .dehumidify 工况下，蒸发器表面冷凝水膜厚度与粉尘黏结效应已在 modeFactor 中以高精连续阻尼插值完成自洽建模；
             // 此处 humidityFactor 保持中性基准 1.00，彻底消除对环境湿度的二次重复计算与指数级过度放大，保持全气候模型严谨自洽。
+            humidityFactor = 1.00
+        } else if modeCode == .fan {
+            // 送风工况干性过滤空气动力学热解耦 (v1.9.67):
+            // 送风模式下变频压缩机完全断电待机，室内机换热器无制冷制热相变，翅片表面与环境处于等温绝热态，物理上绝无冷凝水析出；
+            // 滤网仅承受由风机对流驱动的干性粉尘惯性碰撞截留，其动力学负荷完全由 windFactor 与风切力驱动；
+            // 此处 humidityFactor 严格锁定为中性基准 1.00，杜绝将制冷冷凝结露水膜黏滞效应盲目误施加于无相变送风工况，达成全工况严谨热物理自洽。
             humidityFactor = 1.00
         } else if let hum = indoorHumidity {
             if hum > 75.0 {
@@ -1379,52 +1385,9 @@ final class AppModel: ObservableObject {
         setScheduledActionsEnabled(for: [deviceId], enabled: enabled)
     }
 
-    /// 统一格式化周期重复星期数组为自然语言中文描述 (v1.9.61)
+    /// 统一格式化周期重复星期数组为自然语言中文描述 (v1.9.61, v1.9.67 委托至 VoiceCommandParser 统一大一统引擎)
     nonisolated public static func formatRepeatWeekdaysLabel(_ repeatWeekdays: [Int]) -> String? {
-        guard !repeatWeekdays.isEmpty else { return nil }
-        let sorted = repeatWeekdays.sorted()
-        if sorted.count == 7 { return "每天" }
-        if sorted == [2, 3, 4, 5, 6] { return "工作日" }
-        if sorted == [1, 7] { return "周末" }
-        if sorted == [2, 3, 4, 5, 6, 7] { return "周一至周六" }
-        if sorted == [2, 3, 4, 5] { return "周一至周四" }
-        if sorted == [2, 3, 4] { return "周一至周三" }
-        if sorted == [2, 3] { return "周一至周二" }
-        if sorted == [3, 4, 5, 6, 7] { return "周二至周六" }
-        if sorted == [3, 4, 5, 6] { return "周二至周五" }
-        if sorted == [3, 4, 5] { return "周二至周四" }
-        if sorted == [3, 4] { return "周二至周三" }
-        if sorted == [4, 5, 6, 7] { return "周三至周六" }
-        if sorted == [4, 5, 6] { return "周三至周五" }
-        if sorted == [4, 5] { return "周三至周四" }
-        if sorted == [5, 6, 7] { return "周四至周六" }
-        if sorted == [5, 6] { return "周四至周五" }
-        if sorted == [6, 7] { return "周五至周六" }
-        if sorted == [1, 5, 6, 7] { return "周四至周日" }
-        if sorted == [1, 4, 5, 6, 7] { return "周三至周日" }
-        if sorted == [1, 3, 4, 5, 6, 7] { return "周二至周日" }
-        if sorted == [1, 6, 7] { return "周五至周日" }
-        if sorted == [1, 2, 7] { return "周六至周一" }
-        if sorted == [1, 2] { return "周日至周一" }
-        if sorted == [1, 2, 6, 7] { return "周五至周一" }
-        if sorted == [1, 2, 3, 7] { return "周六至周二" }
-        if sorted == [1, 2, 3, 4, 7] { return "周六至周三" }
-        if sorted == [1, 2, 3, 4, 5, 7] { return "周六至周四" }
-        if sorted == [1, 2, 3, 6, 7] { return "周五至周二" }
-        if sorted == [1, 2, 3, 4, 6, 7] { return "周五至周三" }
-        if sorted == [1, 2, 5, 6, 7] { return "周四至周一" }
-        if sorted == [1, 2, 3, 5, 6, 7] { return "周四至周二" }
-        if sorted == [1, 2, 4, 5, 6, 7] { return "周三至周一" }
-        if sorted == [1, 2, 3, 4, 5, 6] { return "周日至周五" }
-        if sorted == [1, 2, 3, 4, 5] { return "周日至周四" }
-        if sorted == [1, 2, 3, 4] { return "周日至周三" }
-        if sorted == [1, 2, 3] { return "周日至周二" }
-        if sorted == [2, 4, 6] { return "每周一、三、五" }
-        if sorted == [3, 5, 7] { return "每周二、四、六" }
-        if sorted == [3, 5] { return "每周二、四" }
-        let dayChars = ["日", "一", "二", "三", "四", "五", "六"]
-        let dayNames = sorted.map { dayChars[max(0, min($0 - 1, 6))] }
-        return "每周" + dayNames.joined(separator: "、")
+        VoiceCommandParser.formatRepeatWeekdaysLabel(repeatWeekdays)
     }
 
     /// 任务列表变化后唤醒调度器，立即按新时间重新休眠（不用等封顶延迟）
