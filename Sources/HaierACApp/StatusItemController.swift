@@ -148,10 +148,8 @@ final class StatusItemController: NSObject {
             if devIds.count >= allDevices.count && allDevices.count > 1 {
                 targetDeviceDesc = "全屋 \(allDevices.count) 台空调"
             } else if devIds.count > 1 {
-                let names = devIds.compactMap { devId in
-                    allDevices.first(where: { $0.id == devId })?.name
-                }
-                targetDeviceDesc = names.map { "「\($0)」" }.joined(separator: "、")
+                let matchingDevices = allDevices.filter { devIds.contains($0.id) }
+                targetDeviceDesc = matchingDevices.map { "「\($0.name)」" }.joined(separator: "、")
             } else {
                 let devName = allDevices.first(where: { $0.id == firstAction.deviceId })?.name ?? "空调"
                 targetDeviceDesc = "「\(devName)」"
@@ -1038,10 +1036,7 @@ final class StatusItemController: NSObject {
             if !devSchedules.isEmpty {
                 for action in devSchedules {
                     let timeStr = DateFormatter.localizedString(from: action.fireDate, dateStyle: .none, timeStyle: .short)
-                    var cleanActionName = action.name
-                    if cleanActionName.hasPrefix("「\(dev.name)」") {
-                        cleanActionName = String(cleanActionName.dropFirst("「\(dev.name)」".count))
-                    }
+                    let cleanActionName = Self.extractPlanActionVerb(from: action, devName: dev.name)
                     let repeatTag = action.repeatLabel.map { " [\($0)]" } ?? ""
                     let statusTag = action.enabled ? "" : " [已暂停]"
                     let remainingDesc = action.enabled ? "，\(Self.formatRemainingTime(fireDate: action.fireDate))" : ""
@@ -1232,10 +1227,7 @@ final class StatusItemController: NSObject {
             for action in activeSchedules {
                 let devName = model.allUnifiedDevices.first(where: { $0.id == action.deviceId })?.name ?? "空调"
                 let timeStr = DateFormatter.localizedString(from: action.fireDate, dateStyle: .none, timeStyle: .short)
-                var cleanActionName = action.name
-                if cleanActionName.hasPrefix("「\(devName)」") {
-                    cleanActionName = String(cleanActionName.dropFirst("「\(devName)」".count))
-                }
+                let cleanActionName = Self.extractPlanActionVerb(from: action, devName: devName)
                 let repeatTag = action.repeatLabel.map { " [\($0)]" } ?? ""
                 let statusTag = action.enabled ? "" : " [已暂停]"
                 let remainingDesc = action.enabled ? "，\(Self.formatRemainingTime(fireDate: action.fireDate))" : ""
@@ -1806,7 +1798,7 @@ final class StatusItemController: NSObject {
         }
     }
 
-    /// 智能提取计划调度或倒计时任务的干净动作谓词（根除如“将在 18 分钟后30 分钟后关机”的历史口语重复语病与多设备前缀残留） (v1.9.66, v1.9.67)
+    /// 智能提取计划调度或倒计时任务的干净动作谓词（根除如“将在 18 分钟后30 分钟后关机”的历史口语重复语病与钟点/周期前缀残留） (v1.9.66, v1.9.67, v1.9.68)
     private static func extractPlanActionVerb(from action: ScheduledAction, devName: String) -> String {
         var name = action.name
         if !devName.isEmpty && name.hasPrefix("「\(devName)」") {
@@ -1814,17 +1806,26 @@ final class StatusItemController: NSObject {
         } else if let match = name.range(of: #"^「.+?」"#, options: .regularExpression) {
             name.removeSubrange(match)
         }
-        // 清除开头的历史持续时间前缀，如 "30 分钟后"、"1 小时后"、"晨间过渡" 等
-        if let regex = try? NSRegularExpression(pattern: #"^(?:\d+\s*(?:分钟|小时|钟头)后|晨间过渡(?:关机)?)"#) {
+        name = name.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        // 1. 如果是开关机属性，精准提炼为纯净动作动词（彻底根除时间/周期前缀残留语病）
+        if action.attrName == "onOffStatus" {
+            if name.contains("关机") || name.contains("关空调") || name.contains("关闭") {
+                return "关机"
+            }
+            if name.contains("开机") || name.contains("开空调") || name.contains("开启") || name.contains("打开") {
+                return "开机"
+            }
+            return (action.attrValue == .bool(true)) ? "开机" : "关机"
+        }
+
+        // 2. 其他任务类型（自清洁/睡眠曲线/自定义调温等）：清洗前置时间与周期前缀
+        if let prefixRegex = try? NSRegularExpression(pattern: #"^(?:(?:明天|后天|大后天|次日|工作日|平时|周末|双休|每天|周[一二三四五六日天0-7至到\-~、\s]+|每周[一二三四五六日天0-7、\s]+)\s*)*(?:\d{1,2}:\d{2}(?::\d{2})?\s*)*(?:\d+\s*(?:分钟|小时|钟头)后|晨间过渡(?:关机)?\s*)*"#) {
             let range = NSRange(name.startIndex..<name.endIndex, in: name)
-            name = regex.stringByReplacingMatches(in: name, options: [], range: range, withTemplate: "")
+            name = prefixRegex.stringByReplacingMatches(in: name, options: [], range: range, withTemplate: "")
         }
         name = name.trimmingCharacters(in: .whitespacesAndNewlines)
         if name.isEmpty {
-            // 依据属性与值智能兜底
-            if action.attrName == "onOffStatus" {
-                return (action.attrValue == .bool(true)) ? "开机" : "关机"
-            }
             return "执行任务"
         }
         return name

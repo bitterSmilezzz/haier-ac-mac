@@ -6,6 +6,19 @@ A native SwiftUI app to control Haier / Leader (统帅) smart air conditioners o
 
 ## Features
 
+- 🏷 **Negative Exclusion Weekday Schedule Engine, macOS Status Bar Action Verb Sanitization & Jitter Elimination, and Dry Heating Electrostatic Dynamics (v1.9.68)**:
+  - ⏱️ **Natural Language Exclusion-Based Repeating Schedule Engine (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)**:
+    - **Eradication of Inverted Logic Flaw**: Fixed a critical defect where exclusion commands such as "除了周末每天晚上10点关机" (every night except weekends) or "除了工作日每天晚上11点关空调" previously short-circuited on the substring "周末/工作日" and erroneously configured the opposite schedule;
+    - **Comprehensive Exclusion Pattern & Complement Calculation**: Built `exclusionRepeatRegex` and `parseExclusionRepeatWeekdays` supporting "除了周末" -> `[2, 3, 4, 5, 6]` (Weekdays), "除了工作日" -> `[1, 7]` (Weekend), "除了周日/除周日外" -> `[2, 3, 4, 5, 6, 7]` (Mon-Sat), "除周一外" -> `[1, 3, 4, 5, 6, 7]` (Tue-Sun), "除周六周日外" -> `[2, 3, 4, 5, 6]`, "除了周一至周五" -> `[1, 7]`, and discrete combinations like "除周一和周三外";
+    - **Post-Positioned Exclusion Clause Support**: Naturally handles post-positioned clauses such as "每天晚10点关机除了周末" and "晚10点关机除周日外";
+    - **Full Test Guard**: Added `testExclusionRepeatWeekdays` with 16 end-to-end exclusion test cases, 100% PASS.
+  - 🍱 **macOS Status Bar Action Verb Multi-Dimensional Sanitization & Anti-Jitter (`StatusItemController.swift`)**:
+    - **Tooltip Stutter & Repetitive Time Elimination**: Overhauled `extractPlanActionVerb` to strip day prefixes (明天/后天), cycle tags (工作日/周末/周X), and clock time prefixes (`\d{1,2}:\d{2}`), eliminating the awkward "将在 30 分钟后22:00 关机 (22:00)" stutter into pure "将在 30 分钟后关机 (22:00)";
+    - **Device Schedule Submenu Redundancy Cleanup**: Applied `extractPlanActionVerb` to both single-device and multi-device schedule lists, turning "⏱ 22:00 关机 (22:00，剩余 15 分钟)" into clean "⏱ 关机 (22:00，剩余 15 分钟)";
+    - **Co-Execution Tooltip Order Jitter Elimination**: Ordered multi-device names strictly according to `allDevices` order, eradicating `Set`-iteration non-deterministic flipping between ticks.
+  - 🍃 **Winter Heating Low-Humidity Electrostatic Adhesion Filter Dynamics (`AppModel.calculateFilterWearFactor`)**:
+    - **Physically Sound Particle Adhesion**: Modeled electrostatic charging (静电驻极效应) under winter heating when indoor humidity drops below 35% RH, introducing a continuous damping factor (1.00 ~ 1.12) to accurately reflect fine dust particle attraction on dry synthetic filter mesh.
+
 - 🏷 **Compound Continuous-Discrete Mixed Recurring Schedule Engine, Multi-Device Countdown Disambiguation & Aerodynamic Fan Thermodynamic Decoupling (v1.9.67)**:
   - ⏱️ **Compound Continuous Spans & Discrete Mixed Recurring Schedule Engine (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift` / `AppModel.swift`)**:
     - **Beyond Keyword Short-Circuiting**: Overhauled `parseRepeatWeekdays` state machine to eliminate premature returns when encountering "工作日/平时/周末", fully supporting keyword-plus-weekday combinations (e.g., "工作日和周六", "工作日及周日", "平时还有周六", "周末和周一");

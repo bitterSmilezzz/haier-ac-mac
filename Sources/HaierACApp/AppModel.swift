@@ -921,8 +921,19 @@ final class AppModel: ObservableObject {
                 let progress = (hum - 60.0) / 15.0
                 humidityFactor = 1.00 + (progress * 0.15) // 1.00 ~ 1.15 潮湿过渡插值
             } else if hum < 45.0 {
-                let progress = max(0.0, (hum - 25.0) / 20.0)
-                humidityFactor = 0.90 + (min(1.0, progress) * 0.10) // 0.90 ~ 1.00 干燥平滑插值
+                if modeCode == .heating {
+                    // 制热工况：换热器高温无凝结水膜；但在冬季低湿干燥环境（RH < 35%）下，化纤滤网极易产生静电积聚（静电驻极效应），加速对细微干燥扬尘与浮尘的静电吸附截留；
+                    // 采用连续平滑静电吸附阻尼插值 (1.00 ~ 1.12)，消除简单套用制冷减免带来的物理失真 (v1.9.68)
+                    if hum < 35.0 {
+                        let progress = max(0.0, (35.0 - hum) / 20.0)
+                        humidityFactor = 1.00 + (min(1.0, progress) * 0.12)
+                    } else {
+                        humidityFactor = 1.00
+                    }
+                } else {
+                    let progress = max(0.0, (hum - 25.0) / 20.0)
+                    humidityFactor = 0.90 + (min(1.0, progress) * 0.10) // 0.90 ~ 1.00 干燥平滑插值
+                }
             } else {
                 humidityFactor = 1.00 // 45% ~ 60% 人体工学舒适平衡区
             }
