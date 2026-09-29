@@ -445,14 +445,15 @@ public struct VoiceCommandParser {
     }()
 
     /// 匹配连续区间附加离散星期复合口语（如“周一至周三以及周五”、“周一到周四还有周六”、“周一至五和周日”） (v1.9.67)
+    /// 匹配连续区间附加离散星期复合口语（如“周一至周三以及周五”、“周一到周四还有周六”、“周一至五和周日”） (v1.9.67, v1.9.70 增加每天负向断言防误判为星期天)
     private static let rangeWithExtraDaysRegex: NSRegularExpression? = {
-        let pattern = #"(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])\s*(?:[、,，和与及跟以及还有或者或加/／\s]+)\s*(?:(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)?([一二三四五六日天1-7]))"#
+        let pattern = #"(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])\s*(?:[、,，和与及跟以及还有或者或加/／\s]+)\s*(?!(?:每天|天天|每日|每晚|每早|每晨|每夜|日日))(?:(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)?([一二三四五六日天1-7]))"#
         return try? NSRegularExpression(pattern: pattern)
     }()
 
-    /// 匹配核心关键词复合星期口语（如“工作日和周六”、“工作日及周日”、“工作日还有周六”、“工作日加周日”、“工作日加周末”、“周末和周一”、“周末以及周五”） (v1.9.67)
+    /// 匹配核心关键词复合星期口语（如“工作日和周六”、“工作日及周日”、“工作日还有周六”、“工作日加周日”、“工作日加周末”、“周末和周一”、“周末以及周五”） (v1.9.67, v1.9.70 增加每天负向断言防误判为星期天)
     private static let keywordWithExtraDayRegex: NSRegularExpression? = {
-        let pattern = #"(工作日|平时|周末|双休)\s*(?:[、,，和与及跟以及还有或者或加/／\s]+)\s*(?:(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)?([一二三四五六日天1-7]|工作日|平时|周末|双休))"#
+        let pattern = #"(工作日|平时|周末|双休)\s*(?:[、,，和与及跟以及还有或者或加/／\s]+)\s*(?!(?:每天|天天|每日|每晚|每早|每晨|每夜|日日))(?:(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)?([一二三四五六日天1-7]|工作日|平时|周末|双休))"#
         return try? NSRegularExpression(pattern: pattern)
     }()
 
@@ -462,15 +463,15 @@ public struct VoiceCommandParser {
         return try? NSRegularExpression(pattern: pattern)
     }()
 
-    /// 匹配离散多星期组合口语模式（如“周一和周三”、“周二、周四与周六”、“周一及周五”、“星期二和星期四”、“礼拜一跟礼拜五”、“周一三五”、“周二四六”、“周二四”、“每周一和每周三”、“每个周二与每个周四”、“周一或者周四”、“周一还有周五”、“周一加周三”） (v1.9.66, v1.9.67)
+    /// 匹配离散多星期组合口语模式（如“周一和周三”、“周二、周四与周六”、“周一及周五”、“星期二和星期四”、“礼拜一跟礼拜五”、“周一三五”、“周二四六”、“周二四”、“每周一和每周三”、“每个周二与每个周四”、“周一或者周四”、“周一还有周五”、“周一加周三”） (v1.9.66, v1.9.67, v1.9.70 增加每天负向断言防误判为星期天)
     private static let discreteWeekdaysRegex: NSRegularExpression? = {
-        let pattern = #"(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])(?:[、,，和与及跟以及还有或者或加/／\s]+(?:(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)?([一二三四五六日天1-7])))+"#
+        let pattern = #"(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])(?:[、,，和与及跟以及还有或者或加/／\s]+(?!(?:每天|天天|每日|每晚|每早|每晨|每夜|日日))(?:(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)?([一二三四五六日天1-7])))+"#
         return try? NSRegularExpression(pattern: pattern)
     }()
 
     /// 匹配排除型否定星期口语模式（如“除了周末每天晚上10点关机”、“除周末外每天早8点开机”、“除了工作日每天晚上11点关空调”、“除了周日每天早8点开机”、“除周一外每天晚10点关机”、“工作日除了周三早8点开机”、“周一至周五除周二外晚10点关空调”） (v1.9.68, v1.9.69 补全限定基准集约束)
     private static let exclusionRepeatRegex: NSRegularExpression? = {
-        let pattern = #"(?:除了|除)\s*([^，,。！？\s]+?)\s*(?:(?:之|以)?外)?(?=[，,。！？\s]|工作日|平时|周末|双休|每天|天天|每日|每晚|每早|每晨|每夜|日日|\d|早|晚|夜|中|上|下|凌晨|午|点|时|:|$|开|关|停)"#
+        let pattern = #"(?:除了|除)\s*([^，,。！？\s]+?)\s*(?:(?:之|以)?外)?(?=[，,。！？\s]|工作日|平时|周末|双休|单休|一三五|二四六|每天|天天|每日|每晚|每早|每晨|每夜|日日|\d|早|晚|夜|中|上|下|凌晨|午|点|时|:|$|开|关|停)"#
         return try? NSRegularExpression(pattern: pattern)
     }()
 
@@ -515,25 +516,14 @@ public struct VoiceCommandParser {
         return excluded.isEmpty ? nil : excluded
     }
 
-    /// 从除外子句之外的文本中提取基准星期集合（Base Scope），若未指定则默认全周 7 天 (v1.9.69)
+    /// 从除外子句之外的文本中提取基准星期集合（Base Scope），若未指定则默认全周 7 天 (v1.9.69, v1.9.70 大一统基准提取引擎)
     private static func extractBaseScopeWeekdays(from text: String) -> Set<Int>? {
-        let ns = text as NSString
-        let fullRange = NSRange(location: 0, length: ns.length)
-        if let regex = repeatWeekdayRangeRegex,
-           let match = regex.firstMatch(in: text, options: [], range: fullRange),
-           match.numberOfRanges >= 3 {
-            let sStr = ns.substring(with: match.range(at: 1))
-            let eStr = ns.substring(with: match.range(at: 2))
-            if let sCh = sStr.first, let sWd = chineseDayCharToWeekday(sCh),
-               let eCh = eStr.first, let eWd = chineseDayCharToWeekday(eCh) {
-                return Set(generateWeeklyRange(start: sWd, end: eWd))
+        if let base = parseBaseRepeatWeekdays(text) {
+            if base.weekdays.isEmpty {
+                return Set([1, 2, 3, 4, 5, 6, 7]) // "每天" 表示全周 7 天
+            } else {
+                return Set(base.weekdays)
             }
-        }
-        if text.contains("工作日") || text.contains("平时") {
-            return [2, 3, 4, 5, 6]
-        }
-        if text.contains("周末") || text.contains("双休") {
-            return [1, 7]
         }
         return nil
     }
@@ -606,9 +596,11 @@ public struct VoiceCommandParser {
         if sorted == [2, 4, 6] { return "每周一、三、五" }
         if sorted == [3, 5, 7] { return "每周二、四、六" }
         if sorted == [3, 5] { return "每周二、四" }
+        if sorted == [3, 7] { return "每周二、六" }
         if sorted == [2, 4] { return "每周一、三" }
         if sorted == [2, 5] { return "每周一、四" }
         if sorted == [2, 6] { return "每周一、五" }
+        if sorted == [2, 3, 5, 6, 7] { return "每周一、二、四、五、六" }
         if sorted == [2, 3, 4, 5, 6, 7] { return "周一至周六" }
         if sorted == [1, 2, 3, 4, 5, 6] { return "周日至周五" }
 
@@ -651,15 +643,19 @@ public struct VoiceCommandParser {
         formatRepeatWeekdaysLabel(weekdays, startWd: startWd, endWd: endWd) ?? "每天"
     }
 
-    /// 解析文本中的重复周期规则（涵盖周一至周日全周、工作日、周末、每天、单星期及自然语言口语全排列复合离散与连续星期）(v1.9.62 统一公共解析引擎, v1.9.65 升级口语省略语素通用环形范围解析引擎, v1.9.66 升级通用离散与连续全排列混合周期调度引擎, v1.9.67 升级复合连续区间与离散混合大一统引擎)
+    /// 解析文本中的重复周期规则（涵盖周一至周日全周、工作日、周末、单休、每天、单星期及自然语言口语全排列复合离散与连续星期）(v1.9.62 统一公共解析引擎, v1.9.65 升级口语省略语素通用环形范围解析引擎, v1.9.66 升级通用离散与连续全排列混合周期调度引擎, v1.9.67 升级复合连续区间与离散混合大一统引擎, v1.9.70 大一统全基准排除型周期调度引擎与单休制纳管)
     public static func parseRepeatWeekdays(_ text: String) -> (weekdays: [Int], label: String)? {
-        let nsString = text as NSString
-        let fullRange = NSRange(location: 0, length: nsString.length)
-
-        // 0. 排除型否定星期周期优先解析（如“除了周末每天晚上10点关机”、“除周末外每天早8点开机”、“除了工作日每天晚上11点关空调”、“除了周日每天早8点开机”、“除周一外每天晚10点关机”） (v1.9.68 杜绝硬编码包含导致反向语义逻辑颠倒缺陷)
+        // 0. 排除型否定星期周期优先解析（如“除了周末每天晚上10点关机”、“除周末外每天早8点开机”、“除了工作日每天晚上11点关空调”、“除了周日每天早8点开机”、“除周一外每天晚10点关机”） (v1.9.68 杜绝硬编码包含导致反向语义逻辑颠倒缺陷, v1.9.69, v1.9.70 闭环全基准大一统排除引擎)
         if let exclusionResult = parseExclusionRepeatWeekdays(text) {
             return exclusionResult
         }
+        return parseBaseRepeatWeekdays(text)
+    }
+
+    /// 基础周期规则提取（不含排除子句递归，供周期解析与基准范围提取公共复用） (v1.9.70)
+    private static func parseBaseRepeatWeekdays(_ text: String) -> (weekdays: [Int], label: String)? {
+        let nsString = text as NSString
+        let fullRange = NSRange(location: 0, length: nsString.length)
 
         // 1. 复合语义优先匹配：区间 + 附加星期（如“周一至周三以及周五”、“周一到周四还有周六”、“周一至五和周日”）(v1.9.67)
         if let regex = rangeWithExtraDaysRegex,
@@ -737,6 +733,9 @@ public struct VoiceCommandParser {
            text.contains("星期六和星期天") || text.contains("礼拜六礼拜天") || text.contains("礼拜六和礼拜天") ||
            text.contains("礼拜六礼拜日") || text.contains("礼拜六和礼拜日") {
             return ([1, 7], "周末")
+        }
+        if text.contains("单休") {
+            return ([2, 3, 4, 5, 6, 7], "周一至周六")
         }
         if text.contains("一三五") || text.contains("一、三、五") {
             return ([2, 4, 6], "每周一、三、五")

@@ -1068,14 +1068,8 @@ final class StatusItemController: NSObject {
                     cancelItem.representedObject = action.id.uuidString
                     singleMenu.addItem(cancelItem)
 
-                    // 动态检测同频批次兄弟任务并提供一键协同管理 (v1.9.69)
-                    let siblingActions = model.scheduledActions.filter {
-                        abs($0.fireDate.timeIntervalSince(action.fireDate)) <= 2.0 &&
-                        $0.attrName == action.attrName &&
-                        $0.attrValueJSON == action.attrValueJSON &&
-                        $0.repeatsDaily == action.repeatsDaily &&
-                        $0.repeatWeekdays == action.repeatWeekdays
-                    }
+                    // 动态检测同频批次兄弟任务并提供一键协同管理 (v1.9.69, v1.9.70 升级无序集合与自然周期同频判定)
+                    let siblingActions = model.scheduledActions.filter { StatusItemController.isSiblingSchedule($0, action) }
                     if siblingActions.count > 1 {
                         singleMenu.addItem(.separator())
                         let anySiblingEnabled = siblingActions.contains(where: \.enabled)
@@ -1296,14 +1290,8 @@ final class StatusItemController: NSObject {
                 cancelSingleItem.representedObject = action.id.uuidString
                 singleTaskMenu.addItem(cancelSingleItem)
 
-                // 动态检测同频批次兄弟任务并提供一键协同管理 (v1.9.69)
-                let siblingActions = activeSchedules.filter {
-                    abs($0.fireDate.timeIntervalSince(action.fireDate)) <= 2.0 &&
-                    $0.attrName == action.attrName &&
-                    $0.attrValueJSON == action.attrValueJSON &&
-                    $0.repeatsDaily == action.repeatsDaily &&
-                    $0.repeatWeekdays == action.repeatWeekdays
-                }
+                // 动态检测同频批次兄弟任务并提供一键协同管理 (v1.9.69, v1.9.70 升级无序集合与自然周期同频判定)
+                let siblingActions = activeSchedules.filter { StatusItemController.isSiblingSchedule($0, action) }
                 if siblingActions.count > 1 {
                     singleTaskMenu.addItem(.separator())
                     let anySiblingEnabled = siblingActions.contains(where: \.enabled)
@@ -1696,13 +1684,7 @@ final class StatusItemController: NSObject {
         guard !targets.isEmpty else { return }
         let anyEnabled = targets.contains(where: \.enabled)
         let newEnabled = !anyEnabled
-        var modified = 0
-        for action in targets {
-            var updated = action
-            updated.enabled = newEnabled
-            model.updateScheduledAction(updated)
-            modified += 1
-        }
+        let modified = model.setScheduledActionsEnabled(ids: uuids, enabled: newEnabled)
         let actionDesc = newEnabled ? "恢复" : "暂停"
         model.operationNotice = AppModel.OperationNotice(text: "\(newEnabled ? "▶️" : "⏸") 已\(actionDesc)同频批次任务（共 \(modified) 台空调）", isError: false)
         refreshTemperature()
@@ -1711,13 +1693,29 @@ final class StatusItemController: NSObject {
     @objc private func cancelSiblingSchedulesFromMenu(_ sender: NSMenuItem) {
         guard let idStrs = sender.representedObject as? [String] else { return }
         let uuids = Set(idStrs.compactMap { UUID(uuidString: $0) })
-        let targets = model.scheduledActions.filter { uuids.contains($0.id) }
-        guard !targets.isEmpty else { return }
-        for action in targets {
-            model.removeScheduledAction(action)
+        let removed = model.removeScheduledActions(ids: uuids)
+        if removed > 0 {
+            model.operationNotice = AppModel.OperationNotice(text: "🗑 已同步取消同频批次任务（共 \(removed) 台空调）", isError: false)
+            refreshTemperature()
         }
-        model.operationNotice = AppModel.OperationNotice(text: "🗑 已同步取消同频批次任务（共 \(targets.count) 台空调）", isError: false)
-        refreshTemperature()
+    }
+
+    /// 判定两个计划调度任务是否属于同一时间、同一属性、同一动作值且同一重复规则的同频协同任务 (v1.9.70 升级无序集合比对与周期跨天智能同频判定)
+    private static func isSiblingSchedule(_ a: ScheduledAction, _ b: ScheduledAction) -> Bool {
+        guard a.attrName == b.attrName else { return false }
+        guard a.attrValue == b.attrValue else { return false }
+        guard a.repeatsDaily == b.repeatsDaily else { return false }
+        guard Set(a.repeatWeekdays) == Set(b.repeatWeekdays) else { return false }
+        if a.repeatsDaily || !a.repeatWeekdays.isEmpty {
+            let cal = Calendar.current
+            let hourA = cal.component(.hour, from: a.fireDate)
+            let minA = cal.component(.minute, from: a.fireDate)
+            let hourB = cal.component(.hour, from: b.fireDate)
+            let minB = cal.component(.minute, from: b.fireDate)
+            return hourA == hourB && minA == minB
+        } else {
+            return abs(a.fireDate.timeIntervalSince(b.fireDate)) <= 5.0
+        }
     }
 
     @objc private func pauseDeviceSchedulesFromMenu(_ sender: NSMenuItem) {

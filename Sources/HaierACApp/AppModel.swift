@@ -1318,6 +1318,20 @@ final class AppModel: ObservableObject {
         wakeScheduler()
     }
 
+    /// 批量取消指定 ID 集合的定时调度任务并原子重置唤醒调度器 (v1.9.70)
+    @discardableResult
+    public func removeScheduledActions(ids: Set<UUID>) -> Int {
+        guard !ids.isEmpty else { return 0 }
+        let beforeCount = scheduledActions.count
+        scheduledActions.removeAll { ids.contains($0.id) }
+        let removed = beforeCount - scheduledActions.count
+        if removed > 0 {
+            wakeScheduler()
+            AppLog.log("已批量取消指定定时调度任务（共 \(removed) 个）")
+        }
+        return removed
+    }
+
     /// 取消全屋所有定时与倒计时任务并原子重置唤醒调度器 (v1.9.37)
     @discardableResult
     public func cancelAllSchedules() -> Int {
@@ -1363,6 +1377,24 @@ final class AppModel: ObservableObject {
         scheduledActions[idx].enabled = enabled
         AppLog.log(enabled ? "启用调度: \(scheduledActions[idx].name)" : "暂停调度: \(scheduledActions[idx].name)")
         wakeScheduler()
+    }
+
+    /// 批量启用/禁用指定 ID 集合的调度任务（返回受影响的任务数）(v1.9.70)
+    @discardableResult
+    public func setScheduledActionsEnabled(ids: Set<UUID>, enabled: Bool) -> Int {
+        guard !ids.isEmpty else { return 0 }
+        var changed = 0
+        for idx in 0..<scheduledActions.count {
+            if ids.contains(scheduledActions[idx].id) && scheduledActions[idx].enabled != enabled {
+                scheduledActions[idx].enabled = enabled
+                changed += 1
+            }
+        }
+        if changed > 0 {
+            AppLog.log("已\(enabled ? "恢复" : "暂停")指定批次定时调度任务（共 \(changed) 个）")
+            wakeScheduler()
+        }
+        return changed
     }
 
     /// 批量启用/禁用所有调度任务（返回受影响的任务数）(v1.9.60)
