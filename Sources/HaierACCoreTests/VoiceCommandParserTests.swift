@@ -2427,6 +2427,28 @@ final class VoiceCommandParserTests: XCTestCase {
 
         let exDiscreteSuffix = VoiceCommandParser.parse("一三五每天早8点开机除周三外")
         XCTAssertEqual(exDiscreteSuffix?.command, .scheduleRepeatPower(hour: 8, minute: 0, power: true, repeatWeekdays: [2, 6], repeatLabel: "每周一、五"))
+
+        // 6. 单休与周末三天排除型周期与复合口语纳管 (v1.9.71)
+        let exExceptSingleRest1 = VoiceCommandParser.parse("除单休外每天早8点开机")
+        XCTAssertEqual(exExceptSingleRest1?.command, .scheduleRepeatPower(hour: 8, minute: 0, power: true, repeatWeekdays: [1], repeatLabel: "每周日"))
+
+        let exExceptSingleRest2 = VoiceCommandParser.parse("除了单休每天早8点开机")
+        XCTAssertEqual(exExceptSingleRest2?.command, .scheduleRepeatPower(hour: 8, minute: 0, power: true, repeatWeekdays: [1], repeatLabel: "每周日"))
+
+        let exExceptWeekend3Days = VoiceCommandParser.parse("除周末三天外每天早8点开机")
+        XCTAssertEqual(exExceptWeekend3Days?.command, .scheduleRepeatPower(hour: 8, minute: 0, power: true, repeatWeekdays: [2, 3, 4, 5], repeatLabel: "周一至周四"))
+
+        let exWeekend3DaysFri = VoiceCommandParser.parse("周末三天除了周五每天早8点开机")
+        XCTAssertEqual(exWeekend3DaysFri?.command, .scheduleRepeatPower(hour: 8, minute: 0, power: true, repeatWeekdays: [1, 7], repeatLabel: "周末"))
+
+        let exWeekend3DaysSun = VoiceCommandParser.parse("周末三天除周日外每天早8点开机")
+        XCTAssertEqual(exWeekend3DaysSun?.command, .scheduleRepeatPower(hour: 8, minute: 0, power: true, repeatWeekdays: [6, 7], repeatLabel: "周五至周六"))
+
+        let exCompoundSingleRestSun1 = VoiceCommandParser.parse("单休和周日每天早8点开机")
+        XCTAssertEqual(exCompoundSingleRestSun1?.command, .scheduleRepeatPower(hour: 8, minute: 0, power: true, repeatWeekdays: [1, 2, 3, 4, 5, 6, 7], repeatLabel: "周一至周日"))
+
+        let exCompoundSingleRestSun2 = VoiceCommandParser.parse("周日和单休每天早8点开机")
+        XCTAssertEqual(exCompoundSingleRestSun2?.command, .scheduleRepeatPower(hour: 8, minute: 0, power: true, repeatWeekdays: [1, 2, 3, 4, 5, 6, 7], repeatLabel: "周一至周日"))
     }
 
     // MARK: - 无效输入测试

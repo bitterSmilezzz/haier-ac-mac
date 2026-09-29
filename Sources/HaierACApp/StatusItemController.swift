@@ -137,7 +137,11 @@ final class StatusItemController: NSObject {
             .sorted(by: { $0.fireDate < $1.fireDate })
         if let firstAction = upcomingSchedules.first {
             let threshold = firstAction.fireDate.addingTimeInterval(5.0)
-            let sameTimeActions = upcomingSchedules.filter { $0.fireDate <= threshold }
+            let sameTimeActions = upcomingSchedules.filter {
+                $0.fireDate <= threshold &&
+                $0.attrName == firstAction.attrName &&
+                $0.attrValue == firstAction.attrValue
+            }
             let remSecs = Int(firstAction.fireDate.timeIntervalSince(now))
             let remDesc = Self.formatRemainingTimeSpan(remSecs: remSecs)
             let timeStr = DateFormatter.localizedString(from: firstAction.fireDate, dateStyle: .none, timeStyle: .short)
@@ -1881,7 +1885,17 @@ final class StatusItemController: NSObject {
         }
     }
 
-    /// 智能提取计划调度或倒计时任务的干净动作谓词（以硬件底层真实布尔载荷权威裁决开关机，消除“开关”双词倒置开机意图缺陷，并提炼温阶/模式及清洗冗余前缀与重复周期标签） (v1.9.66, v1.9.67, v1.9.68, v1.9.69)
+    private static let schedulePrefixRegex: NSRegularExpression? = {
+        let pattern = #"^(?:(?:定时|预约)?(?:全屋)?(?:在)?\s*)*(?:(?:明天|后天|大后天|次日|工作日|平时|周末三天|周末|双休|单休|每天|周[一二三四五六日天0-7至到\-~、\s]+|每周[一二三四五六日天0-7、\s]+)\s*)*(?:\d{1,2}:\d{2}(?::\d{2})?\s*)*(?:\d+\s*(?:分钟|小时|钟头)后|晨间过渡(?:关机)?\s*)*"#
+        return try? NSRegularExpression(pattern: pattern)
+    }()
+
+    private static let scheduleSuffixRegex: NSRegularExpression? = {
+        let pattern = #"\s*[(（](?:每天|工作日|平时|周末三天|周末|双休|单休|周[一二三四五六日天至到\-~、\s]+)[)）]\s*$"#
+        return try? NSRegularExpression(pattern: pattern)
+    }()
+
+    /// 智能提取计划调度或倒计时任务的干净动作谓词（以硬件底层真实布尔载荷权威裁决开关机，消除“开关”双词倒置开机意图缺陷，并提炼温阶/模式及清洗冗余前缀与重复周期标签） (v1.9.66, v1.9.67, v1.9.68, v1.9.69, v1.9.71 预编译正则与单休/周末三天完备纳管)
     private static func extractPlanActionVerb(from action: ScheduledAction, devName: String) -> String {
         var name = action.name
         if !devName.isEmpty && name.hasPrefix("「\(devName)」") {
@@ -1920,15 +1934,15 @@ final class StatusItemController: NSObject {
             }
         }
 
-        // 4. 其他任务类型（自清洁/睡眠曲线/自定义调温等）：清洗前置时间与周期前缀及冗余前缀
-        if let prefixRegex = try? NSRegularExpression(pattern: #"^(?:(?:定时|预约)?(?:全屋)?(?:在)?\s*)*(?:(?:明天|后天|大后天|次日|工作日|平时|周末|双休|每天|周[一二三四五六日天0-7至到\-~、\s]+|每周[一二三四五六日天0-7、\s]+)\s*)*(?:\d{1,2}:\d{2}(?::\d{2})?\s*)*(?:\d+\s*(?:分钟|小时|钟头)后|晨间过渡(?:关机)?\s*)*"#) {
+        // 4. 其他任务类型（自清洁/睡眠曲线/自定义调温等）：清洗前置时间与周期前缀及冗余前缀 (v1.9.71 预编译正则与单休/周末三天完备纳管)
+        if let regex = schedulePrefixRegex {
             let range = NSRange(name.startIndex..<name.endIndex, in: name)
-            name = prefixRegex.stringByReplacingMatches(in: name, options: [], range: range, withTemplate: "")
+            name = regex.stringByReplacingMatches(in: name, options: [], range: range, withTemplate: "")
         }
-        // 清洗末尾附带的周期重复后缀（如“（工作日）”、“（每天）”），防止与菜单后续追加的周期标签形成双重重复
-        if let suffixRegex = try? NSRegularExpression(pattern: #"\s*[(（](?:每天|工作日|平时|周末|双休|周[一二三四五六日天至到\-~、\s]+)[)）]\s*$"#) {
+        // 清洗末尾附带的周期重复后缀（如“（工作日）”、“（每天）”、“（单休）”），防止与菜单后续追加的周期标签形成双重重复
+        if let regex = scheduleSuffixRegex {
             let range = NSRange(name.startIndex..<name.endIndex, in: name)
-            name = suffixRegex.stringByReplacingMatches(in: name, options: [], range: range, withTemplate: "")
+            name = regex.stringByReplacingMatches(in: name, options: [], range: range, withTemplate: "")
         }
         name = name.trimmingCharacters(in: .whitespacesAndNewlines)
         if name.isEmpty {

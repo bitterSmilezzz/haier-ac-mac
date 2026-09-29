@@ -451,15 +451,15 @@ public struct VoiceCommandParser {
         return try? NSRegularExpression(pattern: pattern)
     }()
 
-    /// 匹配核心关键词复合星期口语（如“工作日和周六”、“工作日及周日”、“工作日还有周六”、“工作日加周日”、“工作日加周末”、“周末和周一”、“周末以及周五”） (v1.9.67, v1.9.70 增加每天负向断言防误判为星期天)
+    /// 匹配核心关键词复合星期口语（如“工作日和周六”、“工作日及周日”、“工作日还有周六”、“工作日加周日”、“工作日加周末”、“周末和周一”、“周末以及周五”、“单休和周日”） (v1.9.67, v1.9.70 增加每天负向断言防误判为星期天, v1.9.71 纳管单休与周末三天)
     private static let keywordWithExtraDayRegex: NSRegularExpression? = {
-        let pattern = #"(工作日|平时|周末|双休)\s*(?:[、,，和与及跟以及还有或者或加/／\s]+)\s*(?!(?:每天|天天|每日|每晚|每早|每晨|每夜|日日))(?:(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)?([一二三四五六日天1-7]|工作日|平时|周末|双休))"#
+        let pattern = #"(工作日|平时|周末|双休|单休|周末三天)\s*(?:[、,，和与及跟以及还有或者或加/／\s]+)\s*(?!(?:每天|天天|每日|每晚|每早|每晨|每夜|日日))(?:(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)?([一二三四五六日天1-7]|工作日|平时|周末|双休|单休|周末三天))"#
         return try? NSRegularExpression(pattern: pattern)
     }()
 
-    /// 匹配离散星期在前、核心关键词在后口语（如“周六和工作日”、“周一和周末”） (v1.9.67)
+    /// 匹配离散星期在前、核心关键词在后口语（如“周六和工作日”、“周一和周末”、“周日和单休”） (v1.9.67, v1.9.71 纳管单休与周末三天)
     private static let extraDayWithKeywordRegex: NSRegularExpression? = {
-        let pattern = #"(?:(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7]))\s*(?:[、,，和与及跟以及还有或者或加/／\s]+)\s*(工作日|平时|周末|双休)"#
+        let pattern = #"(?:(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7]))\s*(?:[、,，和与及跟以及还有或者或加/／\s]+)\s*(工作日|平时|周末|双休|单休|周末三天)"#
         return try? NSRegularExpression(pattern: pattern)
     }()
 
@@ -475,7 +475,7 @@ public struct VoiceCommandParser {
         return try? NSRegularExpression(pattern: pattern)
     }()
 
-    /// 从排除文本中提取被排除的星期集合 (v1.9.68)
+    /// 从排除文本中提取被排除的星期集合 (v1.9.68, v1.9.71 纳管周末三天与单休排除)
     private static func extractExcludedDays(from target: String) -> Set<Int>? {
         var excluded = Set<Int>()
         var remainingTarget = target
@@ -483,9 +483,17 @@ public struct VoiceCommandParser {
             excluded.formUnion([2, 3, 4, 5, 6])
             remainingTarget = remainingTarget.replacingOccurrences(of: "工作日", with: "").replacingOccurrences(of: "平时", with: "")
         }
+        if remainingTarget.contains("周末三天") {
+            excluded.formUnion([1, 6, 7])
+            remainingTarget = remainingTarget.replacingOccurrences(of: "周末三天", with: "")
+        }
         if remainingTarget.contains("周末") || remainingTarget.contains("双休") {
             excluded.formUnion([1, 7])
             remainingTarget = remainingTarget.replacingOccurrences(of: "周末", with: "").replacingOccurrences(of: "双休", with: "")
+        }
+        if remainingTarget.contains("单休") {
+            excluded.formUnion([2, 3, 4, 5, 6, 7])
+            remainingTarget = remainingTarget.replacingOccurrences(of: "单休", with: "")
         }
         // 尝试解析连续区间，如“周一至周五”、“周一到周四”
         if let regex = repeatWeekdayRangeRegex,
@@ -674,7 +682,7 @@ public struct VoiceCommandParser {
             }
         }
 
-        // 2. 复合语义优先匹配：核心关键词 + 附加星期（如“工作日和周六”、“工作日及周日”、“工作日加周末”、“周末和周一”、“周末以及周五”）(v1.9.67)
+        // 2. 复合语义优先匹配：核心关键词 + 附加星期（如“工作日和周六”、“工作日及周日”、“工作日加周末”、“周末和周一”、“周末以及周五”、“单休和周日”）(v1.9.67, v1.9.71)
         if let regex = keywordWithExtraDayRegex,
            let match = regex.firstMatch(in: text, options: [], range: fullRange),
            match.numberOfRanges >= 3 {
@@ -685,11 +693,19 @@ public struct VoiceCommandParser {
                 days.formUnion([2, 3, 4, 5, 6])
             } else if kw == "周末" || kw == "双休" {
                 days.formUnion([1, 7])
+            } else if kw == "单休" {
+                days.formUnion([2, 3, 4, 5, 6, 7])
+            } else if kw == "周末三天" {
+                days.formUnion([1, 6, 7])
             }
             if extra == "工作日" || extra == "平时" {
                 days.formUnion([2, 3, 4, 5, 6])
             } else if extra == "周末" || extra == "双休" {
                 days.formUnion([1, 7])
+            } else if extra == "单休" {
+                days.formUnion([2, 3, 4, 5, 6, 7])
+            } else if extra == "周末三天" {
+                days.formUnion([1, 6, 7])
             } else if let ch = extra.first, let wd = chineseDayCharToWeekday(ch) {
                 days.insert(wd)
             }
@@ -699,7 +715,7 @@ public struct VoiceCommandParser {
             }
         }
 
-        // 3. 复合语义优先匹配：附加星期在前 + 核心关键词在后（如“周六和工作日”、“周一和周末”）(v1.9.67)
+        // 3. 复合语义优先匹配：附加星期在前 + 核心关键词在后（如“周六和工作日”、“周一和周末”、“周日和单休”）(v1.9.67, v1.9.71)
         if let regex = extraDayWithKeywordRegex,
            let match = regex.firstMatch(in: text, options: [], range: fullRange),
            match.numberOfRanges >= 3 {
@@ -713,6 +729,10 @@ public struct VoiceCommandParser {
                 days.formUnion([2, 3, 4, 5, 6])
             } else if kw == "周末" || kw == "双休" {
                 days.formUnion([1, 7])
+            } else if kw == "单休" {
+                days.formUnion([2, 3, 4, 5, 6, 7])
+            } else if kw == "周末三天" {
+                days.formUnion([1, 6, 7])
             }
             if !days.isEmpty {
                 let sorted = days.sorted()

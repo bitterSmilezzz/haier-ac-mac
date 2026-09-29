@@ -1195,6 +1195,7 @@ final class AppModel: ObservableObject {
     }
     private var schedulerTask: Task<Void, Never>?
     private var lastMinuteSampleDate: Date?
+    private var hasLoadedScheduledActions = false
 
     /// 周期性能耗采样积分与滤网运行时长累加 (全屋多设备并发动力学积分，v1.9.21)
     private func accumulateMinuteTick() {
@@ -1264,12 +1265,15 @@ final class AppModel: ObservableObject {
     }
 
     /// 启动调度（登录/恢复会话成功后调用；App 退出前持续运行）。
-    /// 优化：按下一任务触发时刻精确休眠，并保证每 60 秒定期累积能耗、滤网与定时器。
+    /// 优化：按下一任务触发时刻精确休眠，并保证每 60 秒定期累积能耗、滤网与定时器。(v1.9.71 避免 wakeScheduler 重复反序列化磁盘开销)
     func startScheduler() {
         guard schedulerTask == nil else { return }
-        if let data = UserDefaults.standard.data(forKey: "scheduledActions"),
-           let saved = try? JSONDecoder().decode([ScheduledAction].self, from: data) {
-            scheduledActions = saved
+        if !hasLoadedScheduledActions {
+            hasLoadedScheduledActions = true
+            if let data = UserDefaults.standard.data(forKey: "scheduledActions"),
+               let saved = try? JSONDecoder().decode([ScheduledAction].self, from: data) {
+                scheduledActions = saved
+            }
         }
         schedulerTask = Task { [weak self] in
             while !Task.isCancelled {

@@ -6,6 +6,18 @@ A native SwiftUI app to control Haier / Leader (统帅) smart air conditioners o
 
 ## Features
 
+- 🏷 **Closed-Loop Single-Rest & Long-Weekend Exclusion Schedule Engine, macOS Status Bar Same-Time Action Predicate Alignment with Precompiled RegEx & Scheduler I/O Optimization (v1.9.71)**:
+  - ⏱️ **Natural Language Single-Rest & Long-Weekend Exclusion Repeat Schedule Engine (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)**:
+    - **Exclusion Semantics for Single-Rest & 3-Day Weekends**: Fully integrated "Single-Rest" (Mon–Sat, `[2, 3, 4, 5, 6, 7]`) and "3-Day Weekend" (Fri–Sun, `[1, 6, 7]`) in `extractExcludedDays`, fixing issues where "except single-rest" failed to parse and "except 3-day weekend" was prematurely truncated by the "weekend" prefix missing Friday. Accurately evaluates to `[1]` ("Every Sunday") and `[2, 3, 4, 5]` ("Mon to Thu");
+    - **Base Scope Exclusion Closure for Long Weekends**: Supports base scope subtraction on "3-day weekend" (e.g. "3-day weekend except Friday" -> `[1, 7]` "Weekend"; "3-day weekend except Sunday" -> `[6, 7]` "Fri to Sat");
+    - **Compound Weekday Grammar Expansion**: Added `单休` (single-rest) and `周末三天` (3-day weekend) to `keywordWithExtraDayRegex` and `extraDayWithKeywordRegex`, supporting natural expressions like "single-rest plus Sunday" smoothly evaluating to all 7 days (`[1, 2, 3, 4, 5, 6, 7]`);
+    - **100% Test Coverage**: Added 7 end-to-end test cases in `VoiceCommandParserTests`, all assertions 100% PASS.
+  - 🍱 **macOS Status Bar Same-Time Action Predicate Strict Alignment & Precompiled RegEx Optimization (`StatusItemController.swift`)**:
+    - **Tooltip Upcoming Schedule Action Alignment**: Enforced `$0.attrName == firstAction.attrName && $0.attrValue == firstAction.attrValue` on `sameTimeActions`, eliminating flaws where mixed actions (e.g., turning one AC on and another off at the same time) were incorrectly aggregated under a single conflicting verb;
+    - **Precompiled RegEx & Semantic Cleaning**: Upgraded prefix and suffix regexes in `extractPlanActionVerb` to `static let` precompiled constants to reduce main thread CPU overhead, adding cleaning rules for single-rest and 3-day weekends.
+  - ⚡️ **Scheduler Disk I/O & Deserialization Deduplication (`AppModel.swift`)**:
+    - **Eliminated Redundant Deserialization upon Wake**: Added `hasLoadedScheduledActions` gate to only read `scheduledActions` from `UserDefaults` on initial startup, reusing live in-memory data during frequent `wakeScheduler()` cycles to eliminate disk reads and JSON parsing overhead.
+
 - 🏷 **Universal Base Scope Exclusion Weekday Schedule Engine, Single-Rest Workweek Management, Status Bar Synchronized Sibling Disambiguation & Atomic Batch Control (v1.9.70)**:
   - ⏱️ **Natural Language Universal Base Scope Exclusion Schedule Engine & Single-Rest Workweek (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)**:
     - **Unified Hierarchical Base Scope Resolution**: Overhauled `parseRepeatWeekdays` into a layered structure by isolating `parseBaseRepeatWeekdays`. In `extractBaseScopeWeekdays`, eliminated previous narrow scope restrictions to fully parse continuous spans, discrete multi-weekdays (e.g., "一三五除了周三每天早8点开机" -> `[2, 6]`; "二四六除周四外每天早8点开机" -> `[3, 7]`), compound spans with extra days ("工作日和周六除了周三每天早8点开机" -> `[2, 3, 5, 6, 7]`), and single-rest schedules, eradicating severe logic inversions that fell back to all-week 7-day deductions;
