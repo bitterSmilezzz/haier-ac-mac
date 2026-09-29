@@ -379,6 +379,7 @@ final class StatusItemController: NSObject {
         menu.autoenablesItems = false
         let voiceItem = NSMenuItem(title: "语音控制... (⌃⌥A)", action: #selector(openVoiceControl), keyEquivalent: "")
         voiceItem.target = self
+        voiceItem.toolTip = "启动语音交互胶囊 (快捷键: Control-Option-A)，支持口语控制空调开关、调温、模式、定时调度等"
         menu.addItem(voiceItem)
 
         let allDevices = model.allUnifiedDevices
@@ -557,6 +558,19 @@ final class StatusItemController: NSObject {
                 let devIndoorHum = model.currentIndoorHumidity(for: devId)
                 let devRawWind = model.attribute("windSpeed", deviceId: devId)?.stringValue
                 let devWindStr = formatDisplayWindSpeed(devRawWind)
+                let contMins = model.deviceContinuousMinutes[devId] ?? 0
+                let devModeStr: String = {
+                    if let modeCode = modeCode {
+                        switch modeCode {
+                        case .cooling: return "❄️ 制冷"
+                        case .heating: return "🔥 制热"
+                        case .fan: return "🍃 送风"
+                        case .dehumidify: return "💧 除湿"
+                        case .auto: return "🔄 自动"
+                        }
+                    }
+                    return "⚙️ 运行中"
+                }()
                 let devConditionTitle: String = {
                     let envStr: String = {
                         if let t = devIndoorTemp {
@@ -575,25 +589,38 @@ final class StatusItemController: NSObject {
                         return "⚡️ \(dev.name): 离线\(envStr)"
                     }
                     if isPowerOn {
-                        let modeStr: String = {
-                            if let modeCode = modeCode {
-                                switch modeCode {
-                                case .cooling: return "❄️ 制冷"
-                                case .heating: return "🔥 制热"
-                                case .fan: return "🍃 送风"
-                                case .dehumidify: return "💧 除湿"
-                                case .auto: return "🔄 自动"
-                                }
-                            }
-                            return "⚙️ 运行中"
-                        }()
-                        return "🟢 \(dev.name): \(modeStr) \(curTempStr)°C [\(devWindStr)]\(envStr)"
+                        return "🟢 \(dev.name): \(devModeStr) \(curTempStr)°C [\(devWindStr)]\(envStr)"
                     } else {
                         return "⚪️ \(dev.name): 待机\(envStr)"
                     }
                 }()
                 let headerItem = NSMenuItem(title: devConditionTitle, action: nil, keyEquivalent: "")
                 headerItem.isEnabled = false
+                headerItem.toolTip = {
+                    if !isControllable {
+                        return "「\(dev.name)」当前处于离线状态，无法接收控制指令"
+                    }
+                    if isPowerOn {
+                        var details = ["【\(dev.name) 实时运行看板】"]
+                        details.append("• 模式：\(devModeStr)")
+                        details.append("• 设定温度：\(curTempStr)°C")
+                        details.append("• 风速：\(devWindStr)")
+                        if contMins > 0 {
+                            let hrs = contMins / 60
+                            let mins = contMins % 60
+                            let durStr = mins > 0 ? "\(hrs) 小时 \(mins) 分钟" : "\(hrs) 小时"
+                            let soakNotice = contMins >= 120 ? " (已进入变频恒温稳态，热饱和阻抗补偿生效中)" : " (工况平稳上升中)"
+                            details.append("• 连续运转：\(durStr)\(soakNotice)")
+                        }
+                        if let indoor = devIndoorTemp {
+                            let humStr = devIndoorHum.map { " · 相对湿度 \(Int(round($0)))% RH" } ?? ""
+                            details.append("• 室内环境：温度 \(String(format: "%.1f", indoor))°C\(humStr)")
+                        }
+                        return details.joined(separator: "\n")
+                    } else {
+                        return "「\(dev.name)」当前待机（微功耗 1.5W），点击开机可快速启动"
+                    }
+                }()
                 devSubmenu.addItem(headerItem)
                 devSubmenu.addItem(.separator())
 
@@ -900,6 +927,19 @@ final class StatusItemController: NSObject {
             let windStr = formatDisplayWindSpeed(rawWind)
 
             let indoorHum = model.currentIndoorHumidity(for: dev.id)
+            let singleContMins = model.deviceContinuousMinutes[dev.id] ?? 0
+            let singleModeStr: String = {
+                if let modeCode = modeCode {
+                    switch modeCode {
+                    case .cooling: return "❄️ 制冷"
+                    case .heating: return "🔥 制热"
+                    case .fan: return "🍃 送风"
+                    case .dehumidify: return "💧 除湿"
+                    case .auto: return "🔄 自动"
+                    }
+                }
+                return "⚙️ 运行中"
+            }()
             let conditionTitle: String = {
                 let envStr: String = {
                     if let indoor = indoorTemp {
@@ -918,25 +958,38 @@ final class StatusItemController: NSObject {
                     return "⚡️ \(dev.name): 离线\(envStr)"
                 }
                 if isPowerOn {
-                    let modeStr: String = {
-                        if let modeCode = modeCode {
-                            switch modeCode {
-                            case .cooling: return "❄️ 制冷"
-                            case .heating: return "🔥 制热"
-                            case .fan: return "🍃 送风"
-                            case .dehumidify: return "💧 除湿"
-                            case .auto: return "🔄 自动"
-                            }
-                        }
-                        return "⚙️ 运行中"
-                    }()
-                    return "🟢 \(dev.name): \(modeStr) \(curTempStr)°C [\(windStr)]\(envStr)"
+                    return "🟢 \(dev.name): \(singleModeStr) \(curTempStr)°C [\(windStr)]\(envStr)"
                 } else {
                     return "⚪️ \(dev.name): 待机\(envStr)"
                 }
             }()
             let headerItem = NSMenuItem(title: conditionTitle, action: nil, keyEquivalent: "")
             headerItem.isEnabled = false
+            headerItem.toolTip = {
+                if !isControllable {
+                    return "「\(dev.name)」当前处于离线状态，无法接收控制指令"
+                }
+                if isPowerOn {
+                    var details = ["【\(dev.name) 实时运行看板】"]
+                    details.append("• 模式：\(singleModeStr)")
+                    details.append("• 设定温度：\(curTempStr)°C")
+                    details.append("• 风速：\(windStr)")
+                    if singleContMins > 0 {
+                        let hrs = singleContMins / 60
+                        let mins = singleContMins % 60
+                        let durStr = mins > 0 ? "\(hrs) 小时 \(mins) 分钟" : "\(hrs) 小时"
+                        let soakNotice = singleContMins >= 120 ? " (已进入变频恒温稳态，热饱和阻抗补偿生效中)" : " (工况平稳上升中)"
+                        details.append("• 连续运转：\(durStr)\(soakNotice)")
+                    }
+                    if let indoor = indoorTemp {
+                        let humStr = indoorHum.map { " · 相对湿度 \(Int(round($0)))% RH" } ?? ""
+                        details.append("• 室内环境：温度 \(String(format: "%.1f", indoor))°C\(humStr)")
+                    }
+                    return details.joined(separator: "\n")
+                } else {
+                    return "「\(dev.name)」当前待机（微功耗 1.5W），点击开机可快速启动"
+                }
+            }()
             menu.addItem(headerItem)
             menu.addItem(.separator())
 
@@ -1129,6 +1182,7 @@ final class StatusItemController: NSObject {
 
         let openItem = NSMenuItem(title: "打开主窗口", action: #selector(openMainWindow), keyEquivalent: "")
         openItem.target = self
+        openItem.toolTip = "打开海尔空调控制主界面，查看多设备卡片、环境感知、能耗洞察与智能睡眠"
         menu.addItem(openItem)
 
         menu.addItem(.separator())
@@ -1139,6 +1193,7 @@ final class StatusItemController: NSObject {
             "助眠白噪音：已暂停 (点击播放)"
         let ambientItem = NSMenuItem(title: ambientTitle, action: #selector(toggleAmbientSound), keyEquivalent: "")
         ambientItem.target = self
+        ambientItem.toolTip = "切换播放白噪音背景音（\(model.sleepAmbientSoundType.displayName)），营造舒适入眠与专注氛围"
         menu.addItem(ambientItem)
 
         // 滤网健康与自清洁快速入口 (v1.9.21, v1.9.37 多设备全屋最低洁净度预警, v1.9.45 快捷重置子菜单)
@@ -1347,10 +1402,12 @@ final class StatusItemController: NSObject {
 
         let launchItem = NSMenuItem(title: model.launchAtLogin ? "开机自启：开" : "开机自启：关", action: #selector(toggleLaunchAtLogin), keyEquivalent: "")
         launchItem.target = self
+        launchItem.toolTip = "设置登录 macOS 系统时是否自动启动海尔空调控制后台服务"
         menu.addItem(launchItem)
 
         let tempItem = NSMenuItem(title: model.menuBarShowTemperature ? "菜单栏显示温度：开" : "菜单栏显示温度：关", action: #selector(toggleMenuBarTemperature), keyEquivalent: "")
         tempItem.target = self
+        tempItem.toolTip = "切换是否在 macOS 顶部菜单栏图标旁直观显示主显空调当前的温度与运行状态"
         menu.addItem(tempItem)
 
         let themeMenu = NSMenu()
@@ -1360,15 +1417,22 @@ final class StatusItemController: NSObject {
             item.target = self
             item.state = mode == model.themeMode ? .on : .off
             item.representedObject = mode.rawValue
+            switch mode {
+            case .system: item.toolTip = "外观跟随 macOS 系统深浅色外观设置自动切换"
+            case .light: item.toolTip = "强制使用浅色清新界面外观"
+            case .dark: item.toolTip = "强制使用深色深邃夜间界面外观"
+            }
             themeMenu.addItem(item)
         }
         let themeItem = NSMenuItem(title: "主题", action: nil, keyEquivalent: "")
+        themeItem.toolTip = "切换应用外观主题（跟随系统 / 浅色清新 / 深色深邃）"
         menu.setSubmenu(themeMenu, for: themeItem)
         menu.addItem(themeItem)
 
         menu.addItem(.separator())
         let quitItem = NSMenuItem(title: "退出海尔空调控制", action: #selector(quitApp), keyEquivalent: "q")
         quitItem.target = self
+        quitItem.toolTip = "完全退出海尔空调控制应用并终止后台网关长连接与定时调度器"
         menu.addItem(quitItem)
 
         statusItem?.menu = menu

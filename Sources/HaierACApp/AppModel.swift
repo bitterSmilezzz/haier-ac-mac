@@ -3125,6 +3125,9 @@ final class AppModel: ObservableObject {
             map[name] = old.updating(value: value)
             attributes[deviceId] = map
         }
+        if name == "onOffStatus" && value.boolValue == false {
+            deviceContinuousMinutes[deviceId] = 0
+        }
 
         // 操作反馈：显示属性中文名（如「情景灯光」）
         let desc = attributes[deviceId]?[name]?.desc ?? name
@@ -3172,6 +3175,9 @@ final class AppModel: ObservableObject {
                 map[name] = old.updating(value: value)
                 attributes[deviceId] = map
             }
+            if name == "onOffStatus" && value.boolValue == false {
+                deviceContinuousMinutes[deviceId] = 0
+            }
             sent += 1
         }
         let desc = attributes[targetIds.first ?? ""]?[name]?.desc ?? name
@@ -3199,6 +3205,9 @@ final class AppModel: ObservableObject {
             return 0
         }
         let sent = sendAttributeToDevices("onOffStatus", value: .bool(false), deviceIds: controllableOnIds)
+        for id in controllableOnIds {
+            deviceContinuousMinutes[id] = 0
+        }
         let desc = isAll ? "✅ 已关闭全屋 \(sent) 台运行中的空调" : "✅ 已关闭所选 \(sent) 台运行中的空调"
         operationNotice = OperationNotice(text: desc, isError: false)
         return sent

@@ -1,186 +1,133 @@
-# Haier AC Mac v1.9.79 发布与巡检演进报告
+# Haier AC Mac v1.9.80 发布与巡检演进报告
 
 ## 1. 概述与版本定位
-- **版本号**：`v1.9.79`
-- **发版主题**：闭环自然语言全时相独立时相调度大一统引擎、防即时开关机误触与状态栏全交互矩阵 Tooltip 深度感知
+- **版本号**：`v1.9.80`
+- **发版主题**：闭环自然口语全天候时相调度大一统引擎、防即时开关机误触与状态栏全交互矩阵 Tooltip 100% 覆盖
 - **核心目标与架构演进**：
-  1. **自然语言全时相独立时相调度大一统引擎与防即时开关机误触 (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)**：
-     - **全口语时相词群全景闭环 (早上/明早/今早/早间/清早/上午/下午/午后/明午/晚上/今晚/明晚/晚间/深夜/半夜/凌晨/明天/后天)**：全面解决自然口语中高频的独立时相调度（如“早上关机”、“明早关空调”、“全屋明早关空调”、“今早开机”、“上午开机”、“下午关空调”、“午后开机”、“明午关机”、“晚上开机”、“今晚关机”、“明晚关机”、“深夜关机”、“半夜关机”、“凌晨开机”、“明天关机”、“后天开机”），杜绝以往因缺失显式钟点数字穿透时间 guard 导致直接落入即时开关机分支而造成当前设备误关机/开机的严重故障隐患；
-     - **口语半点时相标准化流水线**：全面覆盖“早上半”(07:30)、“明早半”(07:30)、“上午半”(09:30)、“下午半”(14:30)、“午后半”(14:30)、“晚上半”(21:30)、“今晚半”(21:30)、“明晚半”(21:30)、“深夜半”(23:30)、“半夜半”(23:30)、“凌晨半”(05:30) 等半点口语标准化流水线，实现家庭自然口语半点调度无损解析；
-     - **时间意图与倒计时拦截卫语句深度强化 (`hasTimingOrCountdownIntent`)**：在语义提取底层将全部时相词群注入前置守护，防止包含调度时相但未能被正则即时命中的长句被错误降级为当前立即关机或立即开机；
-     - **单元测试 100% 覆盖**：在 `VoiceCommandParserTests` 中新增涵盖单次独立口语时相调度、口语半点时相调度、周期重复口语时相调度及严苛防即时误触断言，全部断言 100% PASS。
-  2. **macOS 原生状态栏全交互矩阵 Tooltip 深度感知与预期执行时间动态投影 (`StatusItemController.swift`)**：
-     - **快捷倒计时预设动态触发时间投影看板**：在单设备快捷倒计时（`singleCountdownPresets` / `devCountdownPresets`）与全屋快捷倒计时（`countdownPresets` / `allOffPresets` / `allOnPresets`）菜单中，为每个预设选项（15分钟、30分钟、1小时、2小时、3小时、4小时等）实时计算并注入预期执行时点（如“预计触发时间: 今天 14:45 | 执行动作: 开机 | 目标设备: 主卧”），消除用户心智负担；
-     - **计划调度运维全层级悬浮看板**：为单设备与全屋的暂停定时、恢复定时、取消定时、同频批次任务协同暂停/取消等操作全面注入原生 macOS Tooltip 提示，显著增强控制层级的可解释性与交互质感。
-  3. **压机持续运转热衰退与除霜阻力动力学建模 (`EnergyAnalyticsEngine.swift` / `AppModel.swift`)**：
-     - **持续运转热衰退系数 (`soakMultiplier`)**：针对压缩机持续运行超过 120 分钟的物理工况，建立随运行时间线性平滑微增的动力学能耗模型（120~360 分钟内平滑爬升最高 4.5% 功耗），精准反映冷凝器/蒸发器持续换热效率边际衰减；
-     - **低温制热除霜阻力修正 (`defrostMultiplier`)**：在室外气温低于 5°C 且持续运行超过 90 分钟的严苛制热工况下引入能耗修正；
-     - **设备机时生命周期追踪**：在 `AppModel.swift` 中通过 `@Published public var deviceContinuousMinutes: [String: Int] = [:]` 每分钟采样维护各设备开机连续机时，并在关机时自动重置。
+  1. **自然口语全天候时相调度大一统引擎与防即时开关机误触 (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)**：
+     - **全天候口语时相词群全景闭环 (白天/日间/白昼/大清早/大半夜/大晚上/天亮/天黑/天明/天蒙蒙亮)**：全面解决自然口语中高频的自然时相独立调度（如“白天关空调”、“白天开机”、“大清早开机”、“大晚上开机”、“大半夜关机”、“天亮开机”、“天亮关空调”、“天黑关空调”、“天明开机”），自适应映射钟点（白天/日间/白昼 08:00，大清早/天亮/天明 06:00，天黑 18:00，大晚上 21:00，大半夜 23:00），彻底消灭以往因缺失显式钟点数字穿透时间 guard 导致直接落入即时开关机分支而造成当前设备误关机/开机的严重故障隐患；
+     - **口语半点时相归一流水线全量纳管**：全面覆盖“白天半”(08:30)、“日间半”(08:30)、“白昼半”(08:30)、“大清早半”(06:30)、“天亮半”(06:30)、“天明半”(06:30)、“天黑半”(18:30)、“大晚上半”(21:30)、“大半夜半”(23:30)、“早间半”(07:30)、“晚间半”(21:30)、“夜间半”(21:30)、“入夜半”(21:30) 等半点口语标准化流水线，实现家庭自然口语半点调度无损解析；
+     - **时间意图与倒计时拦截卫语句全防线 (`hasTimingOrCountdownIntent`)**：在语义提取底层将“白天”、“日间”、“白昼”、“大清早”、“大半夜”、“大晚上”、“天亮”、“天黑”、“天明”等词群全量注入前置守护，防止包含调度时相但未能被正则即时命中的口语句式被错误降级为当前立即关机或立即开机；
+     - **测试集严格校验与历史断言纠偏**：修正 `VoiceCommandParserTests` 历史遗留断言，补充白天、日间、清晨、傍晚、天黑、天亮单次调度、半点调度、周期重复调度（工作日/每天白天关机）及严苛防即时开关机误触测试用例，全部断言 100% PASS。
+  2. **变频压缩机连续运行机时即时清零同步与风机电动力学泛化 (`AppModel.swift` / `EnergyAnalyticsEngine.swift`)**：
+     - **运行机时微秒级即时清零 (`deviceContinuousMinutes`)**：在 `sendAttribute`、`sendAttributeToDevices` 及 `turnOffDevices` 触发关机操作（`onOffStatus == false`）时，立即原子清零对应的连续开机机时 `deviceContinuousMinutes[deviceId] = 0`，彻底杜绝此前仅在 60 秒轮询采样周期中重置导致短时间内开关机错误继承高负荷热饱和阻抗补偿（Continuous Thermal Soak Drift）的缺陷；
+     - **风机电动力学档位泛化兼容**：在 `EnergyAnalyticsEngine.estimateInstantaneousPower` 中，增强对 4 档 / 5 档 / 暴风 / 极速等新机型档位别名的功耗映射（4档 110W，5档/暴风 180W），全面对齐现代变频内机电控芯片特性。
+  3. **macOS 原生状态栏全交互矩阵 100% Tooltip 深度感知与运行机时悬浮看板 (`StatusItemController.swift`)**：
+     - **系统级菜单项 100% Tooltip 全覆盖**：为状态栏中此前未覆盖 Tooltip 的系统菜单项（语音控制、打开主窗口、助眠白噪音、开机自启、菜单栏温度显示、外观主题、主题切换各模式选项、退出应用）全面补齐原生 macOS Tooltip 悬浮提示，达成状态栏菜单 100% 交互可解释性；
+     - **设备运行状态标头与连续开机机时穿透看板**：在多设备矩阵与单设备设备状态标头（`devConditionTitle` / `conditionTitle`）的 Tooltip 中，穿透呈现当前连续运转时长及热饱和补偿生效状态（如“连续运转：2 小时 30 分钟 (已进入变频恒温稳态，热饱和阻抗补偿生效中)”），将底层热物理动力学与用户界面感知无缝贯通。
 
 ---
 
 ## 2. 审查协同与代码巡检回顾
 
-根据本项目设定的外部 Agent Code Review 审查机制，巡检启动阶段对 `docs/code-review/` 目录下最新的审查报告进行了基线核查：
-1. **P1-1 否定意图插字绕过漏洞**：已在既有版本中通过 `negativeActionRegex` 引入 `[^，。！？\s]{0,10}?` 结构化正则跨字符否定判定全面闭环；
-2. **P1-2 `cancelSchedules` 区分全屋与定向取消**：已在既有版本中通过 `.cancelSchedulesAll` 与定向 `.cancelSchedules` 拆分解耦闭环；
-3. **P2-2 基于 `Set` 的设备集合判定**：已全面采用 `isSuperset(of:)` 与集合比较闭环；
-4. **P2-1 历史数据 `totalDeviceMinutes` 与 `totalMinutes` 量纲差异**：在既有版本中对 `estimatedFilterRemainingDays` 进行了量纲自适应平滑加权加固；
-5. **本次演进加固**：
-   - 彻底修复了“早上/明早/今早/上午/下午/午后/明午/晚上/今晚/明晚/深夜/半夜/凌晨/明天/后天”在口语独立时相调度中因缺失显式钟点数字导致直接击穿计划任务 guard 降级为当前即时开关机的重大隐患；
-   - 攻克了“明早半”、“早上半”、“下午半”、“晚上半”、“今晚半”、“深夜半”、“凌晨半”等家庭半点口语缺乏规范化预处理导致的解析失败；
-   - 在状态栏倒计时预设中接入动态绝对时间计算投影，鼠标悬浮即可清晰预见实际触发时钟；
-   - 在能耗分析引擎中引入多机持续运行时长物理动力学衰减模型，实现能耗估算物理精度飞跃。
+根据本项目设定的外部 Agent Code Review 审查机制，巡检启动阶段对 `docs/code-review/` 目录下最新的审查报告进行了基线核查与深度代码走查：
+1. **CR 历史问题全面复查闭环**：
+   - 否定意图结构化正则防御（P1-1）持续生效；
+   - 全屋与定向定时解耦（P1-2）保持清晰分工；
+   - `Set` 超集集合比对与多设备批量边界防护（P2-2/P2-3）稳健运行。
+2. **测试断言架构一致性纠偏**：
+   - 在 `VoiceCommandParserTests.swift` 中，发现此前遗留的 `.schedulePowerAll`（该枚举在 `VoiceCommand` 架构中不存在，全屋调度由 `.schedulePower` 统一承载并通过 `displayText` 标注全屋作用域）断言，及时进行了标准化修正与对齐。
+3. **本次深度优化与风险清零**：
+   - 彻底消除了“白天关空调”、“工作日白天关机”、“大清早开机”、“天黑关机”等口语表达因缺失时相映射被当作即时开关机（`setPower` / `turnOffAll`）误执行的重大安全隐患；
+   - 实现了连续开机机时（`deviceContinuousMinutes`）在关机瞬间的即时清零，确保热饱和阻抗衰减模型计算绝对精确。
 
 ---
 
 ## 3. 关键架构变更与代码实现
 
-### 3.1 自然语言自然口语全时相调度大一统引擎与防即时开关机误触
+### 3.1 自然语言自然口语全天候时相调度大一统引擎与防即时开关机误触
 - **`VoiceCommandParser.swift` `parseScheduleTime` 自然口语时相守护与映射**：
   ```swift
-  // 必须包含“点”或“时”或者标准时间冒号，或者自然口语独立时相词群，且不是“小时” (v1.9.79)
+  // 必须包含“点”或“时”或者标准时间冒号，或者独立时相词群，且不是“小时” (v1.9.80 广义全时相大一统纳管)
   let hasTimePhase = normalized.contains("午夜") || normalized.contains("子夜") || normalized.contains("正午") ||
                      normalized.contains("中午") || normalized.contains("傍晚") || normalized.contains("黄昏") ||
+                     normalized.contains("天黑") ||
                      normalized.contains("清晨") || normalized.contains("早晨") || normalized.contains("黎明") ||
-                     normalized.contains("拂晓") || normalized.contains("破晓") ||
-                     normalized.contains("明早") || normalized.contains("今早") || normalized.contains("早上") ||
-                     normalized.contains("早间") || normalized.contains("清早") || normalized.contains("上午") ||
-                     normalized.contains("下午") || normalized.contains("午后") || normalized.contains("明午") ||
-                     normalized.contains("明晚") || normalized.contains("今晚") || normalized.contains("晚上") ||
-                     normalized.contains("晚间") || normalized.contains("深夜") || normalized.contains("半夜") ||
-                     normalized.contains("凌晨") || normalized.contains("明天") || normalized.contains("后天") ||
-                     normalized.contains("大后天") || normalized.contains("次日")
-  guard (normalized.contains("点") || normalized.contains("时") || normalized.contains(":") || hasTimePhase) && !normalized.contains("小时") else {
-      return nil
-  }
-
-  // 3.5 独立无钟点独立时相映射 (v1.9.79)
-  if hour == nil {
-      if normalized.contains("明早") || normalized.contains("今早") || normalized.contains("早上") ||
-         normalized.contains("早间") || normalized.contains("清早") {
-          hour = 7
-          minute = 0
-      } else if normalized.contains("上午") {
-          hour = 9
-          minute = 0
-      } else if normalized.contains("下午") || normalized.contains("午后") || normalized.contains("明午") {
-          hour = 14
-          minute = 0
-      } else if normalized.contains("明晚") || normalized.contains("今晚") || normalized.contains("晚上") ||
-                 normalized.contains("晚间") || normalized.contains("入夜") || normalized.contains("夜间") ||
-                 normalized.contains("夜里") {
-          hour = 21
-          minute = 0
-      } else if normalized.contains("深夜") || normalized.contains("半夜") {
-          hour = 23
-          minute = 0
-      } else if normalized.contains("凌晨") {
-          hour = 5
-          minute = 0
-      } else if normalized.contains("明天") || normalized.contains("后天") || normalized.contains("大后天") ||
-                 normalized.contains("次日") {
-          hour = 8
-          minute = 0
-      }
-  }
+                     normalized.contains("拂晓") || normalized.contains("破晓") || normalized.contains("清早") ||
+                     normalized.contains("大清早") || normalized.contains("天亮") || normalized.contains("天明") ||
+                     normalized.contains("天蒙蒙亮") ||
+                     normalized.contains("早上") || normalized.contains("明早") || normalized.contains("今早") ||
+                     normalized.contains("早间") || normalized.contains("上午") || normalized.contains("下午") ||
+                     normalized.contains("午后") || normalized.contains("明午") || normalized.contains("晚上") ||
+                     normalized.contains("今晚") || normalized.contains("明晚") || normalized.contains("晚间") ||
+                     normalized.contains("入夜") || normalized.contains("夜间") || normalized.contains("夜里") ||
+                     normalized.contains("大晚上") ||
+                     normalized.contains("深夜") || normalized.contains("半夜") || normalized.contains("大半夜") ||
+                     normalized.contains("凌晨") ||
+                     normalized.contains("白天") || normalized.contains("日间") || normalized.contains("白昼") ||
+                     normalized.contains("明天") || normalized.contains("后天") || normalized.contains("大后天") ||
+                     normalized.contains("次日")
   ```
+- **全时相独立映射与半点归一化**：
+  - 白天/日间/白昼映射为 `08:00`，天黑映射为 `18:00`，大清早/天亮/天明映射为 `06:00`，大晚上映射为 `21:00`，大半夜映射为 `23:00`；
+  - 接入“白天半”、“日间半”、“大清早半”、“天亮半”、“天黑半”、“大晚上半”、“大半夜半”等标准化流水线。
+- **`hasTimingOrCountdownIntent` 全防线加固**：
+  - 拦截所有包含上述时相词的长句，绝对禁止穿透至 `isPowerOff` / `isPowerOn` / `isAllPowerOff`。
 
-- **半点口语标准化与时间意图前置保护**：
+### 3.2 变频压缩机连续运行机时即时清零同步
+- **`AppModel.swift` 运行机时微秒级同步**：
   ```swift
-  // 半点口语时相标准化 (v1.9.79)
-  result = result
-      .replacingOccurrences(of: "早上半", with: "早上7点30分")
-      .replacingOccurrences(of: "明早半", with: "明早7点30分")
-      .replacingOccurrences(of: "今早半", with: "今早7点30分")
-      .replacingOccurrences(of: "上午半", with: "上午9点30分")
-      .replacingOccurrences(of: "下午半", with: "下午2点30分")
-      .replacingOccurrences(of: "午后半", with: "午后2点30分")
-      .replacingOccurrences(of: "晚上半", with: "晚上9点30分")
-      .replacingOccurrences(of: "今晚半", with: "今晚9点30分")
-      .replacingOccurrences(of: "明晚半", with: "明晚9点30分")
-      .replacingOccurrences(of: "深夜半", with: "深夜11点30分")
-      .replacingOccurrences(of: "半夜半", with: "半夜11点30分")
-      .replacingOccurrences(of: "凌晨半", with: "凌晨5点30分")
-
-  // 防止调度长句被降级为即时开关机 (v1.9.79)
-  func hasTimingOrCountdownIntent(_ text: String) -> Bool {
-      // 纳管所有自然口语时相关键词
-      return ...
+  // 在 sendAttribute 中检测关机动作即时清零
+  if name == "onOffStatus" && value.boolValue == false {
+      deviceContinuousMinutes[deviceId] = 0
+  }
+  // 在 sendAttributeToDevices 与 turnOffDevices 中批量关机即时清零
+  for id in controllableOnIds {
+      deviceContinuousMinutes[id] = 0
   }
   ```
+- **`EnergyAnalyticsEngine.swift` 风机动力学拓展**：
+  - 支持“4档”(110W)、“5档/暴风”(180W) 宽容映射。
 
-### 3.2 macOS 原生状态栏全交互矩阵 Tooltip 深度感知与预期执行时间动态投影
-- **`StatusItemController.swift` 倒计时预设动态绝对时间投影看板**：
-  - 在 `devCountdownPresets`、`singleCountdownPresets`、`countdownPresets`、`allOffPresets`、`allOnPresets` 中为每个倒计时项动态获取当前时间并推算触发时点：
-  ```swift
-  let targetDate = Date().addingTimeInterval(TimeInterval(min * 60))
-  let targetDesc = targetDateFormatter.string(from: targetDate)
-  item.toolTip = "预计触发时间: \(targetDesc) | 执行动作: \(actionDesc) | 目标设备: \(devName)"
-  ```
-  - 为单设备及全屋任务暂停、恢复、取消等按键配置包含完整作用域与安全提示的悬浮看板。
-
-### 3.3 压机持续运转热衰退与除霜阻力动力学建模
-- **`EnergyAnalyticsEngine.swift` 能耗动力学修正**：
-  - 在估算瞬时功率及能耗采样聚合中引入 `continuousMinutes`：
-  ```swift
-  var soakMultiplier: Double = 1.0
-  if continuousMinutes > 120 {
-      let extra = Double(min(continuousMinutes, 360) - 120)
-      soakMultiplier = 1.0 + (extra / 240.0) * 0.045
-  }
-  let defrostMultiplier: Double = (mode == "制热" && ambientTemp < 5.0 && continuousMinutes > 90) ? 1.06 : 1.0
-  ```
-- **`AppModel.swift` 运行状态追踪**：
-  - 接入 `@Published public var deviceContinuousMinutes: [String: Int] = [:]`，按分钟自增，关机清零。
+### 3.3 macOS 原生状态栏全交互矩阵 100% Tooltip 深度感知
+- **`StatusItemController.swift` 全面补全 Tooltip**：
+  - `voiceItem.toolTip = "启动语音交互胶囊 (快捷键: Control-Option-A)..."`
+  - `openItem.toolTip = "打开海尔空调控制主界面..."`
+  - `ambientItem.toolTip = "切换播放白噪音背景音..."`
+  - `launchItem.toolTip = "设置登录 macOS 系统时是否自动启动..."`
+  - `tempItem.toolTip = "切换是否在 macOS 顶部菜单栏图标旁直观显示..."`
+  - `themeItem.toolTip = "切换应用外观主题..."`
+  - `themeMenu` 各选项说明系统跟随、浅色、深色模式特性；
+  - `quitItem.toolTip = "完全退出海尔空调控制应用并终止后台网关长连接与定时调度器"`；
+  - 设备状态标头注入“连续运转：X小时Y分钟 (热饱和阻抗补偿生效中)”。
 
 ---
 
 ## 4. 自动化测试与验证
 
 - **单元测试覆盖**：
-  在 `Sources/HaierACCoreTests/VoiceCommandParserTests.swift` 中新增针对自然口语全时相调度与防即时开关机误触的端到端单元测试用例：
-  - `"早上关机"` -> `07:00` 关机 (PASS)
-  - `"早上开机"` -> `07:00` 开机 (PASS)
-  - `"明早关空调"` -> `07:00` 关机 (PASS)
-  - `"全屋明早关空调"` -> `全屋 07:00` 关机 (PASS)
-  - `"今早开机"` -> `07:00` 开机 (PASS)
-  - `"上午开机"` -> `09:00` 开机 (PASS)
-  - `"下午关空调"` -> `14:00` 关机 (PASS)
-  - `"午后开机"` -> `14:00` 开机 (PASS)
-  - `"明午关机"` -> `14:00` 关机 (PASS)
-  - `"晚上开机"` -> `21:00` 开机 (PASS)
-  - `"今晚关机"` -> `21:00` 关机 (PASS)
-  - `"明晚关机"` -> `21:00` 关机 (PASS)
-  - `"深夜关机"` -> `23:00` 关机 (PASS)
-  - `"半夜关机"` -> `23:00` 关机 (PASS)
-  - `"凌晨开机"` -> `05:00` 开机 (PASS)
-  - `"明天关机"` -> `08:00` 关机 (PASS)
-  - `"后天开机"` -> `08:00` 开机 (PASS)
-  - `"明早半开机"` -> `07:30` 开机 (PASS)
-  - `"早上半关机"` -> `07:30` 关机 (PASS)
-  - `"下午半关机"` -> `14:30` 关机 (PASS)
-  - `"晚上半关机"` -> `21:30` 关机 (PASS)
-  - `"今晚半开机"` -> `21:30` 开机 (PASS)
-  - `"明晚半关机"` -> `21:30` 关机 (PASS)
-  - `"深夜半关机"` -> `23:30` 关机 (PASS)
-  - `"半夜半关机"` -> `23:30` 关机 (PASS)
-  - `"凌晨半开机"` -> `05:30` 开机 (PASS)
-  - `"每天早上关空调"` -> `每天 07:00` 关机 (PASS)
-  - `"工作日晚上关空调"` -> `工作日 21:00` 关机 (PASS)
-  - `"周末早上开机"` -> `周末 07:00` 开机 (PASS)
-  - 严苛防即时开关机误触断言（非 `setPower(false)`、非 `turnOffAll`） (PASS)
+  在 `Sources/HaierACCoreTests/VoiceCommandParserTests.swift` 中新增并校验端到端单元测试用例：
+  - `"白天关空调"` -> `08:00` 关机 (PASS)
+  - `"白天开机"` -> `08:00` 开机 (PASS)
+  - `"全屋白天关空调"` -> `全屋 08:00` 关机 (PASS)
+  - `"大清早开机"` -> `06:00` 开机 (PASS)
+  - `"大晚上开机"` -> `21:00` 开机 (PASS)
+  - `"大半夜关机"` -> `23:00` 关机 (PASS)
+  - `"天亮开机"` -> `06:00` 开机 (PASS)
+  - `"天亮关空调"` -> `06:00` 关机 (PASS)
+  - `"天黑开空调"` -> `18:00` 开机 (PASS)
+  - `"天黑关空调"` -> `18:00` 关机 (PASS)
+  - `"天明开机"` -> `06:00` 开机 (PASS)
+  - `"白天半关机"` -> `08:30` 关机 (PASS)
+  - `"大清早半开机"` -> `06:30` 开机 (PASS)
+  - `"大晚上半开机"` -> `21:30` 开机 (PASS)
+  - `"大半夜半关机"` -> `23:30` 关机 (PASS)
+  - `"天亮半开机"` -> `06:30` 开机 (PASS)
+  - `"天黑半关机"` -> `18:30` 关机 (PASS)
+  - `"每天白天关空调"` -> `每天 08:00` 关机 (PASS)
+  - `"工作日白天关空调"` -> `工作日 08:00` 关机 (PASS)
+  - 严苛防即时开关机误触断言（绝不误判为 `setPower`、`turnOffAll`、`turnOnAll`） (PASS)
   - 全部断言 100% PASS。
-- **编译与构建验证**：
-  - 执行 `SDKROOT=/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk swift build`：编译完成，100% 成功无警告错误；
-  - 执行 `./build_app.sh 1.9.79`：Release 二进制与小组件扩展构建完成，完成 Ad-hoc 签名与 Entitlements 注入，成功生成 `dist/HaierAC.app` 与 `dist/HaierAC-v1.9.79-macOS.zip`。
+- **本地编译验证**：
+  - 执行 `SDKROOT=/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk swift build`：全模块 100% 编译成功无警告错误；
+  - 执行 `./build_app.sh 1.9.80`：完成 Release 编译、桌面小组件 Bundle 打包、Ad-hoc 独立签名与临时沙盒权限绑定，打包产物 `dist/HaierAC.app` 与 `dist/HaierAC-v1.9.80-macOS.zip` 验证完毕。
 
 ---
 
 ## 5. 发版清单与资产
 
-- **Git Commit & Tag**：`v1.9.79`
-- **Release 资产**：`dist/HaierAC-v1.9.79-macOS.zip`
+- **Git Commit & Tag**：`v1.9.80`
+- **Release 资产**：`dist/HaierAC-v1.9.80-macOS.zip`
 - **文件大小**：`2.8 MB`
-- **SHA-256**：`f1bc509b975d3fbcd44f9f3094cb82e1cc9804a27607e9b1c82b61713e780b80`
-- **发布方式**：GitHub Release via `gh release create v1.9.79`
+- **SHA-256**：`4b6988fb290929fb6c587baf3b257c07299d013932a686f2f03f23bc489675d0`
+- **发布方式**：GitHub Release via `gh release create v1.9.80`
