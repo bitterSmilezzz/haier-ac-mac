@@ -1305,16 +1305,33 @@ final class AppModel: ObservableObject {
         schedulerTask = nil
     }
 
-    /// 新增调度任务（fireDate 为绝对触发时刻；倒计时由调用方换算为 fireDate）
-    func addScheduledAction(_ action: ScheduledAction) {
-        // 去重：同设备同属性同触发时刻
-        guard !scheduledActions.contains(where: {
-            $0.deviceId == action.deviceId && $0.attrName == action.attrName && $0.fireDate == action.fireDate
-        }) else { return }
-        scheduledActions.append(action)
-        AppLog.log("新增调度: \(action.name) @ \(action.fireDate)")
+    /// 批量新增调度任务（原子去重、单次 UserDefaults 持久化与单次唤醒调度器）(v1.9.72)
+    @discardableResult
+    public func addScheduledActions(_ newActions: [ScheduledAction]) -> Int {
+        guard !newActions.isEmpty else { return 0 }
+        var toAppend: [ScheduledAction] = []
+        for action in newActions {
+            let duplicateInExisting = scheduledActions.contains {
+                $0.deviceId == action.deviceId && $0.attrName == action.attrName && $0.fireDate == action.fireDate
+            }
+            let duplicateInNew = toAppend.contains {
+                $0.deviceId == action.deviceId && $0.attrName == action.attrName && $0.fireDate == action.fireDate
+            }
+            if !duplicateInExisting && !duplicateInNew {
+                toAppend.append(action)
+            }
+        }
+        guard !toAppend.isEmpty else { return 0 }
+        scheduledActions.append(contentsOf: toAppend)
+        AppLog.log("已批量新增调度任务（共 \(toAppend.count) 个）")
         requestNotificationPermission()  // 定时任务需要系统通知权限（用户拒绝则仅 toast 反馈）
         wakeScheduler()
+        return toAppend.count
+    }
+
+    /// 新增调度任务（fireDate 为绝对触发时刻；倒计时由调用方换算为 fireDate）
+    func addScheduledAction(_ action: ScheduledAction) {
+        addScheduledActions([action])
     }
 
     func removeScheduledAction(_ action: ScheduledAction) {

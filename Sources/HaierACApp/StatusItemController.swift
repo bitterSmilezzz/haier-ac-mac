@@ -158,7 +158,16 @@ final class StatusItemController: NSObject {
                 let devName = allDevices.first(where: { $0.id == firstAction.deviceId })?.name ?? "空调"
                 targetDeviceDesc = "「\(devName)」"
             }
-            tooltipParts.append("⏱ 最近计划: \(targetDeviceDesc)将在 \(remDesc)后\(actionVerb) (\(timeStr))")
+            let repeatSuffix: String = {
+                if let label = firstAction.repeatLabel, !label.isEmpty {
+                    return " [\(label)]"
+                } else if firstAction.repeatsDaily {
+                    return " [每天]"
+                } else {
+                    return ""
+                }
+            }()
+            tooltipParts.append("⏱ 最近计划: \(targetDeviceDesc)将在 \(remDesc)后\(actionVerb) (\(timeStr)\(repeatSuffix))")
         }
 
         let primaryTargetId = model.primaryDeviceId
@@ -1789,6 +1798,7 @@ final class StatusItemController: NSObject {
         let actionDesc = powerOn ? "开机" : "关机"
         guard let valJSON = ScheduledAction.valueJSON(.bool(powerOn)) else { return }
 
+        var newActions: [ScheduledAction] = []
         for dev in targetDevices {
             let action = ScheduledAction(
                 name: "「\(dev.name)」\(timeDesc)后\(actionDesc)",
@@ -1801,8 +1811,9 @@ final class StatusItemController: NSObject {
                 repeatWeekdays: [],
                 enabled: true
             )
-            model.addScheduledAction(action)
+            newActions.append(action)
         }
+        model.addScheduledActions(newActions)
         let scope = targetDevices.count > 1 ? "全屋 \(targetDevices.count) 台空调" : "「\(targetDevices[0].name)」"
         let glyph = powerOn ? "❄️" : "⏱"
         model.operationNotice = AppModel.OperationNotice(text: "\(glyph) 已为\(scope)设定 \(timeDesc) 后自动\(actionDesc)", isError: false)

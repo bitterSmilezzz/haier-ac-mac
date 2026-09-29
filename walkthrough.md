@@ -1,101 +1,108 @@
-# Haier AC Mac v1.9.71 发布与巡检演进报告
+# Haier AC Mac v1.9.72 发布与巡检演进报告
 
 ## 1. 概述与版本定位
-- **版本号**：`v1.9.71`
-- **发版主题**：闭环自然语言单休与长周末排除型周期调度通用引擎、macOS 状态栏同频任务真实动作谓词裁决与预编译正则及调度器 I/O 深度优化
+- **版本号**：`v1.9.72`
+- **发版主题**：闭环自然语言双连续区间与跨度复合周期调度大一统引擎、macOS 状态栏同频任务高精周期标签全景展示及调度器原子批量新增重构
 - **核心目标与架构演进**：
-  1. **自然语言单休制与长周末排除型周期调度通用引擎 (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)**：
-     - **单休与周末三天排除语义完备化**：在 `extractExcludedDays` 中全面纳管“单休”（周一至周六，`[2, 3, 4, 5, 6, 7]`）与“周末三天”（周五至周日，`[1, 6, 7]`），彻底修复以往“除单休外每天早8点开机”识别失败以及“除周末三天外每天早8点开机”被“周末”前缀短路遗漏周五的严重逻辑缺陷，精准分别结算为 `[1]`（“每周日”）与 `[2, 3, 4, 5]`（“周一至周四”）；
-     - **长周末基准范围排除闭环**：完善以“周末三天”为限定基准集的排除演算（如“周末三天除了周五每天早8点开机” -> 精准提取为 `[1, 7]` “周末”；“周末三天除周日外每天早8点开机” -> 精准提取为 `[6, 7]` “周五至周六”）；
-     - **复合星期口语语法扩展**：在 `keywordWithExtraDayRegex` 与 `extraDayWithKeywordRegex` 中全面纳入 `单休` 与 `周末三天`，支持“单休和周日每天早8点开机”、“周日和单休每天早8点开机”等自然语言组合，平滑收敛为全周 7 天（`[1, 2, 3, 4, 5, 6, 7]`）；
-     - **单元测试 100% 覆盖**：在 `VoiceCommandParserTests` 中新增 7 组端到端测试用例，涵盖单休排除、周末三天排除、基准范围扣减及复合扩展，全部断言 100% PASS。
-  2. **macOS 原生状态栏同频任务动作谓词真实裁决与预编译正则性能优化 (`StatusItemController.swift`)**：
-     - **状态栏悬浮 Tooltip 最近计划同频协同任务严格动作对齐**：重构 `sameTimeActions` 过滤逻辑，在 5 秒同频时间阈值基础上强制追加动作属性（`attrName`）与动作值（`attrValue`）严格相等约束。彻底消除不同设备同时间分别执行“开机”与“关机”时被错误合并为单一动作（将关机设备错误宣称为开机）的严重语义缺陷；
-     - **任务动作谓词清洗正则预编译与单休/长周末支持**：将 `extractPlanActionVerb` 中的前缀与后缀清洗正则全面提升为类级 `static let` 静态常量，根除高频刷新菜单与 Tooltip 时的反复动态编译开销；同时补充 `单休` 与 `周末三天` 清洗规则，避免菜单生成冗余重复语病。
-  3. **调度器初始化磁盘 I/O 与反序列化去重优化 (`AppModel.swift`)**：
-     - **阻断唤醒时的无谓反序列化竞争**：引入 `hasLoadedScheduledActions` 状态门禁，确保仅在首次调度启动时从 `UserDefaults` 读取历史任务；在后续任务增删改查高频触发 `wakeScheduler()` 时，直接复用内存中最新的数据模型，消除冗余磁盘读取与 JSON 反序列化 CPU 开销。
+  1. **自然语言双连续区间与跨度复合周期调度大一统引擎 (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)**：
+     - **双连续区间无缝复合解析**：新增 `rangeWithRangeRegex` 引擎，全面纳管“周一至周三和周五至周日每天早8点开机”、“周一到周三以及周五到天每天早8点开机”、“周二至周四和周六至周日每天早8点开机”等生活高频双跨度场景，智能融合两组环形区间的并集并格式化为地道标签（如 `[1, 2, 3, 4, 6, 7]` -> “周五至周三”）；
+     - **连续区间与核心关键词双向混合纳管**：新增 `rangeWithKeywordRegex` 与 `keywordWithRangeRegex`，彻底攻克原有仅能捕获单星期字符导致关键词被截断丢弃的缺陷。全面支持“周一至周五和周末每天早8点开机”（全周 7 天）、“周一到周四加单休每天早8点开机”（周一至周六）、“周一至五加双休每天早8点开机”（全周 7 天）、“周末和周一至周三每天早8点开机”（周六至周三）以及“工作日加周六至周日每天早8点开机”等自然口语；
+     - **连续区间附加多离散星期识别**：升级 `rangeWithMultiDaysRegex`，支持“周一至周三和周五周六每天早8点开机”、“周一到周三以及周五、周日每天早8点开机”等多星期捕获；
+     - **复合区间在排除型周期与限定基准集中的大一统**：升级 `extractExcludedDays` 为连续区间全量匹配迭代提取，支持“除周一至周二和周五至周六外每天早8点开机”（提取周日、周三、周四 `[1, 4, 5]`）以及“周一至周五和周末除了周三每天早8点开机”（全周排除周三 `[1, 2, 3, 5, 6, 7]`），集合补集计算严密自洽；
+     - **单元测试 100% 覆盖**：在 `VoiceCommandParserTests` 中新增 12 组端到端双区间、区间与关键词双向复合、区间附加多星期及复杂复合排除测试用例，所有断言 100% PASS。
+  2. **macOS 原生状态栏同频任务高精周期标签全景展示与最近计划感知 (`StatusItemController.swift`)**：
+     - **悬浮 Tooltip 最近计划周期属性直观感知**：在状态栏悬浮 Tooltip 的“最近计划”提示中，针对重复周期任务智能追加规范化地道周期标签（如 `(18:00 [工作日])`、`(08:00 [每天])`、`(22:00 [周一至周五])`），格式如 `⏱ 最近计划: 「客厅空调」将在 10分钟后开机 (18:00 [工作日])`，使用户无需点开二级菜单即可一眼分辨单次倒计时与长期周期规则；
+     - **菜单与快捷倒计时批处理原子优化**：在 `quickCountdownFromMenu` 中全面接入底层 `addScheduledActions` 原子新增 API，彻底消除了全屋/多设备定时设置时的循环频繁磁盘写与调度器震荡。
+  3. **调度器原子批量新增重构与 I/O 效率深度提升 (`AppModel.swift` / `VoiceCapsuleWindowController.swift`)**：
+     - **原子批量新增 API (`addScheduledActions`)**：在 `AppModel` 中提供线程安全且带内存去重的批量新增调度方法，将全屋与多设备批量操作时的多次 `JSONEncoder` 序列化、磁盘 `UserDefaults` I/O、权限请求与调度器唤醒收敛为单次原子执行；
+     - **语音胶囊全屋与多机下发全链路对齐**：将 `VoiceCapsuleWindowController` 中的全屋倒计时、全屋定时、全屋周期重复调度以及多设备批量调度全链路重构，彻底杜绝多设备时的循环序列化开销。
 
 ---
 
 ## 2. 关键架构变更与代码实现
 
-### 2.1 单休与长周末排除型周期调度通用引擎
-- **`VoiceCommandParser.swift` 排除项与复合关键词纳管**：
+### 2.1 双连续区间与跨度复合周期调度大一统引擎
+- **`VoiceCommandParser.swift` 正则模式矩阵**：
   ```swift
-  /// 从排除文本中提取被排除的星期集合 (v1.9.68, v1.9.71 纳管周末三天与单休排除)
-  private static func extractExcludedDays(from target: String) -> Set<Int>? {
-      var excluded = Set<Int>()
-      var remainingTarget = target
-      if remainingTarget.contains("工作日") || remainingTarget.contains("平时") {
-          excluded.formUnion([2, 3, 4, 5, 6])
-          remainingTarget = remainingTarget.replacingOccurrences(of: "工作日", with: "").replacingOccurrences(of: "平时", with: "")
-      }
-      if remainingTarget.contains("周末三天") {
-          excluded.formUnion([1, 6, 7])
-          remainingTarget = remainingTarget.replacingOccurrences(of: "周末三天", with: "")
-      }
-      if remainingTarget.contains("周末") || remainingTarget.contains("双休") {
-          excluded.formUnion([1, 7])
-          remainingTarget = remainingTarget.replacingOccurrences(of: "周末", with: "").replacingOccurrences(of: "双休", with: "")
-      }
-      if remainingTarget.contains("单休") {
-          excluded.formUnion([2, 3, 4, 5, 6, 7])
-          remainingTarget = remainingTarget.replacingOccurrences(of: "单休", with: "")
-      }
-      // ...
-  }
-  ```
+  /// 匹配双连续区间复合口语（如“周一至周三以及周五至周日”、“周一到周三和周五到天”） (v1.9.72)
+  private static let rangeWithRangeRegex: NSRegularExpression? = {
+      let pattern = #"(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])\s*(?:[、,，和与及跟以及还有或者或加/／\s]+)\s*(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])"#
+      return try? NSRegularExpression(pattern: pattern)
+  }()
 
-- **复合星期口语语法扩展**：
-  ```swift
-  private static let keywordWithExtraDayRegex: NSRegularExpression? = {
-      let pattern = #"(工作日|平时|周末|双休|单休|周末三天)\s*(?:[、,，和与及跟以及还有或者或加/／\s]+)\s*(?!(?:每天|天天|每日|每晚|每早|每晨|每夜|日日))(?:(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)?([一二三四五六日天1-7]|工作日|平时|周末|双休|单休|周末三天))"#
+  /// 匹配连续区间在前、核心关键词在后口语（如“周一至周五和周末”、“周一到周四以及单休”） (v1.9.72)
+  private static let rangeWithKeywordRegex: NSRegularExpression? = {
+      let pattern = #"(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])\s*(?:[、,，和与及跟以及还有或者或加/／\s]+)\s*(工作日|平时|周末|双休|单休|周末三天)"#
+      return try? NSRegularExpression(pattern: pattern)
+  }()
+
+  /// 匹配核心关键词在前、连续区间在后口语（如“周末和周一至周三”、“工作日加周六至周日”） (v1.9.72)
+  private static let keywordWithRangeRegex: NSRegularExpression? = {
+      let pattern = #"(工作日|平时|周末|双休|单休|周末三天)\s*(?:[、,，和与及跟以及还有或者或加/／\s]+)\s*(?:(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7]))"#
       return try? NSRegularExpression(pattern: pattern)
   }()
   ```
 
-### 2.2 macOS 状态栏同频任务真实动作谓词裁决与预编译正则
-- **`StatusItemController.swift` 同频任务严格动作属性对齐**：
+- **`extractExcludedDays` 迭代全量范围提取**：
   ```swift
-  if let firstAction = upcomingSchedules.first {
-      let threshold = firstAction.fireDate.addingTimeInterval(5.0)
-      let sameTimeActions = upcomingSchedules.filter {
-          $0.fireDate <= threshold &&
-          $0.attrName == firstAction.attrName &&
-          $0.attrValue == firstAction.attrValue
-      }
-      // ...
-  }
-  ```
-
-- **预编译清洗正则与长周期/单休语素清洗**：
-  ```swift
-  private static let schedulePrefixRegex: NSRegularExpression? = {
-      let pattern = #"^(?:(?:定时|预约)?(?:全屋)?(?:在)?\s*)*(?:(?:明天|后天|大后天|次日|工作日|平时|周末三天|周末|双休|单休|每天|周[一二三四五六日天0-7至到\-~、\s]+|每周[一二三四五六日天0-7、\s]+)\s*)*(?:\d{1,2}:\d{2}(?::\d{2})?\s*)*(?:\d+\s*(?:分钟|小时|钟头)后|晨间过渡(?:关机)?\s*)*"#
-      return try? NSRegularExpression(pattern: pattern)
-  }()
-
-  private static let scheduleSuffixRegex: NSRegularExpression? = {
-      let pattern = #"\s*[(（](?:每天|工作日|平时|周末三天|周末|双休|单休|周[一二三四五六日天至到\-~、\s]+)[)）]\s*$"#
-      return try? NSRegularExpression(pattern: pattern)
-  }()
-  ```
-
-### 2.3 调度器初始化磁盘 I/O 与反序列化去重
-- **`AppModel.swift` 防重复反序列化机制**：
-  ```swift
-  func startScheduler() {
-      guard schedulerTask == nil else { return }
-      if !hasLoadedScheduledActions {
-          hasLoadedScheduledActions = true
-          if let data = UserDefaults.standard.data(forKey: "scheduledActions"),
-             let saved = try? JSONDecoder().decode([ScheduledAction].self, from: data) {
-              scheduledActions = saved
+  if let regex = repeatWeekdayRangeRegex {
+      let ns = remainingTarget as NSString
+      let matches = regex.matches(in: remainingTarget, options: [], range: NSRange(location: 0, length: ns.length))
+      for match in matches {
+          if match.numberOfRanges >= 3 {
+              let sStr = ns.substring(with: match.range(at: 1))
+              let eStr = ns.substring(with: match.range(at: 2))
+              if let sCh = sStr.first, let sWd = chineseDayCharToWeekday(sCh),
+                 let eCh = eStr.first, let eWd = chineseDayCharToWeekday(eCh) {
+                  excluded.formUnion(generateWeeklyRange(start: sWd, end: eWd))
+              }
           }
       }
-      schedulerTask = Task { [weak self] in
-          // ...
+      if !matches.isEmpty {
+          remainingTarget = regex.stringByReplacingMatches(in: remainingTarget, options: [], range: NSRange(location: 0, length: ns.length), withTemplate: " ")
       }
+  }
+  ```
+
+### 2.2 macOS 原生状态栏同频任务高精周期标签全景展示
+- **`StatusItemController.swift` Tooltip 周期标签动态追加**：
+  ```swift
+  let repeatSuffix: String = {
+      if let label = firstAction.repeatLabel, !label.isEmpty {
+          return " [\(label)]"
+      } else if firstAction.repeatsDaily {
+          return " [每天]"
+      } else {
+          return ""
+      }
+  }()
+  tooltipParts.append("⏱ 最近计划: \(targetDeviceDesc)将在 \(remDesc)后\(actionVerb) (\(timeStr)\(repeatSuffix))")
+  ```
+
+### 2.3 调度器原子批量新增重构与 I/O 效率深度提升
+- **`AppModel.swift` 原子批量新增 API**：
+  ```swift
+  @discardableResult
+  public func addScheduledActions(_ newActions: [ScheduledAction]) -> Int {
+      guard !newActions.isEmpty else { return 0 }
+      var toAppend: [ScheduledAction] = []
+      for action in newActions {
+          let duplicateInExisting = scheduledActions.contains {
+              $0.deviceId == action.deviceId && $0.attrName == action.attrName && $0.fireDate == action.fireDate
+          }
+          let duplicateInNew = toAppend.contains {
+              $0.deviceId == action.deviceId && $0.attrName == action.attrName && $0.fireDate == action.fireDate
+          }
+          if !duplicateInExisting && !duplicateInNew {
+              toAppend.append(action)
+          }
+      }
+      guard !toAppend.isEmpty else { return 0 }
+      scheduledActions.append(contentsOf: toAppend)
+      AppLog.log("已批量新增调度任务（共 \(toAppend.count) 个）")
+      requestNotificationPermission()
+      wakeScheduler()
+      return toAppend.count
   }
   ```
 
@@ -103,20 +110,25 @@
 
 ## 3. 验证与测试闭环
 - **单元测试断言覆盖**：
-  - 在 `VoiceCommandParserTests.swift` 中新增 7 组端到端用例，全部断言 100% PASS：
-    1. “除单休外每天早8点开机” -> `[1]`、每周日 08:00:00 开机 ✅
-    2. “除了单休每天早8点开机” -> `[1]`、每周日 08:00:00 开机 ✅
-    3. “除周末三天外每天早8点开机” -> `[2, 3, 4, 5]`、周一至周四 08:00:00 开机 ✅
-    4. “周末三天除了周五每天早8点开机” -> `[1, 7]`、周末 08:00:00 开机 ✅
-    5. “周末三天除周日外每天早8点开机” -> `[6, 7]`、周五至周六 08:00:00 开机 ✅
-    6. “单休和周日每天早8点开机” -> `[1, 2, 3, 4, 5, 6, 7]`、周一至周日 08:00:00 开机 ✅
-    7. “周日和单休每天早8点开机” -> `[1, 2, 3, 4, 5, 6, 7]`、周一至周日 08:00:00 开机 ✅
-    8. 原有全量测试用例（否定句保护、离散星期、单休制、半度调温等）全部保持 100% 兼容通过 ✅
+  - 在 `VoiceCommandParserTests.swift` 中新增 12 组端到端用例，全部断言 100% PASS：
+    1. “周一至周三和周五至周日每天早8点开机” -> `[1, 2, 3, 4, 6, 7]`、周五至周三 08:00:00 开机 ✅
+    2. “周一到周三以及周五到天每天早8点开机” -> `[1, 2, 3, 4, 6, 7]`、周五至周三 08:00:00 开机 ✅
+    3. “周一至周五和周末每天早8点开机” -> `[1, 2, 3, 4, 5, 6, 7]`、周一至周日 08:00:00 开机 ✅
+    4. “周一到周四加单休每天早8点开机” -> `[2, 3, 4, 5, 6, 7]`、周一至周六 08:00:00 开机 ✅
+    5. “周一至五加双休每天早8点开机” -> `[1, 2, 3, 4, 5, 6, 7]`、周一至周日 08:00:00 开机 ✅
+    6. “周一到周三加周末三天每天早8点开机” -> `[1, 2, 3, 4, 7]`、周六至周三 08:00:00 开机 ✅
+    7. “周末和周一至周三每天早8点开机” -> `[1, 2, 3, 4, 7]`、周六至周三 08:00:00 开机 ✅
+    8. “工作日加周六至周日每天早8点开机” -> `[1, 2, 3, 4, 5, 6, 7]`、周一至周日 08:00:00 开机 ✅
+    9. “周一至周三和周五周六每天早8点开机” -> `[1, 2, 3, 4, 6, 7]`、周五至周三 08:00:00 开机 ✅
+    10. “周一到周三以及周五、周日每天早8点开机” -> `[1, 2, 3, 4, 6]`、每周日、一、二、三、五 08:00:00 开机 ✅
+    11. “周一至周五和周末除了周三每天早8点开机” -> `[1, 2, 3, 5, 6, 7]`、周四至周二 08:00:00 开机 ✅
+    12. “除周一至周二和周五至周六外每天早8点开机” -> `[1, 4, 5]`、每周日、三、四 08:00:00 开机 ✅
+    13. 原有全量测试用例（否定句保护、离散星期、单休制、长周末、半度调温等）全部保持 100% 兼容通过 ✅
 - **本地编译与打包校验**：
   - `SDKROOT=/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk swift build` 0 警告 0 错误编译通过；
-  - `./build_app.sh 1.9.71` 构建成功：
+  - `./build_app.sh 1.9.72` 构建成功：
     - `dist/HaierAC.app` (含 `HaierACWidget.appex` 小组件扩展)
-    - `dist/HaierAC-v1.9.71-macOS.zip` (大小: 2.8M)
-    - SHA256 校验和：`2408038e02f85c0a35e6eb832a561d80fd5579deaf8e41f1d3e10bffb53986f7`
+    - `dist/HaierAC-v1.9.72-macOS.zip` (大小: 2.8M)
+    - SHA256 校验和：`2d056c7956476135fe0d1d7d67b4b07c3ee8c8ad306a8759976edc8b6a2e9bd5`
 - **安全敏感数据审查**：
   - 严密审查无任何个人手机号、真实密码、私有 API Key 或敏感隐私数据外泄。

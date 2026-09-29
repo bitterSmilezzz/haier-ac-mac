@@ -477,6 +477,7 @@ public final class VoiceCapsuleWindowController: NSObject, NSWindowDelegate {
                 }
                 let timeDesc = (minutes >= 60 && minutes % 60 == 0) ? "\(minutes / 60) 小时" : "\(minutes) 分钟"
                 let actionName = "\(timeDesc)后\(on ? "开机" : "关机")"
+                var actions: [ScheduledAction] = []
                 for dev in controllable {
                     let action = ScheduledAction(
                         name: "「\(dev.name)」\(actionName)",
@@ -489,8 +490,9 @@ public final class VoiceCapsuleWindowController: NSObject, NSWindowDelegate {
                         repeatWeekdays: [],
                         enabled: true
                     )
-                    model.addScheduledAction(action)
+                    actions.append(action)
                 }
+                model.addScheduledActions(actions)
                 VoiceControlManager.shared.markSuccess("已为全屋 \(controllable.count) 台空调设置：\(actionName)")
                 scheduleAutoDismiss(delay: 1.8)
                 return
@@ -535,6 +537,7 @@ public final class VoiceCapsuleWindowController: NSObject, NSWindowDelegate {
                     scheduleAutoDismiss(delay: 2.0)
                     return
                 }
+                var actions: [ScheduledAction] = []
                 for dev in controllable {
                     let action = ScheduledAction(
                         name: "「\(dev.name)」\(actionName)",
@@ -547,8 +550,9 @@ public final class VoiceCapsuleWindowController: NSObject, NSWindowDelegate {
                         repeatWeekdays: [],
                         enabled: true
                     )
-                    model.addScheduledAction(action)
+                    actions.append(action)
                 }
+                model.addScheduledActions(actions)
                 VoiceControlManager.shared.markSuccess("已为全屋 \(controllable.count) 台空调设定：\(actionName)")
                 scheduleAutoDismiss(delay: 1.8)
                 return
@@ -575,6 +579,7 @@ public final class VoiceCapsuleWindowController: NSObject, NSWindowDelegate {
                     return
                 }
                 let repeatsDaily = (weekdays.isEmpty || weekdays.count == 7)
+                var actions: [ScheduledAction] = []
                 for dev in controllable {
                     let action = ScheduledAction(
                         name: "「\(dev.name)」\(actionName)",
@@ -587,8 +592,9 @@ public final class VoiceCapsuleWindowController: NSObject, NSWindowDelegate {
                         repeatWeekdays: weekdays,
                         enabled: true
                     )
-                    model.addScheduledAction(action)
+                    actions.append(action)
                 }
+                model.addScheduledActions(actions)
                 VoiceControlManager.shared.markSuccess("已为全屋 \(controllable.count) 台空调设定：\(actionName)")
                 scheduleAutoDismiss(delay: 1.8)
                 return
@@ -1115,6 +1121,7 @@ public final class VoiceCapsuleWindowController: NSObject, NSWindowDelegate {
             }
             let timeDesc: String = (minutes >= 60 && minutes % 60 == 0) ? "\(minutes / 60) 小时" : "\(minutes) 分钟"
             let actionName = "\(timeDesc)后\(on ? "开机" : "关机")"
+            var actions: [ScheduledAction] = []
             for dev in controllable {
                 let action = ScheduledAction(
                     name: "「\(dev.name)」\(actionName)",
@@ -1127,8 +1134,9 @@ public final class VoiceCapsuleWindowController: NSObject, NSWindowDelegate {
                     repeatWeekdays: [],
                     enabled: true
                 )
-                model.addScheduledAction(action)
+                actions.append(action)
             }
+            model.addScheduledActions(actions)
             VoiceControlManager.shared.markSuccess("已为\(prefix)设置：\(actionName)")
 
         case .schedulePower(let hour, let minute, let on):
@@ -1160,6 +1168,7 @@ public final class VoiceCapsuleWindowController: NSObject, NSWindowDelegate {
                 scheduleAutoDismiss(delay: 2.0)
                 return
             }
+            var actions: [ScheduledAction] = []
             for dev in controllable {
                 let action = ScheduledAction(
                     name: "「\(dev.name)」\(actionName)",
@@ -1172,8 +1181,9 @@ public final class VoiceCapsuleWindowController: NSObject, NSWindowDelegate {
                     repeatWeekdays: [],
                     enabled: true
                 )
-                model.addScheduledAction(action)
+                actions.append(action)
             }
+            model.addScheduledActions(actions)
             VoiceControlManager.shared.markSuccess("已为\(prefix)设定：\(actionName)")
 
         case .scheduleRepeatPower(let hour, let minute, let on, let weekdays, let label):
@@ -1187,6 +1197,7 @@ public final class VoiceCapsuleWindowController: NSObject, NSWindowDelegate {
                 return
             }
             let repeatsDaily = (weekdays.isEmpty || weekdays.count == 7)
+            var actions: [ScheduledAction] = []
             for dev in controllable {
                 let action = ScheduledAction(
                     name: "「\(dev.name)」\(actionName)",
@@ -1199,8 +1210,9 @@ public final class VoiceCapsuleWindowController: NSObject, NSWindowDelegate {
                     repeatWeekdays: weekdays,
                     enabled: true
                 )
-                model.addScheduledAction(action)
+                actions.append(action)
             }
+            model.addScheduledActions(actions)
             VoiceControlManager.shared.markSuccess("已为\(prefix)设定：\(actionName)")
 
         case .startSelfCleaning:

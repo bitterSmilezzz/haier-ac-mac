@@ -6,6 +6,20 @@ A native SwiftUI app to control Haier / Leader (统帅) smart air conditioners o
 
 ## Features
 
+- 🏷 **Unified Dual-Range & Compound Weekday Schedule Engine, Status Bar High-Precision Repeat Tags & Atomic Batch Scheduler Registration (v1.9.72)**:
+  - ⏱️ **Natural Language Dual-Range & Compound Weekday Schedule Universal Engine (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)**:
+    - **Dual Continuous Range Seamless Parsing**: Added `rangeWithRangeRegex` to recognize dual-interval recurring expressions such as "Mon–Wed and Fri–Sun at 8 AM" or "Tue–Thu and Sat–Sun at 8 AM", merging circular ranges into clean unified sets (e.g. `[1, 2, 3, 4, 6, 7]` -> "周五至周三");
+    - **Bi-directional Continuous Range & Keyword Fusion**: Added `rangeWithKeywordRegex` and `keywordWithRangeRegex` to eliminate previous truncation defects. Seamlessly supports "Mon–Fri plus Weekend" (all 7 days), "Mon–Thu plus Single-Rest" (Mon–Sat), "Weekend plus Mon–Wed" (Sat–Wed), and "Workdays plus Sat–Sun";
+    - **Continuous Range with Multi-Discrete Weekdays**: Upgraded `rangeWithMultiDaysRegex` to support compound oral patterns like "Mon–Wed plus Fri and Sat" or "Mon–Wed plus Fri, Sun";
+    - **Universal Composite Exclusion & Scope Subtraction**: Upgraded `extractExcludedDays` to iterate over all range occurrences, supporting complex exclusions like "except Mon–Tue and Fri–Sat" (`[1, 4, 5]`) and "Mon–Fri and Weekend except Wednesday" (`[1, 2, 3, 5, 6, 7]`);
+    - **100% Test Coverage**: Added 12 new end-to-end test cases in `VoiceCommandParserTests`, all assertions 100% PASS.
+  - 🍱 **macOS Status Bar High-Precision Repeat Tags & Upcoming Schedule Disambiguation (`StatusItemController.swift`)**:
+    - **Hover Tooltip Recurring Schedule Awareness**: Dynamically appends localized repeat labels to upcoming schedule tooltips (e.g. `(18:00 [工作日])`, `(08:00 [每天])`, `(22:00 [周一至周五])`), formatting tooltips as `⏱ 最近计划: 「客厅空调」将在 10分钟后开机 (18:00 [工作日])`, providing instant clarity between one-off timers and recurring rules without opening submenus;
+    - **Atomic Quick Countdown Dispatch**: Rebuilt `quickCountdownFromMenu` to leverage `addScheduledActions`, completely eliminating repeated disk serialization and scheduler wake jitter when configuring whole-house timers.
+  - ⚡️ **Scheduler Atomic Batch Registration & I/O Efficiency (`AppModel.swift` / `VoiceCapsuleWindowController.swift`)**:
+    - **Atomic Batch Addition API (`addScheduledActions`)**: Added an atomic batch registration API with deduplication in `AppModel`, condensing multiple JSON encodings, UserDefaults writes, notification requests, and scheduler wakeups into a single transaction;
+    - **Voice Capsule Batch Dispatch Alignment**: Rebuilt whole-house and multi-device countdown, schedule, and repeat schedule pathways to use batch dispatch.
+
 - 🏷 **Closed-Loop Single-Rest & Long-Weekend Exclusion Schedule Engine, macOS Status Bar Same-Time Action Predicate Alignment with Precompiled RegEx & Scheduler I/O Optimization (v1.9.71)**:
   - ⏱️ **Natural Language Single-Rest & Long-Weekend Exclusion Repeat Schedule Engine (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)**:
     - **Exclusion Semantics for Single-Rest & 3-Day Weekends**: Fully integrated "Single-Rest" (Mon–Sat, `[2, 3, 4, 5, 6, 7]`) and "3-Day Weekend" (Fri–Sun, `[1, 6, 7]`) in `extractExcludedDays`, fixing issues where "except single-rest" failed to parse and "except 3-day weekend" was prematurely truncated by the "weekend" prefix missing Friday. Accurately evaluates to `[1]` ("Every Sunday") and `[2, 3, 4, 5]` ("Mon to Thu");
