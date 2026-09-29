@@ -373,10 +373,10 @@ public struct VoiceCommandParser {
         let isAll = isAllDeviceScope(text)
 
         // 1. 优先判断指定具体钟点定时（如“晚上10点关机”、“明早7点开空调”、“差半小时八点关机”、“十点差五分关机”、“每天晚上10点关机”、“工作日早上7点开空调”）
-        // 必须包含关机/开机/停意图或“定时/预约”，避免“大风一点”、“调高一点”等“一点”被误判为 1 点钟 (v1.9.48, v1.9.50)
-        if (text.contains("关") || text.contains("开") || text.contains("停") || text.contains("定时") || text.contains("预约")),
+        // 必须包含关机/开机/停意图或“启动/运转”或“定时/预约”，避免“大风一点”、“调高一点”等“一点”被误判为 1 点钟 (v1.9.48, v1.9.50, v1.9.78)
+        if (text.contains("关") || text.contains("开") || text.contains("停") || text.contains("启动") || text.contains("运转") || text.contains("定时") || text.contains("预约")),
            let time = parseScheduleTime(from: text) {
-            let isPowerOn = text.contains("开") && !text.contains("关") && !text.contains("停")
+            let isPowerOn = (text.contains("开") || text.contains("启动") || text.contains("运转")) && !text.contains("关") && !text.contains("停")
             let actionStr = isPowerOn ? "开机" : "关机"
             let timeStr = String(format: "%02d:%02d", time.hour, time.minute)
 
@@ -408,17 +408,18 @@ public struct VoiceCommandParser {
             )
         }
 
-        // 2. 判断倒计时（如包含“后”、“倒计时”、“定时关/开”、“定时X分钟/小时”或前置“过/等/延迟/稍后”及直接持续时间“30分钟关机/半小时关机”） (v1.9.50)
+        // 2. 判断倒计时（如包含“后”、“倒计时”、“定时关/开”、“定时X分钟/小时”或前置“过/等/延迟/稍后”及直接持续时间“30分钟关机/半小时关机”） (v1.9.50, v1.9.78)
         let isCountdownTrigger = (text.contains("后") || text.contains("倒计时") ||
-                                  text.contains("定时关") || text.contains("定时开") ||
+                                  text.contains("定时关") || text.contains("定时开") || text.contains("定时启动") ||
+                                  text.contains("倒计时启动") || text.contains("预约启动") ||
                                   (text.contains("定时") && (text.contains("分") || text.contains("小时") || text.contains("钟头"))) ||
                                   text.contains("过") || text.contains("等") || text.contains("延迟") || text.contains("延后") || text.contains("稍后"))
         let hasDuration = (text.contains("分") || text.contains("小时") || text.contains("钟头") || text.contains("半") || text.contains("刻"))
 
         if isCountdownTrigger || hasDuration {
             if let minutes = parseCountdownMinutes(from: text), minutes > 0 {
-                if text.contains("关") || text.contains("开") || text.contains("停") || text.contains("定时") || text.contains("倒计时") {
-                    let isPowerOn = text.contains("开") && !text.contains("关") && !text.contains("停")
+                if text.contains("关") || text.contains("开") || text.contains("停") || text.contains("启动") || text.contains("运转") || text.contains("定时") || text.contains("倒计时") {
+                    let isPowerOn = (text.contains("开") || text.contains("启动") || text.contains("运转")) && !text.contains("关") && !text.contains("停")
                     let actionStr = isPowerOn ? "开机" : "关机"
                     let timeStr: String
                     if minutes >= 60 && minutes % 60 == 0 {
@@ -1317,9 +1318,10 @@ public struct VoiceCommandParser {
             }
         }
 
-        // 默认“定时关机”/“定时关空调”/“定时开机”/“倒计时开机” -> 默认 60 分钟 (v1.9.55 闭环开关机对称性)
+        // 默认“定时关机”/“定时关空调”/“定时开机”/“倒计时开机”/“定时启动” -> 默认 60 分钟 (v1.9.55, v1.9.78)
         if text.contains("定时关") || text.contains("倒计时关") || text.contains("预约关") ||
-           text.contains("定时开") || text.contains("倒计时开") || text.contains("预约开") {
+           text.contains("定时开") || text.contains("倒计时开") || text.contains("预约开") ||
+           text.contains("定时启动") || text.contains("倒计时启动") || text.contains("预约启动") {
             return 60
         }
 
@@ -1329,9 +1331,12 @@ public struct VoiceCommandParser {
     private static func parseScheduleTime(from text: String) -> (hour: Int, minute: Int)? {
         let normalized = convertChineseNumbers(in: text)
 
-        // 必须包含“点”或“时”或者标准时间冒号，或者独立时相词（午夜、子夜、正午），且不是“小时” (v1.9.77)
+        // 必须包含“点”或“时”或者标准时间冒号，或者独立时相词（午夜、子夜、正午、中午、傍晚、黄昏、清晨、早晨、黎明、拂晓、破晓），且不是“小时” (v1.9.77, v1.9.78)
         guard (normalized.contains("点") || normalized.contains("时") || normalized.contains(":") ||
-               normalized.contains("午夜") || normalized.contains("子夜") || normalized.contains("正午")) && !normalized.contains("小时") else {
+               normalized.contains("午夜") || normalized.contains("子夜") || normalized.contains("正午") ||
+               normalized.contains("中午") || normalized.contains("傍晚") || normalized.contains("黄昏") ||
+               normalized.contains("清晨") || normalized.contains("早晨") || normalized.contains("黎明") ||
+               normalized.contains("拂晓") || normalized.contains("破晓")) && !normalized.contains("小时") else {
             return nil
         }
 
@@ -1428,13 +1433,19 @@ public struct VoiceCommandParser {
             }
         }
 
-        // 3.5 独立无钟点独立时相结构（如“午夜关机” / “子夜关空调” -> 00:00；“正午开机” -> 12:00） (v1.9.77)
+        // 3.5 独立无钟点独立时相结构（如“午夜关机” / “子夜关空调” -> 00:00；“正午开机” / “中午关空调” -> 12:00；“傍晚开机” / “黄昏关机” -> 18:00；“清晨开机” / “早晨开机” / “黎明开机” / “拂晓开机” / “破晓关机” -> 06:00） (v1.9.77, v1.9.78)
         if hour == nil {
             if normalized.contains("午夜") || normalized.contains("子夜") {
                 hour = 0
                 minute = 0
-            } else if normalized.contains("正午") {
+            } else if normalized.contains("正午") || normalized.contains("中午") {
                 hour = 12
+                minute = 0
+            } else if normalized.contains("傍晚") || normalized.contains("黄昏") {
+                hour = 18
+                minute = 0
+            } else if normalized.contains("清晨") || normalized.contains("早晨") || normalized.contains("黎明") || normalized.contains("拂晓") || normalized.contains("破晓") {
+                hour = 6
                 minute = 0
             }
         }
@@ -1562,6 +1573,9 @@ public struct VoiceCommandParser {
            text.contains("每周") || text.contains("每逢") || text.contains("逢周") || text.contains("每个周") || text.contains("每个星期") ||
            text.contains("礼拜") || text.contains("逢星期") || text.contains("一三五") || text.contains("二四六") || text.contains("二四") ||
            text.contains("周末三天") ||
+           text.contains("午夜") || text.contains("子夜") || text.contains("正午") || text.contains("中午") ||
+           text.contains("傍晚") || text.contains("黄昏") || text.contains("清晨") || text.contains("早晨") ||
+           text.contains("黎明") || text.contains("拂晓") || text.contains("破晓") ||
            (text.contains("暂停") && (text.contains("定时") || text.contains("倒计时") || text.contains("计划") || text.contains("调度"))) ||
            (text.contains("恢复") && (text.contains("定时") || text.contains("倒计时") || text.contains("计划") || text.contains("调度"))) {
             return true
@@ -2125,6 +2139,15 @@ public struct VoiceCommandParser {
         str = str.replacingOccurrences(of: "半个钟头", with: "30分钟")
         str = str.replacingOccurrences(of: "半钟头", with: "30分钟")
         str = str.replacingOccurrences(of: "半小时", with: "30分钟")
+        str = str.replacingOccurrences(of: "中午半", with: "中午12点30分")
+        str = str.replacingOccurrences(of: "正午半", with: "正午12点30分")
+        str = str.replacingOccurrences(of: "午夜半", with: "午夜0点30分")
+        str = str.replacingOccurrences(of: "子夜半", with: "子夜0点30分")
+        str = str.replacingOccurrences(of: "傍晚半", with: "傍晚6点30分")
+        str = str.replacingOccurrences(of: "黄昏半", with: "黄昏6点30分")
+        str = str.replacingOccurrences(of: "清晨半", with: "清晨6点30分")
+        str = str.replacingOccurrences(of: "早晨半", with: "早晨6点30分")
+        str = str.replacingOccurrences(of: "黎明半", with: "黎明6点30分")
         str = str.replacingOccurrences(of: "点半", with: "点30分")
         str = str.replacingOccurrences(of: "时半", with: "点30分")
         str = str.replacingOccurrences(of: "一刻钟", with: "15分钟")

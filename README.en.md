@@ -6,6 +6,17 @@ A native SwiftUI app to control Haier / Leader (统帅) smart air conditioners o
 
 ## Features
 
+- 🏷 **Unified Natural Language Broad Temporal Phase Schedule Engine & Start Verb Disambiguation, Status Bar Full-Spectrum Control Matrix Tooltip Perception (v1.9.78)**:
+  - ⏱️ **Unified Natural Language Broad Temporal Phase Schedule Engine & Start Verb Disambiguation (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)**:
+    - **Broad Temporal Phase Autonomous Schedule Universal Engine (Midday, Dusk, Dawn)**: Thoroughly broke through the constraint of explicit hour digits. Supported natural conversational phase schedules without explicit numbers, including "中午" (12:00 midday), "傍晚/黄昏" (18:00 dusk), and "清晨/早晨/黎明/拂晓/破晓" (06:00 dawn/early morning) — e.g. "中午关机", "中午开机", "明天中午关机", "傍晚关空调", "早晨开机", "清晨关机", "黎明开空调". Completely eliminated critical risks where missing hour digits bypassed schedule guards and fell through into immediate power actions;
+    - **Half-Point Phase Normalization Pipeline**: Added canonical normalization for colloquial half-hour temporal phrases: "中午半" -> "中午12点30分", "正午半" -> "正午12点30分", "午夜半" -> "午夜0点30分", "子夜半" -> "子夜0点30分", "傍晚半/黄昏半" -> "傍晚6点30分", "清晨半/早晨半/黎明半" -> "06:30", enabling lossless schedule parsing for informal spoken commands;
+    - **Start Action Verb Disambiguation & Accurate Power-On Mapping**: Systematically integrated "启动" (start/launch) and "运转" (run/operate) into schedule and countdown action extraction via `(text.contains("开") || text.contains("启动") || text.contains("运转")) && !text.contains("关") && !text.contains("停")`. Eradicated severe bugs where "定时明早8点启动空调" or "倒计时半小时启动" were misclassified as power-off actions; extended default 60-minute duration to "定时启动" and "倒计时启动";
+    - **100% Test Coverage**: Added 24 new end-to-end unit test assertions in `VoiceCommandParserTests` covering midday, dusk, dawn, half-point phrases, and start action verbs, 100% PASS.
+  - 🍱 **macOS Status Bar Full-Spectrum Control Matrix Tooltip Perception & Temperature Boundary Safeguard (`StatusItemController.swift`)**:
+    - **Whole-House Multi-Device Quick Action Tooltips**: Embedded rich native tooltips across all whole-house mode items (Cool, Heat, Dehum, Fan, Auto, Step Up/Down +1°C/+0.5°C/-0.5°C/-1°C, Power On/Off All, Wind Speed), displaying operating parameters, device count, and 16°C ~ 30°C temperature limits;
+    - **Per-Device Quick Mode & Stepped Temperature Hover Tooltips**: Added informative tooltips to single-device power toggle, mode controls, and temperature adjustments, clarifying target unit, mode characteristics, and extreme boundary protections;
+    - **Per-Device Submenu Full-Hierarchy Alignment**: Aligned status bar cascading device submenus with native tooltips for pinned controls, mode changes, and stepped temperature shifts.
+
 - 🏷 **Nocturnal, Dawn & Midday Full-Phase Disambiguation & Autonomous Single-Phase Schedule Engine, Status Bar Full-Spectrum Hover Dashboard & Multi-Device Filter Health Matrix (v1.9.77)**:
   - ⏱️ **Natural Language Nocturnal, Midnight & Midday Full-Phase Autonomous Schedule Engine (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)**:
     - **Nocturnal & Midnight Lexicon Universal Coverage**: Systematically integrated "深宵" (deep night), "子夜" (midnight/witching hour), "通宵" (all night), and "入夜" (nightfall). Completely resolved defects where "子夜12点" and "深宵12点" lost nocturnal tense and were incorrectly preserved as 12:00 PM noon instead of 00:00 midnight;

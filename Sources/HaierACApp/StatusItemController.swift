@@ -400,29 +400,34 @@ final class StatusItemController: NSObject {
             let coolAllItem = NSMenuItem(title: "❄️ 全屋清爽制冷 26°C\(countDesc)", action: #selector(applyQuickCoolingAll), keyEquivalent: "")
             coolAllItem.target = self
             coolAllItem.isEnabled = hasControllable
+            coolAllItem.toolTip = "一键将全屋 \(controllableDevices.count) 台在线空调统一开启制冷模式，目标温度设为 26°C（当前 \(onDevices.count) 台运行中，\(offDevices.count) 台待机）"
             menu.addItem(coolAllItem)
 
             let heatAllItem = NSMenuItem(title: "🔥 全屋舒适制热 20°C\(countDesc)", action: #selector(applyQuickHeatingAll), keyEquivalent: "")
             heatAllItem.target = self
             heatAllItem.isEnabled = hasControllable
+            heatAllItem.toolTip = "一键将全屋 \(controllableDevices.count) 台在线空调统一开启制热模式，目标温度设为 20°C（当前 \(onDevices.count) 台运行中，\(offDevices.count) 台待机）"
             menu.addItem(heatAllItem)
 
             let dehumAllItem = NSMenuItem(title: "💧 全屋舒爽除湿\(countDesc)", action: #selector(applyQuickDehumidifyAll), keyEquivalent: "")
             dehumAllItem.target = self
             dehumAllItem.isEnabled = hasControllable
+            dehumAllItem.toolTip = "一键将全屋 \(controllableDevices.count) 台在线空调统一开启除湿模式，降低室内湿度保持舒适干爽（当前 \(onDevices.count) 台运行中）"
             menu.addItem(dehumAllItem)
 
             let fanAllItem = NSMenuItem(title: "🍃 全屋清新送风\(countDesc)", action: #selector(applyQuickFanAll), keyEquivalent: "")
             fanAllItem.target = self
             fanAllItem.isEnabled = hasControllable
+            fanAllItem.toolTip = "一键将全屋 \(controllableDevices.count) 台在线空调统一开启送风模式，促进室内空气自然对流循环（当前 \(onDevices.count) 台运行中）"
             menu.addItem(fanAllItem)
 
             let autoAllItem = NSMenuItem(title: "🔄 全屋智能自动 24°C\(countDesc)", action: #selector(applyQuickAutoAll), keyEquivalent: "")
             autoAllItem.target = self
             autoAllItem.isEnabled = hasControllable
+            autoAllItem.toolTip = "一键将全屋 \(controllableDevices.count) 台在线空调统一开启智能自动模式，智能恒温 24°C（当前 \(onDevices.count) 台运行中）"
             menu.addItem(autoAllItem)
 
-            // 全屋统一相对调温 (v1.9.35, v1.9.36 闭环 CR P2-3 增设 16/30°C 极值边界判定, v1.9.42 补齐运行台数精准反馈, v1.9.52 增加 0.5°C 高精微调矩阵, v1.9.54 全景感知当前基准温阶)
+            // 全屋统一相对调温 (v1.9.35, v1.9.36 闭环 CR P2-3 增设 16/30°C 极值边界判定, v1.9.42 补齐运行台数精准反馈, v1.9.52 增加 0.5°C 高精微调矩阵, v1.9.54 全景感知当前基准温阶, v1.9.78 补齐原生 Tooltip 悬浮看板)
             let allTemps = onDevices.compactMap { model.attribute("targetTemperature", deviceId: $0.id)?.doubleValue }
             let allTempsDesc: String = {
                 guard !allTemps.isEmpty else { return "" }
@@ -436,6 +441,7 @@ final class StatusItemController: NSObject {
                     return " · 当前 \(minStr)~\(maxStr)°C"
                 }
             }()
+            let runningNames = onDevices.map { $0.name }.joined(separator: "、")
             let runningCountDesc = !onDevices.isEmpty ? " (\(onDevices.count)台运行中\(allTempsDesc))" : " (当前均未开机)"
             let canStepUpAll = model.gatewayConnected && onDevices.contains { dev in
                 let curTemp = model.attribute("targetTemperature", deviceId: dev.id)?.doubleValue ?? 26.0
@@ -444,6 +450,7 @@ final class StatusItemController: NSObject {
             let stepUpAllItem = NSMenuItem(title: "🔼 全屋统一升温 1°C\(runningCountDesc)", action: #selector(stepUpAllTemperature), keyEquivalent: "")
             stepUpAllItem.target = self
             stepUpAllItem.isEnabled = canStepUpAll
+            stepUpAllItem.toolTip = onDevices.isEmpty ? "当前全屋无运行中的空调" : "将全屋运行中空调统一升温 1°C（上限 30°C）\n受控空调：\(runningNames)"
             menu.addItem(stepUpAllItem)
 
             let canStepUpHalfAll = model.gatewayConnected && onDevices.contains { dev in
@@ -453,6 +460,7 @@ final class StatusItemController: NSObject {
             let stepUpHalfAllItem = NSMenuItem(title: "🔼 全屋微调升温 0.5°C\(runningCountDesc)", action: #selector(stepUpHalfAllTemperature), keyEquivalent: "")
             stepUpHalfAllItem.target = self
             stepUpHalfAllItem.isEnabled = canStepUpHalfAll
+            stepUpHalfAllItem.toolTip = onDevices.isEmpty ? "当前全屋无运行中的空调" : "将全屋运行中空调统一微调升温 0.5°C（上限 30°C）\n受控空调：\(runningNames)"
             menu.addItem(stepUpHalfAllItem)
 
             let canStepDownHalfAll = model.gatewayConnected && onDevices.contains { dev in
@@ -462,6 +470,7 @@ final class StatusItemController: NSObject {
             let stepDownHalfAllItem = NSMenuItem(title: "🔽 全屋微调降温 0.5°C\(runningCountDesc)", action: #selector(stepDownHalfAllTemperature), keyEquivalent: "")
             stepDownHalfAllItem.target = self
             stepDownHalfAllItem.isEnabled = canStepDownHalfAll
+            stepDownHalfAllItem.toolTip = onDevices.isEmpty ? "当前全屋无运行中的空调" : "将全屋运行中空调统一微调降温 0.5°C（下限 16°C）\n受控空调：\(runningNames)"
             menu.addItem(stepDownHalfAllItem)
 
             let canStepDownAll = model.gatewayConnected && onDevices.contains { dev in
@@ -471,6 +480,7 @@ final class StatusItemController: NSObject {
             let stepDownAllItem = NSMenuItem(title: "🔽 全屋统一降温 1°C\(runningCountDesc)", action: #selector(stepDownAllTemperature), keyEquivalent: "")
             stepDownAllItem.target = self
             stepDownAllItem.isEnabled = canStepDownAll
+            stepDownAllItem.toolTip = onDevices.isEmpty ? "当前全屋无运行中的空调" : "将全屋运行中空调统一降温 1°C（下限 16°C）\n受控空调：\(runningNames)"
             menu.addItem(stepDownAllItem)
 
             // 全屋统一风速协同 (v1.9.46, v1.9.47 增加运行台数动态感知与全屋协同一致性勾选反馈)
@@ -504,6 +514,7 @@ final class StatusItemController: NSObject {
                 windMenu.addItem(item)
             }
             let windParentItem = NSMenuItem(title: "🍃 全屋风速协同\(runningCountDesc)...", action: nil, keyEquivalent: "")
+            windParentItem.toolTip = onDevices.isEmpty ? "当前全屋无运行中的空调" : "统一同步全屋 \(onDevices.count) 台运行中空调的出风档位（微风/中风/强劲/自动）"
             menu.setSubmenu(windMenu, for: windParentItem)
             menu.addItem(windParentItem)
 
@@ -511,6 +522,8 @@ final class StatusItemController: NSObject {
                 let turnOnAllItem = NSMenuItem(title: "⏻ 开启全屋空调 (\(offDevices.count) 台待机)", action: #selector(turnOnAllDevices), keyEquivalent: "")
                 turnOnAllItem.target = self
                 turnOnAllItem.isEnabled = model.gatewayConnected && !offDevices.isEmpty
+                let offNames = offDevices.map { $0.name }.joined(separator: "、")
+                turnOnAllItem.toolTip = "一键唤醒全屋 \(offDevices.count) 台待机空调，保持原有运行模式与温度设定\n待机设备：\(offNames)"
                 menu.addItem(turnOnAllItem)
             }
 
@@ -518,6 +531,8 @@ final class StatusItemController: NSObject {
                 let turnOffAllItem = NSMenuItem(title: "⏻ 关闭全屋空调 (\(onDevices.count) 台运行中)", action: #selector(turnOffAllDevices), keyEquivalent: "")
                 turnOffAllItem.target = self
                 turnOffAllItem.isEnabled = model.gatewayConnected && !onDevices.isEmpty
+                let onNames = onDevices.map { $0.name }.joined(separator: "、")
+                turnOffAllItem.toolTip = "一键关闭全屋 \(onDevices.count) 台运行中空调的电源\n运行设备：\(onNames)"
                 menu.addItem(turnOffAllItem)
             }
 
@@ -593,6 +608,7 @@ final class StatusItemController: NSObject {
                 pinItem.target = self
                 pinItem.representedObject = devId
                 pinItem.isEnabled = !isPrimary
+                pinItem.toolTip = isPrimary ? "当前已常驻展示在 macOS 菜单栏主显区域" : "将「\(dev.name)」设为 macOS 菜单栏常驻主显设备"
                 devSubmenu.addItem(pinItem)
                 devSubmenu.addItem(.separator())
 
@@ -605,6 +621,7 @@ final class StatusItemController: NSObject {
                 togglePowerItem.target = self
                 togglePowerItem.representedObject = devId
                 togglePowerItem.isEnabled = isControllable
+                togglePowerItem.toolTip = isPowerOn ? "关闭「\(dev.name)」电源" : "开启「\(dev.name)」电源（保持上次设定）"
                 devSubmenu.addItem(togglePowerItem)
 
                 // 一键制冷 26°C
@@ -616,6 +633,7 @@ final class StatusItemController: NSObject {
                 coolItem.target = self
                 coolItem.representedObject = devId
                 coolItem.isEnabled = isControllable
+                coolItem.toolTip = "将「\(dev.name)」切换至制冷模式并设定为 26°C"
                 devSubmenu.addItem(coolItem)
 
                 // 一键制热 20°C
@@ -627,6 +645,7 @@ final class StatusItemController: NSObject {
                 heatItem.target = self
                 heatItem.representedObject = devId
                 heatItem.isEnabled = isControllable
+                heatItem.toolTip = "将「\(dev.name)」切换至制热模式并设定为 20°C"
                 devSubmenu.addItem(heatItem)
 
                 // 一键除湿 (v1.9.36)
@@ -638,6 +657,7 @@ final class StatusItemController: NSObject {
                 dehumItem.target = self
                 dehumItem.representedObject = devId
                 dehumItem.isEnabled = isControllable
+                dehumItem.toolTip = "将「\(dev.name)」切换至除湿模式，降低室内湿度"
                 devSubmenu.addItem(dehumItem)
 
                 // 一键送风 (v1.9.36)
@@ -649,6 +669,7 @@ final class StatusItemController: NSObject {
                 fanItem.target = self
                 fanItem.representedObject = devId
                 fanItem.isEnabled = isControllable
+                fanItem.toolTip = "将「\(dev.name)」切换至自然送风模式，促进室内空气流通"
                 devSubmenu.addItem(fanItem)
 
                 // 一键智能自动 24°C (v1.9.40)
@@ -660,6 +681,7 @@ final class StatusItemController: NSObject {
                 autoItem.target = self
                 autoItem.representedObject = devId
                 autoItem.isEnabled = isControllable
+                autoItem.toolTip = "将「\(dev.name)」切换至智能自动模式并设定为 24°C"
                 devSubmenu.addItem(autoItem)
 
                 // 升降温与微调温阶 (v1.9.35, v1.9.52 增加 0.5°C 高精微调矩阵)
@@ -671,6 +693,7 @@ final class StatusItemController: NSObject {
                 upItem.target = self
                 upItem.representedObject = devId
                 upItem.isEnabled = isControllable && isPowerOn && curTemp < 30.0
+                upItem.toolTip = "将「\(dev.name)」温度升高 1°C（上限 30°C）"
                 devSubmenu.addItem(upItem)
 
                 let upHalfItem = NSMenuItem(
@@ -681,6 +704,7 @@ final class StatusItemController: NSObject {
                 upHalfItem.target = self
                 upHalfItem.representedObject = devId
                 upHalfItem.isEnabled = isControllable && isPowerOn && curTemp <= 29.5
+                upHalfItem.toolTip = "将「\(dev.name)」温度微调升高 0.5°C（上限 30°C）"
                 devSubmenu.addItem(upHalfItem)
 
                 let downHalfItem = NSMenuItem(
@@ -691,6 +715,7 @@ final class StatusItemController: NSObject {
                 downHalfItem.target = self
                 downHalfItem.representedObject = devId
                 downHalfItem.isEnabled = isControllable && isPowerOn && curTemp >= 16.5
+                downHalfItem.toolTip = "将「\(dev.name)」温度微调降低 0.5°C（下限 16°C）"
                 devSubmenu.addItem(downHalfItem)
 
                 let downItem = NSMenuItem(
@@ -701,6 +726,7 @@ final class StatusItemController: NSObject {
                 downItem.target = self
                 downItem.representedObject = devId
                 downItem.isEnabled = isControllable && isPowerOn && curTemp > 16.0
+                downItem.toolTip = "将「\(dev.name)」温度降低 1°C（下限 16°C）"
                 devSubmenu.addItem(downItem)
 
                 // 调节风速 (v1.9.46)
@@ -850,6 +876,7 @@ final class StatusItemController: NSObject {
 
             let matrixRunningDesc = !onDevices.isEmpty ? "\(onDevices.count)台运行中" : "全屋待机"
             let devicesParentItem = NSMenuItem(title: "空调设备控制矩阵 (\(controllableDevices.count)台在线，\(matrixRunningDesc))...", action: nil, keyEquivalent: "")
+            devicesParentItem.toolTip = "展开查看全屋 \(allDevices.count) 台空调（\(controllableDevices.count) 在线 / \(allDevices.count - controllableDevices.count) 离线，\(onDevices.count) 台运行中）的实时工况、风速模式、主显常驻设定与独立精细化调控"
             menu.setSubmenu(devicesMenu, for: devicesParentItem)
             menu.addItem(devicesParentItem)
         } else if let dev = allDevices.first {
@@ -909,51 +936,61 @@ final class StatusItemController: NSObject {
             let powerItem = NSMenuItem(title: powerTitle, action: #selector(togglePrimaryPower), keyEquivalent: "")
             powerItem.target = self
             powerItem.isEnabled = isControllable
+            powerItem.toolTip = isPowerOn ? "关闭「\(dev.name)」电源" : "开启「\(dev.name)」电源（保持上次设定）"
             menu.addItem(powerItem)
 
             let coolItem = NSMenuItem(title: "❄️ 一键制冷 26°C", action: #selector(applyQuickCoolingPrimary), keyEquivalent: "")
             coolItem.target = self
             coolItem.isEnabled = isControllable
+            coolItem.toolTip = "将「\(dev.name)」切换至制冷模式，目标温度设为 26°C"
             menu.addItem(coolItem)
 
             let heatItem = NSMenuItem(title: "🔥 一键制热 20°C", action: #selector(applyQuickHeatingPrimary), keyEquivalent: "")
             heatItem.target = self
             heatItem.isEnabled = isControllable
+            heatItem.toolTip = "将「\(dev.name)」切换至制热模式，目标温度设为 20°C"
             menu.addItem(heatItem)
 
             let dehumItem = NSMenuItem(title: "💧 一键除湿", action: #selector(applyQuickDehumidifyPrimary), keyEquivalent: "")
             dehumItem.target = self
             dehumItem.isEnabled = isControllable
+            dehumItem.toolTip = "将「\(dev.name)」切换至除湿模式，降低室内湿度保持干爽"
             menu.addItem(dehumItem)
 
             let fanItem = NSMenuItem(title: "🍃 一键送风", action: #selector(applyQuickFanPrimary), keyEquivalent: "")
             fanItem.target = self
             fanItem.isEnabled = isControllable
+            fanItem.toolTip = "将「\(dev.name)」切换至自然送风模式，促进室内空气流通循环"
             menu.addItem(fanItem)
 
             let autoItem = NSMenuItem(title: "🔄 一键智能自动 24°C", action: #selector(applyQuickAutoPrimary), keyEquivalent: "")
             autoItem.target = self
             autoItem.isEnabled = isControllable
+            autoItem.toolTip = "将「\(dev.name)」切换至智能自动模式，恒定设定为 24°C"
             menu.addItem(autoItem)
 
             let stepUpItem = NSMenuItem(title: "🔼 升温 1°C (当前 \(curTempStr)°C)", action: #selector(stepUpPrimaryTemperature), keyEquivalent: "")
             stepUpItem.target = self
             stepUpItem.isEnabled = isControllable && isPowerOn && curTemp < 30.0
+            stepUpItem.toolTip = "将「\(dev.name)」温度升高 1°C（上限 30°C）"
             menu.addItem(stepUpItem)
 
             let stepUpHalfItem = NSMenuItem(title: "🔼 升温 0.5°C (高精微调 · 当前 \(curTempStr)°C)", action: #selector(stepUpHalfPrimaryTemperature), keyEquivalent: "")
             stepUpHalfItem.target = self
             stepUpHalfItem.isEnabled = isControllable && isPowerOn && curTemp <= 29.5
+            stepUpHalfItem.toolTip = "将「\(dev.name)」温度微调升高 0.5°C（上限 30°C）"
             menu.addItem(stepUpHalfItem)
 
             let stepDownHalfItem = NSMenuItem(title: "🔽 降温 0.5°C (高精微调 · 当前 \(curTempStr)°C)", action: #selector(stepDownHalfPrimaryTemperature), keyEquivalent: "")
             stepDownHalfItem.target = self
             stepDownHalfItem.isEnabled = isControllable && isPowerOn && curTemp >= 16.5
+            stepDownHalfItem.toolTip = "将「\(dev.name)」温度微调降低 0.5°C（下限 16°C）"
             menu.addItem(stepDownHalfItem)
 
             let stepDownItem = NSMenuItem(title: "🔽 降温 1°C (当前 \(curTempStr)°C)", action: #selector(stepDownPrimaryTemperature), keyEquivalent: "")
             stepDownItem.target = self
             stepDownItem.isEnabled = isControllable && isPowerOn && curTemp > 16.0
+            stepDownItem.toolTip = "将「\(dev.name)」温度降低 1°C（下限 16°C）"
             menu.addItem(stepDownItem)
 
             // 调节风速 (v1.9.46)
