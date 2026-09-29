@@ -234,7 +234,8 @@ public final class EnergyAnalyticsEngine: ObservableObject {
         indoorTemp: Double?,
         indoorHumidity: Double? = nil,
         windSpeed: String?,
-        isSelfCleaning: Bool = false
+        isSelfCleaning: Bool = false,
+        continuousMinutes: Int = 0
     ) -> Double {
         let windOffset: Double = {
             let wind = windSpeed?.lowercased()
@@ -311,6 +312,14 @@ public final class EnergyAnalyticsEngine: ObservableObject {
                 return min(max(neutralPower, 180.0), 600.0)
             }
         }
+        // 变频压缩机与换热器连续高负荷热饱和阻抗衰减微补偿 (Continuous Thermal Soak Drift) (v1.9.79):
+        // 变频空调机组连续运转超 120 分钟时，外机冷凝器热积累或蒸发器化霜热阻导致稳态 COP 产生 2% ~ 5% 的微漂移：
+        // 120 分钟内为 1.00 基准；120 ~ 360 分钟平滑线性上升至 1.045；超过 360 分钟钳制在 1.05。
+        let soakMultiplier: Double = {
+            guard isPowerOn && !isSelfCleaning && continuousMinutes > 120 else { return 1.0 }
+            let progress = min(1.0, Double(continuousMinutes - 120) / 240.0)
+            return 1.0 + (progress * 0.045)
+        }()
 
         switch mode {
         case .fan:
@@ -357,7 +366,7 @@ public final class EnergyAnalyticsEngine: ObservableObject {
             }()
 
             let power = basePower + (windOffset * 0.5) + tempComp
-            return min(max(power, 200.0), 730.0)
+            return min(max(power * soakMultiplier, 200.0), 730.0)
 
         case .heating:
             // 制热模式：变频温差动力学模型 + 恒温平衡区低频维持态阻尼 + 环境湿度结霜化霜/干燥热焓补偿 + 低温速热 PTC 辅助电热动力学 (v1.9.36, v1.9.39, v1.9.46)
@@ -405,7 +414,7 @@ public final class EnergyAnalyticsEngine: ObservableObject {
                 }()
                 power = 550.0 + ((delta - 1.0) * 110.0) + windOffset + coldBoost + heatHumComp
             }
-            return min(max(power, 220.0), 1950.0)
+            return min(max(power * soakMultiplier, 220.0), 1950.0)
 
         case .cooling:
             // 制冷模式：变频温差动力学模型 + 恒温平衡区低频维持态阻尼 + 环境湿度潜热冷凝补偿 + 酷暑高温大温差重载动力学校准 (v1.9.36, v1.9.40, v1.9.45)
@@ -454,7 +463,7 @@ public final class EnergyAnalyticsEngine: ObservableObject {
                 }()
                 power = 380.0 + ((delta - 1.0) * 95.0) + windOffset + heatBoost + latentHumComp
             }
-            return min(max(power, 180.0), 1800.0)
+            return min(max(power * soakMultiplier, 180.0), 1800.0)
 
         case .auto:
             // 自动模式：根据室内与设定温差智能判别制冷或制热动力曲线，融合环境湿度微调与全气候极端温差超频动力学 (v1.9.36, v1.9.38, v1.9.41, v1.9.47, v1.9.48 全气候双向物理对称)
@@ -494,7 +503,7 @@ public final class EnergyAnalyticsEngine: ObservableObject {
                     }()
                     power = 380.0 + ((delta - 1.0) * 95.0) + windOffset + latentHumComp + heatBoost
                 }
-                return min(max(power, 180.0), 1800.0)
+                return min(max(power * soakMultiplier, 180.0), 1800.0)
             } else {
                 let delta = target - indoor
                 let power: Double
@@ -529,7 +538,7 @@ public final class EnergyAnalyticsEngine: ObservableObject {
                     }()
                     power = 550.0 + ((delta - 1.0) * 110.0) + windOffset + heatHumOffset + coldBoost
                 }
-                return min(max(power, 220.0), 1950.0)
+                return min(max(power * soakMultiplier, 220.0), 1950.0)
             }
         }
     }
@@ -546,6 +555,7 @@ public final class EnergyAnalyticsEngine: ObservableObject {
         public let indoorHumidity: Double?
         public let windSpeed: String?
         public let isSelfCleaning: Bool
+        public let continuousMinutes: Int
 
         public init(
             deviceId: String,
@@ -555,7 +565,8 @@ public final class EnergyAnalyticsEngine: ObservableObject {
             indoorTemp: Double?,
             indoorHumidity: Double? = nil,
             windSpeed: String?,
-            isSelfCleaning: Bool = false
+            isSelfCleaning: Bool = false,
+            continuousMinutes: Int = 0
         ) {
             self.deviceId = deviceId
             self.isPowerOn = isPowerOn
@@ -565,6 +576,7 @@ public final class EnergyAnalyticsEngine: ObservableObject {
             self.indoorHumidity = indoorHumidity
             self.windSpeed = windSpeed
             self.isSelfCleaning = isSelfCleaning
+            self.continuousMinutes = continuousMinutes
         }
     }
 
@@ -598,7 +610,8 @@ public final class EnergyAnalyticsEngine: ObservableObject {
                 indoorTemp: sample.indoorTemp,
                 indoorHumidity: sample.indoorHumidity,
                 windSpeed: sample.windSpeed,
-                isSelfCleaning: sample.isSelfCleaning
+                isSelfCleaning: sample.isSelfCleaning,
+                continuousMinutes: sample.continuousMinutes
             )
             totalInstantaneousPower += power
 

@@ -589,6 +589,9 @@ final class AppModel: ObservableObject {
         }
     }
 
+    /// 各设备当前连续开机运行时长（分钟） (v1.9.79 能耗热饱和漂移模型驱动)
+    @Published public var deviceContinuousMinutes: [String: Int] = [:]
+
     /// 获取指定设备的滤网累计运行分钟数（基于空气动力学等效工时）
     public func filterAccumulatedMinutes(for deviceId: String) -> Int {
         if let minutes = deviceFilterMinutes[deviceId] {
@@ -1269,6 +1272,9 @@ final class AppModel: ObservableObject {
                     deviceId: dev.id
                 )
                 accumulateFilterMinutes(for: dev.id, minutes: elapsedMinutes, wearFactor: wearFactor)
+                deviceContinuousMinutes[dev.id, default: 0] += elapsedMinutes
+            } else {
+                deviceContinuousMinutes[dev.id] = 0
             }
 
             // 自清洁工况归属判定：指定设备精确匹配，未指定仅在单设备时生效，阻断多设备 fail-open 风险 (v1.9.34)
@@ -1283,7 +1289,8 @@ final class AppModel: ObservableObject {
                     indoorTemp: isOnline ? indoorTemp : nil,
                     indoorHumidity: indoorHum,
                     windSpeed: windSpeed,
-                    isSelfCleaning: isCleaning
+                    isSelfCleaning: isCleaning,
+                    continuousMinutes: deviceContinuousMinutes[dev.id] ?? 0
                 )
             )
         }

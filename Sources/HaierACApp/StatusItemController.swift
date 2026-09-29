@@ -775,9 +775,14 @@ final class StatusItemController: NSObject {
                     pItem.target = self
                     pItem.representedObject = ["deviceId": devId, "minutes": p.mins, "powerOn": p.powerOn] as [String: Any]
                     pItem.isEnabled = isControllable
+                    let targetDate = Date().addingTimeInterval(Double(p.mins * 60))
+                    let targetTimeStr = DateFormatter.localizedString(from: targetDate, dateStyle: .none, timeStyle: .short)
+                    let actDesc = p.powerOn ? "开启电源（预冷/预热）" : "关闭电源"
+                    pItem.toolTip = "设定「\(dev.name)」在 \(p.mins) 分钟后（约 \(targetTimeStr)）\(actDesc)"
                     devCountdownMenu.addItem(pItem)
                 }
                 let devCountdownParent = NSMenuItem(title: "⏱ 快捷倒计时...", action: nil, keyEquivalent: "")
+                devCountdownParent.toolTip = "为「\(dev.name)」快速添加 30/45/60/120 分钟关机或开机预冷/预热倒计时任务"
                 devSubmenu.setSubmenu(devCountdownMenu, for: devCountdownParent)
                 devSubmenu.addItem(devCountdownParent)
 
@@ -808,17 +813,20 @@ final class StatusItemController: NSObject {
                         let pItem = NSMenuItem(title: "⏸ 暂停该设备所有定时", action: #selector(pauseDeviceSchedulesFromMenu(_:)), keyEquivalent: "")
                         pItem.target = self
                         pItem.representedObject = devId
+                        pItem.toolTip = "临时暂停「\(dev.name)」名下全部 \(devEnabledCount) 个生效中的计划调度任务"
                         devScheduleMenu.addItem(pItem)
                     }
                     if devPausedCount > 0 {
                         let rItem = NSMenuItem(title: "▶️ 恢复该设备所有定时", action: #selector(resumeDeviceSchedulesFromMenu(_:)), keyEquivalent: "")
                         rItem.target = self
                         rItem.representedObject = devId
+                        rItem.toolTip = "重新恢复启用「\(dev.name)」名下全部 \(devPausedCount) 个已暂停的计划调度任务"
                         devScheduleMenu.addItem(rItem)
                     }
                     let cItem = NSMenuItem(title: "🗑 取消该设备所有定时与倒计时", action: #selector(cancelDeviceSchedulesFromMenu(_:)), keyEquivalent: "")
                     cItem.target = self
                     cItem.representedObject = devId
+                    cItem.toolTip = "一键撤销并清空「\(dev.name)」名下所有计划调度与倒计时任务"
                     devScheduleMenu.addItem(cItem)
                 } else {
                     let emptyItem = NSMenuItem(title: "当前无生效中的计划任务", action: nil, keyEquivalent: "")
@@ -1045,9 +1053,14 @@ final class StatusItemController: NSObject {
                 pItem.target = self
                 pItem.representedObject = ["deviceId": dev.id, "minutes": p.mins, "powerOn": p.powerOn] as [String: Any]
                 pItem.isEnabled = isControllable
+                let targetDate = Date().addingTimeInterval(Double(p.mins * 60))
+                let targetTimeStr = DateFormatter.localizedString(from: targetDate, dateStyle: .none, timeStyle: .short)
+                let actDesc = p.powerOn ? "开启电源（预冷/预热）" : "关闭电源"
+                pItem.toolTip = "设定「\(dev.name)」在 \(p.mins) 分钟后（约 \(targetTimeStr)）\(actDesc)"
                 singleCountdownMenu.addItem(pItem)
             }
             let singleCountdownParent = NSMenuItem(title: "⏱ 快捷倒计时...", action: nil, keyEquivalent: "")
+            singleCountdownParent.toolTip = "为「\(dev.name)」快速添加 30/45/60/120 分钟关机或开机预冷/预热倒计时任务"
             menu.setSubmenu(singleCountdownMenu, for: singleCountdownParent)
             menu.addItem(singleCountdownParent)
 
@@ -1078,17 +1091,20 @@ final class StatusItemController: NSObject {
                     let pItem = NSMenuItem(title: "⏸ 暂停该设备所有定时", action: #selector(pauseDeviceSchedulesFromMenu(_:)), keyEquivalent: "")
                     pItem.target = self
                     pItem.representedObject = dev.id
+                    pItem.toolTip = "临时暂停「\(dev.name)」名下全部 \(devEnabledCount) 个生效中的计划调度任务"
                     devScheduleMenu.addItem(pItem)
                 }
                 if devPausedCount > 0 {
                     let rItem = NSMenuItem(title: "▶️ 恢复该设备所有定时", action: #selector(resumeDeviceSchedulesFromMenu(_:)), keyEquivalent: "")
                     rItem.target = self
                     rItem.representedObject = dev.id
+                    rItem.toolTip = "重新恢复启用「\(dev.name)」名下全部 \(devPausedCount) 个已暂停的计划调度任务"
                     devScheduleMenu.addItem(rItem)
                 }
                 let cItem = NSMenuItem(title: "🗑 取消该设备所有定时与倒计时", action: #selector(cancelDeviceSchedulesFromMenu(_:)), keyEquivalent: "")
                 cItem.target = self
                 cItem.representedObject = dev.id
+                cItem.toolTip = "一键撤销并清空「\(dev.name)」名下所有计划调度与倒计时任务"
                 devScheduleMenu.addItem(cItem)
             } else {
                 let emptyItem = NSMenuItem(title: "当前无生效中的计划任务", action: nil, keyEquivalent: "")
@@ -1210,6 +1226,10 @@ final class StatusItemController: NSObject {
                 repObj["deviceId"] = primaryId
             }
             pItem.representedObject = repObj
+            let targetDate = Date().addingTimeInterval(Double(preset.mins * 60))
+            let targetTimeStr = DateFormatter.localizedString(from: targetDate, dateStyle: .none, timeStyle: .short)
+            let actDesc = preset.powerOn ? "开启电源（预冷/预热）" : "关闭电源"
+            pItem.toolTip = "设定主显空调「\(primaryName)」在 \(preset.mins) 分钟后（约 \(targetTimeStr)）\(actDesc)"
             quickCountdownMenu.addItem(pItem)
         }
 
@@ -1223,6 +1243,9 @@ final class StatusItemController: NSObject {
             let pItem = NSMenuItem(title: p.title, action: #selector(quickCountdownFromMenu(_:)), keyEquivalent: "")
             pItem.target = self
             pItem.representedObject = ["minutes": p.mins, "powerOn": false, "all": true] as [String: Any]
+            let targetDate = Date().addingTimeInterval(Double(p.mins * 60))
+            let targetTimeStr = DateFormatter.localizedString(from: targetDate, dateStyle: .none, timeStyle: .short)
+            pItem.toolTip = "一键设定全屋 \(allDevices.count) 台空调在 \(p.mins) 分钟后（约 \(targetTimeStr)）统一关闭电源"
             quickCountdownMenu.addItem(pItem)
         }
         let allOnPresets: [(title: String, mins: Int)] = [
@@ -1234,6 +1257,9 @@ final class StatusItemController: NSObject {
             let pItem = NSMenuItem(title: p.title, action: #selector(quickCountdownFromMenu(_:)), keyEquivalent: "")
             pItem.target = self
             pItem.representedObject = ["minutes": p.mins, "powerOn": true, "all": true] as [String: Any]
+            let targetDate = Date().addingTimeInterval(Double(p.mins * 60))
+            let targetTimeStr = DateFormatter.localizedString(from: targetDate, dateStyle: .none, timeStyle: .short)
+            pItem.toolTip = "一键设定全屋 \(allDevices.count) 台空调在 \(p.mins) 分钟后（约 \(targetTimeStr)）统一开启并保持设定模式预冷/预热"
             quickCountdownMenu.addItem(pItem)
         }
         let quickCountdownParent = NSMenuItem(title: "⚡️ 快捷倒计时调度...", action: nil, keyEquivalent: "")
@@ -1683,11 +1709,13 @@ final class StatusItemController: NSObject {
         let toggleItem = NSMenuItem(title: toggleTitle, action: #selector(toggleSingleScheduleEnabledFromMenu(_:)), keyEquivalent: "")
         toggleItem.target = self
         toggleItem.representedObject = action.id.uuidString
+        toggleItem.toolTip = action.enabled ? "临时暂停此项计划任务（下次触发将跳过，可随时恢复启用）" : "重新激活恢复此项计划任务（按设定时间或周期正常执行）"
         singleMenu.addItem(toggleItem)
 
         let cancelItem = NSMenuItem(title: "❌ 取消该任务", action: #selector(cancelSingleScheduleFromMenu(_:)), keyEquivalent: "")
         cancelItem.target = self
         cancelItem.representedObject = action.id.uuidString
+        cancelItem.toolTip = "一键撤销并永久移除此项计划调度/倒计时任务"
         singleMenu.addItem(cancelItem)
 
         // 动态检测同频批次兄弟任务并提供一键协同管理 (v1.9.69, v1.9.70, v1.9.74 补全多设备子菜单全层级对称, v1.9.75 增强可视化列表与穿透悬浮感知)
@@ -1707,13 +1735,13 @@ final class StatusItemController: NSObject {
             let syncToggleItem = NSMenuItem(title: syncToggleTitle, action: #selector(toggleSiblingSchedulesFromMenu(_:)), keyEquivalent: "")
             syncToggleItem.target = self
             syncToggleItem.representedObject = siblingActions.map(\.id.uuidString)
-            syncToggleItem.toolTip = "协同管理同频批次空调：\(devListStr)"
+            syncToggleItem.toolTip = anySiblingEnabled ? "一键将同频协同的 \(siblingActions.count) 台空调任务全部设为暂停状态：\(devListStr)" : "一键将同频协同的 \(siblingActions.count) 台空调任务全部恢复生效：\(devListStr)"
             singleMenu.addItem(syncToggleItem)
 
             let syncCancelItem = NSMenuItem(title: "❌ 同步取消此批任务 (\(siblingActions.count) 台)", action: #selector(cancelSiblingSchedulesFromMenu(_:)), keyEquivalent: "")
             syncCancelItem.target = self
             syncCancelItem.representedObject = siblingActions.map(\.id.uuidString)
-            syncCancelItem.toolTip = "取消同频批次空调任务：\(devListStr)"
+            syncCancelItem.toolTip = "一键从全屋调度器中永久移除此批 \(siblingActions.count) 台空调任务：\(devListStr)"
             singleMenu.addItem(syncCancelItem)
         }
 

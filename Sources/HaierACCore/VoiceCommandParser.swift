@@ -392,12 +392,14 @@ public struct VoiceCommandParser {
             }
 
             let dayDesc: String = {
-                if text.contains("明天") || text.contains("明早") || text.contains("明晚") || text.contains("次日") || text.contains("明儿") {
+                if text.contains("明天") || text.contains("明早") || text.contains("明晚") || text.contains("明午") || text.contains("明夜") || text.contains("次日") || text.contains("明儿") {
                     return "明天 "
                 } else if text.contains("大后天") {
                     return "大后天 "
                 } else if text.contains("后天") {
                     return "后天 "
+                } else if text.contains("今晚") || text.contains("今早") || text.contains("今夜") {
+                    return "今天 "
                 }
                 return ""
             }()
@@ -1331,12 +1333,20 @@ public struct VoiceCommandParser {
     private static func parseScheduleTime(from text: String) -> (hour: Int, minute: Int)? {
         let normalized = convertChineseNumbers(in: text)
 
-        // 必须包含“点”或“时”或者标准时间冒号，或者独立时相词（午夜、子夜、正午、中午、傍晚、黄昏、清晨、早晨、黎明、拂晓、破晓），且不是“小时” (v1.9.77, v1.9.78)
-        guard (normalized.contains("点") || normalized.contains("时") || normalized.contains(":") ||
-               normalized.contains("午夜") || normalized.contains("子夜") || normalized.contains("正午") ||
-               normalized.contains("中午") || normalized.contains("傍晚") || normalized.contains("黄昏") ||
-               normalized.contains("清晨") || normalized.contains("早晨") || normalized.contains("黎明") ||
-               normalized.contains("拂晓") || normalized.contains("破晓")) && !normalized.contains("小时") else {
+        // 必须包含“点”或“时”或者标准时间冒号，或者独立时相词（午夜、子夜、正午、中午、傍晚、黄昏、清晨、早晨、黎明、拂晓、破晓、清早、早上、明早、今早、早间、上午、下午、午后、明午、晚上、今晚、明晚、晚间、入夜、夜间、夜里、深夜、半夜、凌晨、明天、后天、大后天、次日），且不是“小时” (v1.9.77, v1.9.78, v1.9.79)
+        let hasTimePhase = normalized.contains("午夜") || normalized.contains("子夜") || normalized.contains("正午") ||
+                           normalized.contains("中午") || normalized.contains("傍晚") || normalized.contains("黄昏") ||
+                           normalized.contains("清晨") || normalized.contains("早晨") || normalized.contains("黎明") ||
+                           normalized.contains("拂晓") || normalized.contains("破晓") || normalized.contains("清早") ||
+                           normalized.contains("早上") || normalized.contains("明早") || normalized.contains("今早") ||
+                           normalized.contains("早间") || normalized.contains("上午") || normalized.contains("下午") ||
+                           normalized.contains("午后") || normalized.contains("明午") || normalized.contains("晚上") ||
+                           normalized.contains("今晚") || normalized.contains("明晚") || normalized.contains("晚间") ||
+                           normalized.contains("入夜") || normalized.contains("夜间") || normalized.contains("夜里") ||
+                           normalized.contains("深夜") || normalized.contains("半夜") || normalized.contains("凌晨") ||
+                           normalized.contains("明天") || normalized.contains("后天") || normalized.contains("大后天") ||
+                           normalized.contains("次日")
+        guard (normalized.contains("点") || normalized.contains("时") || normalized.contains(":") || hasTimePhase) && !normalized.contains("小时") else {
             return nil
         }
 
@@ -1433,7 +1443,7 @@ public struct VoiceCommandParser {
             }
         }
 
-        // 3.5 独立无钟点独立时相结构（如“午夜关机” / “子夜关空调” -> 00:00；“正午开机” / “中午关空调” -> 12:00；“傍晚开机” / “黄昏关机” -> 18:00；“清晨开机” / “早晨开机” / “黎明开机” / “拂晓开机” / “破晓关机” -> 06:00） (v1.9.77, v1.9.78)
+        // 3.5 独立无钟点独立时相结构 (v1.9.77, v1.9.78, v1.9.79 广义全时相大一统纳管)
         if hour == nil {
             if normalized.contains("午夜") || normalized.contains("子夜") {
                 hour = 0
@@ -1444,8 +1454,33 @@ public struct VoiceCommandParser {
             } else if normalized.contains("傍晚") || normalized.contains("黄昏") {
                 hour = 18
                 minute = 0
-            } else if normalized.contains("清晨") || normalized.contains("早晨") || normalized.contains("黎明") || normalized.contains("拂晓") || normalized.contains("破晓") {
+            } else if normalized.contains("清晨") || normalized.contains("早晨") || normalized.contains("黎明") ||
+                       normalized.contains("拂晓") || normalized.contains("破晓") || normalized.contains("清早") {
                 hour = 6
+                minute = 0
+            } else if normalized.contains("早上") || normalized.contains("明早") || normalized.contains("今早") || normalized.contains("早间") {
+                hour = 7
+                minute = 0
+            } else if normalized.contains("上午") {
+                hour = 9
+                minute = 0
+            } else if normalized.contains("下午") || normalized.contains("午后") || normalized.contains("明午") {
+                hour = 14
+                minute = 0
+            } else if normalized.contains("晚上") || normalized.contains("今晚") || normalized.contains("明晚") ||
+                       normalized.contains("晚间") || normalized.contains("入夜") || normalized.contains("夜间") ||
+                       normalized.contains("夜里") {
+                hour = 21
+                minute = 0
+            } else if normalized.contains("深夜") || normalized.contains("半夜") || normalized.contains("深宵") ||
+                       normalized.contains("通宵") || normalized.contains("夜深") {
+                hour = 23
+                minute = 0
+            } else if normalized.contains("凌晨") {
+                hour = 5
+                minute = 0
+            } else if normalized.contains("明天") || normalized.contains("后天") || normalized.contains("大后天") || normalized.contains("次日") {
+                hour = 8
                 minute = 0
             }
         }
@@ -1575,7 +1610,13 @@ public struct VoiceCommandParser {
            text.contains("周末三天") ||
            text.contains("午夜") || text.contains("子夜") || text.contains("正午") || text.contains("中午") ||
            text.contains("傍晚") || text.contains("黄昏") || text.contains("清晨") || text.contains("早晨") ||
-           text.contains("黎明") || text.contains("拂晓") || text.contains("破晓") ||
+           text.contains("黎明") || text.contains("拂晓") || text.contains("破晓") || text.contains("清早") ||
+           text.contains("早上") || text.contains("明早") || text.contains("今早") || text.contains("早间") ||
+           text.contains("上午") || text.contains("下午") || text.contains("午后") || text.contains("明午") ||
+           text.contains("晚上") || text.contains("今晚") || text.contains("明晚") || text.contains("晚间") ||
+           text.contains("入夜") || text.contains("夜间") || text.contains("夜里") ||
+           text.contains("深夜") || text.contains("半夜") || text.contains("凌晨") ||
+           text.contains("明天") || text.contains("后天") || text.contains("大后天") || text.contains("次日") ||
            (text.contains("暂停") && (text.contains("定时") || text.contains("倒计时") || text.contains("计划") || text.contains("调度"))) ||
            (text.contains("恢复") && (text.contains("定时") || text.contains("倒计时") || text.contains("计划") || text.contains("调度"))) {
             return true
@@ -2148,6 +2189,23 @@ public struct VoiceCommandParser {
         str = str.replacingOccurrences(of: "清晨半", with: "清晨6点30分")
         str = str.replacingOccurrences(of: "早晨半", with: "早晨6点30分")
         str = str.replacingOccurrences(of: "黎明半", with: "黎明6点30分")
+        str = str.replacingOccurrences(of: "清早半", with: "清早6点30分")
+        str = str.replacingOccurrences(of: "拂晓半", with: "拂晓6点30分")
+        str = str.replacingOccurrences(of: "破晓半", with: "破晓6点30分")
+        str = str.replacingOccurrences(of: "早上半", with: "早上7点30分")
+        str = str.replacingOccurrences(of: "明早半", with: "明早7点30分")
+        str = str.replacingOccurrences(of: "今早半", with: "今早7点30分")
+        str = str.replacingOccurrences(of: "上午半", with: "上午9点30分")
+        str = str.replacingOccurrences(of: "下午半", with: "下午2点30分")
+        str = str.replacingOccurrences(of: "午后半", with: "午后2点30分")
+        str = str.replacingOccurrences(of: "明午半", with: "明午2点30分")
+        str = str.replacingOccurrences(of: "晚上半", with: "晚上9点30分")
+        str = str.replacingOccurrences(of: "今晚半", with: "今晚9点30分")
+        str = str.replacingOccurrences(of: "明晚半", with: "明晚9点30分")
+        str = str.replacingOccurrences(of: "夜里半", with: "夜里9点30分")
+        str = str.replacingOccurrences(of: "深夜半", with: "深夜11点30分")
+        str = str.replacingOccurrences(of: "半夜半", with: "半夜11点30分")
+        str = str.replacingOccurrences(of: "凌晨半", with: "凌晨5点30分")
         str = str.replacingOccurrences(of: "点半", with: "点30分")
         str = str.replacingOccurrences(of: "时半", with: "点30分")
         str = str.replacingOccurrences(of: "一刻钟", with: "15分钟")
