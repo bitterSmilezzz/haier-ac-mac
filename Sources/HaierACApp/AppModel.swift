@@ -783,22 +783,26 @@ final class AppModel: ObservableObject {
         if let modeCode = ACModeCode.match(from: mode) {
             switch modeCode {
             case .cooling:
-                // 酷暑高温大温差重载冷凝与强对流微粒捕获动力学 (v1.9.54)
+                // 酷暑高温大温差重载冷凝与强对流微粒捕获动力学 (v1.9.54, v1.9.65 升级双线性平滑过渡阻尼消除阶跃断崖)
                 // 典型变频空调制冷热力学：室内温度过高（indoor >= 30°C）或大温差降温（diff >= 5°C）时，
                 // 蒸发器冷凝水析出量达到峰值且室内风机处于超高风量吞吐，翅片水膜与高速通量导致微粒沉降捕获率剧增；
-                // 动态分配 modeFactor = 1.45（与极潮湿除湿工况达成热物理对称）；常规降温为 1.30；恒温维持为 1.15
+                // 采用双线性连续插值阻尼模型，与能耗分析引擎对齐，平滑过渡至 1.45~1.60，消除临界点阶跃断崖
                 if let indoor = indoorTemp {
                     if indoor > targetTemp {
                         let diff = indoor - targetTemp
-                        if diff >= 5.0 || indoor >= 30.0 {
-                            let heatExcess = max(0.0, indoor - 30.0)
-                            let diffExcess = max(0.0, diff - 5.0)
-                            modeFactor = 1.45 + min(0.15, (heatExcess * 0.02) + (diffExcess * 0.02))
-                        } else {
-                            // 0~5°C 连续平滑线性阻尼插值 (1.15 ~ 1.45) (v1.9.63)
-                            let progress = min(1.0, max(0.0, diff / 5.0))
-                            modeFactor = 1.15 + (progress * 0.30)
-                        }
+                        let baseFactor = 1.15 + (min(1.0, max(0.0, diff / 5.0)) * 0.30)
+                        let heatBoost: Double = {
+                            if indoor >= 28.0 && diff >= 4.0 {
+                                let indoorFactor = min(1.0, max(0.0, (indoor - 28.0) / 2.0)) // 28°C ~ 30°C 线性平滑插值
+                                let deltaFactor = min(1.0, max(0.0, (diff - 4.0) / 1.0))   // 4°C ~ 5°C 线性平滑插值
+                                let ramp = indoorFactor * deltaFactor
+                                let excessIndoor = max(0.0, indoor - 30.0)
+                                let excessDiff = max(0.0, diff - 5.0)
+                                return (0.05 * ramp) + min(0.15, (excessIndoor * 0.02) + (excessDiff * 0.02))
+                            }
+                            return 0.0
+                        }()
+                        modeFactor = baseFactor + heatBoost
                     } else {
                         modeFactor = 1.15
                     }
@@ -827,15 +831,19 @@ final class AppModel: ObservableObject {
                 if let indoor = indoorTemp {
                     if targetTemp > indoor {
                         let diff = targetTemp - indoor
-                        if diff >= 5.0 || indoor <= 12.0 {
-                            let coldDeficit = max(0.0, 12.0 - indoor)
-                            let diffExcess = max(0.0, diff - 5.0)
-                            modeFactor = 1.25 + min(0.15, (coldDeficit * 0.02) + (diffExcess * 0.02))
-                        } else {
-                            // 0~5°C 连续平滑线性对流插值 (1.05 ~ 1.25) (v1.9.63)
-                            let progress = min(1.0, max(0.0, diff / 5.0))
-                            modeFactor = 1.05 + (progress * 0.20)
-                        }
+                        let baseFactor = 1.05 + (min(1.0, max(0.0, diff / 5.0)) * 0.20)
+                        let coldBoost: Double = {
+                            if indoor <= 14.0 && diff >= 4.0 {
+                                let indoorFactor = min(1.0, max(0.0, (14.0 - indoor) / 2.0)) // 14°C ~ 12°C 线性平滑插值
+                                let deltaFactor = min(1.0, max(0.0, (diff - 4.0) / 1.0))   // 4°C ~ 5°C 线性平滑插值
+                                let ramp = indoorFactor * deltaFactor
+                                let coldDeficit = max(0.0, 12.0 - indoor)
+                                let diffExcess = max(0.0, diff - 5.0)
+                                return (0.05 * ramp) + min(0.15, (coldDeficit * 0.02) + (diffExcess * 0.02))
+                            }
+                            return 0.0
+                        }()
+                        modeFactor = baseFactor + coldBoost
                     } else {
                         modeFactor = 1.05 // 恒温微载维持
                     }
@@ -846,24 +854,38 @@ final class AppModel: ObservableObject {
                 // 送风模式：无冷凝水吸附，主要为干性浮尘截留；当室内风速处于高风/强劲时（windFactor >= 1.35），高速风切力扬起微尘导致空气对流过滤负荷上升 (0.95)，低中风速维持 0.85 (v1.9.57)
                 modeFactor = windFactor >= 1.35 ? 0.95 : 0.85
             case .auto:
-                // 自动模式：全气候双向热力与气动力学对称 (v1.9.54)
+                // 自动模式：全气候双向热力与气动力学对称 (v1.9.54, v1.9.65 升级全域连续双线性阻尼插值)
                 if let indoor = indoorTemp {
                     if indoor > targetTemp {
                         let diff = indoor - targetTemp
-                        if diff >= 5.0 || indoor >= 30.0 {
-                            modeFactor = 1.35 // 自动酷暑大温差制冷强通量
-                        } else {
-                            let progress = min(1.0, max(0.0, diff / 5.0))
-                            modeFactor = 1.15 + (progress * 0.20) // 1.15 ~ 1.35 连续平滑过渡 (v1.9.63)
-                        }
+                        let baseFactor = 1.15 + (min(1.0, max(0.0, diff / 5.0)) * 0.20) // 1.15 ~ 1.35 连续平滑过渡
+                        let heatBoost: Double = {
+                            if indoor >= 28.0 && diff >= 4.0 {
+                                let indoorFactor = min(1.0, max(0.0, (indoor - 28.0) / 2.0))
+                                let deltaFactor = min(1.0, max(0.0, (diff - 4.0) / 1.0))
+                                let ramp = indoorFactor * deltaFactor
+                                let excessIndoor = max(0.0, indoor - 30.0)
+                                let excessDiff = max(0.0, diff - 5.0)
+                                return (0.05 * ramp) + min(0.15, (excessIndoor * 0.02) + (excessDiff * 0.02))
+                            }
+                            return 0.0
+                        }()
+                        modeFactor = baseFactor + heatBoost
                     } else if indoor < targetTemp {
                         let diff = targetTemp - indoor
-                        if diff >= 5.0 || indoor <= 12.0 {
-                            modeFactor = 1.20 // 自动大温差制热热对流 (v1.9.52)
-                        } else {
-                            let progress = min(1.0, max(0.0, diff / 5.0))
-                            modeFactor = 1.05 + (progress * 0.15) // 1.05 ~ 1.20 连续平滑过渡 (v1.9.63)
-                        }
+                        let baseFactor = 1.05 + (min(1.0, max(0.0, diff / 5.0)) * 0.15) // 1.05 ~ 1.20 连续平滑过渡
+                        let coldBoost: Double = {
+                            if indoor <= 14.0 && diff >= 4.0 {
+                                let indoorFactor = min(1.0, max(0.0, (14.0 - indoor) / 2.0))
+                                let deltaFactor = min(1.0, max(0.0, (diff - 4.0) / 1.0))
+                                let ramp = indoorFactor * deltaFactor
+                                let coldDeficit = max(0.0, 12.0 - indoor)
+                                let diffExcess = max(0.0, diff - 5.0)
+                                return (0.05 * ramp) + min(0.15, (coldDeficit * 0.02) + (diffExcess * 0.02))
+                            }
+                            return 0.0
+                        }()
+                        modeFactor = baseFactor + coldBoost
                     } else {
                         modeFactor = 1.00 // 稳态平衡
                     }

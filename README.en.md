@@ -6,6 +6,18 @@ A native SwiftUI app to control Haier / Leader (统帅) smart air conditioners o
 
 ## Features
 
+- 🏷 **Spoken Ellipsis Recurring Schedule Universal Circular Parser Engine, macOS Status Bar Real-Time Countdown & High-Precision Disambiguation, and Continuous Bilinear Thermal Filter Damping Dynamics (v1.9.65)**:
+  - ⏱️ **Universal Circular Natural Language Repeating Schedule Parser with Colloquial Ellipsis Support (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)**:
+    - **Overcoming Substring Limits**: Solved the long-standing limitation where omitting the second weekday prefix in spoken Chinese (e.g., "周一至五早晨7点开机", "周一到五晚10点关机", "周五至日自动开机", "周五到天开机", "周六至二关机", "周日至五开空调") resulted in `nil` or misparsed commands;
+    - **49 Permutation Circular Weekday Topology**: Engineered a generalized circular topology routing algorithm that maps Monday through Sunday continuously, supporting any arbitrary contiguous or cross-weekend range; automatically formats normalized labels ("工作日", "周末", "周五至周日", "周五至周一", etc.) while remaining fully backwards compatible with fixed lexical terms ("工作日", "平时", "周末", "双休", "周末三天", "一三五", "二四六", and single weekday terms);
+    - **Comprehensive Test Suite**: Added `testOralEllipsisRepeatWeekdays` in `VoiceCommandParserTests` with 14 test cases covering spoken ellipsis permutations and end-to-end command assertions with 100% pass rate.
+  - 🍱 **macOS Native Status Bar Real-Time Countdown & High-Precision Disambiguation (`StatusItemController.swift`)**:
+    - **Dynamic Hover Tooltip Awareness**: Integrated dynamic nearest-schedule calculation into the status bar icon hover tooltip; when active timers or recurring schedules exist, instantly displays `⏱ 最近计划: 「设备名」将在 X 分钟后关机 (09:35)`, giving users instant awareness without clicking;
+    - **Menu Items Real-Time Human-Readable Countdown**: In both multi-device whole-house schedule menus and single-device dedicated menus, dynamically formats remaining time into active task titles (e.g., `⏱ 客厅: 关机 (09:35，剩余 25 分钟)`) and detail submenus (`下次执行: 2026/09/29 09:35:00 (剩余 25 分钟)`), eliminating manual mental calculation.
+  - 🍃 **Thermodynamic Filter Aerodynamics Continuous Bilinear Damping Dynamics (`AppModel.calculateFilterWearFactor`)**:
+    - **Eliminating Critical Temperature Step Discontinuities**: Re-architected heavy thermal difference and extreme room temperature dynamics in cooling, heating, and auto modes within `calculateFilterWearFactor`, adopting a continuous bilinear interpolation model aligned with the energy dynamics engine;
+    - Smoothly scales across cooling/auto (indoor >= 28°C & diff >= 4°C) and heating/auto (indoor <= 14°C & diff >= 4°C), completely eliminating step-function cliff discontinuities at 30°C/5°C and 12°C/5°C to achieve full thermodynamic consistency.
+
 - 🏷 **Extended Cross-Weekend Repeat Schedules, Revoke Task Semantics, Status Bar Countdown Disambiguation & Continuous Bilinear Humidity Filter Damping (v1.9.64)**:
   - 🍃 **Continuous Bilinear Humidity & Dehumidification Damping Dynamics (`AppModel.calculateFilterWearFactor`)**:
     - **Eradication of Step-Function Humidity Discontinuities**: Rebuilt the humidity wear factor (`humidityFactor`) into a continuously differentiable bilinear interpolation model: dry range (hum <= 45%) smoothly ramps across 0.90 ~ 1.00, comfort neutral band (45% ~ 60%) holds steady at 1.00, humid transition (60% ~ 75%) smoothly ramps across 1.00 ~ 1.15, and extreme south-bound humidity (hum > 75%) gently progresses up to 1.30;

@@ -129,6 +129,34 @@ final class StatusItemController: NSObject {
                 tooltipParts.append("🏠 全屋 \(allDevices.count) 台空调当前均处于待机状态")
             }
         }
+
+        // 动态感知生效中且最近即将执行的定时与倒计时任务 (v1.9.65 毫秒级感知高精消歧)
+        let now = Date()
+        let upcomingSchedules = model.scheduledActions
+            .filter { $0.enabled && $0.fireDate > now }
+            .sorted(by: { $0.fireDate < $1.fireDate })
+        if let nextAction = upcomingSchedules.first {
+            let devName = model.allUnifiedDevices.first(where: { $0.id == nextAction.deviceId })?.name ?? "空调"
+            let remSecs = Int(nextAction.fireDate.timeIntervalSince(now))
+            let remDesc: String = {
+                if remSecs < 60 {
+                    return "不到 1 分钟"
+                } else if remSecs < 3600 {
+                    return "\(remSecs / 60) 分钟"
+                } else {
+                    let h = remSecs / 3600
+                    let m = (remSecs % 3600) / 60
+                    return m > 0 ? "\(h) 小时 \(m) 分钟" : "\(h) 小时"
+                }
+            }()
+            let timeStr = DateFormatter.localizedString(from: nextAction.fireDate, dateStyle: .none, timeStyle: .short)
+            var cleanName = nextAction.name
+            if cleanName.hasPrefix("「\(devName)」") {
+                cleanName = String(cleanName.dropFirst("「\(devName)」".count))
+            }
+            tooltipParts.append("⏱ 最近计划: 「\(devName)」将在 \(remDesc)后\(cleanName) (\(timeStr))")
+        }
+
         let primaryTargetId = model.primaryDeviceId
         if !allDevices.isEmpty {
             for dev in allDevices {
@@ -1012,12 +1040,14 @@ final class StatusItemController: NSObject {
                     }
                     let repeatTag = action.repeatLabel.map { " [\($0)]" } ?? ""
                     let statusTag = action.enabled ? "" : " [已暂停]"
-                    let sItem = NSMenuItem(title: "⏱ \(cleanActionName) (\(timeStr))\(repeatTag)\(statusTag)", action: nil, keyEquivalent: "")
+                    let remainingDesc = action.enabled ? "，\(Self.formatRemainingTime(fireDate: action.fireDate))" : ""
+                    let sItem = NSMenuItem(title: "⏱ \(cleanActionName) (\(timeStr)\(remainingDesc))\(repeatTag)\(statusTag)", action: nil, keyEquivalent: "")
 
                     let singleMenu = NSMenu()
                     singleMenu.autoenablesItems = false
                     let fullTimeStr = DateFormatter.localizedString(from: action.fireDate, dateStyle: .medium, timeStyle: .medium)
-                    let timeInfo = NSMenuItem(title: "下次执行: \(fullTimeStr)", action: nil, keyEquivalent: "")
+                    let remInfo = action.enabled ? " (\(Self.formatRemainingTime(fireDate: action.fireDate)))" : ""
+                    let timeInfo = NSMenuItem(title: "下次执行: \(fullTimeStr)\(remInfo)", action: nil, keyEquivalent: "")
                     timeInfo.isEnabled = false
                     singleMenu.addItem(timeInfo)
 
@@ -1204,7 +1234,8 @@ final class StatusItemController: NSObject {
                 }
                 let repeatTag = action.repeatLabel.map { " [\($0)]" } ?? ""
                 let statusTag = action.enabled ? "" : " [已暂停]"
-                let item = NSMenuItem(title: "⏱ \(devName): \(cleanActionName) (\(timeStr))\(repeatTag)\(statusTag)", action: nil, keyEquivalent: "")
+                let remainingDesc = action.enabled ? "，\(Self.formatRemainingTime(fireDate: action.fireDate))" : ""
+                let item = NSMenuItem(title: "⏱ \(devName): \(cleanActionName) (\(timeStr)\(remainingDesc))\(repeatTag)\(statusTag)", action: nil, keyEquivalent: "")
 
                 let singleTaskMenu = NSMenu()
                 singleTaskMenu.autoenablesItems = false
@@ -1214,7 +1245,8 @@ final class StatusItemController: NSObject {
                 singleTaskMenu.addItem(devInfoItem)
 
                 let fullTimeStr = DateFormatter.localizedString(from: action.fireDate, dateStyle: .medium, timeStyle: .medium)
-                let timeInfoItem = NSMenuItem(title: "下次执行: \(fullTimeStr)", action: nil, keyEquivalent: "")
+                let remInfo = action.enabled ? " (\(Self.formatRemainingTime(fireDate: action.fireDate)))" : ""
+                let timeInfoItem = NSMenuItem(title: "下次执行: \(fullTimeStr)\(remInfo)", action: nil, keyEquivalent: "")
                 timeInfoItem.isEnabled = false
                 singleTaskMenu.addItem(timeInfoItem)
 
@@ -1731,6 +1763,25 @@ final class StatusItemController: NSObject {
         guard let raw = sender.representedObject as? String,
               let mode = ThemeMode(rawValue: raw) else { return }
         model.themeMode = mode
+    }
+
+    /// 计算并格式化计划调度任务的实时剩余时间描述 (v1.9.65 毫秒级高精消歧)
+    private static func formatRemainingTime(fireDate: Date, now: Date = Date()) -> String {
+        let diff = Int(fireDate.timeIntervalSince(now))
+        if diff <= 0 {
+            return "即将执行"
+        } else if diff < 60 {
+            return "剩余不到 1 分钟"
+        } else if diff < 3600 {
+            return "剩余 \(diff / 60) 分钟"
+        } else if diff < 86400 {
+            let h = diff / 3600
+            let m = (diff % 3600) / 60
+            return m > 0 ? "剩余 \(h)小时\(m)分" : "剩余 \(h)小时"
+        } else {
+            let d = diff / 86400
+            return "\(d) 天后"
+        }
     }
 
     @objc private func quitApp() {
