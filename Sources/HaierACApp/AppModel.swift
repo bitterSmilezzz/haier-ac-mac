@@ -765,13 +765,17 @@ final class AppModel: ObservableObject {
         windSpeed: String,
         deviceId: String? = nil
     ) -> Double {
-        // 1. 风量通量因子（高速风量通过滤网单位时间截留更多浮尘颗粒） (v1.9.49 补齐“强劲/强”档位匹配，v1.9.50 全面统配英文枚举、档位数字与口语描述，v1.9.51 补充“极速/高速/中速/低速”)
+        // 1. 风量通量因子（高速风量通过滤网单位时间截留更多浮尘颗粒） (v1.9.49 补齐“强劲/强”档位匹配，v1.9.50 全面统配英文枚举、档位数字与口语描述，v1.9.51 补充“极速/高速/中速/低速”，v1.9.81 闭环 4 档/5 档/暴风等全档位动力学自适应)
         let windFactor: Double
         let speed = windSpeed.lowercased()
-        if speed.contains("强") || speed.contains("turbo") || speed.contains("超强") || speed.contains("最大") ||
-           speed.contains("3档") || speed.contains("三档") || speed == "3" || speed.contains("极速") || speed.contains("高速") {
-            windFactor = 1.70
-        } else if speed.contains("高") || speed.contains("high") || speed.contains("大风") || speed.contains("大") {
+        if speed.contains("暴") || speed.contains("5档") || speed.contains("五档") || speed == "5" ||
+           speed.contains("超强") || speed.contains("最大") || speed.contains("极速") {
+            windFactor = 1.85
+        } else if speed.contains("4档") || speed.contains("四档") || speed == "4" ||
+                  speed.contains("强") || speed.contains("turbo") || speed.contains("高速") {
+            windFactor = 1.50
+        } else if speed.contains("3档") || speed.contains("三档") || speed == "3" ||
+                  speed.contains("高") || speed.contains("high") || speed.contains("大风") || speed.contains("大") {
             windFactor = 1.35
         } else if speed.contains("中") || speed.contains("medium") || speed.contains("mid") ||
                   speed.contains("2档") || speed.contains("二档") || speed.contains("两档") || speed == "2" || speed.contains("中速") {
@@ -3396,7 +3400,7 @@ final class AppModel: ObservableObject {
             }
         }
 
-        // 归一化风速标准名称 (v1.9.47 支持一至四档/1~4档/低中高极速/静音等全量别名)
+        // 归一化风速标准名称 (v1.9.47 支持一至四档/1~4档/低中高极速/静音等全量别名, v1.9.81 补齐 4 档/5 档/暴风全量映射)
         let normalizedSpeed: String = {
             if speedName.contains("微") || speedName.contains("低") || speedName.contains("静") ||
                speedName.contains("柔") || speedName.contains("小") || speedName.contains("1") || speedName.contains("一") {
@@ -3406,7 +3410,10 @@ final class AppModel: ObservableObject {
                 return "中风"
             }
             if speedName.contains("强") || speedName.contains("高") || speedName.contains("大") ||
-               speedName.contains("极") || speedName.contains("3") || speedName.contains("三") {
+               speedName.contains("极") || speedName.contains("暴") ||
+               speedName.contains("3") || speedName.contains("三") ||
+               speedName.contains("4") || speedName.contains("四") ||
+               speedName.contains("5") || speedName.contains("五") {
                 return "强劲"
             }
             return "自动"

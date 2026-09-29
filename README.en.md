@@ -6,6 +6,19 @@ A native SwiftUI app to control Haier / Leader (统帅) smart air conditioners o
 
 ## Features
 
+- 🏷 **Unified Colloquial Everyday Phase Schedule Engine, Full Power Protection & Variable-Speed Aerodynamic Alignment (v1.9.81)**:
+  - ⏱️ **Natural Colloquial Standalone Phase Scheduling & Instant Power Protection (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)**:
+    - **High-Frequency Spoken Phase Lexicon Coverage (After-Midnight, Midday/Noon, Deep Night, First Light)**: Fully embraced colloquial spoken terms across dialects—canonicalizing "晌午" (midday) to 12:00, "后半夜" (after-midnight) to 02:00, "三更半夜" (dead of night) to 00:00, and "天蒙蒙亮" (first light of dawn) to 06:00, eliminating schedule parsing gaps for casual voice commands;
+    - **Half-Point Spoken Phase Normalization Pipeline**: Expanded support for half-hour colloquial spoken phrases: "晌午半" (12:30), "后半夜半" (02:30), "三更半夜半" (00:30), "天蒙蒙亮半" (06:30);
+    - **Idiomatic Phrase Canonicalization & Guard Defense (`hasTimingOrCountdownIntent`)**: Canonicalized "三更半夜" into "午夜" before digit normalization to avoid mechanical number substitution of "三" into "3" falling through to 23:00; injected all colloquial terms into the timing guard to strictly prevent voice schedules like "后半夜关空调" from mistakenly powering off active air conditioners immediately;
+    - **100% Test Assertion Alignment**: Added 20 comprehensive test assertions spanning single/repeating schedules ("每天晌午关空调", "工作日后半夜关空调") and non-immediate power guards, 100% PASS.
+  - 🍃 **Variable-Speed Multi-Gear Aerodynamic Wear Dynamics & Control Engine Alignment (`AppModel.swift`)**:
+    - **Level 5, Storm & Level 4 Flow Rate Modeling (`calculateFilterWearFactor`)**: Eliminated the legacy gap where 4-speed, 5-speed, and storm fan levels erroneously fell back to auto-mode temperature delta damping, accurately establishing physical aerodynamic flux multipliers: Level 5/Storm/Turbo 1.85, Level 4/High 1.50, Level 3 1.35, Level 2 1.00, Level 1 0.80, Quiet/Micro 0.60;
+    - **Fan Speed Normalization Engine Completeness (`setWindSpeed`)**: Correctly normalized 4-speed, 5-speed, and storm spoken/batch inputs to "强劲" (High/Turbo) matching hardware ranges, fixing the regression where they defaulted to "自动" (Auto).
+  - 🍱 **macOS Status Bar Full Interaction Matrix Tooltips & Fan Speed State Perception (`StatusItemController.swift`)**:
+    - **100% Native macOS Tooltips for Wind Speed Menus**: Provided comprehensive tooltips across single-device, multi-device, and whole-house wind speed submenus explaining airflow and comfort characteristics;
+    - **High-Fidelity Speed Level State Sync**: Enhanced active speed detection (`allOnSameSpeed` & `isSelected`) to accurately reflect 4-speed, 5-speed, and storm states on modern inverter units.
+
 - 🏷 **Unified Natural Colloquial All-Phase Schedule Universal Engine, Instant Power Misclick Prevention & 100% Status Bar Tooltip Coverage (v1.9.80)**:
   - ⏱️ **Natural Colloquial All-Phase Schedule Universal Engine & Power Protection (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)**:
     - **All-Weather Colloquial Temporal Lexicon Coverage (Daytime, Dawn, Dusk, Late Night)**: Comprehensively resolved high-frequency natural spoken schedule commands without explicit hour digits (e.g. "白天关空调", "白天开机", "大清早开机", "大晚上开机", "大半夜关机", "天亮开机", "天亮关空调", "天黑关空调", "天明开机"), automatically mapping canonical hours (Daytime 08:00, Early Morning/Dawn 06:00, Dusk 18:00, Late Evening 21:00, Deep Midnight 23:00) and preventing accidental immediate shutdowns;

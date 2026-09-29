@@ -499,7 +499,8 @@ final class StatusItemController: NSObject {
                     let raw = model.attribute("windSpeed", deviceId: dev.id)?.stringValue ?? "微风"
                     if raw.contains("微") || raw.contains("低") || raw.contains("静") || raw.contains("1") { return "微风" }
                     if raw.contains("中") || raw.contains("2") { return "中风" }
-                    if raw.contains("强") || raw.contains("高") || raw.contains("大") || raw.contains("3") { return "强劲" }
+                    if raw.contains("强") || raw.contains("高") || raw.contains("大") || raw.contains("极") || raw.contains("暴") ||
+                       raw.contains("3") || raw.contains("4") || raw.contains("5") { return "强劲" }
                     return "自动"
                 })
                 return speeds.count == 1 ? speeds.first : nil
@@ -512,6 +513,12 @@ final class StatusItemController: NSObject {
                 item.target = self
                 item.representedObject = itemDef.val
                 item.isEnabled = hasControllable
+                switch itemDef.val {
+                case "微风": item.toolTip = "一键将全屋运行中空调统一设为微风/低速档，出风轻柔静音，适合夜间睡眠与母婴呵护"
+                case "中风": item.toolTip = "一键将全屋运行中空调统一设为中风档，适中循环风量，兼顾体感舒适与均匀气流"
+                case "强劲": item.toolTip = "一键将全屋运行中空调统一设为强劲/高速/暴风档，输出最大通量与强对流循环，快速调节室温"
+                default: item.toolTip = "一键将全屋运行中空调统一设为智能自动风速，由各室内机自适应调节风档"
+                }
                 windMenu.addItem(item)
             }
             let windParentItem = NSMenuItem(title: "🍃 全屋风速协同\(runningCountDesc)...", action: nil, keyEquivalent: "")
@@ -761,12 +768,20 @@ final class StatusItemController: NSObject {
                 let devWindMenu = NSMenu()
                 devWindMenu.autoenablesItems = false
                 for itemDef in windLevels {
-                    let isSelected = curWind.contains(itemDef.val) || (itemDef.val == "强劲" && (curWind.contains("强") || curWind.contains("高")))
+                    let isSelected = curWind.contains(itemDef.val) ||
+                                     (itemDef.val == "强劲" && (curWind.contains("强") || curWind.contains("高") || curWind.contains("极") || curWind.contains("暴") ||
+                                                               curWind.contains("3") || curWind.contains("4") || curWind.contains("5")))
                     let check = isSelected ? "✓ " : ""
                     let item = NSMenuItem(title: "\(check)\(itemDef.title)", action: #selector(setDeviceWindSpeedFromMenu(_:)), keyEquivalent: "")
                     item.target = self
                     item.representedObject = ["deviceId": devId, "speed": itemDef.val]
                     item.isEnabled = isControllable
+                    switch itemDef.val {
+                    case "微风": item.toolTip = "将「\(dev.name)」设为微风/低速档，出风轻柔静音，适合夜间睡眠与母婴呵护"
+                    case "中风": item.toolTip = "将「\(dev.name)」设为中风档，适中循环风量，兼顾体感舒适与均匀气流"
+                    case "强劲": item.toolTip = "将「\(dev.name)」设为强劲/高速/暴风档，输出最大通量与强对流循环，快速调节室温"
+                    default: item.toolTip = "将「\(dev.name)」设为智能自动风速，由室内机自适应调节风档"
+                    }
                     devWindMenu.addItem(item)
                 }
                 let devWindParentItem = NSMenuItem(title: "🍃 调节风速 (当前: \(curWind))", action: nil, keyEquivalent: "")
@@ -1065,12 +1080,20 @@ final class StatusItemController: NSObject {
             let singleWindMenu = NSMenu()
             singleWindMenu.autoenablesItems = false
             for itemDef in singleWindLevels {
-                let isSelected = curWind.contains(itemDef.val) || (itemDef.val == "强劲" && (curWind.contains("强") || curWind.contains("高")))
+                let isSelected = curWind.contains(itemDef.val) ||
+                                 (itemDef.val == "强劲" && (curWind.contains("强") || curWind.contains("高") || curWind.contains("极") || curWind.contains("暴") ||
+                                                           curWind.contains("3") || curWind.contains("4") || curWind.contains("5")))
                 let check = isSelected ? "✓ " : ""
                 let item = NSMenuItem(title: "\(check)\(itemDef.title)", action: #selector(setPrimaryWindSpeedFromMenu(_:)), keyEquivalent: "")
                 item.target = self
                 item.representedObject = itemDef.val
                 item.isEnabled = isControllable
+                switch itemDef.val {
+                case "微风": item.toolTip = "将「\(dev.name)」设为微风/低速档，出风轻柔静音，适合夜间睡眠与母婴呵护"
+                case "中风": item.toolTip = "将「\(dev.name)」设为中风档，适中循环风量，兼顾体感舒适与均匀气流"
+                case "强劲": item.toolTip = "将「\(dev.name)」设为强劲/高速/暴风档，输出最大通量与强对流循环，快速调节室温"
+                default: item.toolTip = "将「\(dev.name)」设为智能自动风速，由室内机自适应调节风档"
+                }
                 singleWindMenu.addItem(item)
             }
             let singleWindItem = NSMenuItem(title: "🍃 调节风速 (当前: \(curWind))", action: nil, keyEquivalent: "")
