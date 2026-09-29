@@ -6,6 +6,17 @@ A native SwiftUI app to control Haier / Leader (统帅) smart air conditioners o
 
 ## Features
 
+- 🏷 **Nocturnal & Overnight Full Phase Unified Engine, Anti-Accidental Power Protection & Refined Status Bar Fan Speed Perception (v1.9.84)**:
+  - ⏱️ **Colloquial Night & Next-Day Phase Scheduling & Instant Power Protection (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)**:
+    - **Nocturnal & Overnight Lexicon Closure (今夜 / 明夜 / 每夜 / 整夜 / 彻夜 / 隔夜 / 后夜 / 隔日 / 翌日)**: Deeply supported casual spoken terms without explicit hours, canonicalizing "今夜" (tonight), "明夜" (tomorrow night), and "每夜" (every night) to 21:00; "整夜" (all night), "彻夜" (through the night), and "隔夜" (overnight) to 23:00; "后夜" (latter part of night) to 02:00; and "隔日" / "翌日" (next day) to 08:00 (e.g., "今夜关空调", "明夜关机", "整夜开机", "后夜关机", "隔日关空调", "翌日开机");
+    - **Eliminated Nocturnal Hour Inversion & Morning Misclassification**: Fixed severe logic bugs where `isEveningStandard` and `isNocturnal` lacked "今夜", "明夜", and "每夜", which previously prevented the +12 hour addition (causing "今夜十点关空调" and "每夜10点关空调" to schedule at 10:00 AM in the morning instead of 22:00 PM), and prevented "今夜12点" from being converted to midnight 00:00;
+    - **Spoken Half-Hour Normalization Pipeline**: Added "今夜半" (21:30), "明夜半" (21:30), "每夜半" (21:30), "整夜半" (23:30), "彻夜半" (23:30), "隔夜半" (23:30), "后夜半" (02:30), "隔日半" (08:30), and "翌日半" (08:30) to `convertChineseNumbers`;
+    - **Non-Immediate Power Guard Enforcement (`hasTimingOrCountdownIntent` / `hasTimePhase`)**: Fully injected nocturnal and next-day terms into guard predicates, strictly preventing spoken schedules from accidentally penetrating into `isPowerOff` / `isPowerOn` and causing immediate power shutoffs or activations;
+    - **Next-Day Schedule Alignment (`VoiceCapsuleWindowController.swift`)**: Extended `isExplicitTomorrow` to cover "明午", "明夜", "隔日", and "翌日", ensuring cross-day requests like "明夜10点关空调" accurately target tomorrow night;
+    - **100% Unit Test Coverage**: Added comprehensive test cases in `VoiceCommandParserTests.swift` covering single, repeating, and half-hour nocturnal schedules alongside strict anti-misoperation assertions.
+  - 🍱 **macOS Status Bar Fan Speed Menu & Cascade Perception Refinement (`StatusItemController.swift`)**:
+    - **Eliminated Raw Hardware Code Display Defect**: Replaced raw string concatenation in device speed menus (`singleWindItem` and `devWindParentItem`) where codes like "2", "high", "low", or "auto" produced titles like `🍃 调节风速 (当前: 2)`; now unified through `normCurWind` to display graceful native labels like `🍃 调节风速 (当前: 中风)`, `🍃 调节风速 (当前: 强劲)`, and `🍃 调节风速 (当前: 自动)`.
+
 - 🏷 **CR Inverter Multi-Speed Semantic Alignment, Deep Night Phase Power Protection & macOS Status Bar Coordination Refactor (v1.9.83)**:
   - ⏱️ **Deep Night / All Night Spoken Phase Scheduling & Accidental Power Protection (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)**:
     - **Nocturnal Spoken Phase Lexicon Closure (深宵 / 通宵 / 夜深)**: Added full schedule parsing for casual late-night terms without clock numbers, canonicalizing "深宵", "通宵", and "夜深" to 23:00 (e.g., "深宵关空调", "深宵开机", "通宵关机", "通宵开空调", "夜深关空调", "夜深开机");

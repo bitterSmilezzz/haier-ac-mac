@@ -519,7 +519,7 @@ public final class VoiceCapsuleWindowController: NSObject, NSWindowDelegate {
                     scheduleAutoDismiss(delay: 2.0)
                     return
                 }
-                let isExplicitTomorrow = spokenText.contains("明天") || spokenText.contains("明早") || spokenText.contains("明晚") || spokenText.contains("次日") || spokenText.contains("明儿")
+                let isExplicitTomorrow = spokenText.contains("明天") || spokenText.contains("明早") || spokenText.contains("明晚") || spokenText.contains("明午") || spokenText.contains("明夜") || spokenText.contains("次日") || spokenText.contains("明儿") || spokenText.contains("隔日") || spokenText.contains("翌日")
                 let isExplicitDayAfter = spokenText.contains("大后天") ? 3 : (spokenText.contains("后天") ? 2 : 0)
                 if isExplicitDayAfter > 0 {
                     targetDate = calendar.date(byAdding: .day, value: isExplicitDayAfter, to: targetDate) ?? targetDate
@@ -803,7 +803,7 @@ public final class VoiceCapsuleWindowController: NSObject, NSWindowDelegate {
                 scheduleAutoDismiss(delay: 2.0)
                 return
             }
-            let isExplicitTomorrow = spokenText.contains("明天") || spokenText.contains("明早") || spokenText.contains("明晚") || spokenText.contains("次日") || spokenText.contains("明儿")
+            let isExplicitTomorrow = spokenText.contains("明天") || spokenText.contains("明早") || spokenText.contains("明晚") || spokenText.contains("明午") || spokenText.contains("明夜") || spokenText.contains("次日") || spokenText.contains("明儿") || spokenText.contains("隔日") || spokenText.contains("翌日")
             let isExplicitDayAfter = spokenText.contains("大后天") ? 3 : (spokenText.contains("后天") ? 2 : 0)
             if isExplicitDayAfter > 0 {
                 targetDate = calendar.date(byAdding: .day, value: isExplicitDayAfter, to: targetDate) ?? targetDate
@@ -1148,7 +1148,7 @@ public final class VoiceCapsuleWindowController: NSObject, NSWindowDelegate {
                 scheduleAutoDismiss(delay: 2.0)
                 return
             }
-            let isExplicitTomorrow = spokenText.contains("明天") || spokenText.contains("明早") || spokenText.contains("明晚") || spokenText.contains("次日") || spokenText.contains("明儿")
+            let isExplicitTomorrow = spokenText.contains("明天") || spokenText.contains("明早") || spokenText.contains("明晚") || spokenText.contains("明午") || spokenText.contains("明夜") || spokenText.contains("次日") || spokenText.contains("明儿") || spokenText.contains("隔日") || spokenText.contains("翌日")
             let isExplicitDayAfter = spokenText.contains("大后天") ? 3 : (spokenText.contains("后天") ? 2 : 0)
             if isExplicitDayAfter > 0 {
                 targetDate = calendar.date(byAdding: .day, value: isExplicitDayAfter, to: targetDate) ?? targetDate

@@ -1,21 +1,18 @@
-# Haier AC Mac v1.9.83 发布与巡检演进报告
+# Haier AC Mac v1.9.84 发布与巡检演进报告
 
 ## 1. 概述与版本定位
-- **版本号**：`v1.9.83`
-- **发版主题**：闭环 CR 变频多档风速语义与口语大一统对齐、深宵/通宵/夜深全时相防误触闭环与 macOS 状态栏风速协同交互重构
+- **版本号**：`v1.9.84`
+- **发版主题**：闭环自然口语深夜与隔夜全时相调度大一统引擎、防即时开关机误触穿透与状态栏多设备风速感知精细化
 - **核心目标与架构演进**：
-  1. **变频多档风速口语解析大一统与跨层物理语义对齐 (`VoiceCommandParser.swift`)**：
-     - **根除 4 档/四档误判为自动风的历史缺陷**：在 `VoiceCommandParser.parseWindSpeed` 中，彻底清理此前将“四档”、“4档”、“第四档”、“风速4”错误归入自动风的历史遗留代码，严格与 `AppModel.normalizeWindSpeed`、`EnergyAnalyticsEngine.estimateInstantaneousPower`（4档=140W强风）及滤网动力学模型（4档=1.50x风阻通量）达成 100% 语义自洽；
-     - **全量纳管 4档/5档/暴风/极速/超强风大档位口语**：扩展支持“五档”、“5档”、“暴风”、“超强”、“极速”、“风速5”、“风速五”等现代变频内机大档位口语，统一映射至“强劲”标准风速档位；同时将“自动”风速严格限定为“自动风/自动风速/智能风/自适应风速/自动档”，消除语义交叉混淆。
-  2. **深宵 / 通宵 / 夜深 自然口语无钟点独立时相调度大一统引擎与防即时误触全闭环 (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)**：
-     - **深宵/通宵/夜深 词群全景闭环**：纳管“深宵”、“通宵”、“夜深”无钟点独立时相，自适应映射为夜间 23:00，支持“深宵关空调”、“深宵开机”、“通宵关机”、“通宵开空调”、“夜深关空调”、“夜深开机”等自然日常口语调度；
-     - **口语半点时相归一流水线补全**：在 `convertChineseNumbers` 中新增“深宵半”(23:30)、“通宵半”(23:30)、“夜深半”(23:30) 标准化替换，彻底补齐深夜全时相口语表达；
-     - **调度意图判定与防即时开关机穿透全防线 (`hasTimePhase` / `hasTimingOrCountdownIntent`)**：将“深宵”、“通宵”、“夜深”注入 `hasTimePhase` 与 `hasTimingOrCountdownIntent` 前置卫语句，彻底杜绝无显式钟点的深夜口语调度穿透至 `isPowerOff` / `isPowerOn` 造成立即误关机/开机的重大安全缺陷；
-     - **单元测试 100% 满分覆盖**：在 `VoiceCommandParserTests.swift` 中新增涵盖深宵、通宵、夜深单次调度、半点调度、周期重复调度及严苛防即时误触断言（深宵关空调 != setPower(false)，全屋深宵关空调 != turnOffAll，通宵开机 != setPower(true) 等），全部通过。
-  3. **macOS 原生状态栏全交互矩阵风速协同与待机感知重构 (`StatusItemController.swift`)**：
-     - **消除风速协同菜单项的温度语义污染**：此前“全屋风速协同”菜单标题直接复用了带温度范围的 `runningCountDesc`，导致显示为 `🍃 全屋风速协同 (2台运行中 · 当前 24~26°C)...`；现重构为专用的 `windRunningDesc`，若全屋档位一致则显示当前风速（如 `🍃 全屋风速协同 (2台运行中 · 当前微风)...`），档位不同则显示 `(2台运行中 · 档位不同)`，全屋关机时显示 `(当前均未开机)`；
-     - **全屋风速协同精准靶向与使能防护**：全屋风速子菜单项（微风/中风/强劲/自动）当全屋无开机空调时设为不可选（`isEnabled = model.gatewayConnected && !onDevices.isEmpty`），Toolip 提示“当前全屋无运行中的空调”；当有开机设备时附带受控空调清单；且 `setAllWindSpeedFromMenu` 仅向运行中空调下发风速，避免干扰待机设备；
-     - **单设备与级联子菜单待机保护**：风速调节子菜单项设为 `isEnabled = isControllable && isPowerOn`，待机状态标题显示为 `🍃 调节风速 (待机中)`，Tooltip 提示“当前处于关机待机状态，请先开启电源再调节风速”，杜绝向待机设备盲目下发风速指令。
+  1. **自然口语深夜与隔夜全时相独立调度大一统引擎与防即时开关机穿透全闭环 (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)**：
+     - **深宵夜间与次日词群全景闭环**：纳管“今夜”、“明夜”、“每夜”（映射为 21:00）、“整夜”、“彻夜”、“隔夜”（映射为 23:00）、“后夜”（映射为 02:00）、“隔日”、“翌日”（映射为 08:00），支持“今夜关空调”、“明夜关机”、“整夜开机”、“彻夜开空调”、“后夜关机”、“隔夜关机”、“隔日关机”、“翌日开机”等自然日常调度；
+     - **根除夜间口语钟点倒挂与误判为白天上午的重大缺陷**：修复此前因 `isEveningStandard` 和 `isNocturnal` 遗漏“今夜”、“明夜”、“每夜”，导致“今夜十点关空调”、“每夜10点关空调”未累加 12 错误调度为上午 10:00，以及“今夜12点”未被 `isNightMidnight` 捕获误调度为正午 12:00 的严重时态错乱；
+     - **口语半点时相归一流水线全量补全**：在 `convertChineseNumbers` 中新增“今夜半”(21:30)、“明夜半”(21:30)、“每夜半”(21:30)、“整夜半”(23:30)、“彻夜半”(23:30)、“隔夜半”(23:30)、“后夜半”(02:30)、“隔日半”(08:30)、“翌日半”(08:30) 标准化替换，彻底补齐夜间与次日全时相口语表达；
+     - **防即时开关机穿透全防线加固 (`hasTimingOrCountdownIntent` / `hasTimePhase`)**：将“今夜”、“明夜”、“整夜”、“彻夜”、“隔夜”、“后夜”、“隔日”、“翌日”全量注入前置卫语句，彻底杜绝无显式钟点的口语调度穿透至 `isPowerOff` / `isPowerOn` 造成立即误关机/开机的安全缺陷；
+     - **次日调度判定全链路对齐 (`VoiceCapsuleWindowController.swift`)**：在单机、全屋与多机定时调度中，将 `isExplicitTomorrow` 全面扩展覆盖“明午”、“明夜”、“隔日”、“翌日”，确保“明夜10点关空调”等跨天口语精准调度至明天夜间，消除同日误判；
+     - **单元测试 100% 满分覆盖**：在 `VoiceCommandParserTests.swift` 中新增涵盖今夜、明夜、每夜、整夜、彻夜、隔夜、后夜、隔日、翌日单次调度、半点调度、周期重复调度及严苛防即时误触断言，全部通过。
+  2. **macOS 原生状态栏单机与级联子菜单风速动态感知精细化 (`StatusItemController.swift`)**：
+     - **消除设备风速子菜单原始代号显示缺陷**：修复状态栏单机菜单（`singleWindItem`）与设备级联子菜单（`devWindParentItem`）标题及 Tooltip 直接拼接原始硬件代号（导致上报“2”、“high”、“low”、“auto”等字符时显示为 `🍃 调节风速 (当前: 2)`）的显示粗糙问题；统一采用 `normCurWind` 规范化中文名称，呈现为 `🍃 调节风速 (当前: 中风)`、`🍃 调节风速 (当前: 强劲)`、`🍃 调节风速 (当前: 自动)` 等与菜单子项严格一致的优雅原生体验。
 
 ---
 
@@ -28,61 +25,55 @@
    - **工况占比计算属性消费 (P2-1)**：`EcoEnergySection` 已统一调用 4 个比率属性；
    - **死分支清理 (P2-2)**：`.adjustTemperatureAll` 死分支已彻底清理；
    - **调温 16/30°C 边界防护 (P2-3)**：单设备与全屋协同均已严格实施边界限制并同步至状态栏使能状态。
-2. **深度代码走查发现的问题与闭环解决**：
-   - **深宵/通宵/夜深无钟点口语穿透即时误关机缺陷 (P1)**：`hasTimePhase` 与 `hasTimingOrCountdownIntent` 遗漏“深宵”、“通宵”、“夜深”，导致用户说“深宵关空调”时无法解析为定时调度，反而穿透执行为立即全屋/单机断电关机。本次全量纳管深宵/通宵/夜深时相与半点流水线，构筑绝对防误触防线；
-   - **风速口语与变频大档位语义倒挂缺陷 (P1)**：`VoiceCommandParser.parseWindSpeed` 遗留将 4档/四档映射为“自动”的逻辑缺陷，且无法识别 5档/暴风。本次与 `AppModel.normalizeWindSpeed` 及能耗动力学全面对齐，将 4档/5档/暴风统一收敛至“强劲”，自动风严格独立；
-   - **状态栏风速协同菜单温度语义污染与待机误下发 (P2)**：修复状态栏风速协同菜单项借用温度范围标题导致“当前 24~26°C”污染风速菜单的体验缺陷，重构状态栏各级风速菜单的待机使能与提示防护。
+2. **本轮走查发现的高价值优化与缺陷闭环**：
+   - **夜间口语时态倒挂与上午错位重大缺陷 (P1)**：由于此前 `isEveningStandard` 和 `isNocturnal` 遗漏了“今夜”、“明夜”、“每夜”，用户口述“今夜十点关空调”或“每夜10点关空调”时，系统无法将其归入晚间时相，导致小时数未累加 12，而错误在每天/今晚的上午 10:00 执行关机；同理，“今夜12点”亦未能触发 `isNightMidnight`，导致被保留为正午 12:00。本轮将今夜/明夜/每夜/整夜/彻夜/隔夜/后夜全量纳入时区模型，彻底根除该缺陷；
+   - **跨天次日调度同日覆盖缺陷 (P1)**：`VoiceCapsuleWindowController.swift` 中的 `isExplicitTomorrow` 未涵盖“明夜”、“明午”、“隔日”、“翌日”，当用户在白天（如上午 10 点）口述“明夜10点关空调”时，因当天该钟点尚未过去且未被标记为次日，系统误将其设定为今天夜间 22:00 执行。本轮全面补齐跨天次日识别链，彻底消除该逻辑漏洞；
+   - **状态栏风速菜单硬件原始代号未脱敏显示粗糙 (P2)**：单设备与设备子菜单风速标题此前直接显示内机原生代号 `curWind`，导致出现 `🍃 调节风速 (当前: 2)` 或 `(当前: high)` 等非人性化文字，本轮统一规范为 `normCurWind` 中文标准档位展示。
 
 ---
 
 ## 3. 关键架构变更与代码实现
 
-### 3.1 变频多档风速口语解析大一统
-- **`VoiceCommandParser.swift` 风速多档归一重构**：
+### 3.1 深宵夜间与次日自然口语大一统时区校准
+- **`VoiceCommandParser.swift` 广义时相与时区大一统**：
   ```swift
-  // 1. 自动风档位 (v1.9.83 严格限定智能/自动/自适应风速，杜绝将 4 档机械割裂误判为自动风)
-  if text.contains("自动风") || text.contains("风速自动") || text.contains("自动风速") ||
-     text.contains("智能风") || text.contains("自适应风") || text.contains("智能风速") ||
-     text.contains("自适应风速") || text.contains("自动档") || text.contains("自动档位") {
-      return ("自动", "自动风速")
-  }
-  // 2. 强劲 / 暴风 / 5档 / 4档 / 3档 / 高风 / 大风 (v1.9.47, v1.9.83 全量对齐变频大档位动力学，支持4档、5档与暴风极速)
-  if text.contains("暴风") || text.contains("超强") || text.contains("极速") ||
-     text.contains("五档") || text.contains("5档") || text.contains("第5档") || text.contains("第五档") ||
-     text.contains("风速5") || text.contains("风速五") ||
-     text.contains("四档") || text.contains("4档") || text.contains("第4档") || text.contains("第四档") ||
-     text.contains("风速4") || text.contains("风速四") ||
-     text.contains("大风") || text.contains("风大") || text.contains("强劲") || text.contains("高风") ||
-     text.contains("最大风") || text.contains("最大") || text.contains("调大风") || text.contains("风速大") ||
-     text.contains("高速风") || text.contains("开到最大") || text.contains("强风") ||
-     text.contains("三档") || text.contains("3档") || text.contains("第3档") || text.contains("第三档") ||
-     text.contains("风速3") || text.contains("风速三") || text.contains("高档") || text.contains("风速调大") ||
-     text.contains("风开大") || text.contains("把风开大") || text.contains("风调大") || text.contains("风大点") ||
-     text.contains("调大风速") || text.contains("开大风速") || text.contains("吹大风") ||
-     text.contains("吹暴风") || text.contains("吹强风") {
-      return ("强劲", "强劲风速")
-  }
-  ```
-
-### 3.2 深宵/通宵/夜深口语时相调度与防即时开关机穿透
-- **`VoiceCommandParser.swift` 深宵词群纳管与半点流水线**：
-  ```swift
-  // 时相感知与意图识别
-  str = str.replacingOccurrences(of: "深宵半", with: "深宵11点30分")
-  str = str.replacingOccurrences(of: "通宵半", with: "通宵11点30分")
-  str = str.replacingOccurrences(of: "夜深半", with: "夜深11点30分")
-
   // hasTimePhase 与 hasTimingOrCountdownIntent 全防线加固
-  text.contains("深宵") || text.contains("通宵") || text.contains("夜深")
+  normalized.contains("今夜") || normalized.contains("明夜") || normalized.contains("每夜") ||
+  normalized.contains("整夜") || normalized.contains("彻夜") || normalized.contains("隔夜") ||
+  normalized.contains("后夜") || normalized.contains("隔日") || normalized.contains("翌日") ||
+  normalized.contains("明儿")
+
+  // 钟点晚间加 12 与午夜 00:00 精准校准
+  let isNocturnal = ... || normalized.contains("整夜") || normalized.contains("彻夜") || normalized.contains("隔夜") || normalized.contains("后夜")
+  let isEveningStandard = ... || normalized.contains("今夜") || normalized.contains("明夜") || normalized.contains("每夜")
   ```
 
-### 3.3 macOS 状态栏风速协同交互重构
-- **`StatusItemController.swift` 精准风速感知与待机防护**：
+### 3.2 口语半点时相归一流水线补齐
+- **`VoiceCommandParser.swift` 中 `convertChineseNumbers` 拓展**：
   ```swift
-  let windRunningDesc = !onDevices.isEmpty ? (allOnSameSpeed != nil ? " (\(onDevices.count)台运行中 · 当前\(allOnSameSpeed!))" : " (\(onDevices.count)台运行中 · 档位不同)") : " (当前均未开机)"
-  let canSetWindAll = model.gatewayConnected && !onDevices.isEmpty
-  // 菜单项仅在有运行中空调时使能，待机时显示精准指引
-  item.isEnabled = canSetWindAll
+  str = str.replacingOccurrences(of: "今夜半", with: "今夜9点30分")
+  str = str.replacingOccurrences(of: "明夜半", with: "明夜9点30分")
+  str = str.replacingOccurrences(of: "每夜半", with: "每夜9点30分")
+  str = str.replacingOccurrences(of: "整夜半", with: "整夜11点30分")
+  str = str.replacingOccurrences(of: "彻夜半", with: "彻夜11点30分")
+  str = str.replacingOccurrences(of: "隔夜半", with: "隔夜11点30分")
+  str = str.replacingOccurrences(of: "后夜半", with: "后夜2点30分")
+  str = str.replacingOccurrences(of: "隔日半", with: "隔日8点30分")
+  str = str.replacingOccurrences(of: "翌日半", with: "翌日8点30分")
+  ```
+
+### 3.3 次日跨天调度全链路对齐
+- **`VoiceCapsuleWindowController.swift` 全场景次日判定增强**：
+  ```swift
+  let isExplicitTomorrow = spokenText.contains("明天") || spokenText.contains("明早") || spokenText.contains("明晚") || spokenText.contains("明午") || spokenText.contains("明夜") || spokenText.contains("次日") || spokenText.contains("明儿") || spokenText.contains("隔日") || spokenText.contains("翌日")
+  ```
+
+### 3.4 状态栏设备风速菜单原生体验精细化
+- **`StatusItemController.swift` 规范化档位展示**：
+  ```swift
+  let windTitle = isPowerOn ? "🍃 调节风速 (当前: \(normCurWind))" : "🍃 调节风速 (待机中)"
+  let devWindParentItem = NSMenuItem(title: windTitle, action: nil, keyEquivalent: "")
+  devWindParentItem.toolTip = isPowerOn ? "调节「\(dev.name)」出风风速（当前: \(normCurWind)）" : "「\(dev.name)」当前处于关机待机状态"
   ```
 
 ---
@@ -91,35 +82,32 @@
 
 - **单元测试覆盖**：
   在 `Sources/HaierACCoreTests/VoiceCommandParserTests.swift` 中新增并校验端到端单元测试用例：
-  - `"深宵关空调"` -> `23:00` 关机 (PASS)
-  - `"深宵开机"` -> `23:00` 开机 (PASS)
-  - `"深宵半关机"` -> `23:30` 关机 (PASS)
-  - `"通宵关机"` -> `23:00` 关机 (PASS)
-  - `"通宵开空调"` -> `23:00` 开机 (PASS)
-  - `"通宵半关空调"` -> `23:30` 关机 (PASS)
-  - `"夜深关空调"` -> `23:00` 关机 (PASS)
-  - `"夜深开机"` -> `23:00` 开机 (PASS)
-  - `"夜深半关机"` -> `23:30` 关机 (PASS)
-  - `"每天深宵关机"` -> 每天 `23:00` 关机 (PASS)
-  - `"工作日通宵关空调"` -> 工作日 `23:00` 关机 (PASS)
-  - `"周末夜深开机"` -> 周末 `23:00` 开机 (PASS)
-  - `"开四档风"` -> `.setWindSpeed("强劲")` (PASS)
-  - `"风速4档"` -> `.setWindSpeed("强劲")` (PASS)
-  - `"风速四"` -> `.setWindSpeed("强劲")` (PASS)
-  - `"开五档风"` -> `.setWindSpeed("强劲")` (PASS)
-  - `"风速5档"` -> `.setWindSpeed("强劲")` (PASS)
-  - `"吹暴风"` -> `.setWindSpeed("强劲")` (PASS)
-  - `"全屋吹暴风"` -> `.setWindSpeedAll("强劲")` (PASS)
-  - `"全屋风速4档"` -> `.setWindSpeedAll("强劲")` (PASS)
-  - 防误触断言（深宵关空调 != setPower(false)，全屋深宵关空调 != turnOffAll，通宵开机 != setPower(true)，夜深关空调 != setPower(false)）全部 PASS。
-- **本地编译验证**：
-  - `SDKROOT=/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk swift build` -> 100% 成功，0 错误；
-  - 运行 `./build_app.sh 1.9.83` 打包生成 `dist/HaierAC-v1.9.83-macOS.zip` (2.8MB)。
+  - `"今夜关空调"` -> `21:00` 关机 (PASS)
+  - `"今夜开机"` -> `21:00` 开机 (PASS)
+  - `"今夜半关机"` -> `21:30` 关机 (PASS)
+  - `"明夜关空调"` -> `21:00` 关机 (PASS)
+  - `"明夜开机"` -> `21:00` 开机 (PASS)
+  - `"明夜半关空调"` -> `21:30` 关机 (PASS)
+  - `"每夜十点关空调"` -> 每天 `22:00` 重复关机 (PASS)
+  - `"今夜十点关空调"` -> 今天 `22:00` 关机 (PASS)
+  - `"明夜十点关空调"` -> 明天 `22:00` 关机 (PASS)
+  - `"整夜开空调"` -> `23:00` 开机 (PASS)
+  - `"彻夜开空调"` -> `23:00` 开机 (PASS)
+  - `"隔夜关机"` -> `23:00` 关机 (PASS)
+  - `"后夜关机"` -> `02:00` 关机 (PASS)
+  - `"后夜半关机"` -> `02:30` 关机 (PASS)
+  - `"隔日关空调"` -> `08:00` 关机 (PASS)
+  - `"翌日开机"` -> `08:00` 开机 (PASS)
+  - `"全屋明夜关空调"` -> `21:00` 关机 (PASS)
+  - 严苛防即时误触断言（16 组全覆盖，绝对禁止掉入 `setPower`、`turnOffAll` 或 `turnOnAll`，全部 PASS）。
+- **编译与打包校验**：
+  - 执行 `SDKROOT=/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk swift build`，0 错误编译通过；
+  - 运行 `./build_app.sh 1.9.84` 打包生成 `dist/HaierAC-v1.9.84-macOS.zip` (2.8MB)。
 
 ---
 
-## 5. 发版信息与交付产物
-- **Git Tag**：`v1.9.83`
-- **Release 资产**：`dist/HaierAC-v1.9.83-macOS.zip`
-- **SHA-256**：`a7725b5c87d62c66d24ec9937c031f8f1a2c40c7a2f583643f86e44e7fa2fada`
-- **安全敏感数据检查**：经核验，源码与文档均无敏感个人信息、真实 Token 或凭证，符合安全脱敏规范。
+## 5. 发版信息与资产交付
+- **版本号**：`v1.9.84`
+- **Git Tag**：`v1.9.84`
+- **Release 资产**：`dist/HaierAC-v1.9.84-macOS.zip`
+- **SHA-256**：`87ed6d0326bd6208192729ca92af5e4924aa979a3328ddd73b991d37566edcd5`

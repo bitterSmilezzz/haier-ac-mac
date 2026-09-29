@@ -805,9 +805,9 @@ final class StatusItemController: NSObject {
                     }
                     devWindMenu.addItem(item)
                 }
-                let windTitle = isPowerOn ? "🍃 调节风速 (当前: \(curWind))" : "🍃 调节风速 (待机中)"
+                let windTitle = isPowerOn ? "🍃 调节风速 (当前: \(normCurWind))" : "🍃 调节风速 (待机中)"
                 let devWindParentItem = NSMenuItem(title: windTitle, action: nil, keyEquivalent: "")
-                devWindParentItem.toolTip = isPowerOn ? "调节「\(dev.name)」出风风速（当前: \(curWind)）" : "「\(dev.name)」当前处于关机待机状态"
+                devWindParentItem.toolTip = isPowerOn ? "调节「\(dev.name)」出风风速（当前: \(normCurWind)）" : "「\(dev.name)」当前处于关机待机状态"
                 devSubmenu.setSubmenu(devWindMenu, for: devWindParentItem)
                 devSubmenu.addItem(devWindParentItem)
 
@@ -1122,9 +1122,9 @@ final class StatusItemController: NSObject {
                 }
                 singleWindMenu.addItem(item)
             }
-            let singleWindTitle = isPowerOn ? "🍃 调节风速 (当前: \(curWind))" : "🍃 调节风速 (待机中)"
+            let singleWindTitle = isPowerOn ? "🍃 调节风速 (当前: \(normCurWind))" : "🍃 调节风速 (待机中)"
             let singleWindItem = NSMenuItem(title: singleWindTitle, action: nil, keyEquivalent: "")
-            singleWindItem.toolTip = isPowerOn ? "调节「\(dev.name)」出风风速（当前: \(curWind)）" : "「\(dev.name)」当前处于关机待机状态"
+            singleWindItem.toolTip = isPowerOn ? "调节「\(dev.name)」出风风速（当前: \(normCurWind)）" : "「\(dev.name)」当前处于关机待机状态"
             menu.setSubmenu(singleWindMenu, for: singleWindItem)
             menu.addItem(singleWindItem)
 

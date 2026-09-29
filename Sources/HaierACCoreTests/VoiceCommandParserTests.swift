@@ -3052,6 +3052,58 @@ final class VoiceCommandParserTests: XCTestCase {
         let pNightDeepHalf = VoiceCommandParser.parse("夜深半关机")
         XCTAssertEqual(pNightDeepHalf?.command, .schedulePower(hour: 23, minute: 30, power: false))
 
+        // 今夜/明夜/每夜/整夜/彻夜/隔夜/后夜/隔日/翌日独立时相与半点口语 (v1.9.84)
+        let pTonightOff = VoiceCommandParser.parse("今夜关空调")
+        XCTAssertEqual(pTonightOff?.command, .schedulePower(hour: 21, minute: 0, power: false))
+
+        let pTonightOn = VoiceCommandParser.parse("今夜开机")
+        XCTAssertEqual(pTonightOn?.command, .schedulePower(hour: 21, minute: 0, power: true))
+
+        let pTonightHalf = VoiceCommandParser.parse("今夜半关机")
+        XCTAssertEqual(pTonightHalf?.command, .schedulePower(hour: 21, minute: 30, power: false))
+
+        let pTomorrowNightOff = VoiceCommandParser.parse("明夜关空调")
+        XCTAssertEqual(pTomorrowNightOff?.command, .schedulePower(hour: 21, minute: 0, power: false))
+
+        let pTomorrowNightOn = VoiceCommandParser.parse("明夜开机")
+        XCTAssertEqual(pTomorrowNightOn?.command, .schedulePower(hour: 21, minute: 0, power: true))
+
+        let pTomorrowNightHalf = VoiceCommandParser.parse("明夜半关空调")
+        XCTAssertEqual(pTomorrowNightHalf?.command, .schedulePower(hour: 21, minute: 30, power: false))
+
+        let pEveryNight10 = VoiceCommandParser.parse("每夜十点关空调")
+        XCTAssertEqual(pEveryNight10?.command, .scheduleRepeatPower(hour: 22, minute: 0, power: false, repeatWeekdays: [], repeatLabel: "每天"))
+
+        let pTonight10 = VoiceCommandParser.parse("今夜十点关空调")
+        XCTAssertEqual(pTonight10?.command, .schedulePower(hour: 22, minute: 0, power: false))
+
+        let pTomorrowNight10 = VoiceCommandParser.parse("明夜十点关空调")
+        XCTAssertEqual(pTomorrowNight10?.command, .schedulePower(hour: 22, minute: 0, power: false))
+
+        let pAllNight = VoiceCommandParser.parse("整夜开空调")
+        XCTAssertEqual(pAllNight?.command, .schedulePower(hour: 23, minute: 0, power: true))
+
+        let pThroughNight = VoiceCommandParser.parse("彻夜开空调")
+        XCTAssertEqual(pThroughNight?.command, .schedulePower(hour: 23, minute: 0, power: true))
+
+        let pOvernightOff = VoiceCommandParser.parse("隔夜关机")
+        XCTAssertEqual(pOvernightOff?.command, .schedulePower(hour: 23, minute: 0, power: false))
+
+        let pLateNightOff = VoiceCommandParser.parse("后夜关机")
+        XCTAssertEqual(pLateNightOff?.command, .schedulePower(hour: 2, minute: 0, power: false))
+
+        let pLateNightHalf = VoiceCommandParser.parse("后夜半关机")
+        XCTAssertEqual(pLateNightHalf?.command, .schedulePower(hour: 2, minute: 30, power: false))
+
+        let pNextDayOff = VoiceCommandParser.parse("隔日关空调")
+        XCTAssertEqual(pNextDayOff?.command, .schedulePower(hour: 8, minute: 0, power: false))
+
+        let pTomorrowDayOn = VoiceCommandParser.parse("翌日开机")
+        XCTAssertEqual(pTomorrowDayOn?.command, .schedulePower(hour: 8, minute: 0, power: true))
+
+        let pAllTomorrowNight = VoiceCommandParser.parse("全屋明夜关空调")
+        XCTAssertEqual(pAllTomorrowNight?.command, .schedulePower(hour: 21, minute: 0, power: false))
+
         // 4. 严苛防即时开关机误触验证（绝对禁止被误判为 setPower / turnOffAll / turnOnAll）
         XCTAssertNotEqual(VoiceCommandParser.parse("明早关空调")?.command, .setPower(false))
         XCTAssertNotEqual(VoiceCommandParser.parse("明早关空调")?.command, .turnOffAll)
@@ -3086,6 +3138,22 @@ final class VoiceCommandParserTests: XCTestCase {
         XCTAssertNotEqual(VoiceCommandParser.parse("夜深关空调")?.command, .turnOffAll)
         XCTAssertNotEqual(VoiceCommandParser.parse("全屋夜深关空调")?.command, .turnOffAll)
         XCTAssertNotEqual(VoiceCommandParser.parse("夜深开机")?.command, .setPower(true))
+        XCTAssertNotEqual(VoiceCommandParser.parse("今夜关空调")?.command, .setPower(false))
+        XCTAssertNotEqual(VoiceCommandParser.parse("今夜关空调")?.command, .turnOffAll)
+        XCTAssertNotEqual(VoiceCommandParser.parse("全屋今夜关空调")?.command, .turnOffAll)
+        XCTAssertNotEqual(VoiceCommandParser.parse("今夜开机")?.command, .setPower(true))
+        XCTAssertNotEqual(VoiceCommandParser.parse("明夜关空调")?.command, .setPower(false))
+        XCTAssertNotEqual(VoiceCommandParser.parse("明夜关空调")?.command, .turnOffAll)
+        XCTAssertNotEqual(VoiceCommandParser.parse("全屋明夜关空调")?.command, .turnOffAll)
+        XCTAssertNotEqual(VoiceCommandParser.parse("明夜开机")?.command, .setPower(true))
+        XCTAssertNotEqual(VoiceCommandParser.parse("每夜关空调")?.command, .setPower(false))
+        XCTAssertNotEqual(VoiceCommandParser.parse("每夜关空调")?.command, .turnOffAll)
+        XCTAssertNotEqual(VoiceCommandParser.parse("整夜开空调")?.command, .setPower(true))
+        XCTAssertNotEqual(VoiceCommandParser.parse("彻夜开空调")?.command, .setPower(true))
+        XCTAssertNotEqual(VoiceCommandParser.parse("后夜关机")?.command, .setPower(false))
+        XCTAssertNotEqual(VoiceCommandParser.parse("隔夜关机")?.command, .setPower(false))
+        XCTAssertNotEqual(VoiceCommandParser.parse("隔日关空调")?.command, .setPower(false))
+        XCTAssertNotEqual(VoiceCommandParser.parse("翌日开机")?.command, .setPower(true))
         XCTAssertNotEqual(VoiceCommandParser.parse("晌午关空调")?.command, .setPower(false))
         XCTAssertNotEqual(VoiceCommandParser.parse("晌午关机")?.command, .setPower(false))
         XCTAssertNotEqual(VoiceCommandParser.parse("三更半夜关机")?.command, .setPower(false))
