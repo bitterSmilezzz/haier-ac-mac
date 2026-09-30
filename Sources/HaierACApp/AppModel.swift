@@ -765,23 +765,28 @@ final class AppModel: ObservableObject {
         windSpeed: String,
         deviceId: String? = nil
     ) -> Double {
-        // 1. 风量通量因子（高速风量通过滤网单位时间截留更多浮尘颗粒） (v1.9.49 补齐“强劲/强”档位匹配，v1.9.50 全面统配英文枚举、档位数字与口语描述，v1.9.51 补充“极速/高速/中速/低速”，v1.9.81 闭环 4 档/5 档/暴风等全档位动力学自适应)
+        // 1. 风量通量因子（高速风量通过滤网单位时间截留更多浮尘颗粒） (v1.9.49 补齐“强劲/强”档位匹配，v1.9.50 全面统配英文枚举、档位数字与口语描述，v1.9.51 补充“极速/高速/中速/低速”，v1.9.81 闭环 4 档/5 档/暴风等全档位动力学自适应, v1.9.88 全面纳管 level/speed/gear 原生硬件原语)
         let windFactor: Double
         let speed = windSpeed.lowercased()
         if speed.contains("暴") || speed.contains("5档") || speed.contains("五档") || speed == "5" ||
-           speed.contains("超强") || speed.contains("最大") || speed.contains("极速") {
+           speed.contains("超强") || speed.contains("最大") || speed.contains("极速") ||
+           speed.contains("level5") || speed.contains("level_5") || speed.contains("speed5") || speed.contains("speed_5") || speed.contains("gear5") || speed.contains("gear_5") {
             windFactor = 1.85
         } else if speed.contains("4档") || speed.contains("四档") || speed == "4" ||
-                  speed.contains("强") || speed.contains("turbo") || speed.contains("高速") {
+                  speed.contains("强") || speed.contains("turbo") || speed.contains("高速") ||
+                  speed.contains("level4") || speed.contains("level_4") || speed.contains("speed4") || speed.contains("speed_4") || speed.contains("gear4") || speed.contains("gear_4") {
             windFactor = 1.50
         } else if speed.contains("3档") || speed.contains("三档") || speed == "3" ||
-                  speed.contains("高") || speed.contains("high") || speed.contains("大风") || speed.contains("大") {
+                  speed.contains("高") || speed.contains("high") || speed.contains("大风") || speed.contains("大") ||
+                  speed.contains("level3") || speed.contains("level_3") || speed.contains("speed3") || speed.contains("speed_3") || speed.contains("gear3") || speed.contains("gear_3") {
             windFactor = 1.35
         } else if speed.contains("中") || speed.contains("medium") || speed.contains("mid") ||
-                  speed.contains("2档") || speed.contains("二档") || speed.contains("两档") || speed == "2" || speed.contains("中速") {
+                  speed.contains("2档") || speed.contains("二档") || speed.contains("两档") || speed == "2" || speed.contains("中速") ||
+                  speed.contains("level2") || speed.contains("level_2") || speed.contains("speed2") || speed.contains("speed_2") || speed.contains("gear2") || speed.contains("gear_2") {
             windFactor = 1.00
         } else if speed.contains("低") || speed.contains("low") ||
-                  speed.contains("1档") || speed.contains("一档") || speed == "1" || speed.contains("小风") || speed.contains("低速") {
+                  speed.contains("1档") || speed.contains("一档") || speed == "1" || speed.contains("小风") || speed.contains("低速") ||
+                  speed.contains("level1") || speed.contains("level_1") || speed.contains("speed1") || speed.contains("speed_1") || speed.contains("gear1") || speed.contains("gear_1") {
             windFactor = 0.80
         } else if speed.contains("微") || speed.contains("静") || speed.contains("quiet") || speed.contains("mute") || speed.contains("micro") || speed.contains("柔") {
             windFactor = 0.60
@@ -3380,16 +3385,18 @@ final class AppModel: ObservableObject {
         return setTemperature(deviceIds: nil, temperature: temperature)
     }
 
-    /// 归一化风速标准名称 (v1.9.47 支持一至四档/1~4档/低中高极速/静音等全量别名, v1.9.81 补齐 4 档/5 档/暴风全量映射, v1.9.82 提炼公共标准化函数, v1.9.87 支持 level/speed/gear 设备原语与全量英文枚举)
+    /// 归一化风速标准名称 (v1.9.47 支持一至四档/1~4档/低中高极速/静音等全量别名, v1.9.81 补齐 4 档/5 档/暴风全量映射, v1.9.82 提炼公共标准化函数, v1.9.87 支持 level/speed 设备原语与全量英文枚举, v1.9.88 闭环 gear 设备原语与全风量矩阵)
     public static func normalizeWindSpeed(_ speedName: String) -> String {
         let speed = speedName.lowercased()
         if speed.contains("微") || speed.contains("低") || speed.contains("静") ||
            speed.contains("柔") || speed.contains("小") || speed.contains("1") || speed.contains("一") ||
-           speed.contains("level1") || speed.contains("level_1") || speed.contains("speed1") || speed.contains("speed_1") || speed.contains("quiet") || speed.contains("mute") {
+           speed.contains("level1") || speed.contains("level_1") || speed.contains("speed1") || speed.contains("speed_1") ||
+           speed.contains("gear1") || speed.contains("gear_1") || speed.contains("quiet") || speed.contains("mute") {
             return "微风"
         }
         if speed.contains("中") || speed.contains("2") || speed.contains("二") || speed.contains("两") ||
-           speed.contains("level2") || speed.contains("level_2") || speed.contains("speed2") || speed.contains("speed_2") || speed.contains("mid") || speed.contains("medium") {
+           speed.contains("level2") || speed.contains("level_2") || speed.contains("speed2") || speed.contains("speed_2") ||
+           speed.contains("gear2") || speed.contains("gear_2") || speed.contains("mid") || speed.contains("medium") {
             return "中风"
         }
         if speed.contains("强") || speed.contains("高") || speed.contains("大") ||
@@ -3401,6 +3408,8 @@ final class AppModel: ObservableObject {
            speed.contains("level_3") || speed.contains("level_4") || speed.contains("level_5") ||
            speed.contains("speed3") || speed.contains("speed4") || speed.contains("speed5") ||
            speed.contains("speed_3") || speed.contains("speed_4") || speed.contains("speed_5") ||
+           speed.contains("gear3") || speed.contains("gear4") || speed.contains("gear5") ||
+           speed.contains("gear_3") || speed.contains("gear_4") || speed.contains("gear_5") ||
            speed.contains("turbo") || speed.contains("high") {
             return "强劲"
         }

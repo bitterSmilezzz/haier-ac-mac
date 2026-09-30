@@ -8,6 +8,19 @@
 
 ## 功能
 
+- 🏷 **闭环自然口语全时相调度大一统引擎、防即时误触全景加固、滤网与能耗动力学原生硬件风速原语 100% 深度对齐 (v1.9.88)**：
+  - ⏱️ **当日与跨天口语全时相大一统引擎与防即时误触全闭环 (`VoiceCommandParser.swift` / `VoiceCapsuleWindowController.swift` / `VoiceCommandParserTests.swift`)**：
+    - **根除“今天/今日/后儿/大后儿”防误触穿透与即时误关开机重大隐患 (`hasTimingOrCountdownIntent`)**：此前前置防护中虽涵盖明日、隔天、后日等，却唯独遗漏最常用的“今天”、“今日”以及口语两字形态“后儿”、“大后儿”，导致用户说“今天关空调”或“今日关机”时被判定为无定时意图，直接穿透至 `isPowerOff` / `turnOffAll` 造成全屋立即误关机；本版本完成严密补齐，坚固防线；
+    - **独立无钟点时相口语表达全域纳管 (`hasTimePhase` / `parseScheduleTime`)**：将“今天”、“今日”、“今儿”、“今儿个”、“后儿”、“大后儿”、“大后儿个”纳入独立时相体系（自适应映射至 08:00），支持“今天关空调”、“今日开机”、“后儿关机”、“大后儿个开机”等丰富口语；
+    - **口语两字形态半点归一流水线补全 (`convertChineseNumbers`)**：新增“明儿半”(08:30)、“今儿半”(08:30)、“后儿半”(08:30)、“大后儿半”(08:30)、“大后儿个半”(08:30) 等口语标准化映射；
+    - **跨天调度全链路与胶囊反馈闭环 (`VoiceCapsuleWindowController.swift`)**：在单机、多机与全屋调度中，将 `isExplicitDayAfter` 全面扩展覆盖“后儿”、“大后儿”、“大后儿个”，胶囊反馈文案与顺延前缀精准对齐；
+    - **单元测试 100% 满分覆盖**：在 `VoiceCommandParserTests.swift` 中新增 `testCrossDayAndColloquialTimingPrecisionV1988`，包含 19 组覆盖半点归一、独立时相调度与严苛防即时误触断言，全部通过。
+  - 🍃 **滤网动力学、瞬时能耗与状态栏原生硬件风速原语 100% 全域深度对齐 (`AppModel.swift` / `EnergyAnalyticsEngine.swift` / `StatusItemController.swift`)**：
+    - **闭环 `gear1~5` 与 `gear_1~gear_5` 硬件风速原语**：此前虽在部分注释中声明支持，但底层判断中遗漏 gear 原语，导致海尔/卡萨帝机型上报 gear 格式风速时，在 `AppModel.normalizeWindSpeed` 中无法准确匹配；现完成 `gear1~5`、`gear_1~gear_5` 全量映射；
+    - **能耗动力学风机电动力学校准对齐 (`EnergyAnalyticsEngine.swift`)**：在 `estimateInstantaneousPower` 中，将 `windOffset` 全面纳管 `level_1~5`、`level1~5`、`speed_1~5`、`speed1~5`、`gear_1~5`、`gear1~5`，确保硬件原语下精准输出 15W~180W 阶梯功率，杜绝回退至自动风速模型的虚标偏差；
+    - **滤网空气动力学负荷系数对齐 (`AppModel.swift`)**：在 `calculateFilterWearFactor` 中，将 `windFactor` 全面纳管 `level`、`speed`、`gear` 原语，保证滤网磨损衰减估算准确自洽；
+    - **macOS 状态栏风速感知盲区消除 (`StatusItemController.swift`)**：在 `formatDisplayWindSpeed` 中补全 gear 原语，确保顶层概览与二级菜单准确显示“微风”、“低风”、“中风”、“高风”、“强劲风”、“暴风”。
+
 - 🏷 **闭环自然口语全景调度大一统反馈、次日顺延智能明示、除湿工况能耗 C^0 级平滑热阻尼与原生硬件风速原语感知 (v1.9.87)**：
   - ⏱️ **跨天自然口语大一统调度反馈与半点归一闭环 (`VoiceCommandParser.swift` / `VoiceCapsuleWindowController.swift` / `VoiceCommandParserTests.swift`)**：
     - **补全 `dayDesc` 跨天日期前缀缺失重大体验断层**：深度补齐 `"大后天"`、`"大后日"`、`"后天"`、`"后日"`、`"后儿个"`、`"明天"`、`"明早"`、`"明晚"`、`"明日"`、`"隔天"`、`"明儿个"`、`"今天"`、`"今日"`、`"今晚"`、`"今晨"`、`"今儿"`、`"今儿个"` 全量口语前缀，彻底根除此前口述“明日7点关空调”但胶囊弹窗与反馈文案仅显示“定时在 07:00 关机”遗漏跨天日期前缀的历史缺陷，现精准对齐为“定时在 明天 07:00 关机”、“定时在 后天 08:00 关机”等；

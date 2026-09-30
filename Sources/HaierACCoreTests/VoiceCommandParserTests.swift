@@ -3401,6 +3401,68 @@ final class VoiceCommandParserTests: XCTestCase {
         XCTAssertTrue(d8?.displayText.contains("今天 22:00 关机") == true)
     }
 
+    // MARK: - v1.9.88 当日与跨天自然口语全时相归一、dayDesc 反馈与严苛防即时误触测试
+
+    func testCrossDayAndColloquialTimingPrecisionV1988() {
+        // 1. 口语两字形态与复合时相半点归一
+        let r1 = VoiceCommandParser.parse("明儿半开机")
+        XCTAssertEqual(r1?.command, .schedulePower(hour: 8, minute: 30, power: true))
+        XCTAssertTrue(r1?.displayText.contains("明天 08:30 开机") == true)
+
+        let r2 = VoiceCommandParser.parse("今儿半关机")
+        XCTAssertEqual(r2?.command, .schedulePower(hour: 8, minute: 30, power: false))
+        XCTAssertTrue(r2?.displayText.contains("今天 08:30 关机") == true)
+
+        let r3 = VoiceCommandParser.parse("后儿半开机")
+        XCTAssertEqual(r3?.command, .schedulePower(hour: 8, minute: 30, power: true))
+        XCTAssertTrue(r3?.displayText.contains("后天 08:30 开机") == true)
+
+        let r4 = VoiceCommandParser.parse("大后儿半关机")
+        XCTAssertEqual(r4?.command, .schedulePower(hour: 8, minute: 30, power: false))
+        XCTAssertTrue(r4?.displayText.contains("大后天 08:30 关机") == true)
+
+        let r5 = VoiceCommandParser.parse("大后儿个半开机")
+        XCTAssertEqual(r5?.command, .schedulePower(hour: 8, minute: 30, power: true))
+        XCTAssertTrue(r5?.displayText.contains("大后天 08:30 开机") == true)
+
+        // 2. 独立口语时相调度纳管（后儿、大后儿、今天、今日等）
+        let s1 = VoiceCommandParser.parse("后儿关机")
+        XCTAssertEqual(s1?.command, .schedulePower(hour: 8, minute: 0, power: false))
+        XCTAssertTrue(s1?.displayText.contains("后天 08:00 关机") == true)
+
+        let s2 = VoiceCommandParser.parse("大后儿个开机")
+        XCTAssertEqual(s2?.command, .schedulePower(hour: 8, minute: 0, power: true))
+        XCTAssertTrue(s2?.displayText.contains("大后天 08:00 开机") == true)
+
+        let s3 = VoiceCommandParser.parse("今天关空调")
+        XCTAssertEqual(s3?.command, .schedulePower(hour: 8, minute: 0, power: false))
+        XCTAssertTrue(s3?.displayText.contains("今天 08:00 关机") == true)
+
+        let s4 = VoiceCommandParser.parse("今日开机")
+        XCTAssertEqual(s4?.command, .schedulePower(hour: 8, minute: 0, power: true))
+        XCTAssertTrue(s4?.displayText.contains("今天 08:00 开机") == true)
+
+        let s5 = VoiceCommandParser.parse("全屋今天关空调")
+        XCTAssertEqual(s5?.command, .schedulePower(hour: 8, minute: 0, power: false))
+        XCTAssertTrue(s5?.displayText.contains("全屋在 今天 08:00 关机") == true)
+
+        let s6 = VoiceCommandParser.parse("全屋今日开机")
+        XCTAssertEqual(s6?.command, .schedulePower(hour: 8, minute: 0, power: true))
+        XCTAssertTrue(s6?.displayText.contains("全屋在 今天 08:00 开机") == true)
+
+        // 3. 严苛防即时误触全景加固断言
+        XCTAssertNotEqual(VoiceCommandParser.parse("今天关空调")?.command, .setPower(false))
+        XCTAssertNotEqual(VoiceCommandParser.parse("今天关空调")?.command, .turnOffAll)
+        XCTAssertNotEqual(VoiceCommandParser.parse("今日关机")?.command, .setPower(false))
+        XCTAssertNotEqual(VoiceCommandParser.parse("今日关机")?.command, .turnOffAll)
+        XCTAssertNotEqual(VoiceCommandParser.parse("全屋今天关空调")?.command, .turnOffAll)
+        XCTAssertNotEqual(VoiceCommandParser.parse("全屋今日关空调")?.command, .turnOffAll)
+        XCTAssertNotEqual(VoiceCommandParser.parse("后儿关机")?.command, .setPower(false))
+        XCTAssertNotEqual(VoiceCommandParser.parse("后儿关机")?.command, .turnOffAll)
+        XCTAssertNotEqual(VoiceCommandParser.parse("大后儿个关机")?.command, .setPower(false))
+        XCTAssertNotEqual(VoiceCommandParser.parse("大后儿个关机")?.command, .turnOffAll)
+    }
+
     // MARK: - 无效输入测试
 
     func testInvalidCommands() {

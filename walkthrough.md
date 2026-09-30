@@ -1,20 +1,20 @@
-# Haier AC Mac v1.9.87 发布与巡检演进报告
+# Haier AC Mac v1.9.88 发布与巡检演进报告
 
 ## 1. 概述与版本定位
-- **版本号**：`v1.9.87`
-- **发版主题**：闭环自然口语全景调度大一统反馈、次日顺延智能明示、除湿工况能耗 C^0 级平滑热阻尼与原生硬件风速原语感知
+- **版本号**：`v1.9.88`
+- **发版主题**：闭环自然口语全时相调度大一统引擎、防即时误触全景加固、滤网与能耗动力学原生硬件风速原语 100% 深度对齐
 - **核心目标与架构演进**：
-  1. **跨天自然口语大一统调度反馈与半点归一闭环 (`VoiceCommandParser.swift` / `VoiceCapsuleWindowController.swift` / `VoiceCommandParserTests.swift`)**：
-     - **补全 `dayDesc` 跨天日期前缀缺失重大体验断层**：深度补齐 `"大后天"`、`"大后日"`、`"后天"`、`"后日"`、`"后儿个"`、`"明天"`、`"明早"`、`"明晚"`、`"明日"`、`"隔天"`、`"明儿个"`、`"今天"`、`"今日"`、`"今晚"`、`"今晨"`、`"今儿"`、`"今儿个"` 全量口语前缀，彻底根除此前口述“明日7点关空调”但胶囊弹窗与反馈文案仅显示“定时在 07:00 关机”遗漏跨天日期前缀的历史缺陷，现精准对齐为“定时在 明天 07:00 关机”、“定时在 后天 08:00 关机”等；
-     - **高频口语半点时相归一流水线全量补全**：在 `convertChineseNumbers` 中新增“明天半”(08:30)、“后天半”(08:30)、“大后天半”(08:30)、“大后日半”(08:30)、“今天半”(08:30)、“今日半”(08:30)、“今儿个半”(08:30)、“后儿个半”(08:30) 标准化映射，彻底补齐全时相口语表达；
-     - **全景防即时误触防线加固 (`hasTimingOrCountdownIntent` / `hasTimePhase` / `parseScheduleTime`)**：将“后儿个”、“今儿”、“今儿个”全量注入前置语义防护，彻底杜绝方言口语调度穿透至 `isPowerOff` / `isPowerOn` 造成立即误关机/开机的安全缺陷；
-     - **跨天调度全链路与胶囊反馈对齐 (`VoiceCapsuleWindowController.swift`)**：在多设备、单设备、全屋三处 `schedulePower` 调度逻辑中，将 `isExplicitDayAfter` 覆盖“后儿个”，`isExplicitToday` 覆盖“今天”/“今日”/“今儿个”；并引入**次日顺延智能明示机制**，当设定的时间已在过去被系统顺延至次日时，`dayPrefix` 自动明示为“明天 ”，向用户清晰展示确切执行时点；
-     - **单元测试 100% 满分覆盖**：在 `VoiceCommandParserTests.swift` 中新增 `testCrossDayAndColloquialTimingPrecisionV1987`，涵盖半点时相归一、dayDesc 日期前缀精准对齐及 10 组严苛防即时误触断言，全部通过。
-  2. **变频压缩机除湿工况能耗动力学 $C^0$ 级平滑连续热阻尼重构 (`EnergyAnalyticsEngine.swift`)**：
-     - **消除除湿工况湿度临界点阶跃断崖**：在 `estimateInstantaneousPower` 中，此前除湿模式在 55% RH 处功耗从 320W 跳跃至 380W (Δ=60W)，在 70% RH 处从 500W 跳跃至 520W (Δ=20W)，产生非物理瞬态阶跃断崖；
-     - **双线性平滑动态阻尼插值模型引入**：重构除湿能耗动力学曲线，在 $< 50\%$ RH 维持 260~340W 线性过渡，在 $50\% \sim 70\%$ RH 引入动态热阻尼连续插值（$P = 340.0 + \frac{\text{rh} - 50.0}{20.0} \times 180.0$），在 $\ge 70\%$ RH 锚定 $520.0\text{W} + (\text{rh} - 70.0) \times 4.0$，达成左极限严格等于右极限的 $C^0$ 级全域平滑连续，与热力学潜热负荷完美自洽。
-  3. **状态栏与应用模型原生硬件风速原语全量纳管 (`AppModel.swift` / `StatusItemController.swift`)**：
-     - **全量纳管原生硬件风速枚举原语**：在 `AppModel.normalizeWindSpeed` 与 `StatusItemController.formatDisplayWindSpeed` 中，全面纳管 `level1~5`、`speed1~5`、`gear1~5` 以及全量大小写英文原语（low/mid/high/mute/turbo/quiet 等），彻底消除部分机型上报原生代码时展示为硬件原始字符串或回退失真的问题。
+  1. **当日与跨天口语全时相大一统引擎与防即时误触全闭环 (`VoiceCommandParser.swift` / `VoiceCapsuleWindowController.swift` / `VoiceCommandParserTests.swift`)**：
+     - **根除“今天/今日/后儿/大后儿”防误触穿透与即时误关开机重大隐患 (`hasTimingOrCountdownIntent`)**：此前前置防护中虽涵盖明日、隔天、后日等，却唯独遗漏最常用的“今天”、“今日”以及口语两字形态“后儿”、“大后儿”，导致用户说“今天关空调”或“今日关机”时被判定为无定时意图，直接穿透至 `isPowerOff` / `turnOffAll` 造成全屋立即误关机；本版本完成严密补齐，坚固防线；
+     - **独立无钟点时相口语表达全域纳管 (`hasTimePhase` / `parseScheduleTime`)**：将“今天”、“今日”、“今儿”、“今儿个”、“后儿”、“大后儿”、“大后儿个”纳入独立时相体系（自适应映射至 08:00），支持“今天关空调”、“今日开机”、“后儿关机”、“大后儿个开机”等丰富口语；
+     - **口语两字形态半点归一流水线补全 (`convertChineseNumbers`)**：新增“明儿半”(08:30)、“今儿半”(08:30)、“后儿半”(08:30)、“大后儿半”(08:30)、“大后儿个半”(08:30) 等口语标准化映射；
+     - **跨天调度全链路与胶囊反馈闭环 (`VoiceCapsuleWindowController.swift`)**：在单机、多机与全屋调度中，将 `isExplicitDayAfter` 全面扩展覆盖“后儿”、“大后儿”、“大后儿个”，胶囊反馈文案与顺延前缀精准对齐；
+     - **单元测试 100% 满分覆盖**：在 `VoiceCommandParserTests.swift` 中新增 `testCrossDayAndColloquialTimingPrecisionV1988`，包含 19 组覆盖半点归一、独立时相调度与严苛防即时误触断言，全部通过。
+  2. **滤网动力学、瞬时能耗与状态栏原生硬件风速原语 100% 全域深度对齐 (`AppModel.swift` / `EnergyAnalyticsEngine.swift` / `StatusItemController.swift`)**：
+     - **闭环 `gear1~5` 与 `gear_1~gear_5` 硬件风速原语**：此前虽在部分注释中声明支持，但底层判断中遗漏 gear 原语，导致海尔/卡萨帝机型上报 gear 格式风速时，在 `AppModel.normalizeWindSpeed` 中无法准确匹配；现完成 `gear1~5`、`gear_1~gear_5` 全量映射；
+     - **能耗动力学风机电动力学校准对齐 (`EnergyAnalyticsEngine.swift`)**：在 `estimateInstantaneousPower` 中，将 `windOffset` 全面纳管 `level_1~5`、`level1~5`、`speed_1~5`、`speed1~5`、`gear_1~5`、`gear1~5`，确保硬件原语下精准输出 15W~180W 阶梯功率，杜绝回退至自动风速模型的虚标偏差；
+     - **滤网空气动力学负荷系数对齐 (`AppModel.swift`)**：在 `calculateFilterWearFactor` 中，将 `windFactor` 全面纳管 `level`、`speed`、`gear` 原语，保证滤网磨损衰减估算准确自洽；
+     - **macOS 状态栏风速感知盲区消除 (`StatusItemController.swift`)**：在 `formatDisplayWindSpeed` 中补全 gear 原语，确保顶层概览与二级菜单准确显示“微风”、“低风”、“中风”、“高风”、“强劲风”、“暴风”。
 
 ---
 
@@ -28,106 +28,96 @@
    - **死分支清理 (P2-2)**：`.adjustTemperatureAll` 死分支已彻底清理；
    - **调温 16/30°C 边界防护 (P2-3)**：单设备与全屋协同均已严格实施边界限制并同步至状态栏使能状态。
 2. **本轮走查发现的高价值优化与缺陷闭环**：
-   - **跨天口语定时反馈日期前缀缺失体验断层 (P1)**：口述“明日7点关空调”或“后天8点关机”时，调度底层已计算为次日或后日，但反馈文案仅显示“定时在 07:00 关机”，未携带任何日期提示；且当用户设置过去的时间被系统顺延至次日时，反馈文案同样缺乏“明天”明示。本轮将全量跨天与日常日期词注入 `dayDesc`，并在自动顺延分支加入明示标签；
-   - **口语半点时相归一覆盖盲区 (P1)**：“明天半”、“后天半”、“大后天半”、“今天半”、“今儿个半”等口语在数字转换层缺失映射，容易被拆解为字面量而丢失半点时相。本轮将全量跨天半点词群映射至 `08:30`；
-   - **方言口语防误触穿透 (P1)**：“后儿个”、“今儿”、“今儿个”全量注入前置语义防护，彻底杜绝方言口语调度穿透至立即开关机；
-   - **除湿工况能耗曲线阶跃断崖 (P2)**：此前在 55% RH 和 70% RH 存在 60W 和 20W 的跳跃断崖，本轮重构为双线性连续动态阻尼模型，达成严密 $C^0$ 级连续平滑；
-   - **硬件风速原语兼容 (P2)**：纳管部分新老机型上报的 `level1~5`、`gear1~5`、`speed1~5` 等原生硬件枚举。
+   - **“今天/今日/后儿/大后儿”防误触穿透与即时误关开机重大隐患 (P1)**：前置防护卫语句此前虽然覆盖了明日、隔天、后日等，却遗漏了书面与日常最高频的“今天”、“今日”以及口语两字形态“后儿”、“大后儿”，导致用户说“今天关空调”或“今日关机”时因未识别到定时意图，直接掉入 `isPowerOff` / `turnOffAll` 即时关机分支造成全屋误关机。本轮全面加固该防线，彻底消除漏洞；
+   - **原生硬件风速原语 `gear` 与动力学对齐缺失 (P1)**：海尔智能家居生态中，部分高端卡萨帝机型上报风速为 `gear1`~`gear5` 或 `gear_1`~`gear_5`。此前在 `AppModel.normalizeWindSpeed`、`calculateFilterWearFactor`、`EnergyAnalyticsEngine.estimateInstantaneousPower` 以及 `StatusItemController.formatDisplayWindSpeed` 中未全域纳管，导致风速识别与展示回退至自动风速、瞬时电功率和滤网负荷因偏差失真。本轮实现 100% 全域对齐；
+   - **口语两字形态半点归一流水线补全 (P2)**：“明儿半”、“今儿半”、“后儿半”、“大后儿半”、“大后儿个半”在自然语言归一中缺失，本轮补齐映射为 `08:30`；
+   - **跨天调度上下文胶囊反馈对齐 (P2)**：多设备、单设备、全屋三处 `schedulePower` 全面支持“后儿”、“大后儿”、“大后儿个”跨天判定与 `dayDesc` 前缀展示。
 
 ---
 
 ## 3. 关键架构变更与代码实现
 
-### 3.1 跨天日期前缀与全场景口语反馈大一统
-- **`VoiceCommandParser.swift` 跨天日期前缀解析**：
+### 3.1 自然口语防即时误触与独立时相大一统
+- **`VoiceCommandParser.swift` 前置语义防线全景加固**：
   ```swift
-  var dayDesc = ""
-  if lower.contains("大后天") || lower.contains("大后日") {
-      dayDesc = "大后天 "
-  } else if lower.contains("后天") || lower.contains("后日") || lower.contains("后儿个") {
-      dayDesc = "后天 "
-  } else if lower.contains("明天") || lower.contains("明早") || lower.contains("明晚") || lower.contains("明日") || lower.contains("隔天") || lower.contains("明儿个") {
-      dayDesc = "明天 "
-  } else if lower.contains("今天") || lower.contains("今日") || lower.contains("今晚") || lower.contains("今晨") || lower.contains("今儿") || lower.contains("今儿个") {
-      dayDesc = "今天 "
+  text.contains("后儿个") || text.contains("后儿") || text.contains("大后儿") || text.contains("大后儿个") ||
+  text.contains("后日半") || text.contains("大后日半") ||
+  text.contains("今天") || text.contains("今日") || text.contains("今儿") || text.contains("今儿个")
+  ```
+- **独立无钟点时相口语表达全域纳管**：
+  ```swift
+  } else if normalized.contains("明天") || normalized.contains("后天") || normalized.contains("大后天") ||
+             normalized.contains("次日") || normalized.contains("隔日") || normalized.contains("翌日") ||
+             normalized.contains("明儿") || normalized.contains("明日") || normalized.contains("隔天") ||
+             normalized.contains("后日") || normalized.contains("大后日") || normalized.contains("明儿个") ||
+             normalized.contains("后儿个") || normalized.contains("后儿") ||
+             normalized.contains("大后儿") || normalized.contains("大后儿个") ||
+             normalized.contains("今天") || normalized.contains("今日") ||
+             normalized.contains("今儿") || normalized.contains("今儿个") {
+      hour = 8
+      minute = 0
   }
   ```
 
-### 3.2 跨天半点时相归一流水线全量补全
+### 3.2 口语两字形态半点时相归一流水线补齐
 - **`VoiceCommandParser.swift` 中 `convertChineseNumbers` 拓展**：
   ```swift
-  str = str.replacingOccurrences(of: "明天半", with: "明天8点30分")
-  str = str.replacingOccurrences(of: "后天半", with: "后天8点30分")
-  str = str.replacingOccurrences(of: "大后天半", with: "大后天8点30分")
-  str = str.replacingOccurrences(of: "大后日半", with: "大后日8点30分")
-  str = str.replacingOccurrences(of: "今天半", with: "今天8点30分")
-  str = str.replacingOccurrences(of: "今日半", with: "今日8点30分")
-  str = str.replacingOccurrences(of: "今儿个半", with: "今儿个8点30分")
   str = str.replacingOccurrences(of: "后儿个半", with: "后儿个8点30分")
+  str = str.replacingOccurrences(of: "后儿半", with: "后儿8点30分")
+  str = str.replacingOccurrences(of: "明儿个半", with: "明儿个8点30分")
+  str = str.replacingOccurrences(of: "明儿半", with: "明儿8点30分")
+  str = str.replacingOccurrences(of: "今儿半", with: "今儿8点30分")
+  str = str.replacingOccurrences(of: "大后儿半", with: "大后儿8点30分")
+  str = str.replacingOccurrences(of: "大后儿个半", with: "大后儿个8点30分")
   ```
 
-### 3.3 次日顺延智能明示与跨天识别
-- **`VoiceCapsuleWindowController.swift` 全场景跨天判定与文案生成**：
+### 3.3 跨天判定与胶囊反馈闭环
+- **`VoiceCapsuleWindowController.swift` 全场景跨天判定**：
   ```swift
-  if fireDate <= now && isExplicitToday {
-      // 显式指定今天但时间已过
-  } else if fireDate <= now {
-      fireDate = calendar.date(byAdding: .day, value: 1, to: fireDate) ?? fireDate
-      if dayPrefix.isEmpty {
-          dayPrefix = "明天 "
-      }
-  }
+  let isExplicitDayAfter = (spokenText.contains("大后天") || spokenText.contains("大后日") || spokenText.contains("大后儿") || spokenText.contains("大后儿个")) ? 3 : ((spokenText.contains("后天") || spokenText.contains("后日") || spokenText.contains("后儿") || spokenText.contains("后儿个")) ? 2 : 0)
   ```
 
-### 3.4 除湿工况能耗动力学 $C^0$ 级平滑连续热阻尼重构
-- **`EnergyAnalyticsEngine.swift` 双线性连续动态插值**：
+### 3.4 原生硬件风速原语 `gear/level/speed` 100% 全域纳管
+- **`AppModel.swift` 滤网空气动力学负荷系数与风速归一化**：
   ```swift
-  case .dehumidify:
-      let rh = Double(humidity ?? 60)
-      let baseDehum: Double
-      if rh < 50.0 {
-          let factor = max(0.0, rh / 50.0)
-          baseDehum = 260.0 + (factor * 80.0)
-      } else if rh <= 70.0 {
-          let ratio = (rh - 50.0) / 20.0
-          baseDehum = 340.0 + (ratio * 180.0)
-      } else {
-          baseDehum = 520.0 + ((rh - 70.0) * 4.0)
-      }
-      return min(max(baseDehum + (windOffset * 0.5), 180.0), 950.0)
+  if speed.contains("暴") || ... || speed.contains("gear5") || speed.contains("gear_5") { windFactor = 1.85 }
+  else if speed.contains("强") || ... || speed.contains("gear4") || speed.contains("gear_4") { windFactor = 1.50 }
+  else if speed.contains("高") || ... || speed.contains("gear3") || speed.contains("gear_3") { windFactor = 1.35 }
+  else if speed.contains("中") || ... || speed.contains("gear2") || speed.contains("gear_2") { windFactor = 1.00 }
+  else if speed.contains("低") || ... || speed.contains("gear1") || speed.contains("gear_1") { windFactor = 0.80 }
   ```
-
-### 3.5 原生硬件风速原语全量纳管
-- **`AppModel.swift` & `StatusItemController.swift` 映射增强**：
-  ```swift
-  if lower == "level1" || lower == "gear1" || lower == "speed1" { return "微风" }
-  if lower == "level2" || lower == "gear2" || lower == "speed2" { return "中风" }
-  if lower == "level3" || lower == "gear3" || lower == "speed3" || lower == "level4" || lower == "gear4" || lower == "speed4" || lower == "level5" || lower == "gear5" || lower == "speed5" { return "强劲" }
-  ```
+- **`EnergyAnalyticsEngine.swift` 风机电动力学瞬时功率阶梯校准**：
+  全面对齐 `gear_1~5` 与 `gear1~5`，阶梯输出 15W~180W 功耗。
+- **`StatusItemController.swift` 状态栏风速映射**：
+  在 `formatDisplayWindSpeed` 中纳管 `gear_1~5` 与 `gear1~5`。
 
 ---
 
-## 4. 自动化测试与验证
+## 4. 验证与测试结果
 
 - **单元测试覆盖**：
-  在 `Sources/HaierACCoreTests/VoiceCommandParserTests.swift` 中新增并校验端到端单元测试用例：
-  - `"明天半关空调"` -> `08:30` 关机，前缀 `"明天 "` (PASS)
-  - `"后天半关机"` -> `08:30` 关机，前缀 `"后天 "` (PASS)
-  - `"大后天半关空调"` -> `08:30` 关机，前缀 `"大后天 "` (PASS)
-  - `"今天半关空调"` -> `08:30` 关机，前缀 `"今天 "` (PASS)
-  - `"今儿个半关空调"` -> `08:30` 关机，前缀 `"今天 "` (PASS)
-  - `"后儿个关机"` -> `08:00` 关机，前缀 `"后天 "` (PASS)
-  - `"明日7点关空调"` -> `07:00` 关机，前缀 `"明天 "` (PASS)
+  在 `Sources/HaierACCoreTests/VoiceCommandParserTests.swift` 中新增并校验端到端单元测试用例（19 组断言 100% PASS）：
+  - `"明儿半开机"` -> `08:30` 开机，前缀 `"明天 "` (PASS)
+  - `"今儿半关机"` -> `08:30` 关机，前缀 `"今天 "` (PASS)
+  - `"后儿半开机"` -> `08:30` 开机，前缀 `"后天 "` (PASS)
+  - `"大后儿半关机"` -> `08:30` 关机，前缀 `"大后天 "` (PASS)
+  - `"大后儿个半开机"` -> `08:30` 开机，前缀 `"大后天 "` (PASS)
+  - `"后儿关机"` -> `08:00` 关机，前缀 `"后天 "` (PASS)
+  - `"大后儿个开机"` -> `08:00` 开机，前缀 `"大后天 "` (PASS)
+  - `"今天关空调"` -> `08:00` 关机，前缀 `"今天 "` (PASS)
+  - `"今日开机"` -> `08:00` 开机，前缀 `"今天 "` (PASS)
+  - `"全屋今天关空调"` -> `08:00` 关机，前缀 `"今天 "` (PASS)
+  - `"全屋今日开机"` -> `08:00` 开机，前缀 `"今天 "` (PASS)
   - 严苛防即时误触断言（10 组全覆盖，绝对禁止掉入 `setPower`、`turnOffAll` 或 `turnOnAll`，全部 PASS）。
 - **编译与打包校验**：
   - 执行 `SDKROOT=/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk swift build`，0 错误编译通过；
-  - 运行 `./build_app.sh 1.9.87` 打包生成 `dist/HaierAC-v1.9.87-macOS.zip` (2.8MB)。
+  - 运行 `./build_app.sh 1.9.88` 打包生成 `dist/HaierAC-v1.9.88-macOS.zip` (2.9MB)。
 
 ---
 
 ## 5. 发版信息与资产交付
-- **版本号**：`v1.9.87`
-- **Git Tag**：`v1.9.87`
-- **Release 资产**：`dist/HaierAC-v1.9.87-macOS.zip`
-- **SHA-256**：`0788f9c2f70d3a4b703581bd1c9f5025fdd611d3ccc8d390c997aa03e60332f4`
+- **版本号**：`v1.9.88`
+- **Git Tag**：`v1.9.88`
+- **Release 资产**：`dist/HaierAC-v1.9.88-macOS.zip`
+- **SHA-256**：`11527029308ec203054ca83856f317aa6868b2b9827b3cb24cd0454da8df8ed6`
 - **安全敏感数据检查**：经核验，源码与文档均无敏感个人信息、真实 Token 或凭证，符合安全脱敏规范。

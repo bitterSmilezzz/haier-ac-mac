@@ -6,6 +6,19 @@ A native SwiftUI app to control Haier / Leader (统帅) smart air conditioners o
 
 ## Features
 
+- 🏷 **Colloquial Full-Phase Scheduling Unified Engine, Full Accidental Power Protection & 100% Filter/Energy Hardware Fan Speed Primitives Alignment (v1.9.88)**:
+  - ⏱️ **Today & Cross-Day Colloquial Full-Phase Scheduling & Accidental Power Protection Closure (`VoiceCommandParser.swift` / `VoiceCapsuleWindowController.swift` / `VoiceCommandParserTests.swift`)**:
+    - **Eliminated "今天/今日/后儿/大后儿" Accidental Power Shutoff Hazard (`hasTimingOrCountdownIntent`)**: Rectified semantic guards that previously omitted standard "今天" (today) and "今日" alongside colloquial "后儿" and "大后儿", preventing spoken scheduling like "今天关空调" or "今日关机" from accidentally penetrating into `isPowerOff` / `turnOffAll` and shutting down devices immediately;
+    - **Independent Hourless Phase Spoken Lexicon Alignment (`hasTimePhase` / `parseScheduleTime`)**: Integrated "今天", "今日", "今儿", "今儿个", "后儿", "大后儿", and "大后儿个" into independent phase normalization (mapped adaptively to 08:00);
+    - **Colloquial Two-Character Half-Hour Normalization Pipeline (`convertChineseNumbers`)**: Added "明儿半" (08:30), "今儿半" (08:30), "后儿半" (08:30), "大后儿半" (08:30), and "大后儿个半" (08:30) standardized mappings;
+    - **Cross-Day Schedule Alignment & Capsule Feedback (`VoiceCapsuleWindowController.swift`)**: Extended `isExplicitDayAfter` across single-device, multi-device, and whole-house scheduling to cover "后儿", "大后儿", and "大后儿个", aligning capsule feedback with next-day rollover prefixes;
+    - **100% Unit Test Coverage**: Added comprehensive test cases in `VoiceCommandParserTests.swift` covering half-hour normalization, independent phase scheduling, and 19 groups of strict anti-misoperation assertions.
+  - 🍃 **Filter Dynamics, Instantaneous Power & Status Bar Native Hardware Fan Speed Primitives 100% Alignment (`AppModel.swift` / `EnergyAnalyticsEngine.swift` / `StatusItemController.swift`)**:
+    - **Full `gear1~5` & `gear_1~gear_5` Hardware Speed Primitive Closure**: Addressed missed gear primitive matching in `AppModel.normalizeWindSpeed` when smart devices report gear-formatted speed values, completing full mapping across `gear1~5` and `gear_1~gear_5`;
+    - **Thermodynamic Fan Motor Power Calibration Alignment (`EnergyAnalyticsEngine.swift`)**: In `estimateInstantaneousPower`, fully accommodated `level_1~5`, `level1~5`, `speed_1~5`, `speed1~5`, `gear_1~5`, and `gear1~5` within `windOffset`, accurately estimating 15W~180W stepped fan motor power instead of falling back to neutral auto-speed models;
+    - **Filter Aerodynamic Load Factor Calibration (`AppModel.swift`)**: In `calculateFilterWearFactor`, mapped `level`, `speed`, and `gear` primitives within `windFactor`, ensuring consistent filter wear and service-life estimation;
+    - **Status Bar Fan Speed Perception Blindspot Eradication (`StatusItemController.swift`)**: Completed gear primitive mapping in `formatDisplayWindSpeed`, accurately rendering Breeze, Low, Medium, High, Turbo, and Gale modes across menu bar overviews and device submenus.
+
 - 🏷 **Cross-Day Phase Unified Feedback, Next-Day Rollover Explicit Labeling, Dehumidification Thermodynamic $C^0$ Continuous Damping & Native Hardware Fan Speed Perception (v1.9.87)**:
   - ⏱️ **Colloquial Cross-Day Phase Scheduling Feedback & Half-Hour Normalization Closure (`VoiceCommandParser.swift` / `VoiceCapsuleWindowController.swift` / `VoiceCommandParserTests.swift`)**:
     - **Eliminated `dayDesc` Missing Date Prefix Experience Gap**: Fully covered prefixes `"大后天"`, `"大后日"`, `"后天"`, `"后日"`, `"后儿个"`, `"明天"`, `"明早"`, `"明晚"`, `"明日"`, `"隔天"`, `"明儿个"`, `"今天"`, `"今日"`, `"今晚"`, `"今晨"`, `"今儿"`, and `"今儿个"`. Eradicated historical flaw where spoken commands like "明日7点关空调" rendered as "定时在 07:00 关机" without cross-day dates; now accurately renders as "定时在 明天 07:00 关机", "定时在 后天 08:00 关机", etc.;

@@ -306,27 +306,32 @@ final class StatusItemController: NSObject {
         guard let raw = raw?.lowercased() else { return "自动风" }
         if raw.contains("暴") || raw.contains("5档") || raw.contains("五档") || raw == "5" ||
            raw.contains("超强") || raw.contains("最大") || raw.contains("极速") ||
-           raw.contains("level_5") || raw.contains("level5") || raw.contains("speed5") || raw.contains("speed_5") {
+           raw.contains("level_5") || raw.contains("level5") || raw.contains("speed5") || raw.contains("speed_5") ||
+           raw.contains("gear_5") || raw.contains("gear5") {
             return "暴风"
         }
         if raw.contains("4档") || raw.contains("四档") || raw == "4" ||
            raw.contains("强") || raw.contains("turbo") || raw.contains("高速") ||
-           raw.contains("level_4") || raw.contains("level4") || raw.contains("speed4") || raw.contains("speed_4") {
+           raw.contains("level_4") || raw.contains("level4") || raw.contains("speed4") || raw.contains("speed_4") ||
+           raw.contains("gear_4") || raw.contains("gear4") {
             return "强劲风"
         }
         if raw.contains("3档") || raw.contains("三档") || raw == "3" ||
            raw.contains("高") || raw.contains("high") || raw.contains("大风") || raw.contains("大") ||
-           raw.contains("level_3") || raw.contains("level3") || raw.contains("speed3") || raw.contains("speed_3") {
+           raw.contains("level_3") || raw.contains("level3") || raw.contains("speed3") || raw.contains("speed_3") ||
+           raw.contains("gear_3") || raw.contains("gear3") {
             return "高风"
         }
         if raw.contains("中") || raw.contains("medium") || raw.contains("mid") ||
            raw.contains("2档") || raw.contains("二档") || raw.contains("两档") || raw == "2" || raw.contains("中速") ||
-           raw.contains("level_2") || raw.contains("level2") || raw.contains("speed2") || raw.contains("speed_2") {
+           raw.contains("level_2") || raw.contains("level2") || raw.contains("speed2") || raw.contains("speed_2") ||
+           raw.contains("gear_2") || raw.contains("gear2") {
             return "中风"
         }
         if raw.contains("低") || raw.contains("low") ||
            raw.contains("1档") || raw.contains("一档") || raw == "1" || raw.contains("小风") || raw.contains("低速") ||
-           raw.contains("level_1") || raw.contains("level1") || raw.contains("speed1") || raw.contains("speed_1") {
+           raw.contains("level_1") || raw.contains("level1") || raw.contains("speed1") || raw.contains("speed_1") ||
+           raw.contains("gear_1") || raw.contains("gear1") {
             return "低风"
         }
         if raw.contains("微") || raw.contains("静") || raw.contains("quiet") || raw.contains("mute") || raw.contains("micro") || raw.contains("柔") {

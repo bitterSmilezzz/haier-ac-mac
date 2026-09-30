@@ -241,23 +241,28 @@ public final class EnergyAnalyticsEngine: ObservableObject {
             let wind = windSpeed?.lowercased()
             if let wind = wind {
                 if wind.contains("暴") || wind.contains("5档") || wind.contains("五档") || wind == "5" ||
-                   wind.contains("超强") || wind.contains("最大") || wind.contains("极速") {
+                   wind.contains("超强") || wind.contains("最大") || wind.contains("极速") ||
+                   wind.contains("level5") || wind.contains("level_5") || wind.contains("speed5") || wind.contains("speed_5") || wind.contains("gear5") || wind.contains("gear_5") {
                     return 180.0
                 }
                 if wind.contains("4档") || wind.contains("四档") || wind == "4" ||
-                   wind.contains("强") || wind.contains("turbo") || wind.contains("高速") {
+                   wind.contains("强") || wind.contains("turbo") || wind.contains("高速") ||
+                   wind.contains("level4") || wind.contains("level_4") || wind.contains("speed4") || wind.contains("speed_4") || wind.contains("gear4") || wind.contains("gear_4") {
                     return 140.0
                 }
                 if wind.contains("3档") || wind.contains("三档") || wind == "3" ||
-                   wind.contains("高") || wind.contains("high") || wind.contains("大风") || wind.contains("大") {
+                   wind.contains("高") || wind.contains("high") || wind.contains("大风") || wind.contains("大") ||
+                   wind.contains("level3") || wind.contains("level_3") || wind.contains("speed3") || wind.contains("speed_3") || wind.contains("gear3") || wind.contains("gear_3") {
                     return 100.0
                 }
                 if wind.contains("中") || wind.contains("medium") || wind.contains("mid") ||
-                   wind.contains("2档") || wind.contains("二档") || wind.contains("两档") || wind == "2" || wind.contains("中速") {
+                   wind.contains("2档") || wind.contains("二档") || wind.contains("两档") || wind == "2" || wind.contains("中速") ||
+                   wind.contains("level2") || wind.contains("level_2") || wind.contains("speed2") || wind.contains("speed_2") || wind.contains("gear2") || wind.contains("gear_2") {
                     return 65.0
                 }
                 if wind.contains("低") || wind.contains("low") ||
-                   wind.contains("1档") || wind.contains("一档") || wind == "1" || wind.contains("小风") || wind.contains("低速") {
+                   wind.contains("1档") || wind.contains("一档") || wind == "1" || wind.contains("小风") || wind.contains("低速") ||
+                   wind.contains("level1") || wind.contains("level_1") || wind.contains("speed1") || wind.contains("speed_1") || wind.contains("gear1") || wind.contains("gear_1") {
                     return 35.0
                 }
                 if wind.contains("微") || wind.contains("静") || wind.contains("quiet") || wind.contains("mute") || wind.contains("micro") || wind.contains("柔") {
