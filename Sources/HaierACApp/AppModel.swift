@@ -637,7 +637,7 @@ final class AppModel: ObservableObject {
 
     /// 全局综合最低滤网清洁度百分比 (0 ~ 100%)
     var filterCleanlinessPercentage: Int {
-        let allIds = devices.map(\.id) + manualDevices.map(\.deviceId)
+        let allIds = allUnifiedDevices.map(\.id)
         guard !allIds.isEmpty else {
             let maxMinutes = Self.filterServiceLifeMinutes
             let remaining = max(0, maxMinutes - filterAccumulatedMinutes)
@@ -3385,9 +3385,14 @@ final class AppModel: ObservableObject {
         return setTemperature(deviceIds: nil, temperature: temperature)
     }
 
-    /// 归一化风速标准名称 (v1.9.47 支持一至四档/1~4档/低中高极速/静音等全量别名, v1.9.81 补齐 4 档/5 档/暴风全量映射, v1.9.82 提炼公共标准化函数, v1.9.87 支持 level/speed 设备原语与全量英文枚举, v1.9.88 闭环 gear 设备原语与全风量矩阵)
+    /// 归一化风速标准名称 (v1.9.47 支持一至四档/1~4档/低中高极速/静音等全量别名, v1.9.81 补齐 4 档/5 档/暴风全量映射, v1.9.82 提炼公共标准化函数, v1.9.87 支持 level/speed 设备原语与全量英文枚举, v1.9.88 闭环 gear 设备原语与全风量矩阵, v1.9.89 纳管 gear0/level0/speed0 原生硬件自动风原语)
     public static func normalizeWindSpeed(_ speedName: String) -> String {
         let speed = speedName.lowercased()
+        if speed.contains("自") || speed.contains("auto") || speed == "0" || speed == "零" ||
+           speed.contains("level0") || speed.contains("level_0") || speed.contains("speed0") || speed.contains("speed_0") ||
+           speed.contains("gear0") || speed.contains("gear_0") {
+            return "自动"
+        }
         if speed.contains("微") || speed.contains("低") || speed.contains("静") ||
            speed.contains("柔") || speed.contains("小") || speed.contains("1") || speed.contains("一") ||
            speed.contains("level1") || speed.contains("level_1") || speed.contains("speed1") || speed.contains("speed_1") ||

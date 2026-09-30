@@ -1366,7 +1366,12 @@ public struct VoiceCommandParser {
                            normalized.contains("后儿个") || normalized.contains("后儿") ||
                            normalized.contains("大后儿") || normalized.contains("大后儿个") ||
                            normalized.contains("今天") || normalized.contains("今日") ||
-                           normalized.contains("今儿") || normalized.contains("今儿个")
+                           normalized.contains("今儿") || normalized.contains("今儿个") ||
+                           normalized.contains("每天") || normalized.contains("天天") ||
+                           normalized.contains("每日") || normalized.contains("日日") ||
+                           normalized.contains("工作日") || normalized.contains("平时") ||
+                           normalized.contains("周末") || normalized.contains("双休") ||
+                           normalized.contains("单休") || (parseRepeatWeekdays(normalized) != nil)
         guard (normalized.contains("点") || normalized.contains("时") || normalized.contains(":") || hasTimePhase) && !normalized.contains("小时") else {
             return nil
         }
@@ -1529,7 +1534,12 @@ public struct VoiceCommandParser {
                        normalized.contains("后儿个") || normalized.contains("后儿") ||
                        normalized.contains("大后儿") || normalized.contains("大后儿个") ||
                        normalized.contains("今天") || normalized.contains("今日") ||
-                       normalized.contains("今儿") || normalized.contains("今儿个") {
+                       normalized.contains("今儿") || normalized.contains("今儿个") ||
+                       normalized.contains("每天") || normalized.contains("天天") ||
+                       normalized.contains("每日") || normalized.contains("日日") ||
+                       normalized.contains("工作日") || normalized.contains("平时") ||
+                       normalized.contains("周末") || normalized.contains("双休") ||
+                       normalized.contains("单休") || (parseRepeatWeekdays(normalized) != nil) {
                 hour = 8
                 minute = 0
             }
@@ -1658,8 +1668,10 @@ public struct VoiceCommandParser {
     private static func hasTimingOrCountdownIntent(_ text: String) -> Bool {
         if text.contains("后") || text.contains("倒计时") || text.contains("定时") || text.contains("预约") ||
            text.contains("延迟") || text.contains("延后") || text.contains("稍后") ||
-           text.contains("每天") || text.contains("天天") || text.contains("每日") || text.contains("每晚") || text.contains("每早") || text.contains("每晨") || text.contains("每夜") ||
-           text.contains("工作日") || text.contains("周末") || text.contains("双休") ||
+           text.contains("每天") || text.contains("天天") || text.contains("每日") || text.contains("每晚") || text.contains("每早") || text.contains("每晨") || text.contains("每夜") || text.contains("日日") ||
+           text.contains("每天半") || text.contains("天天半") || text.contains("每日半") || text.contains("日日半") ||
+           text.contains("工作日") || text.contains("平时") || text.contains("工作日半") || text.contains("平时半") ||
+           text.contains("周末") || text.contains("双休") || text.contains("单休") || text.contains("周末半") || text.contains("双休半") || text.contains("单休半") ||
            text.contains("每周") || text.contains("每逢") || text.contains("逢周") || text.contains("每个周") || text.contains("每个星期") ||
            text.contains("礼拜") || text.contains("逢星期") || text.contains("一三五") || text.contains("二四六") || text.contains("二四") ||
            text.contains("周末三天") ||
@@ -2327,6 +2339,15 @@ public struct VoiceCommandParser {
         str = str.replacingOccurrences(of: "今儿半", with: "今儿8点30分")
         str = str.replacingOccurrences(of: "大后儿半", with: "大后儿8点30分")
         str = str.replacingOccurrences(of: "大后儿个半", with: "大后儿个8点30分")
+        str = str.replacingOccurrences(of: "工作日半", with: "工作日8点30分")
+        str = str.replacingOccurrences(of: "平时半", with: "平时8点30分")
+        str = str.replacingOccurrences(of: "周末半", with: "周末8点30分")
+        str = str.replacingOccurrences(of: "双休半", with: "双休8点30分")
+        str = str.replacingOccurrences(of: "单休半", with: "单休8点30分")
+        str = str.replacingOccurrences(of: "每天半", with: "每天8点30分")
+        str = str.replacingOccurrences(of: "天天半", with: "天天8点30分")
+        str = str.replacingOccurrences(of: "每日半", with: "每日8点30分")
+        str = str.replacingOccurrences(of: "日日半", with: "日日8点30分")
         str = str.replacingOccurrences(of: "今晨半", with: "今晨7点30分")
         str = str.replacingOccurrences(of: "明晨半", with: "明晨7点30分")
         str = str.replacingOccurrences(of: "每晨半", with: "每晨7点30分")

@@ -8,6 +8,18 @@
 
 ## 功能
 
+- 🏷 **闭环自然口语循环调度大一统引擎、防即时误触全景加固、滤网动力学与状态栏多设备监控全域对齐 (v1.9.89)**：
+  - ⏱️ **“每天/工作日/周末/双休/单休”全时相循环调度大一统引擎与防即时误触全闭环 (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)**：
+    - **彻底解决无钟点循环定时口语被解析器拦截丢弃的重大缺陷**：此前用户说“工作日关空调”、“工作日开机”、“周末关空调”、“周末开机”、“双休关机”、“单休关空调”、“每天关空调”、“天天关机”、“每日开机”、“全屋工作日关空调”、“全屋每天关空调”等高频日常调度时，因未显式提及具体钟点，`parseScheduleTime` 无法识别，导致整个口令解析失败返回 `nil`，界面提示“未识别到有效的控制指令”；本版本在 `parseScheduleTime` 的 `hasTimePhase` 中纳管“每天/天天/每日/日日/工作日/平时/周末/双休/单休”及 `parseRepeatWeekdays(normalized) != nil`，在独立时相体系中将其默认时相基准对齐至 `08:00`，使所有独立循环调度自然口语无缝映射为 `.scheduleRepeatPower` 循环任务；
+    - **高频循环口语半点时相归一流水线全量补齐 (`convertChineseNumbers`)**：新增“工作日半”(工作日8点30分)、“平时半”(平时8点30分)、“周末半”(周末8点30分)、“双休半”(双休8点30分)、“单休半”(单休8点30分)、“每天半”(每天8点30分)、“天天半”(天天8点30分)、“每日半”(每日8点30分)、“日日半”(日日8点30分) 标准化映射；
+    - **全景防即时误触语义防线加固 (`hasTimingOrCountdownIntent`)**：补齐“单休”、“平时”、“日日”、“每天半”、“天天半”、“每日半”、“工作日半”、“周末半”、“双休半”、“单休半”等显式防线，杜绝任何循环调度指令掉入 `setPower(false/true)` 或 `turnOffAll/turnOnAll` 即时开关机；
+    - **单元测试 100% 满分覆盖**：在 `VoiceCommandParserTests.swift` 中新增 `testRepeatSchedulePrecisionAndProtectionV1989`，包含 17 组单机与全屋循环调度、半点归一及严苛防即时误触断言，全部通过。
+  - 🍃 **滤网动力学与状态栏多设备监控全域对齐 (`AppModel.swift` / `StatusItemController.swift`)**：
+    - **消除状态栏滤网监控盲区**：在 `StatusItemController.setup()` 的 `Publishers.MergeMany` 中补齐 `model.$deviceFilterMinutes`，确保任何子设备或非主控设备的滤网机时累加、保养或重置时，状态栏悬浮 Tooltip 的低洁净度警报与全屋概览即时无感刷新；
+    - **全局最低滤网清洁度对齐统一设备模型**：`AppModel.filterCleanlinessPercentage` 改用 `allUnifiedDevices.map(\.id)`，杜绝 `devices` 与 `manualDevices` 重复计算或不同步风险；
+    - **原生硬件自动风速原语纳管**：在 `AppModel.normalizeWindSpeed` 与 `StatusItemController.formatDisplayWindSpeed` 中纳管 `gear0`、`gear_0`、`level0`、`level_0`、`speed0`、`speed_0` 原语映射至“自动/自动风”，消除特定机型在自动风速下的展示与识别回退偏差；
+    - **macOS 状态栏右键菜单与 Tooltip 细节打磨**：全景对齐全屋调度任务展示看板与悬浮提示。
+
 - 🏷 **闭环自然口语全时相调度大一统引擎、防即时误触全景加固、滤网与能耗动力学原生硬件风速原语 100% 深度对齐 (v1.9.88)**：
   - ⏱️ **当日与跨天口语全时相大一统引擎与防即时误触全闭环 (`VoiceCommandParser.swift` / `VoiceCapsuleWindowController.swift` / `VoiceCommandParserTests.swift`)**：
     - **根除“今天/今日/后儿/大后儿”防误触穿透与即时误关开机重大隐患 (`hasTimingOrCountdownIntent`)**：此前前置防护中虽涵盖明日、隔天、后日等，却唯独遗漏最常用的“今天”、“今日”以及口语两字形态“后儿”、“大后儿”，导致用户说“今天关空调”或“今日关机”时被判定为无定时意图，直接穿透至 `isPowerOff` / `turnOffAll` 造成全屋立即误关机；本版本完成严密补齐，坚固防线；

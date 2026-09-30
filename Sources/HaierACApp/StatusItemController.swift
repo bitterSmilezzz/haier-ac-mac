@@ -47,6 +47,7 @@ final class StatusItemController: NSObject {
             model.$activeSleepSession.map { _ in () }.eraseToAnyPublisher(),
             model.$gatewayConnected.map { _ in () }.eraseToAnyPublisher(),
             model.$filterAccumulatedMinutes.map { _ in () }.eraseToAnyPublisher(),
+            model.$deviceFilterMinutes.map { _ in () }.eraseToAnyPublisher(),
             model.$scheduledActions.map { _ in () }.eraseToAnyPublisher(),
             EnergyAnalyticsEngine.shared.$currentInstantaneousPower.map { _ in () }.eraseToAnyPublisher(),
             AmbientSoundEngine.shared.$isPlaying.map { _ in () }.eraseToAnyPublisher()
@@ -304,6 +305,11 @@ final class StatusItemController: NSObject {
 
     private func formatDisplayWindSpeed(_ raw: String?) -> String {
         guard let raw = raw?.lowercased() else { return "自动风" }
+        if raw.contains("自") || raw.contains("auto") || raw == "0" || raw == "零" ||
+           raw.contains("level_0") || raw.contains("level0") || raw.contains("speed0") || raw.contains("speed_0") ||
+           raw.contains("gear_0") || raw.contains("gear0") {
+            return "自动风"
+        }
         if raw.contains("暴") || raw.contains("5档") || raw.contains("五档") || raw == "5" ||
            raw.contains("超强") || raw.contains("最大") || raw.contains("极速") ||
            raw.contains("level_5") || raw.contains("level5") || raw.contains("speed5") || raw.contains("speed_5") ||
