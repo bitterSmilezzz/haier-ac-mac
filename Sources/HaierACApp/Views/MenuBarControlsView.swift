@@ -106,8 +106,8 @@ struct MenuBarControlsView: View {
                     ambientSoundPod
                 }
 
-                // 2.4 活跃定时与倒计时任务快捷指示胶囊 (若存在活跃任务) (v1.9.104)
-                if hasActiveSchedules(device: device) {
+                // 2.4 活跃定时与倒计时任务快捷指示胶囊 (全屋调度全景感知与跨房间管理) (v1.9.104, v1.9.105)
+                if hasScheduledActions(device: device) {
                     activeSchedulePod(device: device)
                 }
 
@@ -394,19 +394,71 @@ struct MenuBarControlsView: View {
         }
     }
 
-    // MARK: - 2.4 活跃定时与倒计时任务指示胶囊 (v1.9.104)
+    // MARK: - 2.4 活跃定时与倒计时任务指示胶囊 (v1.9.104, v1.9.105 全屋活跃调度全景感知与跨房间管理)
 
-    private func hasActiveSchedules(device: DeviceInfo) -> Bool {
-        model.scheduledActions.contains { $0.enabled && ($0.deviceId == device.id || $0.deviceId.isEmpty) }
+    private func hasScheduledActions(device: DeviceInfo) -> Bool {
+        !model.scheduledActions.isEmpty
     }
 
     @ViewBuilder
     private func activeSchedulePod(device: DeviceInfo) -> some View {
-        let schedules = model.scheduledActions
-            .filter { $0.enabled && ($0.deviceId == device.id || $0.deviceId.isEmpty) }
+        let allActions = model.scheduledActions
+        let enabledActions = allActions.filter(\.enabled)
+        let isAllPaused = !allActions.isEmpty && enabledActions.isEmpty
+
+        let deviceEnabledActions = enabledActions
+            .filter { $0.deviceId == device.id || $0.deviceId.isEmpty }
             .sorted { $0.fireDate < $1.fireDate }
 
-        if let nearest = schedules.first {
+        let allSortedEnabledActions = enabledActions.sorted { $0.fireDate < $1.fireDate }
+
+        if isAllPaused {
+            // 全屋任务全部暂停态
+            HStack(spacing: 8) {
+                Image(systemName: "pause.circle.fill")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(Theme.warning)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("定时任务已暂停")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(Theme.ink)
+                    Text("全屋共 \(allActions.count) 个计划已暂停生效")
+                        .font(.system(size: 10))
+                        .foregroundStyle(Theme.inkSubtle)
+                }
+
+                Spacer()
+
+                Button {
+                    triggerHaptic()
+                    withAnimation(Theme.springFast) {
+                        _ = model.setAllScheduledActionsEnabled(true)
+                    }
+                } label: {
+                    Text("一键恢复")
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(Color.dynamic(light: 0x007AFF, dark: 0x0A84FF))
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(Color.dynamic(light: 0x007AFF, dark: 0x0A84FF).opacity(0.12))
+                        .cornerRadius(Theme.radiusSM)
+                }
+                .buttonStyle(.plain)
+                .help("一键恢复全屋所有已暂停的定时任务")
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(
+                RoundedRectangle(cornerRadius: Theme.radiusMD, style: .continuous)
+                    .fill(Color.dynamic(light: 0xFFF9F0, dark: 0x2E2412))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: Theme.radiusMD, style: .continuous)
+                            .strokeBorder(Color.dynamic(light: 0xFFE0B2, dark: 0x543B17), lineWidth: 1)
+                    )
+            )
+        } else if let nearest = deviceEnabledActions.first ?? allSortedEnabledActions.first {
+            let isCurrentDeviceTask = (nearest.deviceId == device.id || nearest.deviceId.isEmpty)
             let remainingSeconds = nearest.fireDate.timeIntervalSince(Date())
             let timeDesc: String = {
                 let df = DateFormatter()
@@ -431,6 +483,14 @@ struct MenuBarControlsView: View {
             }()
 
             let repeatDesc = nearest.repeatLabel
+            let roomPrefix: String = {
+                if isCurrentDeviceTask {
+                    return ""
+                } else {
+                    let rName = model.allUnifiedDevices.first(where: { $0.id == nearest.deviceId })?.name ?? "其他房间"
+                    return "「\(rName)」"
+                }
+            }()
 
             HStack(spacing: 8) {
                 Image(systemName: "timer")
@@ -439,7 +499,7 @@ struct MenuBarControlsView: View {
 
                 VStack(alignment: .leading, spacing: 2) {
                     HStack(spacing: 5) {
-                        Text(nearest.name)
+                        Text("\(roomPrefix)\(nearest.name)")
                             .font(.system(size: 11, weight: .semibold))
                             .foregroundStyle(Theme.ink)
                             .lineLimit(1)
@@ -455,7 +515,21 @@ struct MenuBarControlsView: View {
                         }
                     }
 
-                    Text(schedules.count > 1 ? "\(timeDesc) · 共 \(schedules.count) 个计划" : timeDesc)
+                    let subTitleText: String = {
+                        if isCurrentDeviceTask {
+                            if allSortedEnabledActions.count > deviceEnabledActions.count {
+                                return "\(timeDesc) · 本机\(deviceEnabledActions.count)个/全屋\(allSortedEnabledActions.count)个计划"
+                            } else if deviceEnabledActions.count > 1 {
+                                return "\(timeDesc) · 共 \(deviceEnabledActions.count) 个计划"
+                            } else {
+                                return timeDesc
+                            }
+                        } else {
+                            return "\(timeDesc) · 全屋共 \(allSortedEnabledActions.count) 个计划生效中"
+                        }
+                    }()
+
+                    Text(subTitleText)
                         .font(.system(size: 10))
                         .foregroundStyle(Theme.inkSubtle)
                         .lineLimit(1)
@@ -463,7 +537,7 @@ struct MenuBarControlsView: View {
 
                 Spacer()
 
-                if schedules.count == 1 {
+                if allActions.count == 1 {
                     Button {
                         triggerHaptic()
                         withAnimation(Theme.springFast) {
@@ -479,28 +553,53 @@ struct MenuBarControlsView: View {
                             .cornerRadius(Theme.radiusSM)
                     }
                     .buttonStyle(.plain)
-                    .help("取消当前「\(nearest.name)」任务")
+                    .help("取消当前任务")
                 } else {
                     Menu {
-                        Button("取消此任务 (\(nearest.name))") {
+                        Button("取消此任务 (\(roomPrefix)\(nearest.name))") {
                             triggerHaptic()
                             withAnimation(Theme.springFast) {
                                 model.removeScheduledAction(nearest)
                             }
                         }
-                        Button("取消「\(device.deviceName)」全部定时 (\(schedules.count))") {
-                            triggerHaptic()
-                            withAnimation(Theme.springFast) {
-                                _ = model.cancelSchedules(for: device.id)
-                            }
-                        }
-                        if model.allUnifiedDevices.count > 1 {
-                            Divider()
-                            Button("取消全屋所有定时") {
+                        if !deviceEnabledActions.isEmpty {
+                            Button("取消「\(device.deviceName)」全部定时 (\(deviceEnabledActions.count))") {
                                 triggerHaptic()
                                 withAnimation(Theme.springFast) {
-                                    _ = model.cancelAllSchedules()
+                                    _ = model.cancelSchedules(for: device.id)
                                 }
+                            }
+                            Button("临时暂停「\(device.deviceName)」定时") {
+                                triggerHaptic()
+                                withAnimation(Theme.springFast) {
+                                    _ = model.setScheduledActionsEnabled(for: device.id, enabled: false)
+                                }
+                            }
+                        } else if allActions.contains(where: { $0.deviceId == device.id && !$0.enabled }) {
+                            Button("恢复生效「\(device.deviceName)」定时") {
+                                triggerHaptic()
+                                withAnimation(Theme.springFast) {
+                                    _ = model.setScheduledActionsEnabled(for: device.id, enabled: true)
+                                }
+                            }
+                        }
+                        Divider()
+                        Button("临时暂停全屋所有定时") {
+                            triggerHaptic()
+                            withAnimation(Theme.springFast) {
+                                _ = model.setAllScheduledActionsEnabled(false)
+                            }
+                        }
+                        Button("恢复生效全屋所有定时") {
+                            triggerHaptic()
+                            withAnimation(Theme.springFast) {
+                                _ = model.setAllScheduledActionsEnabled(true)
+                            }
+                        }
+                        Button("取消全屋所有定时") {
+                            triggerHaptic()
+                            withAnimation(Theme.springFast) {
+                                _ = model.cancelAllSchedules()
                             }
                         }
                     } label: {

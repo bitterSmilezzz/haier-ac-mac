@@ -384,6 +384,10 @@ public struct VoiceCommandParser {
             let repeatInfo = parseRepeatWeekdays(text)
 
             if let rep = repeatInfo {
+                if rep.label == "无" {
+                    // 用户指定了排除全部日期的矛盾调度（如“除了工作日和大休每天早8点开机”），安全拦截，杜绝误触发即时或单次开关机 (v1.9.105)
+                    return nil
+                }
                 let display = isAll ? "定时全屋在 \(rep.label) \(timeStr) \(actionStr)" : "定时在 \(rep.label) \(timeStr) \(actionStr)"
                 return VoiceParseResult(
                     command: .scheduleRepeatPower(hour: time.hour, minute: time.minute, power: isPowerOn, repeatWeekdays: rep.weekdays, repeatLabel: rep.label),
@@ -647,9 +651,15 @@ public struct VoiceCommandParser {
         return try? NSRegularExpression(pattern: pattern)
     }()
 
-    /// 匹配排除型否定星期口语模式（如“除了周末每天晚上10点关机”、“除周末外每天早8点开机”、“除了工作日每天晚上11点关空调”、“除了周日每天早8点开机”、“除周一外每天晚10点关机”、“工作日除了周三早8点开机”、“周一至周五除周二外晚10点关空调”、“除非工作日外每天早8点开机”） (v1.9.68, v1.9.69 补全限定基准集约束, v1.9.96 闭环前置反相时态贪婪截断, v1.9.100 恢复基准集限定前置断言, v1.9.102 补齐大休日/大周/小休日/小周/单休日)
-    private static let exclusionRepeatRegex: NSRegularExpression? = {
-        let pattern = #"(?:除了|除)\s*([^，,。！？\s]+?)\s*(?:(?:之|以)?外)?(?=[，,。！？\s]|(?<!非)(?:工作日|平时|平日|双休日|双休|周末三天|周末|休息日|公休日|休假日|放假日|节假日|单休日|单休|大休日|大休|大周|小休日|小休|小周|一三五|二四六)|每天|天天|每日|每晚|每早|每晨|每夜|日日|\d|早|晚|夜|中|上|下|凌晨|午|点|时|:|$|开|关|停)"#
+    /// 匹配显式带“外/之外/以外”的排除型否定星期口语模式（如“除周一至周二和周五至周六外每天早8点开机”、“除周末和大休外每天早8点开机”、“除单休外每天早8点开机”） (v1.9.105 彻底根除并列排除词中途断裂缺陷)
+    private static let explicitExclusionRepeatRegex: NSRegularExpression? = {
+        let pattern = #"(?:除了|除)\s*([^，,。！？\s]+?)\s*(?:之|以)?外"#
+        return try? NSRegularExpression(pattern: pattern)
+    }()
+
+    /// 匹配隐式无“外”的排除型否定星期口语模式（如“除了周末和大休每天早8点开机”、“除了大休和小休每天早8点开机”、“除了单休日和双休日每天早8点开机”、“除了周三工作日每天早8点开机”） (v1.9.105 彻底根除基准词连词并列截断缺陷)
+    private static let implicitExclusionRepeatRegex: NSRegularExpression? = {
+        let pattern = #"(?:除了|除)\s*([^，,。！？\s]+?)(?=[，,。！？\s]|(?<!(?:和|与|及|加|以及|还有|另外|、|\s))\s*(?<!非)(?:工作日|平时|平日|双休日|双休|周末三天|周末|休息日|公休日|休假日|放假日|节假日|单休日|单休|大休日|大休|大周|小休日|小休|小周|一三五|二四六)(?=\s*(?:每天|天天|每日|每晚|每早|每晨|每夜|日日|\d|早|晚|夜|中|上|下|凌晨|午|点|时|:|开|关|停))|每天|天天|每日|每晚|每早|每晨|每夜|日日|(?<![周星期礼拜])(?:\d|早|晚|夜|中|上|下|凌晨|午|点|时|:|$|开|关|停))"#
         return try? NSRegularExpression(pattern: pattern)
     }()
 
@@ -856,12 +866,26 @@ public struct VoiceCommandParser {
         return nil
     }
 
-    /// 解析排除型周期语义并计算指定基准集合或全周的补集 (v1.9.68, v1.9.69 闭环限定基准范围约束)
+    /// 解析排除型周期语义并计算指定基准集合或全周的补集 (v1.9.68, v1.9.69, v1.9.105 闭环限定基准范围约束与零运行天安全拦截)
     private static func parseExclusionRepeatWeekdays(_ text: String) -> (weekdays: [Int], label: String)? {
         let ns = text as NSString
-        guard let regex = exclusionRepeatRegex,
-              let match = regex.firstMatch(in: text, options: [], range: NSRange(location: 0, length: ns.length)),
-              match.numberOfRanges >= 2 else {
+        let fullRange = NSRange(location: 0, length: ns.length)
+
+        let matchOpt: NSTextCheckingResult? = {
+            if let explicit = explicitExclusionRepeatRegex,
+               let m = explicit.firstMatch(in: text, options: [], range: fullRange),
+               m.numberOfRanges >= 2 {
+                return m
+            }
+            if let implicit = implicitExclusionRepeatRegex,
+               let m = implicit.firstMatch(in: text, options: [], range: fullRange),
+               m.numberOfRanges >= 2 {
+                return m
+            }
+            return nil
+        }()
+
+        guard let match = matchOpt, match.numberOfRanges >= 2 else {
             return nil
         }
         let target = ns.substring(with: match.range(at: 1))
@@ -872,7 +896,12 @@ public struct VoiceCommandParser {
         let remainingText = ns.replacingCharacters(in: match.range, with: " ")
         let baseScope = extractBaseScopeWeekdays(from: remainingText) ?? Set([1, 2, 3, 4, 5, 6, 7])
         let remaining = baseScope.subtracting(excluded)
-        guard !remaining.isEmpty && remaining.count < baseScope.count else {
+
+        // 当完全排除所有基准日（如“除了工作日和大休每天早8点开机”），返回特殊标记空数组以供上层安全拦截，严禁回退正向开启
+        if remaining.isEmpty {
+            return (weekdays: [], label: "无")
+        }
+        guard remaining.count < baseScope.count else {
             return nil
         }
         let sorted = Array(remaining).sorted()
@@ -2417,6 +2446,7 @@ public struct VoiceCommandParser {
            text.contains("后儿个") || text.contains("后儿") || text.contains("大后儿") || text.contains("大后儿个") ||
            text.contains("后日半") || text.contains("大后日半") ||
            text.contains("今天") || text.contains("今日") || text.contains("今儿") || text.contains("今儿个") ||
+           text.contains("除了") || text.contains("除") ||
            (text.contains("暂停") && (text.contains("定时") || text.contains("倒计时") || text.contains("计划") || text.contains("调度"))) ||
            (text.contains("恢复") && (text.contains("定时") || text.contains("倒计时") || text.contains("计划") || text.contains("调度"))) {
             return true

@@ -6,6 +6,18 @@ A native SwiftUI app to control Haier / Leader (统帅) smart air conditioners o
 
 ## Features
 
+- 🏷 **Universal Compound Exclusion & Inverted Cycle Scheduling, Menu Bar Whole-House Active Schedule Panoramic Pod & Cross-Room Management (v1.9.105)**:
+  - ⏱️ **"Universal Compound Exclusion & Inverted Cycle Scheduling, Zero-Day Contradiction Safe Interception" Engine (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)**:
+    - **Explicit & Implicit Exclusion Pattern Architecture**: Refactored exclusion parsing into `explicitExclusionRepeatRegex` (explicit delimiters with "外/之外/以外") and `implicitExclusionRepeatRegex` (implicit boundaries), completely eliminating greedy truncation bugs caused by conjunction conflicts (`和`, `与`, `及`, `加`, `、`, `以及`) with base scope keywords;
+    - **Comprehensive Compound Multi-Keyword and Multi-Range Parallel Exclusion**: Fully covers spoken queries such as "除了周末和大休每天早8点开机" (`[2, 3, 4, 5, 6]`), "除了大休和小休每天早8点开机" (`[2, 3, 4, 5, 6]`), "除了单休日和双休日每天早8点开机" (`[2, 3, 4, 5, 6]`), "除了周一至周二和周五至周六每天早8点开机" (`[1, 4, 5]`), and "除周一至周二、周三至周四和周五至周六外每天早8点开机" (`[1]`), preventing parallel exclusions from being truncated into base scope and causing disastrous reverse execution;
+    - **Zero-Day Contradiction Safety Interception**: When excluded days cover the entire base scope (e.g., "除了工作日和大休每天早8点开机" or "工作日除周一至周五外每天早8点开机"), the system strictly identifies zero active days and securely returns `nil`, preventing fallback to single execution or immediate power triggers;
+    - **100% Unit Test Suite Coverage**: Added `testCompoundExclusionAndAllInclusiveHardeningV19105` test suite covering multi-keyword exclusions, multi-range parallel exclusions, explicit delimiter exclusions, and anti-misoperation assertions, passing all 113 unit tests.
+  - 🖥️ **macOS Menu Bar Bento Popover Control Center Whole-House Active Schedule Panoramic Pod & Cross-Room Management (`MenuBarControlsView.swift`)**:
+    - **Cross-Room Active Schedule Indicator Pod (`activeSchedulePod`)**: Eliminates single-unit blind spots. When the current device has no active schedules but other units do, the pod automatically surfaces the nearest upcoming task in the home (e.g., "「客厅」22:00 关机"), with subtitle indicating whole-house active counts;
+    - **Schedule Pause State Awareness & One-Click Resume**: When all schedules are paused, the pod presents a clear "定时任务已暂停" state banner with an immediate "一键恢复" action button;
+    - **Full Cross-Room Management Menu**: The action menu now supports pausing/resuming current unit schedules, pausing/resuming whole-house schedules, and cancelling all schedules, perfectly aligned with the voice capsule and main window;
+    - **Native System Haptics (`NSHapticFeedbackManager`)**: Infused trackpad haptic pulses into all pause, resume, and cancellation actions.
+
 - 🏷 **Universal Tri-Range & Core Keyword Repeat Scheduling, Menu Bar Whole-House Scene Switcher & Active Schedule Pod (v1.9.104)**:
   - ⏱️ **"Tri-Range & Core Keyword Bi-directional Universal Repeat Scheduling, Range + Discrete Days + Keyword Ternary Engine" (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)**:
     - **Triangular Topology for Tri-Ranges and Core Keywords**: Added `triRangeWithKeywordRegex` (tri-range + keyword), `keywordWithTriRangeRegex` (keyword + tri-range), `rangeWithKeywordAndDualRangeRegex` (range + keyword + dual-range sandwich), and `dualRangeWithKeywordAndRangeRegex` (dual-range + keyword + range sandwich) macro regex engines;
