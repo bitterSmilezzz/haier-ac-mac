@@ -580,18 +580,23 @@ public struct VoiceCommandParser {
         var excluded = Set<Int>()
         var remainingTarget = target
 
-        // 1. 前置反相时态与否定周期的排除拦截（杜绝被下方正相词贪婪截断导致排除极性反向） (v1.9.96)
+        // 1. 前置反相时态与否定周期的排除拦截（杜绝被下方正相词贪婪截断导致排除极性反向） (v1.9.96, v1.9.99 拓展大休小休与节假日反相)
         if remainingTarget.contains("非工作日") || remainingTarget.contains("非平时") || remainingTarget.contains("非平日") {
             excluded.formUnion([1, 7]) // 排除非工作日（即排除周末），保留工作日 [2, 3, 4, 5, 6]
             remainingTarget = remainingTarget.replacingOccurrences(of: "非工作日", with: "").replacingOccurrences(of: "非平时", with: "").replacingOccurrences(of: "非平日", with: "")
         }
-        if remainingTarget.contains("非周末") || remainingTarget.contains("非双休") || remainingTarget.contains("非双休日") || remainingTarget.contains("非休息日") || remainingTarget.contains("非公休日") {
-            excluded.formUnion([2, 3, 4, 5, 6]) // 排除非周末（即排除工作日），保留周末 [1, 7]
+        if remainingTarget.contains("非周末") || remainingTarget.contains("非双休") || remainingTarget.contains("非双休日") || remainingTarget.contains("非休息日") || remainingTarget.contains("非公休日") ||
+           remainingTarget.contains("非大休") || remainingTarget.contains("非大休日") || remainingTarget.contains("非大周") ||
+           remainingTarget.contains("非休假日") || remainingTarget.contains("非放假日") || remainingTarget.contains("非节假日") {
+            excluded.formUnion([2, 3, 4, 5, 6]) // 排除非周末/非大休（即排除工作日），保留周末 [1, 7]
             remainingTarget = remainingTarget.replacingOccurrences(of: "非双休日", with: "").replacingOccurrences(of: "非双休", with: "").replacingOccurrences(of: "非周末", with: "").replacingOccurrences(of: "非休息日", with: "").replacingOccurrences(of: "非公休日", with: "")
+                .replacingOccurrences(of: "非大休日", with: "").replacingOccurrences(of: "非大休", with: "").replacingOccurrences(of: "非大周", with: "")
+                .replacingOccurrences(of: "非休假日", with: "").replacingOccurrences(of: "非放假日", with: "").replacingOccurrences(of: "非节假日", with: "")
         }
-        if remainingTarget.contains("非单休日") {
-            excluded.formUnion([2, 3, 4, 5, 6, 7]) // 排除非单休日（周一至周六），保留单休日周日 [1]
+        if remainingTarget.contains("非单休日") || remainingTarget.contains("非小休") || remainingTarget.contains("非小休日") || remainingTarget.contains("非小周") {
+            excluded.formUnion([2, 3, 4, 5, 6, 7]) // 排除非单休日/非小休（周一至周六），保留单休日周日 [1]
             remainingTarget = remainingTarget.replacingOccurrences(of: "非单休日", with: "")
+                .replacingOccurrences(of: "非小休日", with: "").replacingOccurrences(of: "非小休", with: "").replacingOccurrences(of: "非小周", with: "")
         }
         if remainingTarget.contains("非单休") {
             excluded.formUnion([1, 7]) // 排除非单休（周末双休），保留单休
@@ -688,10 +693,26 @@ public struct VoiceCommandParser {
             remainingTarget = nonSingleRegex?.stringByReplacingMatches(in: remainingTarget, options: [], range: NSRange(location: 0, length: nonNs.length), withTemplate: " ") ?? remainingTarget
         }
 
-        // 2. 单休日与逢单休精准排除（周日 [1]），前置拦截杜绝误入下方“单休”周一至周六 (v1.9.96)
-        if remainingTarget.contains("单休日") || remainingTarget.contains("逢单休") || remainingTarget.contains("每逢单休") {
+        // 2. 单休日、逢单休与小休/小周精准排除（周日 [1]），前置拦截杜绝误入下方“单休”周一至周六 (v1.9.96, v1.9.99)
+        if remainingTarget.contains("单休日") || remainingTarget.contains("逢单休") || remainingTarget.contains("每逢单休") ||
+           remainingTarget.contains("小休日") || remainingTarget.contains("逢小休") || remainingTarget.contains("每逢小休") ||
+           remainingTarget.contains("逢小周") || remainingTarget.contains("每逢小周") || remainingTarget.contains("小周") ||
+           remainingTarget.contains("小休") {
             excluded.insert(1)
             remainingTarget = remainingTarget.replacingOccurrences(of: "每逢单休", with: "").replacingOccurrences(of: "逢单休", with: "").replacingOccurrences(of: "单休日", with: "")
+                .replacingOccurrences(of: "每逢小休", with: "").replacingOccurrences(of: "逢小休", with: "").replacingOccurrences(of: "小休日", with: "")
+                .replacingOccurrences(of: "每逢小周", with: "").replacingOccurrences(of: "逢小周", with: "").replacingOccurrences(of: "小周", with: "")
+                .replacingOccurrences(of: "小休", with: "")
+        }
+
+        // 2.5 大休/大周/大休日排除（周末双休 [1, 7]） (v1.9.99)
+        if remainingTarget.contains("大休日") || remainingTarget.contains("逢大休") || remainingTarget.contains("每逢大休") ||
+           remainingTarget.contains("逢大周") || remainingTarget.contains("每逢大周") || remainingTarget.contains("大周") ||
+           remainingTarget.contains("大休") {
+            excluded.formUnion([1, 7])
+            remainingTarget = remainingTarget.replacingOccurrences(of: "每逢大休", with: "").replacingOccurrences(of: "逢大休", with: "").replacingOccurrences(of: "大休日", with: "")
+                .replacingOccurrences(of: "每逢大周", with: "").replacingOccurrences(of: "逢大周", with: "").replacingOccurrences(of: "大周", with: "")
+                .replacingOccurrences(of: "大休", with: "")
         }
 
         // 3. 正相工作日、周末三天、周末/双休/休息日与单休排除
@@ -1318,10 +1339,12 @@ public struct VoiceCommandParser {
         if text.contains("非工作日") || text.contains("非平时") || text.contains("非平日") {
             return ([1, 7], "周末")
         }
-        if text.contains("非周末") || text.contains("非双休") || text.contains("非双休日") || text.contains("非休息日") || text.contains("非公休日") {
+        if text.contains("非周末") || text.contains("非双休") || text.contains("非双休日") || text.contains("非休息日") || text.contains("非公休日") ||
+           text.contains("非大休") || text.contains("非大休日") || text.contains("非大周") ||
+           text.contains("非休假日") || text.contains("非放假日") || text.contains("非节假日") {
             return ([2, 3, 4, 5, 6], "工作日")
         }
-        if text.contains("非单休日") {
+        if text.contains("非单休日") || text.contains("非小休") || text.contains("非小休日") || text.contains("非小周") {
             return ([2, 3, 4, 5, 6, 7], "周一至周六")
         }
         if text.contains("非单休") {
@@ -1411,11 +1434,17 @@ public struct VoiceCommandParser {
             }
         }
 
-        // 4.0 逢单休/单休日与逢双休口语调度（逢单休精准映射至周日 [1]，逢双休映射至周末 [1, 7]），前置拦截杜绝误入单休 (v1.9.94)
-        if text.contains("逢单休") || text.contains("每逢单休") || text.contains("单休日") {
+        // 4.0 逢单休/单休日与逢双休口语调度（逢单休/小休精准映射至周日 [1]，逢双休/大休映射至周末 [1, 7]），前置拦截杜绝误入单休 (v1.9.94, v1.9.99)
+        if text.contains("逢单休") || text.contains("每逢单休") || text.contains("单休日") ||
+           text.contains("逢小休") || text.contains("每逢小休") || text.contains("小休日") ||
+           text.contains("逢小周") || text.contains("每逢小周") || text.contains("小周") ||
+           text.contains("小休") {
             return ([1], "周日")
         }
-        if text.contains("逢双休") || text.contains("每逢双休") || text.contains("双休日") {
+        if text.contains("逢双休") || text.contains("每逢双休") || text.contains("双休日") ||
+           text.contains("逢大休") || text.contains("每逢大休") || text.contains("大休日") ||
+           text.contains("逢大周") || text.contains("每逢大周") || text.contains("大周") ||
+           text.contains("大休") {
             return ([1, 7], "周末")
         }
         // 4.01 休息日/公休日/休假日/放假日/节假日/平日独立语义识别 (v1.9.95)
@@ -1969,6 +1998,20 @@ public struct VoiceCommandParser {
            text.contains("逢双休") || text.contains("逢双休半") || text.contains("每逢双休半") ||
            text.contains("逢周末") || text.contains("逢周末半") || text.contains("每逢周末半") ||
            text.contains("逢单休") || text.contains("逢单休半") || text.contains("每逢单休半") || text.contains("单休日") || text.contains("单休日半") ||
+           text.contains("逢大休") || text.contains("逢大休半") || text.contains("每逢大休") || text.contains("每逢大休半") ||
+           text.contains("大休日") || text.contains("大休日半") || text.contains("逢大周") || text.contains("逢大周半") ||
+           text.contains("每逢大周") || text.contains("每逢大周半") || text.contains("大周") || text.contains("大周半") ||
+           text.contains("大休") || text.contains("大休半") ||
+           text.contains("逢小休") || text.contains("逢小休半") || text.contains("每逢小休") || text.contains("每逢小休半") ||
+           text.contains("小休日") || text.contains("小休日半") || text.contains("逢小周") || text.contains("逢小周半") ||
+           text.contains("每逢小周") || text.contains("每逢小周半") || text.contains("小周") || text.contains("小周半") ||
+           text.contains("小休") || text.contains("小休半") ||
+           text.contains("非大休") || text.contains("非大休半") || text.contains("非大休日") || text.contains("非大休日半") ||
+           text.contains("非大周") || text.contains("非大周半") ||
+           text.contains("非小休") || text.contains("非小休半") || text.contains("非小休日") || text.contains("非小休日半") ||
+           text.contains("非小周") || text.contains("非小周半") ||
+           text.contains("非休假日") || text.contains("非休假日半") || text.contains("非放假日") || text.contains("非放假日半") ||
+           text.contains("非节假日") || text.contains("非节假日半") ||
            text.contains("下周半") || text.contains("下个周半") || text.contains("这周半") || text.contains("这个周半") || text.contains("本周半") ||
            text.contains("下星期半") || text.contains("下个星期半") || text.contains("这星期半") || text.contains("这个星期半") || text.contains("本星期半") ||
            text.contains("下礼拜半") || text.contains("下个礼拜半") || text.contains("这礼拜半") || text.contains("这个礼拜半") || text.contains("本礼拜半") ||
@@ -2816,6 +2859,30 @@ public struct VoiceCommandParser {
         str = str.replacingOccurrences(of: "放假日半", with: "放假日8点30分")
         str = str.replacingOccurrences(of: "节假日半", with: "节假日8点30分")
         str = str.replacingOccurrences(of: "平日半", with: "平日8点30分")
+        // 大小周、大休小休与节假日半点时相归一 (v1.9.99)
+        str = str.replacingOccurrences(of: "逢大休半", with: "逢大休8点30分")
+        str = str.replacingOccurrences(of: "每逢大休半", with: "每逢大休8点30分")
+        str = str.replacingOccurrences(of: "大休日半", with: "大休日8点30分")
+        str = str.replacingOccurrences(of: "逢大周半", with: "逢大周8点30分")
+        str = str.replacingOccurrences(of: "每逢大周半", with: "每逢大周8点30分")
+        str = str.replacingOccurrences(of: "大周半", with: "大周8点30分")
+        str = str.replacingOccurrences(of: "大休半", with: "大休8点30分")
+        str = str.replacingOccurrences(of: "逢小休半", with: "逢小休8点30分")
+        str = str.replacingOccurrences(of: "每逢小休半", with: "每逢小休8点30分")
+        str = str.replacingOccurrences(of: "小休日半", with: "小休日8点30分")
+        str = str.replacingOccurrences(of: "逢小周半", with: "逢小周8点30分")
+        str = str.replacingOccurrences(of: "每逢小周半", with: "每逢小周8点30分")
+        str = str.replacingOccurrences(of: "小周半", with: "小周8点30分")
+        str = str.replacingOccurrences(of: "小休半", with: "小休8点30分")
+        str = str.replacingOccurrences(of: "非大休半", with: "非大休8点30分")
+        str = str.replacingOccurrences(of: "非大休日半", with: "非大休日8点30分")
+        str = str.replacingOccurrences(of: "非大周半", with: "非大周8点30分")
+        str = str.replacingOccurrences(of: "非小休半", with: "非小休8点30分")
+        str = str.replacingOccurrences(of: "非小休日半", with: "非小休日8点30分")
+        str = str.replacingOccurrences(of: "非小周半", with: "非小周8点30分")
+        str = str.replacingOccurrences(of: "非休假日半", with: "非休假日8点30分")
+        str = str.replacingOccurrences(of: "非放假日半", with: "非放假日8点30分")
+        str = str.replacingOccurrences(of: "非节假日半", with: "非节假日8点30分")
         str = str.replacingOccurrences(of: "今晨半", with: "今晨7点30分")
         str = str.replacingOccurrences(of: "明晨半", with: "明晨7点30分")
         str = str.replacingOccurrences(of: "每晨半", with: "每晨7点30分")

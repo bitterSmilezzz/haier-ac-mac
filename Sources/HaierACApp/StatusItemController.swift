@@ -469,6 +469,7 @@ final class StatusItemController: NSObject {
             menu.addItem(autoAllItem)
 
             // 全屋统一相对调温 (v1.9.35, v1.9.36 闭环 CR P2-3 增设 16/30°C 极值边界判定, v1.9.42 补齐运行台数精准反馈, v1.9.52 增加 0.5°C 高精微调矩阵, v1.9.54 全景感知当前基准温阶, v1.9.78 补齐原生 Tooltip 悬浮看板)
+            // 全屋统一相对调温 (v1.9.35, v1.9.36 闭环 CR P2-3, v1.9.52 增加 0.5°C 高精微调矩阵, v1.9.54 全景感知当前基准温阶, v1.9.78 补齐原生 Tooltip 悬浮看板, v1.9.99 原生状态栏全屋待机唤醒大一统)
             let allTemps = onDevices.compactMap { model.attribute("targetTemperature", deviceId: $0.id)?.doubleValue }
             let allTempsDesc: String = {
                 guard !allTemps.isEmpty else { return "" }
@@ -483,45 +484,54 @@ final class StatusItemController: NSObject {
                 }
             }()
             let runningNames = onDevices.map { $0.name }.joined(separator: "、")
-            let runningCountDesc = !onDevices.isEmpty ? " (\(onDevices.count)台运行中\(allTempsDesc))" : " (当前均未开机)"
-            let canStepUpAll = model.gatewayConnected && onDevices.contains { dev in
+            let controllableNames = controllableDevices.map { $0.name }.joined(separator: "、")
+            let runningCountDesc = !onDevices.isEmpty ? " (\(onDevices.count)台运行中\(allTempsDesc))" : " (全屋待机中 · 点击唤醒调温)"
+            let canStepUpAll = model.gatewayConnected && controllableDevices.contains { dev in
                 let curTemp = model.attribute("targetTemperature", deviceId: dev.id)?.doubleValue ?? 26.0
                 return curTemp < 30.0
             }
             let stepUpAllItem = NSMenuItem(title: "🔼 全屋统一升温 1°C\(runningCountDesc)", action: #selector(stepUpAllTemperature), keyEquivalent: "")
             stepUpAllItem.target = self
             stepUpAllItem.isEnabled = canStepUpAll
-            stepUpAllItem.toolTip = onDevices.isEmpty ? "当前全屋无运行中的空调" : "将全屋运行中空调统一升温 1°C（上限 30°C）\n受控空调：\(runningNames)"
+            stepUpAllItem.toolTip = onDevices.isEmpty
+                ? "一键开启全屋 \(controllableDevices.count) 台空调并统一升温 1°C（上限 30°C）\n受控空调：\(controllableNames)"
+                : "将全屋运行中空调统一升温 1°C（上限 30°C）\n受控空调：\(runningNames)"
             menu.addItem(stepUpAllItem)
 
-            let canStepUpHalfAll = model.gatewayConnected && onDevices.contains { dev in
+            let canStepUpHalfAll = model.gatewayConnected && controllableDevices.contains { dev in
                 let curTemp = model.attribute("targetTemperature", deviceId: dev.id)?.doubleValue ?? 26.0
                 return curTemp <= 29.5
             }
             let stepUpHalfAllItem = NSMenuItem(title: "🔼 全屋微调升温 0.5°C\(runningCountDesc)", action: #selector(stepUpHalfAllTemperature), keyEquivalent: "")
             stepUpHalfAllItem.target = self
             stepUpHalfAllItem.isEnabled = canStepUpHalfAll
-            stepUpHalfAllItem.toolTip = onDevices.isEmpty ? "当前全屋无运行中的空调" : "将全屋运行中空调统一微调升温 0.5°C（上限 30°C）\n受控空调：\(runningNames)"
+            stepUpHalfAllItem.toolTip = onDevices.isEmpty
+                ? "一键开启全屋 \(controllableDevices.count) 台空调并微调升温 0.5°C（上限 30°C）\n受控空调：\(controllableNames)"
+                : "将全屋运行中空调统一微调升温 0.5°C（上限 30°C）\n受控空调：\(runningNames)"
             menu.addItem(stepUpHalfAllItem)
 
-            let canStepDownHalfAll = model.gatewayConnected && onDevices.contains { dev in
+            let canStepDownHalfAll = model.gatewayConnected && controllableDevices.contains { dev in
                 let curTemp = model.attribute("targetTemperature", deviceId: dev.id)?.doubleValue ?? 26.0
                 return curTemp >= 16.5
             }
             let stepDownHalfAllItem = NSMenuItem(title: "🔽 全屋微调降温 0.5°C\(runningCountDesc)", action: #selector(stepDownHalfAllTemperature), keyEquivalent: "")
             stepDownHalfAllItem.target = self
             stepDownHalfAllItem.isEnabled = canStepDownHalfAll
-            stepDownHalfAllItem.toolTip = onDevices.isEmpty ? "当前全屋无运行中的空调" : "将全屋运行中空调统一微调降温 0.5°C（下限 16°C）\n受控空调：\(runningNames)"
+            stepDownHalfAllItem.toolTip = onDevices.isEmpty
+                ? "一键开启全屋 \(controllableDevices.count) 台空调并微调降温 0.5°C（下限 16°C）\n受控空调：\(controllableNames)"
+                : "将全屋运行中空调统一微调降温 0.5°C（下限 16°C）\n受控空调：\(runningNames)"
             menu.addItem(stepDownHalfAllItem)
 
-            let canStepDownAll = model.gatewayConnected && onDevices.contains { dev in
+            let canStepDownAll = model.gatewayConnected && controllableDevices.contains { dev in
                 let curTemp = model.attribute("targetTemperature", deviceId: dev.id)?.doubleValue ?? 26.0
                 return curTemp > 16.0
             }
             let stepDownAllItem = NSMenuItem(title: "🔽 全屋统一降温 1°C\(runningCountDesc)", action: #selector(stepDownAllTemperature), keyEquivalent: "")
             stepDownAllItem.target = self
             stepDownAllItem.isEnabled = canStepDownAll
-            stepDownAllItem.toolTip = onDevices.isEmpty ? "当前全屋无运行中的空调" : "将全屋运行中空调统一降温 1°C（下限 16°C）\n受控空调：\(runningNames)"
+            stepDownAllItem.toolTip = onDevices.isEmpty
+                ? "一键开启全屋 \(controllableDevices.count) 台空调并统一降温 1°C（下限 16°C）\n受控空调：\(controllableNames)"
+                : "将全屋运行中空调统一降温 1°C（下限 16°C）\n受控空调：\(runningNames)"
             menu.addItem(stepDownAllItem)
 
             // 全屋统一风速协同 (v1.9.46, v1.9.47 增加运行台数动态感知与全屋协同一致性勾选反馈)
@@ -813,49 +823,53 @@ final class StatusItemController: NSObject {
                 autoItem.toolTip = "将「\(dev.name)」切换至智能自动模式并设定为 24°C"
                 devSubmenu.addItem(autoItem)
 
-                // 升降温与微调温阶 (v1.9.35, v1.9.52 增加 0.5°C 高精微调矩阵)
+                // 升降温与微调温阶 (v1.9.35, v1.9.52 增加 0.5°C 高精微调矩阵, v1.9.99 原生状态栏待机唤醒大一统)
+                let upTitle = isPowerOn ? "🔼 升温 1°C (当前 \(curTempStr)°C)" : "🔼 升温 1°C (待机中 · 点击唤醒升温)"
                 let upItem = NSMenuItem(
-                    title: "🔼 升温 1°C (当前 \(curTempStr)°C)",
+                    title: upTitle,
                     action: #selector(stepUpDeviceTemperature(_:)),
                     keyEquivalent: ""
                 )
                 upItem.target = self
                 upItem.representedObject = devId
-                upItem.isEnabled = isControllable && isPowerOn && curTemp < 30.0
-                upItem.toolTip = "将「\(dev.name)」温度升高 1°C（上限 30°C）"
+                upItem.isEnabled = isControllable && curTemp < 30.0
+                upItem.toolTip = isPowerOn ? "将「\(dev.name)」温度升高 1°C（上限 30°C）" : "开启「\(dev.name)」并将温度升高 1°C（上限 30°C）"
                 devSubmenu.addItem(upItem)
 
+                let upHalfTitle = isPowerOn ? "🔼 升温 0.5°C (高精微调 · 当前 \(curTempStr)°C)" : "🔼 升温 0.5°C (待机微调 · 点击唤醒)"
                 let upHalfItem = NSMenuItem(
-                    title: "🔼 升温 0.5°C (高精微调 · 当前 \(curTempStr)°C)",
+                    title: upHalfTitle,
                     action: #selector(stepUpHalfDeviceTemperature(_:)),
                     keyEquivalent: ""
                 )
                 upHalfItem.target = self
                 upHalfItem.representedObject = devId
-                upHalfItem.isEnabled = isControllable && isPowerOn && curTemp <= 29.5
-                upHalfItem.toolTip = "将「\(dev.name)」温度微调升高 0.5°C（上限 30°C）"
+                upHalfItem.isEnabled = isControllable && curTemp <= 29.5
+                upHalfItem.toolTip = isPowerOn ? "将「\(dev.name)」温度微调升高 0.5°C（上限 30°C）" : "开启「\(dev.name)」并将温度微调升高 0.5°C（上限 30°C）"
                 devSubmenu.addItem(upHalfItem)
 
+                let downHalfTitle = isPowerOn ? "🔽 降温 0.5°C (高精微调 · 当前 \(curTempStr)°C)" : "🔽 降温 0.5°C (待机微调 · 点击唤醒)"
                 let downHalfItem = NSMenuItem(
-                    title: "🔽 降温 0.5°C (高精微调 · 当前 \(curTempStr)°C)",
+                    title: downHalfTitle,
                     action: #selector(stepDownHalfDeviceTemperature(_:)),
                     keyEquivalent: ""
                 )
                 downHalfItem.target = self
                 downHalfItem.representedObject = devId
-                downHalfItem.isEnabled = isControllable && isPowerOn && curTemp >= 16.5
-                downHalfItem.toolTip = "将「\(dev.name)」温度微调降低 0.5°C（下限 16°C）"
+                downHalfItem.isEnabled = isControllable && curTemp >= 16.5
+                downHalfItem.toolTip = isPowerOn ? "将「\(dev.name)」温度微调降低 0.5°C（下限 16°C）" : "开启「\(dev.name)」并将温度微调降低 0.5°C（下限 16°C）"
                 devSubmenu.addItem(downHalfItem)
 
+                let downTitle = isPowerOn ? "🔽 降温 1°C (当前 \(curTempStr)°C)" : "🔽 降温 1°C (待机中 · 点击唤醒降温)"
                 let downItem = NSMenuItem(
-                    title: "🔽 降温 1°C (当前 \(curTempStr)°C)",
+                    title: downTitle,
                     action: #selector(stepDownDeviceTemperature(_:)),
                     keyEquivalent: ""
                 )
                 downItem.target = self
                 downItem.representedObject = devId
-                downItem.isEnabled = isControllable && isPowerOn && curTemp > 16.0
-                downItem.toolTip = "将「\(dev.name)」温度降低 1°C（下限 16°C）"
+                downItem.isEnabled = isControllable && curTemp > 16.0
+                downItem.toolTip = isPowerOn ? "将「\(dev.name)」温度降低 1°C（下限 16°C）" : "开启「\(dev.name)」并将温度降低 1°C（下限 16°C）"
                 devSubmenu.addItem(downItem)
 
                 // 运行模式协同切换 (v1.9.95, v1.9.96 支持待机一键模式唤醒)
@@ -1180,28 +1194,32 @@ final class StatusItemController: NSObject {
             autoItem.toolTip = "将「\(dev.name)」切换至智能自动模式，恒定设定为 24°C"
             menu.addItem(autoItem)
 
-            let stepUpItem = NSMenuItem(title: "🔼 升温 1°C (当前 \(curTempStr)°C)", action: #selector(stepUpPrimaryTemperature), keyEquivalent: "")
+            let singleUpTitle = isPowerOn ? "🔼 升温 1°C (当前 \(curTempStr)°C)" : "🔼 升温 1°C (待机中 · 点击唤醒升温)"
+            let stepUpItem = NSMenuItem(title: singleUpTitle, action: #selector(stepUpPrimaryTemperature), keyEquivalent: "")
             stepUpItem.target = self
-            stepUpItem.isEnabled = isControllable && isPowerOn && curTemp < 30.0
-            stepUpItem.toolTip = "将「\(dev.name)」温度升高 1°C（上限 30°C）"
+            stepUpItem.isEnabled = isControllable && curTemp < 30.0
+            stepUpItem.toolTip = isPowerOn ? "将「\(dev.name)」温度升高 1°C（上限 30°C）" : "开启「\(dev.name)」并将温度升高 1°C（上限 30°C）"
             menu.addItem(stepUpItem)
 
-            let stepUpHalfItem = NSMenuItem(title: "🔼 升温 0.5°C (高精微调 · 当前 \(curTempStr)°C)", action: #selector(stepUpHalfPrimaryTemperature), keyEquivalent: "")
+            let singleUpHalfTitle = isPowerOn ? "🔼 升温 0.5°C (高精微调 · 当前 \(curTempStr)°C)" : "🔼 升温 0.5°C (待机微调 · 点击唤醒)"
+            let stepUpHalfItem = NSMenuItem(title: singleUpHalfTitle, action: #selector(stepUpHalfPrimaryTemperature), keyEquivalent: "")
             stepUpHalfItem.target = self
-            stepUpHalfItem.isEnabled = isControllable && isPowerOn && curTemp <= 29.5
-            stepUpHalfItem.toolTip = "将「\(dev.name)」温度微调升高 0.5°C（上限 30°C）"
+            stepUpHalfItem.isEnabled = isControllable && curTemp <= 29.5
+            stepUpHalfItem.toolTip = isPowerOn ? "将「\(dev.name)」温度微调升高 0.5°C（上限 30°C）" : "开启「\(dev.name)」并将温度微调升高 0.5°C（上限 30°C）"
             menu.addItem(stepUpHalfItem)
 
-            let stepDownHalfItem = NSMenuItem(title: "🔽 降温 0.5°C (高精微调 · 当前 \(curTempStr)°C)", action: #selector(stepDownHalfPrimaryTemperature), keyEquivalent: "")
+            let singleDownHalfTitle = isPowerOn ? "🔽 降温 0.5°C (高精微调 · 当前 \(curTempStr)°C)" : "🔽 降温 0.5°C (待机微调 · 点击唤醒)"
+            let stepDownHalfItem = NSMenuItem(title: singleDownHalfTitle, action: #selector(stepDownHalfPrimaryTemperature), keyEquivalent: "")
             stepDownHalfItem.target = self
-            stepDownHalfItem.isEnabled = isControllable && isPowerOn && curTemp >= 16.5
-            stepDownHalfItem.toolTip = "将「\(dev.name)」温度微调降低 0.5°C（下限 16°C）"
+            stepDownHalfItem.isEnabled = isControllable && curTemp >= 16.5
+            stepDownHalfItem.toolTip = isPowerOn ? "将「\(dev.name)」温度微调降低 0.5°C（下限 16°C）" : "开启「\(dev.name)」并将温度微调降低 0.5°C（下限 16°C）"
             menu.addItem(stepDownHalfItem)
 
-            let stepDownItem = NSMenuItem(title: "🔽 降温 1°C (当前 \(curTempStr)°C)", action: #selector(stepDownPrimaryTemperature), keyEquivalent: "")
+            let singleDownTitle = isPowerOn ? "🔽 降温 1°C (当前 \(curTempStr)°C)" : "🔽 降温 1°C (待机中 · 点击唤醒降温)"
+            let stepDownItem = NSMenuItem(title: singleDownTitle, action: #selector(stepDownPrimaryTemperature), keyEquivalent: "")
             stepDownItem.target = self
-            stepDownItem.isEnabled = isControllable && isPowerOn && curTemp > 16.0
-            stepDownItem.toolTip = "将「\(dev.name)」温度降低 1°C（下限 16°C）"
+            stepDownItem.isEnabled = isControllable && curTemp > 16.0
+            stepDownItem.toolTip = isPowerOn ? "将「\(dev.name)」温度降低 1°C（下限 16°C）" : "开启「\(dev.name)」并将温度降低 1°C（下限 16°C）"
             menu.addItem(stepDownItem)
 
             // 运行模式协同切换 (v1.9.95, v1.9.96 支持待机一键模式唤醒)
@@ -1702,59 +1720,75 @@ final class StatusItemController: NSObject {
     }
 
     @objc private func stepUpAllTemperature() {
-        model.adjustTemperatureAll(delta: 1.0)
+        let hasActive = model.allUnifiedDevices.contains { model.reachability(for: $0.id).isControllable && model.attribute("onOffStatus", deviceId: $0.id)?.boolValue == true }
+        _ = model.adjustTemperatureAll(delta: 1.0, autoPowerOn: !hasActive)
+        refreshTemperature()
     }
 
     @objc private func stepUpHalfAllTemperature() {
-        model.adjustTemperatureAll(delta: 0.5)
+        let hasActive = model.allUnifiedDevices.contains { model.reachability(for: $0.id).isControllable && model.attribute("onOffStatus", deviceId: $0.id)?.boolValue == true }
+        _ = model.adjustTemperatureAll(delta: 0.5, autoPowerOn: !hasActive)
+        refreshTemperature()
     }
 
     @objc private func stepDownHalfAllTemperature() {
-        model.adjustTemperatureAll(delta: -0.5)
+        let hasActive = model.allUnifiedDevices.contains { model.reachability(for: $0.id).isControllable && model.attribute("onOffStatus", deviceId: $0.id)?.boolValue == true }
+        _ = model.adjustTemperatureAll(delta: -0.5, autoPowerOn: !hasActive)
+        refreshTemperature()
     }
 
     @objc private func stepDownAllTemperature() {
-        model.adjustTemperatureAll(delta: -1.0)
+        let hasActive = model.allUnifiedDevices.contains { model.reachability(for: $0.id).isControllable && model.attribute("onOffStatus", deviceId: $0.id)?.boolValue == true }
+        _ = model.adjustTemperatureAll(delta: -1.0, autoPowerOn: !hasActive)
+        refreshTemperature()
     }
 
     @objc private func stepUpPrimaryTemperature() {
         guard let devId = primaryDeviceId else { return }
-        model.adjustDeviceTemperature(deviceId: devId, delta: 1.0)
+        _ = model.adjustDeviceTemperature(deviceId: devId, delta: 1.0, autoPowerOn: true)
+        refreshTemperature()
     }
 
     @objc private func stepUpHalfPrimaryTemperature() {
         guard let devId = primaryDeviceId else { return }
-        model.adjustDeviceTemperature(deviceId: devId, delta: 0.5)
+        _ = model.adjustDeviceTemperature(deviceId: devId, delta: 0.5, autoPowerOn: true)
+        refreshTemperature()
     }
 
     @objc private func stepDownHalfPrimaryTemperature() {
         guard let devId = primaryDeviceId else { return }
-        model.adjustDeviceTemperature(deviceId: devId, delta: -0.5)
+        _ = model.adjustDeviceTemperature(deviceId: devId, delta: -0.5, autoPowerOn: true)
+        refreshTemperature()
     }
 
     @objc private func stepDownPrimaryTemperature() {
         guard let devId = primaryDeviceId else { return }
-        model.adjustDeviceTemperature(deviceId: devId, delta: -1.0)
+        _ = model.adjustDeviceTemperature(deviceId: devId, delta: -1.0, autoPowerOn: true)
+        refreshTemperature()
     }
 
     @objc private func stepUpDeviceTemperature(_ sender: NSMenuItem) {
         guard let devId = sender.representedObject as? String else { return }
-        model.adjustDeviceTemperature(deviceId: devId, delta: 1.0)
+        _ = model.adjustDeviceTemperature(deviceId: devId, delta: 1.0, autoPowerOn: true)
+        refreshTemperature()
     }
 
     @objc private func stepUpHalfDeviceTemperature(_ sender: NSMenuItem) {
         guard let devId = sender.representedObject as? String else { return }
-        model.adjustDeviceTemperature(deviceId: devId, delta: 0.5)
+        _ = model.adjustDeviceTemperature(deviceId: devId, delta: 0.5, autoPowerOn: true)
+        refreshTemperature()
     }
 
     @objc private func stepDownHalfDeviceTemperature(_ sender: NSMenuItem) {
         guard let devId = sender.representedObject as? String else { return }
-        model.adjustDeviceTemperature(deviceId: devId, delta: -0.5)
+        _ = model.adjustDeviceTemperature(deviceId: devId, delta: -0.5, autoPowerOn: true)
+        refreshTemperature()
     }
 
     @objc private func stepDownDeviceTemperature(_ sender: NSMenuItem) {
         guard let devId = sender.representedObject as? String else { return }
-        model.adjustDeviceTemperature(deviceId: devId, delta: -1.0)
+        _ = model.adjustDeviceTemperature(deviceId: devId, delta: -1.0, autoPowerOn: true)
+        refreshTemperature()
     }
 
     /// 设为菜单栏主显常驻设备 (v1.9.39)

@@ -134,20 +134,20 @@ struct SetACTemperatureIntent: AppIntent {
         let isAll = (deviceName?.contains("全") == true) || (deviceName?.contains("所有") == true)
         let tempStr = temperature.truncatingRemainder(dividingBy: 1.0) == 0 ? "\(Int(temperature))" : String(format: "%.1f", temperature)
         if isAll {
-            let count = model.setTemperatureAll(temperature: temperature)
+            let count = model.setTemperatureAll(temperature: temperature, autoPowerOn: true)
             guard count > 0 else {
                 throw ACIntentError.message("未能完成全屋调温，当前无可用在线空调")
             }
             return .result(dialog: "已将全屋 \(count) 台空调温度统一设为 \(tempStr) 度")
         }
         let deviceId = try requireGatewayAndDevice(deviceName)
-        _ = model.setTemperature(deviceIds: [deviceId], temperature: temperature)
+        _ = model.setTemperature(deviceIds: [deviceId], temperature: temperature, autoPowerOn: true)
         let devName = model.deviceName(for: deviceId)
         return .result(dialog: "已将「\(devName)」温度设置为 \(tempStr) 度")
     }
 }
 
-// MARK: - 相对微调温度 (v1.9.53)
+// MARK: - 相对微调温度 (v1.9.53, v1.9.99 待机自动唤醒与虚假上限纠正)
 
 struct AdjustACTemperatureIntent: AppIntent {
     static var title: LocalizedStringResource = "微调空调温度"
@@ -175,12 +175,14 @@ struct AdjustACTemperatureIntent: AppIntent {
         let deltaStr = deltaAbs.truncatingRemainder(dividingBy: 1.0) == 0 ? "\(Int(deltaAbs))" : String(format: "%.1f", deltaAbs)
 
         if isAll {
-            let count = model.adjustTemperatureAll(delta: delta)
+            let activeDevices = model.allUnifiedDevices.filter { model.reachability(for: $0.id).isControllable && model.attribute("onOffStatus", deviceId: $0.id)?.boolValue == true }
+            let count = model.adjustTemperatureAll(delta: delta, autoPowerOn: true)
             if count > 0 {
-                return .result(dialog: "已将全屋 \(count) 台运行中的空调统一\(dir) \(deltaStr) 度")
+                let wakePrefix = activeDevices.isEmpty ? "已唤醒全屋 \(count) 台空调并" : "已将全屋 \(count) 台运行中的空调"
+                return .result(dialog: "\(wakePrefix)统一\(dir) \(deltaStr) 度")
             } else {
                 let limitDesc = delta > 0 ? "已达到最高温度 30°C 上限" : "已达到最低温度 16°C 下限"
-                return .result(dialog: "全屋运行中的空调均\(limitDesc)")
+                return .result(dialog: "全屋空调均\(limitDesc)")
             }
         }
 
@@ -193,12 +195,12 @@ struct AdjustACTemperatureIntent: AppIntent {
             throw ACIntentError.message("\(devName)当前离线或不可控")
         }
 
-        let count = model.adjustTemperature(deviceIds: [deviceId], delta: delta)
+        let wasPowerOn = model.attribute("onOffStatus", deviceId: deviceId)?.boolValue == true
         let devName = model.deviceName(for: deviceId)
-        if count > 0 {
-            let cur = model.attribute("targetTemperature", deviceId: deviceId)?.doubleValue ?? 26.0
-            let curStr = cur.truncatingRemainder(dividingBy: 1.0) == 0 ? "\(Int(cur))" : String(format: "%.1f", cur)
-            return .result(dialog: "已将「\(devName)」\(dir) \(deltaStr) 度，当前为 \(curStr) 度")
+        if let newTemp = model.adjustDeviceTemperature(deviceId: deviceId, delta: delta, autoPowerOn: true) {
+            let curStr = newTemp.truncatingRemainder(dividingBy: 1.0) == 0 ? "\(Int(newTemp))" : String(format: "%.1f", newTemp)
+            let wakePrefix = !wasPowerOn ? "已唤醒「\(devName)」并" : "已将「\(devName)」"
+            return .result(dialog: "\(wakePrefix)\(dir) \(deltaStr) 度，当前为 \(curStr) 度")
         } else {
             let limitDesc = delta > 0 ? "已达到最高温度 30°C 上限" : "已达到最低温度 16°C 下限"
             return .result(dialog: "「\(devName)」\(limitDesc)")
@@ -1176,10 +1178,14 @@ struct ACAppShortcuts: AppShortcutsProvider {
                         "用 \(.applicationName) 降温",
                         "用 \(.applicationName) 上调温度",
                         "用 \(.applicationName) 下调温度",
+                        "用 \(.applicationName) 全屋升温",
+                        "用 \(.applicationName) 全屋降温",
                         "\(.applicationName) 调高温度",
                         "\(.applicationName) 调低温度",
                         "\(.applicationName) 上调温度",
                         "\(.applicationName) 下调温度",
+                        "\(.applicationName) 全屋升温",
+                        "\(.applicationName) 全屋降温",
                     ],
                     shortTitle: "微调温度",
                     systemImageName: "thermometer.high"
@@ -1272,6 +1278,8 @@ struct ACAppShortcuts: AppShortcutsProvider {
                         "用 \(.applicationName) 降温",
                         "用 \(.applicationName) 上调温度",
                         "用 \(.applicationName) 下调温度",
+                        "用 \(.applicationName) 全屋升温",
+                        "用 \(.applicationName) 全屋降温",
                     ]
                 ),
                 AppShortcut(

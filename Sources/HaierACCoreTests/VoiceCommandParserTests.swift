@@ -4301,6 +4301,116 @@ final class VoiceCommandParserTests: XCTestCase {
         XCTAssertNotEqual(VoiceCommandParser.parse("非周六周日半关机")?.command, .turnOffAll)
     }
 
+    // MARK: - 大小周/大休小休/节假日与反相全景调度测试 (v1.9.99)
+
+    func testBigSmallWeekendScheduleV1999() {
+        // 1. 正相逢大休/大周/双休/节假日调度
+        let bigOff = VoiceCommandParser.parse("逢大休8点开机")
+        XCTAssertEqual(bigOff?.command, .scheduleRepeatPower(hour: 8, minute: 0, power: true, repeatWeekdays: [1, 7], repeatLabel: "周末"))
+
+        let bigOff2 = VoiceCommandParser.parse("大休8点开机")
+        XCTAssertEqual(bigOff2?.command, .scheduleRepeatPower(hour: 8, minute: 0, power: true, repeatWeekdays: [1, 7], repeatLabel: "周末"))
+
+        let bigOffDay = VoiceCommandParser.parse("大休日8点开机")
+        XCTAssertEqual(bigOffDay?.command, .scheduleRepeatPower(hour: 8, minute: 0, power: true, repeatWeekdays: [1, 7], repeatLabel: "周末"))
+
+        let bigWeek = VoiceCommandParser.parse("逢大周8点开机")
+        XCTAssertEqual(bigWeek?.command, .scheduleRepeatPower(hour: 8, minute: 0, power: true, repeatWeekdays: [1, 7], repeatLabel: "周末"))
+
+        let bigWeek2 = VoiceCommandParser.parse("大周8点开机")
+        XCTAssertEqual(bigWeek2?.command, .scheduleRepeatPower(hour: 8, minute: 0, power: true, repeatWeekdays: [1, 7], repeatLabel: "周末"))
+
+        let holiday = VoiceCommandParser.parse("逢节假日8点开机")
+        XCTAssertEqual(holiday?.command, .scheduleRepeatPower(hour: 8, minute: 0, power: true, repeatWeekdays: [1, 7], repeatLabel: "周末"))
+
+        let holiday2 = VoiceCommandParser.parse("节假日8点开机")
+        XCTAssertEqual(holiday2?.command, .scheduleRepeatPower(hour: 8, minute: 0, power: true, repeatWeekdays: [1, 7], repeatLabel: "周末"))
+
+        // 2. 正相逢小休/小周/单休调度
+        let smallOff = VoiceCommandParser.parse("逢小休8点开机")
+        XCTAssertEqual(smallOff?.command, .scheduleRepeatPower(hour: 8, minute: 0, power: true, repeatWeekdays: [1], repeatLabel: "周日"))
+
+        let smallOff2 = VoiceCommandParser.parse("小休8点开机")
+        XCTAssertEqual(smallOff2?.command, .scheduleRepeatPower(hour: 8, minute: 0, power: true, repeatWeekdays: [1], repeatLabel: "周日"))
+
+        let smallOffDay = VoiceCommandParser.parse("小休日8点开机")
+        XCTAssertEqual(smallOffDay?.command, .scheduleRepeatPower(hour: 8, minute: 0, power: true, repeatWeekdays: [1], repeatLabel: "周日"))
+
+        let smallWeek = VoiceCommandParser.parse("逢小周8点开机")
+        XCTAssertEqual(smallWeek?.command, .scheduleRepeatPower(hour: 8, minute: 0, power: true, repeatWeekdays: [1], repeatLabel: "周日"))
+
+        let smallWeek2 = VoiceCommandParser.parse("小周8点开机")
+        XCTAssertEqual(smallWeek2?.command, .scheduleRepeatPower(hour: 8, minute: 0, power: true, repeatWeekdays: [1], repeatLabel: "周日"))
+
+        // 3. 反相时态调度
+        let nonBigOff = VoiceCommandParser.parse("非大休8点开机")
+        XCTAssertEqual(nonBigOff?.command, .scheduleRepeatPower(hour: 8, minute: 0, power: true, repeatWeekdays: [2, 3, 4, 5, 6], repeatLabel: "工作日"))
+
+        let nonBigOffDay = VoiceCommandParser.parse("非大休日8点开机")
+        XCTAssertEqual(nonBigOffDay?.command, .scheduleRepeatPower(hour: 8, minute: 0, power: true, repeatWeekdays: [2, 3, 4, 5, 6], repeatLabel: "工作日"))
+
+        let nonBigWeek = VoiceCommandParser.parse("非大周8点开机")
+        XCTAssertEqual(nonBigWeek?.command, .scheduleRepeatPower(hour: 8, minute: 0, power: true, repeatWeekdays: [2, 3, 4, 5, 6], repeatLabel: "工作日"))
+
+        let nonSmallOff = VoiceCommandParser.parse("非小休8点开机")
+        XCTAssertEqual(nonSmallOff?.command, .scheduleRepeatPower(hour: 8, minute: 0, power: true, repeatWeekdays: [2, 3, 4, 5, 6, 7], repeatLabel: "周一至周六"))
+
+        let nonSmallOffDay = VoiceCommandParser.parse("非小休日8点开机")
+        XCTAssertEqual(nonSmallOffDay?.command, .scheduleRepeatPower(hour: 8, minute: 0, power: true, repeatWeekdays: [2, 3, 4, 5, 6, 7], repeatLabel: "周一至周六"))
+
+        let nonSmallWeek = VoiceCommandParser.parse("非小周8点开机")
+        XCTAssertEqual(nonSmallWeek?.command, .scheduleRepeatPower(hour: 8, minute: 0, power: true, repeatWeekdays: [2, 3, 4, 5, 6, 7], repeatLabel: "周一至周六"))
+
+        let nonHoliday = VoiceCommandParser.parse("非节假日8点开机")
+        XCTAssertEqual(nonHoliday?.command, .scheduleRepeatPower(hour: 8, minute: 0, power: true, repeatWeekdays: [2, 3, 4, 5, 6], repeatLabel: "工作日"))
+
+        let nonVacation = VoiceCommandParser.parse("非休假日8点开机")
+        XCTAssertEqual(nonVacation?.command, .scheduleRepeatPower(hour: 8, minute: 0, power: true, repeatWeekdays: [2, 3, 4, 5, 6], repeatLabel: "工作日"))
+
+        // 4. 排除型语义
+        let exceptBigOff = VoiceCommandParser.parse("除大休外每天8点开机")
+        XCTAssertEqual(exceptBigOff?.command, .scheduleRepeatPower(hour: 8, minute: 0, power: true, repeatWeekdays: [2, 3, 4, 5, 6], repeatLabel: "工作日"))
+
+        let exceptSmallOff = VoiceCommandParser.parse("除小休外每天8点开机")
+        XCTAssertEqual(exceptSmallOff?.command, .scheduleRepeatPower(hour: 8, minute: 0, power: true, repeatWeekdays: [2, 3, 4, 5, 6, 7], repeatLabel: "周一至周六"))
+
+        let exceptNonBigOff = VoiceCommandParser.parse("除非大休外每天8点开机")
+        XCTAssertEqual(exceptNonBigOff?.command, .scheduleRepeatPower(hour: 8, minute: 0, power: true, repeatWeekdays: [1, 7], repeatLabel: "周末"))
+
+        let exceptNonSmallOff = VoiceCommandParser.parse("除非小休外每天8点开机")
+        XCTAssertEqual(exceptNonSmallOff?.command, .scheduleRepeatPower(hour: 8, minute: 0, power: true, repeatWeekdays: [1], repeatLabel: "周日"))
+
+        let exceptHoliday = VoiceCommandParser.parse("除节假日外每天8点开机")
+        XCTAssertEqual(exceptHoliday?.command, .scheduleRepeatPower(hour: 8, minute: 0, power: true, repeatWeekdays: [2, 3, 4, 5, 6], repeatLabel: "工作日"))
+
+        // 5. 半点归一
+        let bigOffHalf = VoiceCommandParser.parse("逢大休半开机")
+        XCTAssertEqual(bigOffHalf?.command, .scheduleRepeatPower(hour: 8, minute: 30, power: true, repeatWeekdays: [1, 7], repeatLabel: "周末"))
+
+        let smallOffHalf = VoiceCommandParser.parse("逢小休半开机")
+        XCTAssertEqual(smallOffHalf?.command, .scheduleRepeatPower(hour: 8, minute: 30, power: true, repeatWeekdays: [1], repeatLabel: "周日"))
+
+        let nonBigOffHalf = VoiceCommandParser.parse("非大休半开机")
+        XCTAssertEqual(nonBigOffHalf?.command, .scheduleRepeatPower(hour: 8, minute: 30, power: true, repeatWeekdays: [2, 3, 4, 5, 6], repeatLabel: "工作日"))
+
+        let nonSmallOffHalf = VoiceCommandParser.parse("非小休半开机")
+        XCTAssertEqual(nonSmallOffHalf?.command, .scheduleRepeatPower(hour: 8, minute: 30, power: true, repeatWeekdays: [2, 3, 4, 5, 6, 7], repeatLabel: "周一至周六"))
+
+        // 6. 防即时误触
+        XCTAssertNotEqual(VoiceCommandParser.parse("逢大休8点开机")?.command, .setPower(true))
+        XCTAssertNotEqual(VoiceCommandParser.parse("逢大休8点开机")?.command, .turnOnAll)
+        XCTAssertNotEqual(VoiceCommandParser.parse("逢小休8点开机")?.command, .setPower(true))
+        XCTAssertNotEqual(VoiceCommandParser.parse("逢小休8点开机")?.command, .turnOnAll)
+        XCTAssertNotEqual(VoiceCommandParser.parse("非大休8点开机")?.command, .setPower(true))
+        XCTAssertNotEqual(VoiceCommandParser.parse("非大休8点开机")?.command, .turnOnAll)
+        XCTAssertNotEqual(VoiceCommandParser.parse("非小休8点开机")?.command, .setPower(true))
+        XCTAssertNotEqual(VoiceCommandParser.parse("非小休8点开机")?.command, .turnOnAll)
+        XCTAssertNotEqual(VoiceCommandParser.parse("逢大休半开机")?.command, .setPower(true))
+        XCTAssertNotEqual(VoiceCommandParser.parse("逢小休半开机")?.command, .setPower(true))
+        XCTAssertNotEqual(VoiceCommandParser.parse("非大休半开机")?.command, .setPower(true))
+        XCTAssertNotEqual(VoiceCommandParser.parse("非小休半开机")?.command, .setPower(true))
+    }
+
     // MARK: - 无效输入测试
 
     func testInvalidCommands() {

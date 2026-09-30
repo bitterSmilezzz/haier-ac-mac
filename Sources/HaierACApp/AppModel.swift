@@ -3297,46 +3297,56 @@ final class AppModel: ObservableObject {
         return applyPreset(deviceIds: nil, mode: mode, temperature: temperature, windSpeed: windSpeed)
     }
 
-    /// 调整单个空调的设定温度（相对步进 delta，如 +1.0 或 -1.0） (v1.9.35, v1.9.36 极值边界防护)
+    /// 调整单个空调的设定温度（相对步进 delta，如 +1.0 或 -1.0） (v1.9.35, v1.9.36 极值边界防护, v1.9.99 增加 autoPowerOn 待机唤醒支持)
     @discardableResult
-    public func adjustDeviceTemperature(deviceId: String, delta: Double) -> Double? {
+    public func adjustDeviceTemperature(deviceId: String, delta: Double, autoPowerOn: Bool = false) -> Double? {
         guard reachability(for: deviceId).isControllable else {
             operationNotice = OperationNotice(text: "⚠️ 设备不可控或离线", isError: true)
             return nil
         }
+        let isPowerOn = attribute("onOffStatus", deviceId: deviceId)?.boolValue == true
         let current = attribute("targetTemperature", deviceId: deviceId)?.doubleValue ?? 26.0
         let target = min(30.0, max(16.0, current + delta))
         let devName = deviceName(for: deviceId)
-        if target == current {
+        if target == current && isPowerOn {
             let limitDesc = delta > 0 ? "已达到最高温度上限 30°C" : "已达到最低温度下限 16°C"
             operationNotice = OperationNotice(text: "「\(devName)」\(limitDesc)", isError: false)
             return current
         }
+        if !isPowerOn && autoPowerOn {
+            sendAttribute("onOffStatus", value: .bool(true), deviceId: deviceId)
+        }
         sendAttribute("targetTemperature", value: .double(target), deviceId: deviceId)
         let tempDesc = target.truncatingRemainder(dividingBy: 1.0) == 0 ? "\(Int(target))" : String(format: "%.1f", target)
-        operationNotice = OperationNotice(text: "✅ 已将「\(devName)」温度调至 \(tempDesc)°C", isError: false)
+        let actionDesc = (!isPowerOn && autoPowerOn) ? "已唤醒「\(devName)」并调至" : "已将「\(devName)」温度调至"
+        operationNotice = OperationNotice(text: "✅ \(actionDesc) \(tempDesc)°C", isError: false)
         return target
     }
 
-    /// 批量/全屋相对调温：为目标设备集（若为 nil 则默认全屋）中所有可控空调按 delta 步进调温 (v1.9.35, v1.9.36 极值边界防护, v1.9.43 增强对待机状态调温支持)
+    /// 批量/全屋相对调温：为目标设备集（若为 nil 则默认全屋）中所有可控空调按 delta 步进调温 (v1.9.35, v1.9.36 极值边界防护, v1.9.43 增强对待机状态调温支持, v1.9.99 增加 autoPowerOn 待机唤醒大一统支持)
     @discardableResult
-    public func adjustTemperature(deviceIds: [String]? = nil, delta: Double, includeStandby: Bool = false) -> Int {
+    public func adjustTemperature(deviceIds: [String]? = nil, delta: Double, includeStandby: Bool = false, autoPowerOn: Bool = false) -> Int {
         let targets = deviceIds ?? allUnifiedDevices.map(\.id)
         let allIds = Set(allUnifiedDevices.map(\.id))
         let isAll = (deviceIds == nil) || (!allIds.isEmpty && Set(targets).isSuperset(of: allIds))
         let eligibleIds = targets.filter {
-            reachability(for: $0).isControllable && (includeStandby || attribute("onOffStatus", deviceId: $0)?.boolValue == true)
+            reachability(for: $0).isControllable && (includeStandby || autoPowerOn || attribute("onOffStatus", deviceId: $0)?.boolValue == true)
         }
         guard !eligibleIds.isEmpty else {
             let desc = isAll ? "当前无任何开机运行中的在线空调" : "所选设备中无可调节的在线空调"
             operationNotice = OperationNotice(text: desc, isError: false)
             return 0
         }
+        let standbyIds = eligibleIds.filter { attribute("onOffStatus", deviceId: $0)?.boolValue != true }
+        if autoPowerOn && !standbyIds.isEmpty {
+            sendAttributeToDevices("onOffStatus", value: .bool(true), deviceIds: standbyIds)
+        }
         var changedCount = 0
         for id in eligibleIds {
             let current = attribute("targetTemperature", deviceId: id)?.doubleValue ?? 26.0
             let target = min(30.0, max(16.0, current + delta))
-            if target != current {
+            let wasOff = standbyIds.contains(id)
+            if target != current || (wasOff && autoPowerOn) {
                 sendAttribute("targetTemperature", value: .double(target), deviceId: id)
                 changedCount += 1
             }
@@ -3350,22 +3360,23 @@ final class AppModel: ObservableObject {
         let deltaAbs = abs(delta)
         let deltaDesc = deltaAbs.truncatingRemainder(dividingBy: 1.0) == 0 ? "\(Int(deltaAbs))" : String(format: "%.1f", deltaAbs)
         let dirDesc = delta > 0 ? "升温 \(deltaDesc)°C" : "降温 \(deltaDesc)°C"
+        let wakeDesc = (autoPowerOn && !standbyIds.isEmpty) ? "已唤醒并" : "已将"
         let desc = isAll
-            ? "✅ 已将全屋 \(changedCount) 台空调统一\(dirDesc)"
-            : "✅ 已将所选 \(changedCount) 台空调统一\(dirDesc)"
+            ? "✅ \(wakeDesc)统一全屋 \(changedCount) 台空调\(dirDesc)"
+            : "✅ \(wakeDesc)统一所选 \(changedCount) 台空调\(dirDesc)"
         operationNotice = OperationNotice(text: desc, isError: false)
         return changedCount
     }
 
-    /// 全屋一键相对调温 (v1.9.35)
+    /// 全屋一键相对调温 (v1.9.35, v1.9.99 增加 autoPowerOn 支持)
     @discardableResult
-    public func adjustTemperatureAll(delta: Double) -> Int {
-        return adjustTemperature(deviceIds: nil, delta: delta)
+    public func adjustTemperatureAll(delta: Double, autoPowerOn: Bool = false) -> Int {
+        return adjustTemperature(deviceIds: nil, delta: delta, includeStandby: autoPowerOn, autoPowerOn: autoPowerOn)
     }
 
-    /// 批量/全屋绝对温度设定：将目标设备集（若为 nil 则默认全屋）中所有可控空调设置为指定温度 (v1.9.35)
+    /// 批量/全屋绝对温度设定：将目标设备集（若为 nil 则默认全屋）中所有可控空调设置为指定温度 (v1.9.35, v1.9.99 增加 autoPowerOn 待机唤醒支持)
     @discardableResult
-    public func setTemperature(deviceIds: [String]? = nil, temperature: Double) -> Int {
+    public func setTemperature(deviceIds: [String]? = nil, temperature: Double, autoPowerOn: Bool = false) -> Int {
         let targets = deviceIds ?? allUnifiedDevices.map(\.id)
         let allIds = Set(allUnifiedDevices.map(\.id))
         let isAll = (deviceIds == nil) || (!allIds.isEmpty && Set(targets).isSuperset(of: allIds))
@@ -3376,11 +3387,16 @@ final class AppModel: ObservableObject {
             operationNotice = OperationNotice(text: desc, isError: true)
             return 0
         }
+        let standbyIds = controllableIds.filter { attribute("onOffStatus", deviceId: $0)?.boolValue != true }
+        if autoPowerOn && !standbyIds.isEmpty {
+            sendAttributeToDevices("onOffStatus", value: .bool(true), deviceIds: standbyIds)
+        }
         sendAttributeToDevices("targetTemperature", value: .double(safeTemp), deviceIds: controllableIds)
         let tempDesc = safeTemp.truncatingRemainder(dividingBy: 1.0) == 0 ? "\(Int(safeTemp))" : String(format: "%.1f", safeTemp)
+        let wakeDesc = (autoPowerOn && !standbyIds.isEmpty) ? "已唤醒并" : "已将"
         let desc = isAll
-            ? "✅ 已将全屋 \(controllableIds.count) 台空调目标温度统一设为 \(tempDesc)°C"
-            : "✅ 已将所选 \(controllableIds.count) 台空调目标温度统一设为 \(tempDesc)°C"
+            ? "✅ \(wakeDesc)统一全屋 \(controllableIds.count) 台空调目标温度设为 \(tempDesc)°C"
+            : "✅ \(wakeDesc)统一所选 \(controllableIds.count) 台空调目标温度设为 \(tempDesc)°C"
         operationNotice = OperationNotice(text: desc, isError: false)
         return controllableIds.count
     }
@@ -3421,10 +3437,10 @@ final class AppModel: ObservableObject {
         return setMode(deviceIds: nil, mode: mode)
     }
 
-    /// 全屋一键绝对温度设定 (v1.9.35)
+    /// 全屋一键绝对温度设定 (v1.9.35, v1.9.99 增加 autoPowerOn 支持)
     @discardableResult
-    public func setTemperatureAll(temperature: Double) -> Int {
-        return setTemperature(deviceIds: nil, temperature: temperature)
+    public func setTemperatureAll(temperature: Double, autoPowerOn: Bool = false) -> Int {
+        return setTemperature(deviceIds: nil, temperature: temperature, autoPowerOn: autoPowerOn)
     }
 
     /// 归一化风速标准名称 (v1.9.47 支持一至四档/1~4档/低中高极速/静音等全量别名, v1.9.81 补齐 4 档/5 档/暴风全量映射, v1.9.82 提炼公共标准化函数, v1.9.87 支持 level/speed 设备原语与全量英文枚举, v1.9.88 闭环 gear 设备原语与全风量矩阵, v1.9.93 闭环静音 0 档与微风对齐)

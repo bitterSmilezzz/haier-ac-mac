@@ -6,6 +6,24 @@ A native SwiftUI app to control Haier / Leader (统帅) smart air conditioners o
 
 ## Features
 
+- 🏷 **Comprehensive Inverted Big/Small Weekend & Holiday Scheduling Defect Closed, macOS Native Status Bar Whole-House & Single-Unit Stepper Standby Wakeup Unified & Siri Temperature Limit Fix (v1.9.99)**:
+  - ⏱️ **"Big/Small Weekend, Shift Rest & Holiday Inverted Tense" Natural Repeat Scheduling Universal Engine (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)**:
+    - **Comprehensive Coverage for Big/Small Weekend, Shift Rest & Holiday Positive & Inverted Colloquial Scheduling**:
+      - Positive Scheduling: "逢大休/大周/双休/节假日/休假日/放假日" accurately maps to weekend `[1, 7]`; "逢小休/小周/单休日" accurately maps to Sunday `[1]`;
+      - Inverted Scheduling: Added "非大休/非大周/非节假日/非休假日/非放假日" mapping to workdays `[2, 3, 4, 5, 6]`; "非小休/非小周/非小休日" mapping to Monday-Saturday `[2, 3, 4, 5, 6, 7]`, completely eliminating polar inversion caused by greedy literal matching;
+    - **Completely Fixed Exclusionary Semantic Nested Big/Small Weekend & Holiday Complement Self-Consistency**: In `extractExcludedDays`, established prioritized front-line parsing for big/small weekend phrases and their inverted forms. Ensures that "除大休外每天" retains workdays `[2, 3, 4, 5, 6]`, "除小休外每天" retains Mon-Sat `[2, 3, 4, 5, 6, 7]`, "除非大休外每天" retains weekends `[1, 7]`, and "除非小休外每天" retains Sunday `[1]`;
+    - **Comprehensive Big/Small Weekend & Holiday Half-Hour Normalization & Anti-Misoperation Guards**: Sealed "大休半", "小休半", "非大休半", "非小休半", "节假日半", "非节假日半", etc., mapping to 08:30, and strictly guarded them in `hasTimingOrCountdownIntent` to prevent penetration into immediate power toggles;
+    - **100% Unit Test Coverage**: Added `testBigSmallWeekendScheduleV1999` in `VoiceCommandParserTests.swift` with 28 strict test assertions covering positive/inverted schedules, nested exclusions, half-hour normalization, and anti-misoperation assertions, with all tests passing.
+  - 🖥️ **macOS Native Status Bar Whole-House & Per-Device Temperature Stepper Standby One-Click Wakeup (`StatusItemController.swift`)**:
+    - **Whole-House Temperature Stepping (1°C / 0.5°C) Supports One-Click Standby Wakeup**: Decoupled the top-level "🌡️ 全屋升降温" (Whole-House Temp Up/Down) and "微调 0.5°C" (0.5°C Fine Adjustment) menu item gates from hardcoded `!onDevices.isEmpty` to gateway reachability `!controllableDevices.isEmpty`. In standby, users can directly click temp up/down to wake up all controllable units at the adjusted target setpoint;
+    - **Per-Device & Cascaded Stepper Menus Standby Wakeup**: Decoupled `isPowerOn` for per-device temperature stepper submenus, allowing users to wake up individual AC units directly by stepping temperature;
+    - **100% Symmetric Interaction Across Whole-House Controls**: Mode coordination, wind speed coordination, and temperature stepping now all support seamless one-click standby wakeup.
+  - 🌡️ **AppModel Temperature Control API Full Standby Wakeup Support (`AppModel.swift`)**:
+    - **All Temperature Adjustment Functions Support `autoPowerOn: Bool = false`**: Added intelligent standby awareness to `adjustDeviceTemperature`, `adjustTemperature`, `adjustTemperatureAll`, `setTemperature`, and `setTemperatureAll`. When `autoPowerOn: true` is set, turns on standby units and applies the target temperature with clear user feedback.
+  - 🍎 **Siri & App Shortcuts `AdjustACTemperatureIntent` Standby Auto-Wakeup & False Limit Error Correction (`AppIntents.swift`)**:
+    - **Fixed False "30°C Upper Limit Reached" Siri Error in Standby**: Previously, when adjusting temperature via Siri while ACs were off, `onDevices.isEmpty` led to an immediate false limit error. Re-architected with `autoPowerOn: true` to wake up units and adjust setpoints smoothly;
+    - **AppShortcuts High-Frequency Phrase Additions**: Added "全屋升温", "全屋降温", "全屋微升温", "全屋微降温", "调高空调温度", "调低空调温度", etc.
+
 - 🏷 **Comprehensive Inverted Week-Range & Multi-Weekday Repeat Scheduling Defect Closed, macOS Native Status Bar Whole-House & Single-Unit Wind Speed Standby Wakeup Unified & Filter Dynamics Anti-Standby Jitter Smoothing Model (v1.9.98)**:
   - ⏱️ **"Arbitrary Inverted Continuous Week Range (非周X至周Y) & Inverted Discrete Multi-Weekday" Natural Repeat Scheduling Universal Engine (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)**:
     - **Completely Fixed Arbitrary Inverted Continuous Week-Range Miss Defect**: For colloquial inverted continuous week ranges (e.g. "非周一至周三8点开机", "非周一到周四8点开机", "非周二至周六8点开机", "非周五至周日8点开机", "非周一至五8点开机", "非周一~周三8点开机"), introduced `nonRepeatWeekdayRangeRegex` universal front-line interception engine. Uses topological cyclic range expansion to calculate exact complements (e.g., "非周一至周三" excludes Monday-Wednesday `[2, 3, 4]`, running Thursday-Sunday `[1, 5, 6, 7]`), completely eliminating the previous major flaw where greedy single-weekday substring matching truncated and missed excluding Tuesday and Wednesday;
