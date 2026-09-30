@@ -575,7 +575,7 @@ struct MenuBarControlsView: View {
                                     _ = model.setScheduledActionsEnabled(for: device.id, enabled: false)
                                 }
                             }
-                        } else if allActions.contains(where: { $0.deviceId == device.id && !$0.enabled }) {
+                        } else if allActions.contains(where: { ($0.deviceId == device.id || ($0.deviceId.isEmpty && device.id == (model.primaryDeviceId ?? ""))) && !$0.enabled }) {
                             Button("恢复生效「\(device.deviceName)」定时") {
                                 triggerHaptic()
                                 withAnimation(Theme.springFast) {

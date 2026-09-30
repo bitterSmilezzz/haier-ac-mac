@@ -1291,7 +1291,14 @@ final class AppModel: ObservableObject {
                 accumulateFilterMinutes(for: dev.id, minutes: elapsedMinutes, wearFactor: wearFactor)
                 deviceContinuousMinutes[dev.id, default: 0] += elapsedMinutes
             } else {
-                deviceContinuousMinutes[dev.id] = 0
+                // 变频机组热容量连续性物理散热衰减模型 (Thermal Mass Dissipation Model) (v1.9.106):
+                // 关机或待机时，换热器翅片与压缩机机体热饱和积累随时间遵循牛顿冷却定律平滑自然散热；
+                // 采用 3 倍速线性散热衰减，既避免瞬间归零导致短时停机/调档丢失热饱和稳态阻抗，
+                // 又确保长时间停机（连续待机 40~60 分钟以上）自然彻底冷却至零。
+                let current = deviceContinuousMinutes[dev.id] ?? 0
+                if current > 0 {
+                    deviceContinuousMinutes[dev.id] = max(0, current - elapsedMinutes * 3)
+                }
             }
 
             // 自清洁工况归属判定：指定设备精确匹配，未指定仅在单设备时生效，阻断多设备 fail-open 风险 (v1.9.34)
@@ -1418,12 +1425,17 @@ final class AppModel: ObservableObject {
         return count
     }
 
-    /// 取消指定设备集合的所有定时与倒计时任务并原子重置唤醒调度器 (v1.9.37)
+    /// 取消指定设备集合的所有定时与倒计时任务并原子重置唤醒调度器 (v1.9.37, v1.9.106 纳管空设备ID历史任务)
     @discardableResult
     public func cancelSchedules(for deviceIds: [String]) -> Int {
         let idSet = Set(deviceIds)
+        let primaryId = primaryDeviceId
         let beforeCount = scheduledActions.count
-        scheduledActions.removeAll { idSet.contains($0.deviceId) }
+        scheduledActions.removeAll { action in
+            if idSet.contains(action.deviceId) { return true }
+            if action.deviceId.isEmpty, let primary = primaryId, idSet.contains(primary) { return true }
+            return false
+        }
         let removed = beforeCount - scheduledActions.count
         if removed > 0 {
             wakeScheduler()
@@ -1490,13 +1502,17 @@ final class AppModel: ObservableObject {
         return changed
     }
 
-    /// 批量启用/禁用指定设备的调度任务（返回受影响的任务数）(v1.9.60)
+    /// 批量启用/禁用指定设备的调度任务（返回受影响的任务数）(v1.9.60, v1.9.106 纳管空设备ID历史任务)
     @discardableResult
     public func setScheduledActionsEnabled(for deviceIds: [String], enabled: Bool) -> Int {
         guard !scheduledActions.isEmpty else { return 0 }
+        let idSet = Set(deviceIds)
+        let primaryId = primaryDeviceId
         var changed = 0
         for idx in 0..<scheduledActions.count {
-            if deviceIds.contains(scheduledActions[idx].deviceId) && scheduledActions[idx].enabled != enabled {
+            let matches = idSet.contains(scheduledActions[idx].deviceId) ||
+                (scheduledActions[idx].deviceId.isEmpty && primaryId != nil && idSet.contains(primaryId!))
+            if matches && scheduledActions[idx].enabled != enabled {
                 scheduledActions[idx].enabled = enabled
                 changed += 1
             }

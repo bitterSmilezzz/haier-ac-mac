@@ -177,6 +177,8 @@ final class StatusItemController: NSObject {
                 }
             }()
             tooltipParts.append("⏱ 最近计划: \(targetDeviceDesc)将在 \(remDesc)后\(actionVerb) (\(timeStr)\(repeatSuffix))")
+        } else if !model.scheduledActions.isEmpty && model.scheduledActions.filter(\.enabled).isEmpty {
+            tooltipParts.append("⏸ 计划调度: 全屋共 \(model.scheduledActions.count) 个定时任务已全部暂停生效 (右键菜单可一键恢复)")
         }
 
         let primaryTargetId = model.primaryDeviceId
@@ -976,8 +978,8 @@ final class StatusItemController: NSObject {
                 devSubmenu.setSubmenu(devCountdownMenu, for: devCountdownParent)
                 devSubmenu.addItem(devCountdownParent)
 
-                // 单设备计划调度全生命周期管理与感知矩阵 (v1.9.61)
-                let devSchedules = model.scheduledActions.filter { $0.deviceId == devId }
+                // 单设备计划调度全生命周期管理与感知矩阵 (v1.9.61, v1.9.106 纳管空设备ID历史任务)
+                let devSchedules = model.scheduledActions.filter { $0.deviceId == devId || ($0.deviceId.isEmpty && devId == primaryDeviceId) }
                 let devScheduleMenu = NSMenu()
                 devScheduleMenu.autoenablesItems = false
                 let devEnabledCount = devSchedules.filter(\.enabled).count
@@ -1365,8 +1367,8 @@ final class StatusItemController: NSObject {
             menu.setSubmenu(singleCountdownMenu, for: singleCountdownParent)
             menu.addItem(singleCountdownParent)
 
-            // 单设备计划调度全生命周期管理与感知矩阵 (v1.9.62)
-            let devSchedules = model.scheduledActions.filter { $0.deviceId == dev.id }
+            // 单设备计划调度全生命周期管理与感知矩阵 (v1.9.62, v1.9.106 纳管空设备ID历史任务)
+            let devSchedules = model.scheduledActions.filter { $0.deviceId == dev.id || ($0.deviceId.isEmpty && dev.id == primaryDeviceId) }
             let devScheduleMenu = NSMenu()
             devScheduleMenu.autoenablesItems = false
             let devEnabledCount = devSchedules.filter(\.enabled).count
