@@ -4521,6 +4521,52 @@ final class VoiceCommandParserTests: XCTestCase {
         XCTAssertNotEqual(VoiceCommandParser.parse("单休日和周一到周三8点开机")?.command, .turnOnAll)
     }
 
+    // MARK: - 双连续区间与核心关键词双向全景复合调度大一统测试 (v1.9.103)
+
+    func testDualRangeAndKeywordUnificationV19103() {
+        // 1. 双连续区间在前 + 核心关键词在后
+        let r1 = VoiceCommandParser.parse("周一至周二、周四至周五和大休早8点开机")
+        XCTAssertEqual(r1?.command, .scheduleRepeatPower(hour: 8, minute: 0, power: true, repeatWeekdays: [1, 2, 3, 5, 6, 7], repeatLabel: "周四至周二"))
+
+        let r2 = VoiceCommandParser.parse("周一到周三、周五到周六加双休日早8点开机")
+        XCTAssertEqual(r2?.command, .scheduleRepeatPower(hour: 8, minute: 0, power: true, repeatWeekdays: [1, 2, 3, 4, 6, 7], repeatLabel: "周五至周三"))
+
+        let r3 = VoiceCommandParser.parse("周一至周二、周四至周五加单休日晚9点关空调")
+        XCTAssertEqual(r3?.command, .scheduleRepeatPower(hour: 21, minute: 0, power: false, repeatWeekdays: [1, 2, 3, 5, 6], repeatLabel: "每周日、一、二、四、五"))
+
+        let r4 = VoiceCommandParser.parse("周一至周三、周五至周日和平日早8点开机")
+        XCTAssertEqual(r4?.command, .scheduleRepeatPower(hour: 8, minute: 0, power: true, repeatWeekdays: [1, 2, 3, 4, 5, 6, 7], repeatLabel: "周一至周日"))
+
+        // 2. 核心关键词在前 + 双连续区间在后
+        let kw1 = VoiceCommandParser.parse("大休和周一至周二、周四至周五早8点开机")
+        XCTAssertEqual(kw1?.command, .scheduleRepeatPower(hour: 8, minute: 0, power: true, repeatWeekdays: [1, 2, 3, 5, 6, 7], repeatLabel: "周四至周二"))
+
+        let kw2 = VoiceCommandParser.parse("双休日加周一到周三、周五到周六早8点开机")
+        XCTAssertEqual(kw2?.command, .scheduleRepeatPower(hour: 8, minute: 0, power: true, repeatWeekdays: [1, 2, 3, 4, 6, 7], repeatLabel: "周五至周三"))
+
+        let kw3 = VoiceCommandParser.parse("单休日和周一至周二、周四至周五晚9点关空调")
+        XCTAssertEqual(kw3?.command, .scheduleRepeatPower(hour: 21, minute: 0, power: false, repeatWeekdays: [1, 2, 3, 5, 6], repeatLabel: "每周日、一、二、四、五"))
+
+        let kw4 = VoiceCommandParser.parse("周末加周一至周二、周四至周五早8点开机")
+        XCTAssertEqual(kw4?.command, .scheduleRepeatPower(hour: 8, minute: 0, power: true, repeatWeekdays: [1, 2, 3, 5, 6, 7], repeatLabel: "周四至周二"))
+
+        // 3. 连续区间在先、核心关键词居中、连续区间在后夹心
+        let mid1 = VoiceCommandParser.parse("周一至周二、大休和周四至周五早8点开机")
+        XCTAssertEqual(mid1?.command, .scheduleRepeatPower(hour: 8, minute: 0, power: true, repeatWeekdays: [1, 2, 3, 5, 6, 7], repeatLabel: "周四至周二"))
+
+        let mid2 = VoiceCommandParser.parse("周一到周二、双休日加周四到周五早8点开机")
+        XCTAssertEqual(mid2?.command, .scheduleRepeatPower(hour: 8, minute: 0, power: true, repeatWeekdays: [1, 2, 3, 5, 6, 7], repeatLabel: "周四至周二"))
+
+        let mid3 = VoiceCommandParser.parse("周一至周二、单休日加周四至周五早8点开机")
+        XCTAssertEqual(mid3?.command, .scheduleRepeatPower(hour: 8, minute: 0, power: true, repeatWeekdays: [1, 2, 3, 5, 6], repeatLabel: "每周日、一、二、四、五"))
+
+        // 4. 严格防即时误触断言
+        XCTAssertNotEqual(VoiceCommandParser.parse("周一至周二、周四至周五和大休8点开机")?.command, .setPower(true))
+        XCTAssertNotEqual(VoiceCommandParser.parse("周一至周二、周四至周五和大休8点开机")?.command, .turnOnAll)
+        XCTAssertNotEqual(VoiceCommandParser.parse("大休和周一至周二、周四至周五8点开机")?.command, .setPower(true))
+        XCTAssertNotEqual(VoiceCommandParser.parse("周一至周二、大休和周四至周五8点开机")?.command, .turnOnAll)
+    }
+
     // MARK: - 无效输入测试
 
     func testInvalidCommands() {

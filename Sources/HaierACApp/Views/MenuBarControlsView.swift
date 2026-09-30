@@ -103,6 +103,11 @@ struct MenuBarControlsView: View {
                     ambientSoundPod
                 }
 
+                // 2.4 一键情景预设 Bento 矩阵 (若存在配置情景) (v1.9.103)
+                if !model.scenes.isEmpty {
+                    scenesPod(device: device, reachability: reachability)
+                }
+
                 // 3. 核心温控 Bento 卡片
                 temperatureBentoPod(device: device, attrs: attrs, isPowerOn: isPowerOn, tint: tint)
                     .disabled(!reachability.isControllable)
@@ -377,6 +382,76 @@ struct MenuBarControlsView: View {
                 .buttonStyle(.plain)
             }
         }
+    }
+
+    // MARK: - 2.4 一键情景预设 Bento 矩阵 (v1.9.103)
+
+    private func scenesPod(device: DeviceInfo, reachability: AppModel.DeviceReachability) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 4) {
+                Image(systemName: "sparkles")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(Theme.accent)
+                Text("一键情景")
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(Theme.inkSubtle)
+                Spacer()
+                if model.allUnifiedDevices.count > 1 {
+                    Text("当前: \(device.deviceName)")
+                        .font(.system(size: 9))
+                        .foregroundStyle(Theme.inkTertiary)
+                        .lineLimit(1)
+                }
+            }
+            .padding(.horizontal, 2)
+
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: min(model.scenes.count, 3)), spacing: 6) {
+                ForEach(model.scenes) { scene in
+                    let sceneGlyph: String = {
+                        switch scene.name {
+                        case "睡眠": return "🌙"
+                        case "离家": return "🚪"
+                        case "回家": return "🏠"
+                        default: return "✨"
+                        }
+                    }()
+                    Button {
+                        withAnimation(Theme.springFast) {
+                            model.applyScene(scene, targetDeviceId: device.id)
+                        }
+                    } label: {
+                        HStack(spacing: 4) {
+                            Text(sceneGlyph)
+                                .font(.system(size: 10))
+                            Text(scene.name)
+                                .font(.system(size: 11, weight: .medium))
+                                .lineLimit(1)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 6)
+                        .foregroundStyle(Theme.ink)
+                        .background(
+                            RoundedRectangle(cornerRadius: Theme.radiusSM, style: .continuous)
+                                .fill(Theme.surface2)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: Theme.radiusSM, style: .continuous)
+                                        .strokeBorder(Theme.hairline, lineWidth: 1)
+                                )
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .help("为「\(device.deviceName)」一键应用「\(scene.name)」情景")
+                }
+            }
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 6)
+        .background(
+            RoundedRectangle(cornerRadius: Theme.radiusMD, style: .continuous)
+                .fill(Color.primary.opacity(0.03))
+        )
+        .disabled(!reachability.isControllable)
+        .opacity(reachability.isControllable ? 1.0 : 0.6)
     }
 
     // MARK: - 3. 核心温控 Bento 卡片

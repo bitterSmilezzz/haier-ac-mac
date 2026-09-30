@@ -491,6 +491,60 @@ struct DeviceControlView: View {
                     .background(Theme.bentoCardBackground(radius: Theme.radiusLG, tint: isLightOn ? Theme.accent : nil))
                 }
             }
+
+            // 一键情景预设快捷网格 (v1.9.103)
+            if !model.scenes.isEmpty {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 5) {
+                        Image(systemName: "sparkles")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(Theme.accent)
+                        Text("一键情景模式")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundStyle(Theme.inkSubtle)
+                        Spacer()
+                    }
+                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
+                        ForEach(model.scenes) { scene in
+                            let sceneGlyph: String = {
+                                switch scene.name {
+                                case "睡眠": return "🌙"
+                                case "离家": return "🚪"
+                                case "回家": return "🏠"
+                                default: return "✨"
+                                }
+                            }()
+                            Button {
+                                withAnimation(Theme.spring) {
+                                    model.applyScene(scene, targetDeviceId: device.id)
+                                }
+                            } label: {
+                                HStack(spacing: 6) {
+                                    Text(sceneGlyph)
+                                        .font(.system(size: 12))
+                                    Text(scene.name)
+                                        .font(.system(size: 12, weight: .medium))
+                                        .lineLimit(1)
+                                }
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 8)
+                                .foregroundStyle(Theme.ink)
+                                .background(
+                                    RoundedRectangle(cornerRadius: Theme.radiusMD, style: .continuous)
+                                        .fill(Theme.surface2)
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: Theme.radiusMD, style: .continuous)
+                                                .strokeBorder(Theme.hairline, lineWidth: 1)
+                                        )
+                                )
+                            }
+                            .buttonStyle(.plain)
+                            .help("为「\(device.deviceName)」一键应用「\(scene.name)」情景")
+                        }
+                    }
+                }
+                .padding(.top, 4)
+            }
         }
     }
 

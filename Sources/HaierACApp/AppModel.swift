@@ -1538,13 +1538,16 @@ final class AppModel: ObservableObject {
             // 静默下发（不走操作反馈 toast，避免批量触发刷屏）
             gatewayHandle?.sendControl(deviceId: action.deviceId, attributes: [action.attrName: value.jsonValue], completion: nil)
 
-            // 本地状态乐观更新与运行机时重置 (v1.9.102 状态即时同步)
+            // 本地状态乐观更新与运行机时重置 (v1.9.102 状态即时同步, v1.9.103 开关机自洽)
             if var map = attributes[action.deviceId], let old = map[action.attrName] {
+                let wasOff = (old.boolValue != true)
                 map[action.attrName] = old.updating(value: value)
                 attributes[action.deviceId] = map
-            }
-            if action.attrName == "onOffStatus" && value.boolValue == false {
-                deviceContinuousMinutes[action.deviceId] = 0
+                if action.attrName == "onOffStatus" {
+                    if value.boolValue == false || wasOff {
+                        deviceContinuousMinutes[action.deviceId] = 0
+                    }
+                }
             }
 
             guard let idx = scheduledActions.firstIndex(where: { $0.id == action.id }) else { continue }
@@ -2736,13 +2739,16 @@ final class AppModel: ObservableObject {
             for deviceId in targets where !deviceId.isEmpty {
                 guard reachability(for: deviceId).isControllable else { continue }
                 gatewayHandle?.sendControl(deviceId: deviceId, attributes: [action.attrName: value.jsonValue], completion: nil)
-                // 乐观更新
+                // 乐观更新与机时管理 (v1.9.102, v1.9.103)
                 if var map = attributes[deviceId], let old = map[action.attrName] {
+                    let wasOff = (old.boolValue != true)
                     map[action.attrName] = old.updating(value: value)
                     attributes[deviceId] = map
-                }
-                if action.attrName == "onOffStatus" && value.boolValue == false {
-                    deviceContinuousMinutes[deviceId] = 0
+                    if action.attrName == "onOffStatus" {
+                        if value.boolValue == false || wasOff {
+                            deviceContinuousMinutes[deviceId] = 0
+                        }
+                    }
                 }
                 controlledDeviceIds.insert(deviceId)
                 sent += 1
@@ -3188,13 +3194,16 @@ final class AppModel: ObservableObject {
                 }
             }
         }
-        // 乐观更新
+        // 乐观更新与机时管理 (v1.9.103)
         if var map = attributes[deviceId], let old = map[name] {
+            let wasOff = (old.boolValue != true)
             map[name] = old.updating(value: value)
             attributes[deviceId] = map
-        }
-        if name == "onOffStatus" && value.boolValue == false {
-            deviceContinuousMinutes[deviceId] = 0
+            if name == "onOffStatus" {
+                if value.boolValue == false || wasOff {
+                    deviceContinuousMinutes[deviceId] = 0
+                }
+            }
         }
 
         // 操作反馈：显示属性中文名（如「情景灯光」）
@@ -3240,11 +3249,14 @@ final class AppModel: ObservableObject {
                 }
             }
             if var map = attributes[deviceId], let old = map[name] {
+                let wasOff = (old.boolValue != true)
                 map[name] = old.updating(value: value)
                 attributes[deviceId] = map
-            }
-            if name == "onOffStatus" && value.boolValue == false {
-                deviceContinuousMinutes[deviceId] = 0
+                if name == "onOffStatus" {
+                    if value.boolValue == false || wasOff {
+                        deviceContinuousMinutes[deviceId] = 0
+                    }
+                }
             }
             sent += 1
         }

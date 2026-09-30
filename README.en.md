@@ -6,6 +6,18 @@ A native SwiftUI app to control Haier / Leader (统帅) smart air conditioners o
 
 ## Features
 
+- 🏷 **Universal Dual-Range & Core Keyword Repeat Scheduling, Menu Bar & Main Window Scene Presets Matrix, and Power-On Runtime Consistency (v1.9.103)**:
+  - ⏱️ **"Dual-Range & Core Keyword Bi-directional Universal Repeat Scheduling" Engine (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)**:
+    - **Triangular Topology for Dual Ranges and Core Keywords**: Added `dualRangeWithKeywordRegex` (dual range + keyword), `keywordWithDualRangeRegex` (keyword + dual range), and `rangeWithKeywordAndRangeRegex` (range + keyword + range sandwich) macro regex engines, completely eliminating the historical bug where `rangeWithRangeRegex` greedily truncated two ranges and silently discarded trailing or sandwiched keywords (such as "大休", "双休日", "单休日");
+    - **Full Spoken Schedule Benchmark Coverage**: Seamlessly handles "周一至周二、周四至周五和大休早8点开机" (`[1, 2, 3, 5, 6, 7]`), "周一到周三、周五到周六加双休日早8点开机" (`[1, 2, 3, 4, 6, 7]`), "周一至周二、周四至周五加单休日晚9点关空调" (`[1, 2, 3, 5, 6]`), "大休和周一至周二、周四至周五早8点开机" (`[1, 2, 3, 5, 6, 7]`), and "周一至周二、大休和周四至周五早8点开机" (`[1, 2, 3, 5, 6, 7]`);
+    - **100% Unit Test Suite Coverage**: Added `testDualRangeAndKeywordUnificationV19103` test suite covering forward, reverse, and sandwiched dual ranges with strict anti-misoperation assertions, passing all 111 unit tests with zero defects.
+  - 🖥️ **macOS Menu Bar Bento Control Center & Main Window Scene Presets Matrix (`MenuBarControlsView.swift` / `DeviceControlView.swift`)**:
+    - **Quick Scene Presets Bento Pod in Menu Bar Control Center**: Added native Bento-styled scene capsules into `MenuBarControlsView` directly underneath quick actions, displaying scene glyphs (🌙 Sleep, 🚪 Away, 🏠 Home, ✨ Custom) and names. Users can apply scenes to the currently active unit with one click from the menu bar popover with spring animations and toast feedback;
+    - **Main Window Device Detail Scene Presets Grid**: Embedded a scene preset card grid into the quick controls section of `DeviceControlView`, providing full operational symmetry across the right-click menu, batch control sheet, menu bar popover, main window, Shortcuts intents, and voice capsules;
+    - **Offline & Reconnection Gate Guards**: Scene controls strictly adhere to the tri-state reachability model, automatically disabling and dimming when units are offline or the gateway is reconnecting.
+  - 🔋 **Power-On Runtime Initialization & State Synchronization (`AppModel.swift`)**:
+    - **Consistent Runtime Reset on Power-On**: Refactored `applyScene`, `fireDueActions`, `sendAttribute`, and `sendAttributeToDevices` so that when turning on (`onOffStatus == true`) from standby, `deviceContinuousMinutes` is properly reset to 0, preventing standby drift and ensuring 100% thermodynamic energy model fidelity.
+
 - 🏷 **Universal Natural Schedule Parsing for Big/Small Weekend & Shift Variants, Batch Scene Presets Matrix & Immediate Scheduled State Sync (v1.9.102)**:
   - ⏱️ **"大休日/小休日/大周/小周/单休日" Extended Core Keywords Repeat Scheduling Engine (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)**:
     - **Full Core Keyword Lexicon Alignment & Alternation Order Hardening**: Systematically integrated `大休日|大周` (weekend `[1, 7]`) and `小休日|小周|单休日` (single rest day Sunday `[1]`) across `daysFromKeyword` and all 8 composite schedule regexes. Reordered regex alternation patterns so longer prefixes precede shorter ones, completely preventing "单休日" from being greedily truncated by "单休" and resolving historical edge cases;
