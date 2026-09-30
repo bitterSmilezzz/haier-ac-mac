@@ -6,6 +6,18 @@ A native SwiftUI app to control Haier / Leader (统帅) smart air conditioners o
 
 ## Features
 
+- 🏷 **Morning & Midnight Phase Unified Engine, Full Non-Immediate Power Protection & Inverter Continuous Thermodynamic Damping Refactor (v1.9.85)**:
+  - ⏱️ **Colloquial Morning & Midnight Phase Scheduling & Accidental Power Protection (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)**:
+    - **Morning & Classical Midnight Spoken Phase Lexicon Closure (今晨 / 明晨 / 每晨 / 次晨 / 翌晨 / 夜半)**: Deeply supported casual colloquial terms without explicit hours, canonicalizing "今晨" (this morning), "明晨" (tomorrow morning), "每晨" (every morning), "次晨" (next morning), and "翌晨" (next morning) to 07:00; and "夜半" (classical midnight) to 00:00 (e.g., "今晨关空调", "明晨关空调", "明晨开机", "每晨关空调", "次晨关空调", "翌晨开机", "夜半关空调", "夜半开机");
+    - **Eliminated Critical Accidental Immediate Shutdown/Startup Defects (`hasTimingOrCountdownIntent` / `hasTimePhase`)**: Rectified guard predicates that previously omitted morning and midnight keywords, which caused phrases like "明晨关空调" or "夜半开机" to fail timing intent detection and accidentally trigger immediate power off / on;
+    - **Spoken Half-Hour Normalization Pipeline**: Added "今晨半" (07:30), "明晨半" (07:30), "每晨半" (07:30), "次晨半" (07:30), "翌晨半" (07:30), "每早半" (07:30), "每晚半" (21:30), and "夜半半" (00:30) to `convertChineseNumbers`, completing full colloquial time normalization;
+    - **Midnight Clock Disambiguation & Time Zone Calibration**: Integrated "夜半" into `isNightMidnight` ("夜半12点" = 00:00) and `isNocturnal` ("夜半1点" = 01:00, "夜半10点" = 22:00), ensuring accurate 24-hour conversion;
+    - **Next-Day Cross-Date Schedule Alignment (`VoiceCapsuleWindowController.swift`)**: Extended `isExplicitTomorrow` across single and multi-device pipelines to cover "明晨", "次晨", and "翌晨", preventing daylight cross-day scheduling from accidentally firing today;
+    - **100% Unit Test Coverage**: Added comprehensive test cases in `VoiceCommandParserTests.swift` covering single, repeating, and half-hour morning/midnight schedules along with strict anti-misoperation assertions.
+  - ⚡️ **Inverter Compressor Constant-Temp Equilibrium Zone $C^0$ Continuous Damping Refactor (`EnergyAnalyticsEngine.swift`)**:
+    - **Eliminated $\Delta T = 1.0^\circ\text{C}$ Power Step Discontinuity**: In `estimateInstantaneousPower`, previously when transitioning from the near-equilibrium zone ($0 < \Delta T < 1.0^\circ\text{C}$) to the heavy-load zone ($\Delta T \ge 1.0^\circ\text{C}$), fan offset weight (0.8) and humidity compensation weight (0.7) jumped to 1.0 at $\Delta T = 1.0^\circ\text{C}$, creating an artificial step discontinuity of up to 36W;
+    - **Bilinear Thermodynamic Continuous Dynamic Interpolation**: Refactored transition formulas across cooling, heating, and auto modes in $0 < \Delta T < 1.0^\circ\text{C}$ with `windFactor = 0.6 + delta * 0.4` and `humFactor = 0.4 + delta * 0.6`, ensuring left limit strictly equals right limit across boundaries for true physical $C^0$ continuity.
+
 - 🏷 **Nocturnal & Overnight Full Phase Unified Engine, Anti-Accidental Power Protection & Refined Status Bar Fan Speed Perception (v1.9.84)**:
   - ⏱️ **Colloquial Night & Next-Day Phase Scheduling & Instant Power Protection (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)**:
     - **Nocturnal & Overnight Lexicon Closure (今夜 / 明夜 / 每夜 / 整夜 / 彻夜 / 隔夜 / 后夜 / 隔日 / 翌日)**: Deeply supported casual spoken terms without explicit hours, canonicalizing "今夜" (tonight), "明夜" (tomorrow night), and "每夜" (every night) to 21:00; "整夜" (all night), "彻夜" (through the night), and "隔夜" (overnight) to 23:00; "后夜" (latter part of night) to 02:00; and "隔日" / "翌日" (next day) to 08:00 (e.g., "今夜关空调", "明夜关机", "整夜开机", "后夜关机", "隔日关空调", "翌日开机");

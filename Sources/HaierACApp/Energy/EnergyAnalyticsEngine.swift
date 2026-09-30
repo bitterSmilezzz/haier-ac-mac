@@ -400,8 +400,10 @@ public final class EnergyAnalyticsEngine: ObservableObject {
                 // 已达到或高于设定温度：压缩机进入超节能恒温维持态
                 power = 300.0 + (windOffset * 0.6) + (heatHumComp * 0.4)
             } else if delta < 1.0 {
-                // 接近目标温差 (0 < ΔT < 1.0°C)：平滑过渡至稳态低频
-                power = 300.0 + (delta * 250.0) + (windOffset * 0.8) + (heatHumComp * 0.7)
+                // 接近目标温差 (0 < ΔT < 1.0°C)：平滑过渡至稳态低频 (v1.9.85 变频连续热阻尼动态插值，彻底消除 1.0°C 阶跃断崖)
+                let windFactor = 0.6 + (delta * 0.4)
+                let humFactor = 0.4 + (delta * 0.6)
+                power = 300.0 + (delta * 250.0) + (windOffset * windFactor) + (heatHumComp * humFactor)
             } else {
                 // 严寒低温速热热力补偿：当室内温度偏低（indoor <= 17.0°C）且大温差升温（delta >= 4.0°C）时，
                 // 拟真变频空调自动启动 PTC 辅助加热与大压比高频超载运转；
@@ -448,8 +450,10 @@ public final class EnergyAnalyticsEngine: ObservableObject {
                 // 已达到或低于设定温度：压缩机进入超节能恒温维持态
                 power = 220.0 + (windOffset * 0.6) + (latentHumComp * 0.4)
             } else if delta < 1.0 {
-                // 接近目标温差 (0 < ΔT < 1.0°C)：平滑过渡至稳态低频
-                power = 220.0 + (delta * 160.0) + (windOffset * 0.8) + (latentHumComp * 0.7)
+                // 接近目标温差 (0 < ΔT < 1.0°C)：平滑过渡至稳态低频 (v1.9.85 变频连续热阻尼动态插值，彻底消除 1.0°C 阶跃断崖)
+                let windFactor = 0.6 + (delta * 0.4)
+                let humFactor = 0.4 + (delta * 0.6)
+                power = 220.0 + (delta * 160.0) + (windOffset * windFactor) + (latentHumComp * humFactor)
             } else {
                 // 变频重载降温区 (ΔT >= 1.0°C)
                 // 酷暑高温大温差超载动力学补偿：当室内温度偏高（indoor >= 28.0°C）且大温差降温（delta >= 4.0°C）时，
@@ -492,7 +496,9 @@ public final class EnergyAnalyticsEngine: ObservableObject {
                 if delta <= 0.0 {
                     power = 220.0 + (windOffset * 0.6) + (latentHumComp * 0.4)
                 } else if delta < 1.0 {
-                    power = 220.0 + (delta * 160.0) + (windOffset * 0.8) + (latentHumComp * 0.7)
+                    let windFactor = 0.6 + (delta * 0.4)
+                    let humFactor = 0.4 + (delta * 0.6)
+                    power = 220.0 + (delta * 160.0) + (windOffset * windFactor) + (latentHumComp * humFactor)
                 } else {
                     // 酷暑极端高温与冷凝器恶化超频动力学补偿 (v1.9.62 双线性平滑过渡)
                     let heatBoost: Double = {
@@ -527,7 +533,9 @@ public final class EnergyAnalyticsEngine: ObservableObject {
                 if delta <= 0.0 {
                     power = 300.0 + (windOffset * 0.6) + (heatHumOffset * 0.4)
                 } else if delta < 1.0 {
-                    power = 300.0 + (delta * 250.0) + (windOffset * 0.8) + (heatHumOffset * 0.7)
+                    let windFactor = 0.6 + (delta * 0.4)
+                    let humFactor = 0.4 + (delta * 0.6)
+                    power = 300.0 + (delta * 250.0) + (windOffset * windFactor) + (heatHumOffset * humFactor)
                 } else {
                     // 严寒低温大温差 PTC 电辅热与大压比高频超载运转补偿 (v1.9.62 双线性平滑过渡)
                     let coldBoost: Double = {
