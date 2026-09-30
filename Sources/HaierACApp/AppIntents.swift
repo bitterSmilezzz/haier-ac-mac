@@ -92,15 +92,28 @@ struct SetACTemperatureIntent: AppIntent {
     @Parameter(title: "温度（°C）", default: 26.0)
     var temperature: Double
 
-    @Parameter(title: "设备名称", description: "可选；留空使用第一台设备")
+    @Parameter(title: "设备名称", description: "可选；留空使用主设备，填“全屋”或“全部”统一设置所有设备")
     var deviceName: String?
 
     @MainActor
     func perform() async throws -> some IntentResult & ProvidesDialog {
-        let deviceId = try requireGatewayAndDevice(deviceName)
-        AppModel.shared.sendAttribute("targetTemperature", value: .double(temperature), deviceId: deviceId)
+        let model = AppModel.shared
+        guard model.gatewayConnected else {
+            throw ACIntentError.message("空调连接中断，请稍后重试")
+        }
+        let isAll = (deviceName?.contains("全") == true) || (deviceName?.contains("所有") == true)
         let tempStr = temperature.truncatingRemainder(dividingBy: 1.0) == 0 ? "\(Int(temperature))" : String(format: "%.1f", temperature)
-        return .result(dialog: "已将温度设置为 \(tempStr) 度")
+        if isAll {
+            let count = model.setTemperatureAll(temperature: temperature)
+            guard count > 0 else {
+                throw ACIntentError.message("未能完成全屋调温，当前无可用在线空调")
+            }
+            return .result(dialog: "已将全屋 \(count) 台空调温度统一设为 \(tempStr) 度")
+        }
+        let deviceId = try requireGatewayAndDevice(deviceName)
+        model.sendAttribute("targetTemperature", value: .double(temperature), deviceId: deviceId)
+        let devName = model.deviceName(for: deviceId)
+        return .result(dialog: "已将「\(devName)」温度设置为 \(tempStr) 度")
     }
 }
 
@@ -169,24 +182,33 @@ struct SetACModeIntent: AppIntent {
     static var title: LocalizedStringResource = "设置空调模式"
     static var description = IntentDescription("设置海尔空调的运行模式（制冷/制热/送风等）", categoryName: "空调控制")
 
-    @Parameter(title: "模式", description: "如：制冷、制热、自动、送风")
+    @Parameter(title: "模式", description: "如：制冷、制热、自动、送风、除湿")
     var mode: String
 
-    @Parameter(title: "设备名称", description: "可选；留空使用第一台设备")
+    @Parameter(title: "设备名称", description: "可选；留空使用主设备，填“全屋”或“全部”统一设置所有设备")
     var deviceName: String?
 
     @MainActor
     func perform() async throws -> some IntentResult & ProvidesDialog {
-        let deviceId = try requireGatewayAndDevice(deviceName)
-        // 在数字模型中查找与用户输入匹配的模式选项
-        let attrs = AppModel.shared.attributes[deviceId] ?? [:]
-        guard let modeAttr = attrs["operationMode"],
-              case .list(let options) = modeAttr.valueRange,
-              let match = options.first(where: { $0.desc.contains(mode) || mode.contains($0.desc) }) else {
-            throw ACIntentError.message("该设备不支持模式「\(mode)」")
+        let model = AppModel.shared
+        guard model.gatewayConnected else {
+            throw ACIntentError.message("空调连接中断，请稍后重试")
         }
-        AppModel.shared.sendAttribute("operationMode", value: match.data, deviceId: deviceId)
-        return .result(dialog: "已切换到\(match.desc)模式")
+        guard let matched = ACModeCode.match(from: mode) else {
+            throw ACIntentError.message("未能识别模式「\(mode)」")
+        }
+        let isAll = (deviceName?.contains("全") == true) || (deviceName?.contains("所有") == true)
+        if isAll {
+            let count = model.setModeAll(mode: matched)
+            guard count > 0 else {
+                throw ACIntentError.message("未能完成全屋模式切换，当前无可用在线空调")
+            }
+            return .result(dialog: "已将全屋 \(count) 台空调统一切换为「\(matched.desc)」模式")
+        }
+        let deviceId = try requireGatewayAndDevice(deviceName)
+        model.sendAttribute("operationMode", value: .string(matched.rawValue), deviceId: deviceId)
+        let devName = model.deviceName(for: deviceId)
+        return .result(dialog: "已将「\(devName)」切换为「\(matched.desc)」模式")
     }
 }
 
@@ -276,12 +298,34 @@ struct GetACTemperatureIntent: AppIntent {
     static var title: LocalizedStringResource = "查询空调温度"
     static var description = IntentDescription("查询空调当前室内温度", categoryName: "空调控制")
 
-    @Parameter(title: "设备名称", description: "可选；留空使用第一台设备")
+    @Parameter(title: "设备名称", description: "可选；留空使用主设备，填“全屋”或“全部”查询全屋室温")
     var deviceName: String?
 
     @MainActor
     func perform() async throws -> some IntentResult & ProvidesDialog {
         let model = AppModel.shared
+        let isAll = (deviceName?.contains("全") == true) || (deviceName?.contains("所有") == true)
+        if isAll {
+            let all = model.allUnifiedDevices
+            var temps: [Double] = []
+            var summaries: [String] = []
+            for dev in all {
+                if let attr = AppModel.indoorTemperatureAttribute(in: model.attributes[dev.id] ?? [:]),
+                   let temp = attr.doubleValue {
+                    temps.append(temp)
+                    let tempStr = temp.truncatingRemainder(dividingBy: 1.0) == 0 ? "\(Int(temp))°C" : String(format: "%.1f°C", temp)
+                    summaries.append("「\(dev.name)」\(tempStr)")
+                }
+            }
+            guard !temps.isEmpty else {
+                throw ACIntentError.message("暂未获取到全屋空调室内温度数据")
+            }
+            let avg = temps.reduce(0.0, +) / Double(temps.count)
+            let avgStr = String(format: "%.1f°C", avg)
+            let dialog = "全屋平均室温 \(avgStr)（" + summaries.joined(separator: "、") + "）"
+            return .result(value: avgStr, dialog: IntentDialog(stringLiteral: dialog))
+        }
+
         guard let deviceId = resolveDeviceId(named: deviceName) else {
             throw ACIntentError.message("没有可控制的空调设备")
         }
@@ -290,7 +334,7 @@ struct GetACTemperatureIntent: AppIntent {
             throw ACIntentError.message("暂未获取到室内温度")
         }
         let name = model.deviceName(for: deviceId)
-        let text = String(format: "%.0f°", temp)
+        let text = temp.truncatingRemainder(dividingBy: 1.0) == 0 ? "\(Int(temp))°C" : String(format: "%.1f°C", temp)
         return .result(value: text, dialog: "\(name)当前室内温度 \(text)")
     }
 }
@@ -434,18 +478,45 @@ struct StopSelfCleaningIntent: AppIntent {
     }
 }
 
-// MARK: - 查询滤网健康度 (v1.9.44)
+// MARK: - 查询滤网健康度 (v1.9.44, v1.9.93 全屋看板支持)
 
 struct GetFilterHealthIntent: AppIntent {
     static var title: LocalizedStringResource = "查询滤网健康度"
     static var description = IntentDescription("查询空调滤网洁净度与保养健康状态", categoryName: "空调控制")
 
-    @Parameter(title: "设备名称", description: "可选；留空使用当前主设备或第一台设备")
+    @Parameter(title: "设备名称", description: "可选；留空使用当前主设备或第一台设备，填“全屋”或“所有”查询所有设备")
     var deviceName: String?
 
     @MainActor
     func perform() async throws -> some IntentResult & ProvidesDialog {
         let model = AppModel.shared
+        let isAll = (deviceName?.contains("全") == true) || (deviceName?.contains("所有") == true)
+        if isAll {
+            let devices = model.allUnifiedDevices
+            guard !devices.isEmpty else {
+                throw ACIntentError.message("没有可控制的空调设备")
+            }
+            var needService: [String] = []
+            var summaries: [String] = []
+            var totalPct = 0
+            for dev in devices {
+                let pct = model.filterCleanlinessPercentage(for: dev.id)
+                totalPct += pct
+                let hours = Double(model.filterAccumulatedMinutes(for: dev.id)) / 60.0
+                let hoursStr = String(format: "%.1f", hours)
+                summaries.append("「\(dev.name)」\(pct)%(\(hoursStr)h)")
+                if pct <= 20 {
+                    needService.append(dev.name)
+                }
+            }
+            let avgPct = totalPct / devices.count
+            let advice = needService.isEmpty
+                ? "全屋滤网状态均良好"
+                : "注意：\(needService.joined(separator: "、"))建议及时清洗"
+            let dialog = "全屋 \(devices.count) 台空调平均滤网洁净度 \(avgPct)%（\(summaries.joined(separator: "、"))），\(advice)"
+            return .result(dialog: IntentDialog(stringLiteral: dialog))
+        }
+
         guard let deviceId = resolveDeviceId(named: deviceName) else {
             throw ACIntentError.message("没有可控制的空调设备")
         }

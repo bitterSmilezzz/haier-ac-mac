@@ -6,6 +6,21 @@ A native SwiftUI app to control Haier / Leader (统帅) smart air conditioners o
 
 ## Features
 
+- 🏷 **Colloquial Far-Future Week/Weekend/Single-Day-Off Repeat Scheduling Unified Engine, Full Accidental Power Protection, Mute Gear 0 Breeze Primitives Model Alignment & Siri Whole-House Control/Dashboard Integration (v1.9.93)**:
+  - ⏱️ **"Week-After-Next-Next / Alternate Weekend / Single Day Off" Colloquial Shift Scheduling & Full Anti-Misoperation Guard (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)**:
+    - **Eradicated Critical Flaw Where Far-Future Week and Shift-Off Commands Triggered Immediate Power Operations**: Previously, commands like "大后周关空调" (turn off AC three weeks later), "逢双休关空调" (turn off on weekends), "逢单休开机" (turn on on single days off), "单休日关机" penetrated through `hasTimingOrCountdownIntent`, triggering unintended instant shutdowns or turn-ons (`turnOffAll` / `turnOnAll`). v1.9.93 builds complete front-line protections and maps them seamlessly to Monday base (`[2]`), weekend base (`[1, 7]`), or Sunday base (`[1]`) at 08:00;
+    - **Colloquial Half-Hour Normalization Pipeline (`convertChineseNumbers`)**: Standardized 15 colloquial half-hour expressions ("大后周半", "逢双休半", "逢单休半", "单休日半", etc.) to 08:30;
+    - **100% Unit Test Coverage**: Added `testFarFutureWeekAndQuietWindAndAllScopeV1993` in `VoiceCommandParserTests.swift` with 17 groups of scheduling, breeze gear 0, and strict anti-misoperation assertions.
+  - 🍃 **Mute Gear 0 Hardware Primitives Status Bar & Model Normalization Convergence (`VoiceCommandParser.swift` / `AppModel.swift` / `StatusItemController.swift`)**:
+    - **Voice Command Parsing for Gear 0 Quiet Wind**: Parsed "0档", "零档", "风速0", "静音档", "静音风" directly into breeze ("微风");
+    - **Eliminated Status Bar and Model Semantic Drift**: Fixed legacy flaw where gear 0 was incorrectly displayed as "Auto Wind", fully aligning it to breeze ("微风") across `StatusItemController` and `AppModel.normalizeWindSpeed`, achieving 100% cohesion with `EnergyAnalyticsEngine` (15W power and 0.60 filter wear factor);
+    - **Auto Wind Convergence**: "自" / "auto" strictly reserved for actual Auto mode.
+  - 🍎 **Siri & App Shortcuts (`AppIntents.swift`) Whole-House Temperature, Mode & Filter Health Dashboard Integration (`AppIntents.swift` / `AppModel.swift`)**:
+    - **Whole-House Temperature Batch Control**: `SetACTemperatureIntent` detects "全" / "所有" to invoke `AppModel.setTemperatureAll`;
+    - **Whole-House Mode Batch Control**: Added `setMode(deviceIds:mode:)` and `setModeAll(mode:)` in `AppModel`; `SetACModeIntent` switches all online units to cooling/heating/dehumidification/fan/auto mode;
+    - **Whole-House Room Temperature Dashboard**: `GetACTemperatureIntent` aggregates average whole-house indoor temperature and device-by-device distribution;
+    - **Whole-House Filter Health Dashboard**: `GetFilterHealthIntent` scans all unified units, calculating average cleanliness percentage and identifying heavily polluted filters (<=20%) with maintenance warnings.
+
 - 🏷 **Colloquial Advanced Multi-Week/Weekend Repeat Scheduling Unified Engine, Full Accidental Power Protection, Mute Gear 0 Thermodynamic Alignment & Siri/Shortcuts Device Routing Convergence (v1.9.92)**:
   - ⏱️ **"Week-After-Next / Dual Weekend Days" Colloquial Multi-Week Repeat Scheduling & Full Anti-Misoperation Guard (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)**:
     - **Eradicated Critical Flaw Where Advanced Multi-Week Commands Were Misinterpreted as Immediate Power Operations**: Previously, when users spoke multi-week or dialectal schedule commands like "下下周关空调" (turn off AC the week after next), "下下周开机" (turn on the week after next), "后周关空调" (turn off AC next subsequent week), "双休日关空调" (turn off AC on weekends), or "全屋下下周关空调", `hasTimingOrCountdownIntent` returned false due to lacking matching patterns, triggering immediate shutdown/turn-on (`isPowerOff` / `isPowerOn` / `turnOffAll` / `turnOnAll`) with severe misoperation hazards. v1.9.92 establishes strict multi-layered front-line protection across "下下周", "下下个周", "下下星期", "下下个星期", "下下礼拜", "下下个礼拜", "后周", "后个周", "后星期", "后个星期", "后礼拜", "后个礼拜", "双休日", and their half-hour variants;

@@ -305,9 +305,7 @@ final class StatusItemController: NSObject {
 
     private func formatDisplayWindSpeed(_ raw: String?) -> String {
         guard let raw = raw?.lowercased() else { return "自动风" }
-        if raw.contains("自") || raw.contains("auto") || raw == "0" || raw == "零" ||
-           raw.contains("level_0") || raw.contains("level0") || raw.contains("speed0") || raw.contains("speed_0") ||
-           raw.contains("gear_0") || raw.contains("gear0") {
+        if raw.contains("自") || raw.contains("auto") {
             return "自动风"
         }
         if raw.contains("暴") || raw.contains("5档") || raw.contains("五档") || raw == "5" ||
@@ -340,7 +338,10 @@ final class StatusItemController: NSObject {
            raw.contains("gear_1") || raw.contains("gear1") {
             return "低风"
         }
-        if raw.contains("微") || raw.contains("静") || raw.contains("quiet") || raw.contains("mute") || raw.contains("micro") || raw.contains("柔") {
+        if raw.contains("微") || raw.contains("静") || raw.contains("quiet") || raw.contains("mute") || raw.contains("micro") || raw.contains("柔") ||
+           raw.contains("0档") || raw.contains("零档") || raw == "0" || raw == "零" ||
+           raw.contains("level0") || raw.contains("level_0") || raw.contains("speed0") || raw.contains("speed_0") ||
+           raw.contains("gear0") || raw.contains("gear_0") {
             return "微风"
         }
         return "自动风"

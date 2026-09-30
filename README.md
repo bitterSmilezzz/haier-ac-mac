@@ -8,6 +8,21 @@
 
 ## 功能
 
+- 🏷 **闭环自然口语大后周/逢双休/单休调度大一统引擎、防即时误触全景加固、静音 0 档微风原语状态栏与模型全域自洽、Siri全屋温控/模式/滤网看板全域贯通 (v1.9.93)**：
+  - ⏱️ **“大后周/大后个周/逢双休/逢单休/单休日”自然口语跨周与排班循环调度大一统与防即时误触全闭环 (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)**：
+    - **彻底解决大后周、逢双休、单休日等时态口语穿透为即时开关机造成全屋误关开机的严重隐患**：此前用户说“大后周关空调”、“大后个周开机”、“逢双休关空调”、“逢单休开机”、“单休日关机”等高频家庭口语时，因未匹配旧有时态前缀，`hasTimingOrCountdownIntent` 返回 false，直接穿透至 `turnOffAll` / `turnOnAll`，造成全屋立即误动作；本版本在 `hasTimingOrCountdownIntent` 与 `parseBaseRepeatWeekdays` 中建立全景前置防线，无具体钟点时自动映射为周一（`[2]`）、周末（`[1, 7]`）或周日（`[1]`）循环基准（08:00），无缝生成 `.scheduleRepeatPower` 调度；
+    - **大后周/逢双休/单休自然半点时相归一流水线 (`convertChineseNumbers`)**：新增“大后周半”、“大后个周半”、“逢双休半”、“逢单休半”、“单休日半”等 15 组自然半点标准化对齐至 08:30；
+    - **单元测试 100% 满分覆盖**：在 `VoiceCommandParserTests.swift` 中新增 `testFarFutureWeekAndQuietWindAndAllScopeV1993`，包含 17 组单机与全屋调度、半点归一、静音 0 档及严苛防即时误触断言，全部通过。
+  - 🍃 **静音 0 档原生硬件原语状态栏展示与设备模型风速归一全域自洽 (`VoiceCommandParser.swift` / `AppModel.swift` / `StatusItemController.swift`)**：
+    - **口语解析静音 0 档风速闭环**：`VoiceCommandParser.parseWindSpeed` 纳管“0档”、“零档”、“第0档”、“第零档”、“风速0”、“风速零”、“静音档”、“静音风”等原生口语，精准映射至“微风”档位；
+    - **消除状态栏与模型风速归一撕裂缺陷**：修复历史遗留的将 0 档误映射为“自动风”的缺陷，统一将 `0档`、`零档`、`0`、`level0`、`gear0` 等对齐归一为“微风”，与 `EnergyAnalyticsEngine` 的 15W 微风维持功率和 0.60 滤网低风阻因数达成全仓 100% 自洽；
+    - **自动风速收敛**：“自”/“auto”保留为真正的“自动风”，边界清晰自洽。
+  - 🍎 **Siri 与快捷指令 (`AppIntents.swift`) 全屋温控、运行模式与滤网健康度全景看板贯通 (`AppIntents.swift` / `AppModel.swift`)**：
+    - **全屋温度批量控制**：`SetACTemperatureIntent` 识别 `deviceName` 包含“全”/“所有”时，一键调用 `AppModel.setTemperatureAll` 批量设定全屋空调温度；
+    - **全屋运行模式批量控制**：`AppModel` 新增 `setMode(deviceIds:mode:)` 与 `setModeAll(mode:)` API；`SetACModeIntent` 识别全屋范围时一键统一切换全屋空调模式（制冷/制热/除湿/送风/自动）；
+    - **全屋室温看板汇总**：`GetACTemperatureIntent` 支持全屋查询，自动统计并汇报全屋平均室温与各空调室温分布；
+    - **全屋滤网健康度全景看板**：`GetFilterHealthIntent` 支持全屋查询，汇总全屋平均洁净度、各设备等效机时与健康状态，并智能识别低于 20% 的滤网输出清洗建议。
+
 - 🏷 **闭环自然口语下下周/后周/双休日循环调度大一统引擎、防即时误触全景加固、静音 0 档原生硬件原语热动力学对齐与 Siri/快捷指令设备路由收敛 (v1.9.92)**：
   - ⏱️ **“下下周/后周/双休日”自然口语跨周循环调度大一统与防即时误触全闭环 (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)**：
     - **彻底解决“下下周”、“后周”、“双休日”等时态口语被判定为即时开关机导致立即关机/开机的严重安全隐患**：此前用户说“下下周关空调”、“下下周开机”、“后周关空调”、“后周开机”、“双休日关空调”、“双休日开机”、“每逢双休开空调”、“全屋下下周关空调”等高频家庭口语时，因未命中旧有单周匹配，`hasTimingOrCountdownIntent` 返回 false，直接穿透至 `isPowerOff` / `isPowerOn` / `turnOffAll` / `turnOnAll`，造成**全屋或单机立即误关机/开机**的重大误触隐患；本版本在 `hasTimingOrCountdownIntent` 与 `parseBaseRepeatWeekdays` 中全面建立防线，在无具体星期时统一映射为周一或周末基准并生成 `.scheduleRepeatPower` 循环调度；

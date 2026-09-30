@@ -3382,22 +3382,53 @@ final class AppModel: ObservableObject {
         return controllableIds.count
     }
 
+    /// 批量/全屋运行模式切换：将目标设备集（若为 nil 则默认全屋）中所有可控空调设置为指定运行模式 (v1.9.93)
+    @discardableResult
+    public func setMode(deviceIds: [String]? = nil, mode: ACModeCode) -> Int {
+        let targets = deviceIds ?? allUnifiedDevices.map(\.id)
+        let allIds = Set(allUnifiedDevices.map(\.id))
+        let isAll = (deviceIds == nil) || (!allIds.isEmpty && Set(targets).isSuperset(of: allIds))
+        let controllableIds = targets.filter { reachability(for: $0).isControllable }
+        guard !controllableIds.isEmpty else {
+            let desc = isAll ? "⚠️ 当前无任何可控的在线空调设备" : "⚠️ 所选设备当前均不可控或离线"
+            operationNotice = OperationNotice(text: desc, isError: true)
+            return 0
+        }
+        let standbyIds = controllableIds.filter { attribute("onOffStatus", deviceId: $0)?.boolValue != true }
+        if !standbyIds.isEmpty {
+            sendAttributeToDevices("onOffStatus", value: .bool(true), deviceIds: standbyIds)
+        }
+        sendAttributeToDevices("operationMode", value: .string(mode.rawValue), deviceIds: controllableIds)
+        let desc = isAll
+            ? "✅ 已将全屋 \(controllableIds.count) 台空调模式统一设为「\(mode.desc)」"
+            : "✅ 已将所选 \(controllableIds.count) 台空调模式统一设为「\(mode.desc)」"
+        operationNotice = OperationNotice(text: desc, isError: false)
+        return controllableIds.count
+    }
+
+    /// 全屋一键运行模式切换 (v1.9.93)
+    @discardableResult
+    public func setModeAll(mode: ACModeCode) -> Int {
+        return setMode(deviceIds: nil, mode: mode)
+    }
+
     /// 全屋一键绝对温度设定 (v1.9.35)
     @discardableResult
     public func setTemperatureAll(temperature: Double) -> Int {
         return setTemperature(deviceIds: nil, temperature: temperature)
     }
 
-    /// 归一化风速标准名称 (v1.9.47 支持一至四档/1~4档/低中高极速/静音等全量别名, v1.9.81 补齐 4 档/5 档/暴风全量映射, v1.9.82 提炼公共标准化函数, v1.9.87 支持 level/speed 设备原语与全量英文枚举, v1.9.88 闭环 gear 设备原语与全风量矩阵, v1.9.89 纳管 gear0/level0/speed0 原生硬件自动风原语)
+    /// 归一化风速标准名称 (v1.9.47 支持一至四档/1~4档/低中高极速/静音等全量别名, v1.9.81 补齐 4 档/5 档/暴风全量映射, v1.9.82 提炼公共标准化函数, v1.9.87 支持 level/speed 设备原语与全量英文枚举, v1.9.88 闭环 gear 设备原语与全风量矩阵, v1.9.93 闭环静音 0 档与微风对齐)
     public static func normalizeWindSpeed(_ speedName: String) -> String {
         let speed = speedName.lowercased()
-        if speed.contains("自") || speed.contains("auto") || speed == "0" || speed == "零" ||
-           speed.contains("level0") || speed.contains("level_0") || speed.contains("speed0") || speed.contains("speed_0") ||
-           speed.contains("gear0") || speed.contains("gear_0") {
+        if speed.contains("自") || speed.contains("auto") {
             return "自动"
         }
         if speed.contains("微") || speed.contains("低") || speed.contains("静") ||
            speed.contains("柔") || speed.contains("小") || speed.contains("1") || speed.contains("一") ||
+           speed.contains("0档") || speed.contains("零档") || speed == "0" || speed == "零" ||
+           speed.contains("level0") || speed.contains("level_0") || speed.contains("speed0") || speed.contains("speed_0") ||
+           speed.contains("gear0") || speed.contains("gear_0") ||
            speed.contains("level1") || speed.contains("level_1") || speed.contains("speed1") || speed.contains("speed_1") ||
            speed.contains("gear1") || speed.contains("gear_1") || speed.contains("quiet") || speed.contains("mute") {
             return "微风"
