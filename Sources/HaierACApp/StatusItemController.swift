@@ -582,8 +582,8 @@ final class StatusItemController: NSObject {
                 return modes.count == 1 ? modes.first : nil
             }()
 
-            let modeRunningDesc = !onDevices.isEmpty ? (allOnSameMode != nil ? " (\(onDevices.count)台运行中 · 当前\(allOnSameMode!.desc))" : " (\(onDevices.count)台运行中 · 模式不同)") : " (当前均未开机)"
-            let canSetModeAll = model.gatewayConnected && !onDevices.isEmpty
+            let modeRunningDesc = !onDevices.isEmpty ? (allOnSameMode != nil ? " (\(onDevices.count)台运行中 · 当前\(allOnSameMode!.desc))" : " (\(onDevices.count)台运行中 · 模式不同)") : " (全屋待机中 · 点击开启模式)"
+            let canSetModeAll = model.gatewayConnected && !controllableDevices.isEmpty
 
             for itemDef in modeLevels {
                 let isSelected = (allOnSameMode == itemDef.code)
@@ -593,7 +593,13 @@ final class StatusItemController: NSObject {
                 item.representedObject = itemDef.code.rawValue
                 item.isEnabled = canSetModeAll
                 if onDevices.isEmpty {
-                    item.toolTip = "当前全屋无运行中的空调，请先开启空调后再协同切换运行模式"
+                    switch itemDef.code {
+                    case .cooling: item.toolTip = "一键开启全屋 \(controllableDevices.count) 台空调并设为制冷模式，保持当前设定温度"
+                    case .heating: item.toolTip = "一键开启全屋 \(controllableDevices.count) 台空调并设为制热模式，保持当前设定温度"
+                    case .dehumidify: item.toolTip = "一键开启全屋 \(controllableDevices.count) 台空调并设为除湿模式，降低室内湿度"
+                    case .fan: item.toolTip = "一键开启全屋 \(controllableDevices.count) 台空调并设为送风模式，促进室内空气流通"
+                    case .auto: item.toolTip = "一键开启全屋 \(controllableDevices.count) 台空调并设为智能自适应模式"
+                    }
                 } else {
                     switch itemDef.code {
                     case .cooling: item.toolTip = "一键将全屋运行中空调统一设为制冷模式\n受控空调：\(runningNames)"
@@ -606,7 +612,7 @@ final class StatusItemController: NSObject {
                 modeMenu.addItem(item)
             }
             let modeParentItem = NSMenuItem(title: "🔄 全屋模式协同\(modeRunningDesc)...", action: nil, keyEquivalent: "")
-            modeParentItem.toolTip = onDevices.isEmpty ? "当前全屋无运行中的空调" : "统一同步全屋 \(onDevices.count) 台运行中空调的运行模式（制冷/制热/除湿/送风/自动）\n受控设备：\(runningNames)"
+            modeParentItem.toolTip = onDevices.isEmpty ? "全屋空调处于关机待机状态，点击子菜单模式项可一键唤醒开机并切换至目标模式\n可控设备：\(controllableDevices.map { "「\($0.name)」" }.joined(separator: "、"))" : "统一同步全屋 \(onDevices.count) 台运行中空调的运行模式（制冷/制热/除湿/送风/自动）\n受控设备：\(runningNames)"
             menu.setSubmenu(modeMenu, for: modeParentItem)
             menu.addItem(modeParentItem)
 

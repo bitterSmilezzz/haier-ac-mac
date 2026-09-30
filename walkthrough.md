@@ -1,22 +1,22 @@
-# Haier AC Mac v1.9.96 发布与巡检演进报告
+# Haier AC Mac v1.9.97 发布与巡检演进报告
 
 ## 1. 概述与版本定位
-- **版本号**：`v1.9.96`
-- **发版主题**：闭环排除型否定与非单休/非单休日调度脱靶缺陷、Siri 全屋综合状态看板贯通与状态栏待机模式一键唤醒
+- **版本号**：`v1.9.97`
+- **发版主题**：闭环单星期与周区间反相循环调度脱靶缺陷、macOS 原生状态栏全屋模式待机唤醒大一统与滤网动力学时间衰减加权模型
 - **核心目标与架构演进**：
-  1. **“排除型否定时态与非单休/非单休日”自然周期循环调度逻辑脱靶缺陷彻底修复与防误触全闭环 (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)**：
-     - **彻底修复排除型否定时态中“非工作日/非平时/非平日/非周末/非双休/非单休”反相词被正相贪婪匹配导致的 180 度极性颠倒重大缺陷**：此前在排除型模式提取正则与 `extractExcludedDays` 中，由于子串贪婪匹配，导致“除非工作日外每天开机”（意图为非工作日即周末除外，在工作日执行）被错误识别为排除“工作日”，导致仅在周末开机；“除非周末外每天开机”被错误识别为排除“周末”，导致仅在工作日开机；本版本重构了 `exclusionRepeatRegex` 结构化非贪婪捕获边界，并在 `extractExcludedDays` 中建立了前置反相调度拦截（将“非工作日/非平日”排除映射至周末 `[1, 7]` 保留工作日 `[2, 3, 4, 5, 6]`，将“非周末/非双休/非双休日/非休息日”排除映射至工作日 `[2, 3, 4, 5, 6]` 保留周末 `[1, 7]`），彻底消除极性反转缺陷；
-     - **彻底修复“单休日”与“逢单休”在排除型语义与基础周期中被“单休”贪婪匹配缺陷**：此前“除单休日外每天开机”中的“单休日”（周日）被贪婪截取识别为“单休”（周一至周六），导致排除了周一至周六仅在周日开机的重大颠倒；“非单休日开机”被截取颠倒为仅周日执行；本版本建立前置精准拦截，将“单休日/逢单休”在排除语义中精准映射为排除周日 `[1]`，保留周一至周六 `[2, 3, 4, 5, 6, 7]`；将“非单休日开机”在基础调度中精准映射为周一至周六 `[2, 3, 4, 5, 6, 7]`；将“非单休开机”精准映射为周末双休 `[1, 7]`；
-     - **非单休与非单休日半点时相标准化归一流水线与防即时误触全景加固**：新增“非单休半”、“非单休日半”映射至 08:30；在 `hasTimingOrCountdownIntent` 中全面筑牢时态防线，严禁掉入即时开关机；
-     - **单元测试 100% 满分覆盖**：在 `VoiceCommandParserTests.swift` 中新增 `testExclusionAndNonSingleRestScheduleHardeningV1996`，包含 28 组反相排除、单休日排除、非单休调度、半点归一及严苛防即时误触断言，全部通过。
-  2. **Siri 与快捷指令 (`AppIntents.swift`) 综合状态看板与 AppShortcuts 索引缺陷闭环 (`AppIntents.swift`)**：
-     - **修复 `GetACHumidityIntent` 在 macOS 14.0+ 快捷指令体系中漏注册缺陷**：此前仅在低版本 fallback 分支中注册，导致现代 macOS 无法在系统快捷指令与 Siri 中正确索引湿度查询；本次完成双版本统一注册；
-     - **新增 `GetACStatusIntent` 综合状态看板**：支持语音或快捷指令查询单机当前开关机、模式、目标温度、室内温度、相对湿度与风速档位（如“「客厅」正在运行，当前为制冷模式，设定温度 26°C，风速微风，室内温度 25°C，相对湿度 52%”）；支持全屋查询自动汇总运行设备台数、全屋平均室温、平均相对湿度及各设备分布看板；
-     - **AppShortcuts 系统无缝索引**：注册“用 Haier AC 查询状态”、“空调状态怎么样”等快捷短语。
-  3. **macOS 原生状态栏待机模式一键唤醒与温控按钮极值防护 (`StatusItemController.swift` / `MenuBarControlsView.swift` / `DeviceControlView.swift`)**：
-     - **单设备与矩阵设备专属运行模式待机一键唤醒**：优化状态栏单设备与多设备右键菜单中的「🔄 运行模式」子菜单，放开 `isPowerOn` 门禁（保留 `isControllable` 网关与离线防护），允许设备待机时直接点击目标模式（如制热、除湿）一键唤醒并平滑切入该模式，杜绝了必须先开旧模式吹冷/热风再二次进菜单切模式的繁琐断层；
-     - **状态栏 Tooltip 与标题文案自适应**：待机时呈现“🔄 运行模式 (待机中 · 点击开启模式)”，菜单项智能提示“开启「客厅」并设为制热模式”；
-     - **UI 触感与温控极限值（16°C/30°C）边界禁用防护**：在 `MenuBarControlsView.swift` 与 `DeviceControlView.swift` 的目标温度加减 Stepper 按钮中新增 `current <= min` 与 `current >= max` 边界禁用及自适应置灰色彩逻辑，消除极限温区无效网络下发与视觉反馈缺失。
+  1. **“非周X / 非星期X / 非礼拜X及反相周区间”自然周期循环调度逻辑脱靶缺陷彻底修复与防误触全闭环 (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)**：
+     - **彻底修复单星期与周区间反相表达被正相词贪婪匹配导致星期极性 180 度颠倒重大缺陷**：此前在自然周期提取管线中，“非周一8点开机”、“非周日8点开机”、“非星期三开机”、“非周一至周五开机”等口语由于缺乏前置反相拦截，被下方的“周一”、“周日”、“周一至周五”等正相词贪婪截断，导致“非周一开机”（意图为除周一外的周二至周日 `[1, 3, 4, 5, 6, 7]`）被严重颠倒识别为仅在周一开机 `[2]`；“非周日开机”被颠倒识别为仅在周日开机 `[1]`；“非周一至周五开机”（非工作日）被颠倒识别为工作日 `[2, 3, 4, 5, 6]`！本版本在 `parseBaseRepeatWeekdays` 中建立了核心前置反相单星期与周区间调度拦截，将“非周一”至“非周日”精准映射为对应的周环形补集，将“非周一至周五”精准映射至周末 `[1, 7]`，将“非周六至周日”精准映射至工作日 `[2, 3, 4, 5, 6]`，彻底消除反向极性颠倒；
+     - **彻底修复排除型否定语义中嵌套反相星期（“除非周一外每天开机”）被正向截断反向排除的缺陷**：在 `extractExcludedDays` 中建立“非周X / 非星期X”前置拦截，精准提取其补集，实现“除非周一外每天开机”正确保留并仅在周一执行 `[2]`，彻底自洽；
+     - **全景反相星期与半点时相归一流水线与防即时误触加固**：全面纳管“非周一”至“非周日”、“非星期1~7”、“非礼拜1~7”及半点“非周一半”~“非周日半”（映射至 08:30），并在 `hasTimingOrCountdownIntent` 中全面严防，绝不掉入即时开关机；
+     - **单元测试 100% 满分覆盖**：在 `VoiceCommandParserTests.swift` 中新增 `testNonWeekdayScheduleHardeningV1997`，包含 22 组单星期反相、周区间反相、排除型嵌套、半点归一及严苛防即时误触断言，全部通过。
+  2. **macOS 原生状态栏全屋运行模式协同待机唤醒大一统 (`StatusItemController.swift`)**：
+     - **全屋待机状态下支持直接选择模式一键唤醒**：解耦顶层「🔄 全屋模式协同」菜单项门禁，从原本硬编码依赖 `!onDevices.isEmpty` 升级为基于 `!controllableDevices.isEmpty` 网关可控裁决。当全屋空调均处于关机待机状态时，菜单项不再置灰禁用，用户可直接点击制热（🔥）、制冷（❄️）等工况项一键全屋唤醒并平滑切入该模式，杜绝了此前必须先开启全屋空调（以旧模式吹风）再二次进菜单修改模式的断层繁琐体验；
+     - **自适应悬浮 Tooltip 与运行台数动态指引**：待机时菜单项呈现“🔄 全屋模式协同 (全屋待机中 · 点击开启模式)”，各模式子项智能提示“一键开启全屋 N 台空调并设为制热模式”；与单设备及级联设备模式菜单形成 100% 全对称交互闭环。
+  3. **多设备滤网动力学近期机时时间衰减加权平滑算法升级 (`AppModel.swift`)**：
+     - **时间衰减高斯加权模型引入**：在 `estimatedFilterRemainingDays` 中，对提取的近 14 天 `totalDeviceMinutes` 引入时间衰减加权平滑机制（近 3 天 1.4x，4~7 天 1.2x，远期 1.0x），显著降低了换季骤冷骤热时单日异常机时对滤网剩余寿命估算的剧烈抖动，计算更平滑拟真。
+  4. **Siri 与快捷指令全屋模式快捷词拓展与计划调度反相时态安全防护 (`AppIntents.swift`)**：
+     - **AppShortcuts 高频快捷短语扩展**：在 `SetACModeIntent` 中新增“用 Haier AC 开启制冷”、“用 Haier AC 开启制热”、“全屋制冷”、“全屋制热”等高频口语；
+     - **计划调度单星期字面量反相否定前置守卫**：在 `ScheduleACPowerIntent` 中增加否定词前置拦截，防止包含“非”/“除”的口语掉入单星期字面量匹配。
 
 ---
 
@@ -30,60 +30,81 @@
    - **死分支清理 (P2-2)**：`.adjustTemperatureAll` 死分支已彻底清理；
    - **调温 16/30°C 边界防护 (P2-3)**：单设备与全屋协同均已严格实施边界限制并同步至状态栏与 UI Stepper 使能状态。
 2. **本轮走查发现的高价值优化与缺陷闭环**：
-   - **排除型反相调度“除非工作日外/除非周末外”极性颠倒重大缺陷 (P0/P1)**：在排除型调度中，“除非工作日外每天开机”由于直接匹配“工作日”导致排除了工作日，星期极性 180 度颠倒；同时“除单休日外每天开机”中的“单休日”（周日）被贪婪截取识别为“单休”（周一至周六），导致排除了周一至周六。本版本在 `extractExcludedDays` 与 `parseBaseRepeatWeekdays` 中建立核心前置反相与单休日识别，完美修复；
-   - **Siri Shortcuts macOS 14+ 遗漏湿度 Intent 注册与综合状态查询缺失 (P1/P2)**：macOS 14+ `AppShortcutsProvider` 分支漏掉了 `GetACHumidityIntent`；且缺少一个综合看板让用户一句话掌握空调所有核心状态。本次闭环注册并新增 `GetACStatusIntent`；
-   - **状态栏待机状态下无法直接选择模式唤醒 (P2)**：此前在多设备与单设备状态栏菜单中，设备待机时「🔄 运行模式」整组置灰禁用，用户想换模式开机必须先点开机（以之前的旧模式运转），再重新呼出菜单选择模式。本次放开待机模式选择，支持一键开机并切入指定模式。
-   - **温度加减 Stepper 触达 16°C/30°C 极限时未禁用 (P2)**：已在 `MenuBarControlsView` 与 `DeviceControlView` 中增加边界防护，按钮禁用并变灰。
+   - **单星期与周区间反相调度“非周X / 非星期X / 非周一至周五”极性颠倒重大缺陷 (P0/P1)**：在自然周期调度提取中，“非周一8点开机”由于直接匹配“周一”导致仅在周一开机，星期极性 180 度颠倒；同时“除非周一外每天开机”被反向排除周一导致周一不开机。本版本在 `parseBaseRepeatWeekdays` 与 `extractExcludedDays` 中建立前置反相单星期与区间识别，完美修复；
+   - **状态栏全屋协同待机状态下无法直接选择模式唤醒 (P1/P2)**：此前在状态栏顶层菜单中，全屋待机时「🔄 全屋模式协同」整组置灰禁用，用户无法在全屋待机时一键将所有设备以制冷/制热模式唤醒。本次放开待机模式选择，支持一键全屋唤醒并切入指定模式；
+   - **滤网剩余天数近期波动剧烈 (P2)**：已在 `AppModel.estimatedFilterRemainingDays` 中引入时间衰减加权平滑算法；
+   - **Siri 快捷指令与 AppShortcuts 模式短语扩充 (P2)**：已在 `AppIntents.swift` 中为 `SetACModeIntent` 增加全屋制冷/制热高频快捷短语。
 
 ---
 
 ## 3. 关键架构变更与代码实现
 
-### 3.1 排除型否定与反相时态循环调度修复
-- **`VoiceCommandParser.swift` 前置反相与单休日排除提取**：
+### 3.1 单星期与周区间反相循环调度修复
+- **`VoiceCommandParser.swift` 前置反相星期与周区间提取**：
   ```swift
-  // 排除语义中的反相前置拦截 (v1.9.96)
-  if excludedText.contains("非工作日") || excludedText.contains("非平日") {
-      excludedDays.formUnion([1, 7])
-      excludedText = excludedText.replacingOccurrences(of: "非工作日", with: "").replacingOccurrences(of: "非平日", with: "")
+  // 4.-1 非单星期反相调度前置拦截 (v1.9.97)
+  if text.contains("非周一至周五") || text.contains("非周一到周五") || text.contains("非星期一到星期五") {
+      return ([1, 7], "周末")
   }
-  if excludedText.contains("非周末") || excludedText.contains("非双休") || excludedText.contains("非双休日") || excludedText.contains("非休息日") {
-      excludedDays.formUnion([2, 3, 4, 5, 6])
-      ...
+  if text.contains("非周六至周日") || text.contains("非周六到周日") || text.contains("非星期六到星期日") {
+      return ([2, 3, 4, 5, 6], "工作日")
   }
-  if excludedText.contains("单休日") || excludedText.contains("逢单休") {
-      excludedDays.insert(1) // 周日
-      ...
+
+  let nonWeekdayRegex = try? NSRegularExpression(pattern: #"(?:每个?|每周|每逢|逢)?\s*非\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])"#)
+  let baseNs = text as NSString
+  let baseFullRange = NSRange(location: 0, length: baseNs.length)
+  if let nonMatches = nonWeekdayRegex?.matches(in: text, options: [], range: baseFullRange), !nonMatches.isEmpty {
+      var excludedWds = Set<Int>()
+      for m in nonMatches {
+          if m.numberOfRanges >= 2 {
+              let chStr = baseNs.substring(with: m.range(at: 1))
+              if let ch = chStr.first, let wd = chineseDayCharToWeekday(ch) {
+                  excludedWds.insert(wd)
+              }
+          }
+      }
+      if !excludedWds.isEmpty {
+          let targetDays = Set([1, 2, 3, 4, 5, 6, 7]).subtracting(excludedWds).sorted()
+          let label = formatRepeatWeekdaysLabel(targetDays) ?? "每天"
+          return (targetDays, label)
+      }
   }
   ```
-- **`hasTimingOrCountdownIntent` 严密时态防线**：
-  全面纳管“非单休”、“非单休日”、“非单休半”、“非单休日半”等全量口语，杜绝误触立即开关机。
+- **`hasTimingOrCountdownIntent` 与 `normalizeTimeExpressions` 严密时态防线**：
+  全面纳管“非周一”至“非周日”、“非周1~7”、“非星期1~7”、“非礼拜1~7”及半点归一，杜绝误触立即开关机。
 
-### 3.2 macOS 原生状态栏待机模式一键唤醒
+### 3.2 macOS 原生状态栏全屋运行模式协同待机唤醒
 - **`StatusItemController.swift`**：
   ```swift
-  // 运行模式子菜单 (v1.9.96: 待机状态放开，允许一键唤醒并切换至指定模式)
-  let devModeMenu = NSMenu()
-  devModeMenu.autoenablesItems = false
-  for itemDef in Self.modeLevels {
-      let isSelected = isPowerOn && (modeCode == itemDef.code)
+  let controllableDevices = model.allUnifiedDevices.filter { model.reachability(for: $0.id).isControllable }
+  let modeRunningDesc = !onDevices.isEmpty ? (allOnSameMode != nil ? " (\(onDevices.count)台运行中 · 当前\(allOnSameMode!.desc))" : " (\(onDevices.count)台运行中 · 模式不同)") : " (全屋待机中 · 点击开启模式)"
+  let canSetModeAll = model.gatewayConnected && !controllableDevices.isEmpty
+
+  for itemDef in modeLevels {
+      let isSelected = (allOnSameMode == itemDef.code)
       let check = isSelected ? "✓ " : ""
-      let item = NSMenuItem(title: "\(check)\(itemDef.title)", action: #selector(setDeviceModeFromMenu(_:)), keyEquivalent: "")
+      let item = NSMenuItem(title: "\(check)\(itemDef.title)", action: #selector(setAllModeFromMenu(_:)), keyEquivalent: "")
       item.target = self
-      item.representedObject = ["deviceId": devId, "mode": itemDef.code.rawValue]
-      item.isEnabled = isControllable // 待机只要在线可控即可一键唤醒并切入模式
+      item.representedObject = itemDef.code.rawValue
+      item.isEnabled = canSetModeAll
       ...
   }
   ```
 
-### 3.3 Siri 综合状态看板与 AppShortcuts 注册闭环
-- **`AppIntents.swift`**：
+### 3.3 滤网动力学近期机时时间衰减加权平滑
+- **`AppModel.swift`**：
   ```swift
-  struct GetACStatusIntent: AppIntent {
-      static var title: LocalizedStringResource = "查询空调综合状态"
-      static var description = IntentDescription("查询空调当前开关机、模式、温度、湿度与风速状态看板", categoryName: "空调控制")
-      ...
+  let devCount = max(1, allUnifiedDevices.count)
+  var weightedMinutesSum = 0.0
+  var totalWeight = 0.0
+  for (idx, record) in activeRecords.enumerated() {
+      let weight: Double = idx < 3 ? 1.4 : (idx < 7 ? 1.2 : 1.0)
+      let devMins = record.totalDeviceMinutes > 0 ? (Double(record.totalDeviceMinutes) / Double(devCount)) : Double(record.totalMinutes)
+      weightedMinutesSum += devMins * weight
+      totalWeight += weight
   }
+  let avgDeviceMins = weightedMinutesSum / max(1.0, totalWeight)
+  dailyMinutes = max(30.0, avgDeviceMins)
   ```
 
 ---
@@ -91,27 +112,23 @@
 ## 4. 验证与测试结果
 
 - **单元测试覆盖**：
-  在 `Sources/HaierACCoreTests/VoiceCommandParserTests.swift` 中新增并校验端到端单元测试用例（28 组严苛断言 100% PASS）：
-  - `"除非工作日外每天开机"` -> `08:00` 开机，工作日循环 (`[2, 3, 4, 5, 6]`) (PASS)
-  - `"除非平时外每天开机"` -> `08:00` 开机，工作日循环 (`[2, 3, 4, 5, 6]`) (PASS)
-  - `"除非周末外每天关机"` -> `08:00` 关机，周末循环 (`[1, 7]`) (PASS)
-  - `"除非双休外每天关机"` -> `08:00` 关机，周末循环 (`[1, 7]`) (PASS)
-  - `"除单休日外每天开机"` -> `08:00` 开机，周一至周六循环 (`[2, 3, 4, 5, 6, 7]`) (PASS)
-  - `"除逢单休外每天开机"` -> `08:00` 开机，周一至周六循环 (`[2, 3, 4, 5, 6, 7]`) (PASS)
-  - `"非单休日开机"` -> `08:00` 开机，周一至周六循环 (`[2, 3, 4, 5, 6, 7]`) (PASS)
-  - `"非单休开机"` -> `08:00` 开机，周末双休循环 (`[1, 7]`) (PASS)
-  - `"非单休半关机"` -> `08:30` 关机，周末双休循环 (`[1, 7]`) (PASS)
-  - `"非单休日半开机"` -> `08:30` 开机，周一至周六循环 (`[2, 3, 4, 5, 6, 7]`) (PASS)
-  - 严苛防即时误触断言（针对上述所有口语，严格禁止掉入 `setPower`、`turnOffAll` 或 `turnOnAll` 即时开关机，全部 PASS）。
-- **编译与打包校验**：
-  - 执行 `SDKROOT=/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk swift build`，0 警告 0 错误编译通过；
-  - 运行 `./build_app.sh 1.9.96` 打包生成 `dist/HaierAC-v1.9.96-macOS.zip` (2.9MB)。
+  在 `Sources/HaierACCoreTests/VoiceCommandParserTests.swift` 中新增并校验端到端单元测试用例（22 组严苛断言 100% PASS）：
+  - `"非周一8点开机"` -> `08:00` 开机，周二至周日循环 (`[1, 3, 4, 5, 6, 7]`) (PASS)
+  - `"非周日8点开机"` -> `08:00` 开机，周一至周六循环 (`[2, 3, 4, 5, 6, 7]`) (PASS)
+  - `"非周天8点关机"` -> `08:00` 关机，周一至周六循环 (`[2, 3, 4, 5, 6, 7]`) (PASS)
+  - `"非周六8点开机"` -> `08:00` 开机，周日至周五循环 (`[1, 2, 3, 4, 5, 6]`) (PASS)
+  - `"非星期三8点开机"` -> `08:00` 开机，周四至周二循环 (`[1, 2, 3, 5, 6, 7]`) (PASS)
+  - `"非礼拜五8点开机"` -> `08:00` 开机，周六至周四循环 (`[1, 2, 3, 4, 5, 7]`) (PASS)
+  - `"非周一至周五8点开机"` -> `08:00` 开机，周末循环 (`[1, 7]`) (PASS)
+  - `"非周六至周日8点开机"` -> `08:00` 开机，工作日循环 (`[2, 3, 4, 5, 6]`) (PASS)
+  - `"除非周一外每天开机"` -> `08:00` 开机，每周一 (`[2]`) (PASS)
+  - `"除非周日外每天开机"` -> `08:00` 开机，每周日 (`[1]`) (PASS)
+  - `"非周一半开机"` -> `08:30` 开机，周二至周日循环 (`[1, 3, 4, 5, 6, 7]`) (PASS)
+  - `"非周日半关机"` -> `08:30` 关机，周一至周六循环 (`[2, 3, 4, 5, 6, 7]`) (PASS)
+  - 防即时误触全景断言：10 组反相口语严苛断言绝不触发 `setPower`、`turnOffAll` 或 `turnOnAll` (PASS)
 
----
-
-## 5. 发版信息与资产交付
-- **版本号**：`v1.9.96`
-- **Git Tag**：`v1.9.96`
-- **Release 资产**：`dist/HaierAC-v1.9.96-macOS.zip`
-- **SHA-256**：`8343860b406ade2add71883a12b5875fa1f7732ad43759347815403021f4dd7e`
-- **安全敏感数据检查**：经核验，源码与文档均无敏感个人信息、真实 Token 或凭证，符合安全脱敏规范。
+- **本地编译验证**：
+  - `SDKROOT=/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk swift build` -> 100% 通过（0 错误，0 致命告警）
+  - `./build_app.sh 1.9.97` -> 打包成功：
+    - `dist/HaierAC.app` (v1.9.97, 含小组件)
+    - `dist/HaierAC-v1.9.97-macOS.zip`

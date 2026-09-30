@@ -737,16 +737,18 @@ final class AppModel: ObservableObject {
         let isHistorical: Bool
         if activeRecords.count >= 3 {
             // 优先采用真实设备机时 totalDeviceMinutes 计算多设备日均负载，消除以墙钟时间估算的系统性偏差 (v1.9.46, v1.9.74 新老历史数据量纲自适应平滑加权)
+            // 采用近期高斯/时间衰减加权平滑模型 (v1.9.97):
+            // 越接近当天的记录 (prefix 顺序为从近到远) 赋予更高权重 (近 3 天 1.4x，4~7 天 1.2x，远期 1.0x)，提升对近期气温骤变或工况切换的自适应响应灵敏度
             let devCount = max(1, allUnifiedDevices.count)
-            let totalDevMinsSum = activeRecords.reduce(0.0) { sum, record in
-                if record.totalDeviceMinutes > 0 {
-                    return sum + (Double(record.totalDeviceMinutes) / Double(devCount))
-                } else {
-                    // 老版本历史记录无 totalDeviceMinutes 时，墙钟 totalMinutes 为并发运行基准，不重复除以设备数
-                    return sum + Double(record.totalMinutes)
-                }
+            var weightedMinutesSum = 0.0
+            var totalWeight = 0.0
+            for (idx, record) in activeRecords.enumerated() {
+                let weight: Double = idx < 3 ? 1.4 : (idx < 7 ? 1.2 : 1.0)
+                let devMins = record.totalDeviceMinutes > 0 ? (Double(record.totalDeviceMinutes) / Double(devCount)) : Double(record.totalMinutes)
+                weightedMinutesSum += devMins * weight
+                totalWeight += weight
             }
-            let avgDeviceMins = totalDevMinsSum / Double(activeRecords.count)
+            let avgDeviceMins = weightedMinutesSum / max(1.0, totalWeight)
             dailyMinutes = max(30.0, avgDeviceMins)
             isHistorical = true
         } else {

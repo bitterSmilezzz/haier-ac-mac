@@ -583,6 +583,30 @@ public struct VoiceCommandParser {
             excluded.formUnion([1, 7]) // 排除非单休（周末双休），保留单休
             remainingTarget = remainingTarget.replacingOccurrences(of: "非单休", with: "")
         }
+        if remainingTarget.contains("非周一至周五") || remainingTarget.contains("非周一到周五") || remainingTarget.contains("非星期一到星期五") || remainingTarget.contains("非礼拜一到礼拜五") {
+            excluded.formUnion([1, 7]) // 排除非工作日（即排除周末），保留工作日 [2, 3, 4, 5, 6]
+            remainingTarget = remainingTarget.replacingOccurrences(of: "非周一至周五", with: "").replacingOccurrences(of: "非周一到周五", with: "").replacingOccurrences(of: "非星期一到星期五", with: "").replacingOccurrences(of: "非礼拜一到礼拜五", with: "")
+        }
+        if remainingTarget.contains("非周六至周日") || remainingTarget.contains("非周六到周日") || remainingTarget.contains("非星期六到星期日") || remainingTarget.contains("非礼拜六到礼拜日") {
+            excluded.formUnion([2, 3, 4, 5, 6]) // 排除非周末（即排除工作日），保留周末 [1, 7]
+            remainingTarget = remainingTarget.replacingOccurrences(of: "非周六至周日", with: "").replacingOccurrences(of: "非周六到周日", with: "").replacingOccurrences(of: "非星期六到星期日", with: "").replacingOccurrences(of: "非礼拜六到礼拜日", with: "")
+        }
+
+        // 1.5 非单星期前置拦截（如“非周一”、“非周日”、“非星期三”、“非礼拜五”），排除非该星期的其它所有日子，保留该星期 (v1.9.97)
+        let nonSingleRegex = try? NSRegularExpression(pattern: #"非\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])"#)
+        let nonNs = remainingTarget as NSString
+        if let nonMatches = nonSingleRegex?.matches(in: remainingTarget, options: [], range: NSRange(location: 0, length: nonNs.length)), !nonMatches.isEmpty {
+            for m in nonMatches {
+                if m.numberOfRanges >= 2 {
+                    let chStr = nonNs.substring(with: m.range(at: 1))
+                    if let ch = chStr.first, let wd = chineseDayCharToWeekday(ch) {
+                        let otherDays = Set([1, 2, 3, 4, 5, 6, 7]).subtracting([wd])
+                        excluded.formUnion(otherDays)
+                    }
+                }
+            }
+            remainingTarget = nonSingleRegex?.stringByReplacingMatches(in: remainingTarget, options: [], range: NSRange(location: 0, length: nonNs.length), withTemplate: " ") ?? remainingTarget
+        }
 
         // 2. 单休日与逢单休精准排除（周日 [1]），前置拦截杜绝误入下方“单休”周一至周六 (v1.9.96)
         if remainingTarget.contains("单休日") || remainingTarget.contains("逢单休") || remainingTarget.contains("每逢单休") {
@@ -1210,7 +1234,7 @@ public struct VoiceCommandParser {
         }
 
         // 4. 语义化独立核心短语识别
-        // 4.-1 非工作日/非平日与非周末/非双休反相调度核心前置拦截（非工作日/非平日精准映射至周末 [1, 7]，非周末/非双休/非双休日/非休息日/非公休日精准映射至工作日 [2, 3, 4, 5, 6]，非单休日映射至周一至周六 [2, 3, 4, 5, 6, 7]，非单休映射至周末 [1, 7]）(v1.9.95, v1.9.96)
+        // 4.-1 非工作日/非平日与非周末/非双休反相调度核心前置拦截（非工作日/非平日精准映射至周末 [1, 7]，非周末/非双休/非双休日/非休息日/非公休日精准映射至工作日 [2, 3, 4, 5, 6]，非单休日映射至周一至周六 [2, 3, 4, 5, 6, 7]，非单休映射至周末 [1, 7]，非周X映射至全周除去周X [1...7 \ {X}]）(v1.9.95, v1.9.96, v1.9.97)
         if text.contains("非工作日") || text.contains("非平时") || text.contains("非平日") {
             return ([1, 7], "周末")
         }
@@ -1222,6 +1246,33 @@ public struct VoiceCommandParser {
         }
         if text.contains("非单休") {
             return ([1, 7], "周末")
+        }
+        if text.contains("非周一至周五") || text.contains("非周一到周五") || text.contains("非星期一到星期五") || text.contains("非礼拜一到礼拜五") {
+            return ([1, 7], "周末")
+        }
+        if text.contains("非周六至周日") || text.contains("非周六到周日") || text.contains("非星期六到星期日") || text.contains("非礼拜六到礼拜日") {
+            return ([2, 3, 4, 5, 6], "工作日")
+        }
+
+        // 4.-02 非单星期反相调度拦截（涵盖“非周一”、“非周日”、“非星期三”、“非礼拜五”、“非周1~7”等）(v1.9.97)
+        let nonWeekdayRegex = try? NSRegularExpression(pattern: #"(?:每个?|每周|每逢|逢)?\s*非\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])"#)
+        let baseNs = text as NSString
+        let baseFullRange = NSRange(location: 0, length: baseNs.length)
+        if let nonMatches = nonWeekdayRegex?.matches(in: text, options: [], range: baseFullRange), !nonMatches.isEmpty {
+            var excludedWds = Set<Int>()
+            for m in nonMatches {
+                if m.numberOfRanges >= 2 {
+                    let chStr = baseNs.substring(with: m.range(at: 1))
+                    if let ch = chStr.first, let wd = chineseDayCharToWeekday(ch) {
+                        excludedWds.insert(wd)
+                    }
+                }
+            }
+            if !excludedWds.isEmpty {
+                let targetDays = Set([1, 2, 3, 4, 5, 6, 7]).subtracting(excludedWds).sorted()
+                let label = formatRepeatWeekdaysLabel(targetDays) ?? "每天"
+                return (targetDays, label)
+            }
         }
 
         // 4.0 逢单休/单休日与逢双休口语调度（逢单休精准映射至周日 [1]，逢双休映射至周末 [1, 7]），前置拦截杜绝误入单休 (v1.9.94)
@@ -1745,6 +1796,16 @@ public struct VoiceCommandParser {
            text.contains("非工作日") || text.contains("非工作日半") || text.contains("非平时") || text.contains("非平日") || text.contains("非平日半") ||
            text.contains("非周末") || text.contains("非周末半") || text.contains("非双休") || text.contains("非双休半") || text.contains("非双休日") || text.contains("非双休日半") ||
            text.contains("非休息日") || text.contains("非休息日半") || text.contains("非公休日") || text.contains("非公休日半") ||
+           text.contains("非周一") || text.contains("非周二") || text.contains("非周三") || text.contains("非周四") || text.contains("非周五") || text.contains("非周六") || text.contains("非周日") || text.contains("非周天") ||
+           text.contains("非周1") || text.contains("非周2") || text.contains("非周3") || text.contains("非周4") || text.contains("非周5") || text.contains("非周6") || text.contains("非周7") ||
+           text.contains("非星期一") || text.contains("非星期二") || text.contains("非星期三") || text.contains("非星期四") || text.contains("非星期五") || text.contains("非星期六") || text.contains("非星期日") || text.contains("非星期天") ||
+           text.contains("非星期1") || text.contains("非星期2") || text.contains("非星期3") || text.contains("非星期4") || text.contains("非星期5") || text.contains("非星期6") || text.contains("非星期7") ||
+           text.contains("非礼拜一") || text.contains("非礼拜二") || text.contains("非礼拜三") || text.contains("非礼拜四") || text.contains("非礼拜五") || text.contains("非礼拜六") || text.contains("非礼拜日") || text.contains("非礼拜天") ||
+           text.contains("非礼拜1") || text.contains("非礼拜2") || text.contains("非礼拜3") || text.contains("非礼拜4") || text.contains("非礼拜5") || text.contains("非礼拜6") || text.contains("非礼拜7") ||
+           text.contains("非周一至周五") || text.contains("非周一到周五") || text.contains("非周六至周日") || text.contains("非周六到周日") ||
+           text.contains("非周一半") || text.contains("非周二半") || text.contains("非周三半") || text.contains("非周四半") || text.contains("非周五半") || text.contains("非周六半") || text.contains("非周日半") || text.contains("非周天半") ||
+           text.contains("非星期一半") || text.contains("非星期二半") || text.contains("非星期三半") || text.contains("非星期四半") || text.contains("非星期五半") || text.contains("非星期六半") || text.contains("非星期日半") || text.contains("非星期天半") ||
+           text.contains("非礼拜一半") || text.contains("非礼拜二半") || text.contains("非礼拜三半") || text.contains("非礼拜四半") || text.contains("非礼拜五半") || text.contains("非礼拜六半") || text.contains("非礼拜日半") || text.contains("非礼拜天半") ||
            text.contains("休息日") || text.contains("休息日半") || text.contains("公休日") || text.contains("公休日半") ||
            text.contains("休假日") || text.contains("休假日半") || text.contains("放假日") || text.contains("放假日半") ||
            text.contains("节假日") || text.contains("节假日半") ||
@@ -2573,6 +2634,13 @@ public struct VoiceCommandParser {
         str = str.replacingOccurrences(of: "非双休日半", with: "非双休日8点30分")
         str = str.replacingOccurrences(of: "非休息日半", with: "非休息日8点30分")
         str = str.replacingOccurrences(of: "非公休日半", with: "非公休日8点30分")
+        // 非周X半时相标准化归一映射至 08:30 (v1.9.97)
+        let nonDayChars = ["一", "二", "三", "四", "五", "六", "日", "天", "1", "2", "3", "4", "5", "6", "7"]
+        for d in nonDayChars {
+            str = str.replacingOccurrences(of: "非周\(d)半", with: "非周\(d)8点30分")
+            str = str.replacingOccurrences(of: "非星期\(d)半", with: "非星期\(d)8点30分")
+            str = str.replacingOccurrences(of: "非礼拜\(d)半", with: "非礼拜\(d)8点30分")
+        }
         str = str.replacingOccurrences(of: "逢休息日半", with: "逢休息日8点30分")
         str = str.replacingOccurrences(of: "每逢休息日半", with: "每逢休息日8点30分")
         str = str.replacingOccurrences(of: "逢公休日半", with: "逢公休日8点30分")

@@ -948,7 +948,10 @@ struct ScheduleACPowerIntent: AppIntent {
             if repeatsDaily || sched.contains("每天") || sched.contains("天天") || sched.contains("每日") || sched.contains("每晚") || sched.contains("每早") {
                 return ([], true, "每天")
             }
-            // 兼容单星期字面量输入（如 "周一"、"星期二"、"礼拜三"）
+            // 兼容单星期字面量输入（如 "周一"、"星期二"、"礼拜三"），前置排除否定词 (v1.9.97)
+            guard !sched.contains("非") && !sched.contains("除") else {
+                return ([], false, "")
+            }
             if sched.contains("周一") || sched.contains("星期一") || sched.contains("礼拜一") {
                 return ([2], false, "每周一")
             } else if sched.contains("周二") || sched.contains("星期二") || sched.contains("礼拜二") {
@@ -1051,6 +1054,11 @@ struct ACAppShortcuts: AppShortcutsProvider {
                     intent: SetACModeIntent(),
                     phrases: [
                         "用 \(.applicationName) 切换模式",
+                        "用 \(.applicationName) 开启制冷",
+                        "用 \(.applicationName) 开启制热",
+                        "用 \(.applicationName) 全屋制冷",
+                        "用 \(.applicationName) 全屋制热",
+                        "\(.applicationName) 切换模式",
                     ],
                     shortTitle: "切换模式",
                     systemImageName: "slider.horizontal.3"
@@ -1287,6 +1295,10 @@ struct ACAppShortcuts: AppShortcutsProvider {
                     intent: SetACModeIntent(),
                     phrases: [
                         "用 \(.applicationName) 切换模式",
+                        "用 \(.applicationName) 开启制冷",
+                        "用 \(.applicationName) 开启制热",
+                        "用 \(.applicationName) 全屋制冷",
+                        "用 \(.applicationName) 全屋制热",
                     ]
                 ),
                 AppShortcut(
