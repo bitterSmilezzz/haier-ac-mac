@@ -8,6 +8,20 @@
 
 ## 功能
 
+- 🏷 **闭环自然口语「逢单休/单休日」循环调度脱靶缺陷、macOS 原生状态栏全屋模式协同大一统、静音 0 档动力学全仓对齐与 Siri 全屋电源控制贯通 (v1.9.94)**：
+  - ⏱️ **“逢单休/单休日”自然周期循环调度逻辑脱靶缺陷彻底修复与防误触全闭环 (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)**：
+    - **彻底修复逢单休/单休日被通用“单休”贪婪拦截导致星期反向颠倒的严重缺陷**：此前由于调度提取管线中遗漏了具体的关键词分支，导致用户说“逢单休开机”、“单休日关机”、“逢单休半开机”等表达周日休息日执行的口语时，被下方的通用“单休”贪婪拦截，错误映射为 `[2, 3, 4, 5, 6, 7]`（“周一至周六”），产生了与用户休息日意图完全相反的反向执行缺陷；本版本在 `parseBaseRepeatWeekdays` 中建立核心前置拦截，将“逢单休/每逢单休/单休日”精准映射至周日（`[1]`），将“逢双休/每逢双休/双休日”精准映射至周末（`[1, 7]`），彻底自洽；
+    - **单休与双休半点归一化及防即时误触全景加固**：扩充“每逢单休开机”、“每逢单休关空调”、“单休日半关机”等全景时态，在 `hasTimingOrCountdownIntent` 中严密封锁，绝不穿透至即时开关机；
+    - **单元测试 100% 满分覆盖**：在 `VoiceCommandParserTests.swift` 中新增 `testSingleWeekendAndMultiScheduleHardeningV1994`，包含 16 组全景调度与严苛防即时误触断言，验证全部通过。
+  - 🖥️ **macOS 原生状态栏全屋模式协同大一统 (`StatusItemController.swift`)**：
+    - **全屋运行模式一键协同子菜单**：在状态栏右键系统菜单的全屋协同区域新增「🔄 全屋模式协同」独立子菜单，涵盖制冷（❄️）、制热（🔥）、除湿（💧）、送风（🍃）、自动（🔄）全量工况，直接调用底层 `AppModel.setModeAll(mode:)`；
+    - **全屋多设备工况一致性智能感知**：自动统计全屋运行中空调的模式状态，模式相同时动态呈现 `(N台运行中 · 当前制冷)` 并显示 `✓` 选中态，模式不同时动态呈现 `(N台运行中 · 模式不同)`，全屋待机时显示中性禁用与引导 Tooltip，与全屋调温、全屋风速协同达成视觉与操作体验的极致对称。
+  - 🍃 **静音 0 档原生硬件原语热动力学与滤网气动力学全仓 100% 自洽 (`AppModel.swift` / `EnergyAnalyticsEngine.swift`)**：
+    - **修复滤网因数与功率模型中 0 档“零”原语微漏缺陷**：在 `AppModel.filterAccumulationFactor` 与 `EnergyAnalyticsEngine.calculateTheoreticalPower` 中补全 `speed == "零"` 与 `wind == "零"`，使硬件上报为汉字“零”或“零档”时亦能 100% 命中 15W 微风维持态功率与 0.60 滤网低风阻负荷，消除微小偏差。
+  - 🍎 **Siri 与快捷指令 (`AppIntents.swift`) 全屋电源控制与情景应用全域打通 (`AppIntents.swift`)**：
+    - **`SetACPowerIntent` 全屋电源大一统**：支持识别 `deviceName` 中“全”/“所有”关键字，一键批量唤醒 `turnOnAllDevices()` 或关机 `turnOffAllDevices()`，并在单设备场景下输出带设备名称的精致对话反馈；
+    - **`ApplyACSceneIntent` 全屋情景支持**：支持通过 `deviceName` 自动识别全屋应用意图，消除通过 Siri 应用全屋情景时的语义断层。
+
 - 🏷 **闭环自然口语大后周/逢双休/单休调度大一统引擎、防即时误触全景加固、静音 0 档微风原语状态栏与模型全域自洽、Siri全屋温控/模式/滤网看板全域贯通 (v1.9.93)**：
   - ⏱️ **“大后周/大后个周/逢双休/逢单休/单休日”自然口语跨周与排班循环调度大一统与防即时误触全闭环 (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)**：
     - **彻底解决大后周、逢双休、单休日等时态口语穿透为即时开关机造成全屋误关开机的严重隐患**：此前用户说“大后周关空调”、“大后个周开机”、“逢双休关空调”、“逢单休开机”、“单休日关机”等高频家庭口语时，因未匹配旧有时态前缀，`hasTimingOrCountdownIntent` 返回 false，直接穿透至 `turnOffAll` / `turnOnAll`，造成全屋立即误动作；本版本在 `hasTimingOrCountdownIntent` 与 `parseBaseRepeatWeekdays` 中建立全景前置防线，无具体钟点时自动映射为周一（`[2]`）、周末（`[1, 7]`）或周日（`[1]`）循环基准（08:00），无缝生成 `.scheduleRepeatPower` 调度；

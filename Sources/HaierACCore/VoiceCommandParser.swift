@@ -1184,6 +1184,13 @@ public struct VoiceCommandParser {
         }
 
         // 4. 语义化独立核心短语识别
+        // 4.0 逢单休/单休日与逢双休口语调度（逢单休精准映射至周日 [1]，逢双休映射至周末 [1, 7]），前置拦截杜绝误入单休 (v1.9.94)
+        if text.contains("逢单休") || text.contains("每逢单休") || text.contains("单休日") {
+            return ([1], "周日")
+        }
+        if text.contains("逢双休") || text.contains("每逢双休") || text.contains("双休日") {
+            return ([1, 7], "周末")
+        }
         if text.contains("工作日") || text.contains("平时") {
             return ([2, 3, 4, 5, 6], "工作日")
         }

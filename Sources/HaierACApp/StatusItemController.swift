@@ -561,6 +561,53 @@ final class StatusItemController: NSObject {
             menu.setSubmenu(windMenu, for: windParentItem)
             menu.addItem(windParentItem)
 
+            // 全屋统一模式协同 (v1.9.94)
+            let modeMenu = NSMenu()
+            modeMenu.autoenablesItems = false
+            let modeLevels: [(code: ACModeCode, title: String)] = [
+                (.cooling, "❄️ 制冷模式"),
+                (.heating, "🔥 制热模式"),
+                (.dehumidify, "💧 除湿模式"),
+                (.fan, "🍃 送风模式"),
+                (.auto, "🔄 自动模式")
+            ]
+            let allOnSameMode: ACModeCode? = {
+                guard !onDevices.isEmpty else { return nil }
+                let modes = Set(onDevices.compactMap { dev -> ACModeCode? in
+                    let raw = model.attribute("operationMode", deviceId: dev.id)?.stringValue
+                    return ACModeCode.match(from: raw)
+                })
+                return modes.count == 1 ? modes.first : nil
+            }()
+
+            let modeRunningDesc = !onDevices.isEmpty ? (allOnSameMode != nil ? " (\(onDevices.count)台运行中 · 当前\(allOnSameMode!.desc))" : " (\(onDevices.count)台运行中 · 模式不同)") : " (当前均未开机)"
+            let canSetModeAll = model.gatewayConnected && !onDevices.isEmpty
+
+            for itemDef in modeLevels {
+                let isSelected = (allOnSameMode == itemDef.code)
+                let check = isSelected ? "✓ " : ""
+                let item = NSMenuItem(title: "\(check)\(itemDef.title)", action: #selector(setAllModeFromMenu(_:)), keyEquivalent: "")
+                item.target = self
+                item.representedObject = itemDef.code.rawValue
+                item.isEnabled = canSetModeAll
+                if onDevices.isEmpty {
+                    item.toolTip = "当前全屋无运行中的空调，请先开启空调后再协同切换运行模式"
+                } else {
+                    switch itemDef.code {
+                    case .cooling: item.toolTip = "一键将全屋运行中空调统一设为制冷模式\n受控空调：\(runningNames)"
+                    case .heating: item.toolTip = "一键将全屋运行中空调统一设为制热模式\n受控空调：\(runningNames)"
+                    case .dehumidify: item.toolTip = "一键将全屋运行中空调统一设为除湿模式\n受控空调：\(runningNames)"
+                    case .fan: item.toolTip = "一键将全屋运行中空调统一设为送风循环模式\n受控空调：\(runningNames)"
+                    case .auto: item.toolTip = "一键将全屋运行中空调统一设为智能自适应模式\n受控空调：\(runningNames)"
+                    }
+                }
+                modeMenu.addItem(item)
+            }
+            let modeParentItem = NSMenuItem(title: "🔄 全屋模式协同\(modeRunningDesc)...", action: nil, keyEquivalent: "")
+            modeParentItem.toolTip = onDevices.isEmpty ? "当前全屋无运行中的空调" : "统一同步全屋 \(onDevices.count) 台运行中空调的运行模式（制冷/制热/除湿/送风/自动）\n受控设备：\(runningNames)"
+            menu.setSubmenu(modeMenu, for: modeParentItem)
+            menu.addItem(modeParentItem)
+
             if !offDevices.isEmpty {
                 let turnOnAllItem = NSMenuItem(title: "⏻ 开启全屋空调 (\(offDevices.count) 台待机)", action: #selector(turnOnAllDevices), keyEquivalent: "")
                 turnOnAllItem.target = self
@@ -2057,6 +2104,20 @@ final class StatusItemController: NSObject {
             _ = model.setWindSpeed(deviceIds: onIds, speedName: speed, autoPowerOn: false)
         } else {
             _ = model.setWindSpeedAll(speedName: speed, autoPowerOn: false)
+        }
+        refreshTemperature()
+    }
+
+    @objc private func setAllModeFromMenu(_ sender: NSMenuItem) {
+        guard let raw = sender.representedObject as? String,
+              let mode = ACModeCode(rawValue: raw) else { return }
+        let onIds = model.allUnifiedDevices.filter { dev in
+            model.reachability(for: dev.id).isControllable && (model.attribute("onOffStatus", deviceId: dev.id)?.boolValue == true)
+        }.map(\.id)
+        if !onIds.isEmpty {
+            _ = model.setMode(deviceIds: onIds, mode: mode)
+        } else {
+            _ = model.setModeAll(mode: mode)
         }
         refreshTemperature()
     }

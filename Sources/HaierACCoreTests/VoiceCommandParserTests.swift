@@ -3904,6 +3904,63 @@ final class VoiceCommandParserTests: XCTestCase {
         XCTAssertNotEqual(VoiceCommandParser.parse("逢双休半开机")?.command, .turnOnAll)
     }
 
+    // MARK: - v1.9.94 逢单休/单休日与双休循环调度大一统及防误触全景加固
+
+    func testSingleWeekendAndMultiScheduleHardeningV1994() {
+        // 1. 逢单休/每逢单休/单休日精确映射至周日（[1]）调度闭环
+        let singleOffOn = VoiceCommandParser.parse("逢单休开机")
+        XCTAssertEqual(singleOffOn?.command, .scheduleRepeatPower(hour: 8, minute: 0, power: true, repeatWeekdays: [1], repeatLabel: "周日"))
+        XCTAssertTrue(singleOffOn?.displayText.contains("周日 08:00 开机") == true)
+
+        let singleOffDayOff = VoiceCommandParser.parse("单休日关机")
+        XCTAssertEqual(singleOffDayOff?.command, .scheduleRepeatPower(hour: 8, minute: 0, power: false, repeatWeekdays: [1], repeatLabel: "周日"))
+        XCTAssertTrue(singleOffDayOff?.displayText.contains("周日 08:00 关机") == true)
+
+        let everySingleOffOn = VoiceCommandParser.parse("每逢单休开机")
+        XCTAssertEqual(everySingleOffOn?.command, .scheduleRepeatPower(hour: 8, minute: 0, power: true, repeatWeekdays: [1], repeatLabel: "周日"))
+        XCTAssertTrue(everySingleOffOn?.displayText.contains("周日 08:00 开机") == true)
+
+        let everySingleOffAcOff = VoiceCommandParser.parse("每逢单休关空调")
+        XCTAssertEqual(everySingleOffAcOff?.command, .scheduleRepeatPower(hour: 8, minute: 0, power: false, repeatWeekdays: [1], repeatLabel: "周日"))
+        XCTAssertTrue(everySingleOffAcOff?.displayText.contains("周日 08:00 关机") == true)
+
+        // 2. 半点口语归一化（映射至 08:30）
+        let singleOffHalf = VoiceCommandParser.parse("逢单休半开机")
+        XCTAssertEqual(singleOffHalf?.command, .scheduleRepeatPower(hour: 8, minute: 30, power: true, repeatWeekdays: [1], repeatLabel: "周日"))
+        XCTAssertTrue(singleOffHalf?.displayText.contains("周日 08:30 开机") == true)
+
+        let singleOffDayHalf = VoiceCommandParser.parse("单休日半关机")
+        XCTAssertEqual(singleOffDayHalf?.command, .scheduleRepeatPower(hour: 8, minute: 30, power: false, repeatWeekdays: [1], repeatLabel: "周日"))
+        XCTAssertTrue(singleOffDayHalf?.displayText.contains("周日 08:30 关机") == true)
+
+        // 3. 逢双休与双休日调度闭环
+        let everyDoubleOffOn = VoiceCommandParser.parse("每逢双休开机")
+        XCTAssertEqual(everyDoubleOffOn?.command, .scheduleRepeatPower(hour: 8, minute: 0, power: true, repeatWeekdays: [1, 7], repeatLabel: "周末"))
+        XCTAssertTrue(everyDoubleOffOn?.displayText.contains("周末 08:00 开机") == true)
+
+        let doubleOffDayOff = VoiceCommandParser.parse("双休日关机")
+        XCTAssertEqual(doubleOffDayOff?.command, .scheduleRepeatPower(hour: 8, minute: 0, power: false, repeatWeekdays: [1, 7], repeatLabel: "周末"))
+        XCTAssertTrue(doubleOffDayOff?.displayText.contains("周末 08:00 关机") == true)
+
+        // 4. 严苛防即时误触断言（杜绝穿透至即时 setPower/turnOnAll/turnOffAll）
+        XCTAssertNotEqual(VoiceCommandParser.parse("逢单休开机")?.command, .setPower(true))
+        XCTAssertNotEqual(VoiceCommandParser.parse("逢单休开机")?.command, .turnOnAll)
+        XCTAssertNotEqual(VoiceCommandParser.parse("单休日关机")?.command, .setPower(false))
+        XCTAssertNotEqual(VoiceCommandParser.parse("单休日关机")?.command, .turnOffAll)
+        XCTAssertNotEqual(VoiceCommandParser.parse("每逢单休开机")?.command, .setPower(true))
+        XCTAssertNotEqual(VoiceCommandParser.parse("每逢单休开机")?.command, .turnOnAll)
+        XCTAssertNotEqual(VoiceCommandParser.parse("每逢单休关空调")?.command, .setPower(false))
+        XCTAssertNotEqual(VoiceCommandParser.parse("每逢单休关空调")?.command, .turnOffAll)
+        XCTAssertNotEqual(VoiceCommandParser.parse("逢单休半开机")?.command, .setPower(true))
+        XCTAssertNotEqual(VoiceCommandParser.parse("逢单休半开机")?.command, .turnOnAll)
+        XCTAssertNotEqual(VoiceCommandParser.parse("单休日半关机")?.command, .setPower(false))
+        XCTAssertNotEqual(VoiceCommandParser.parse("单休日半关机")?.command, .turnOffAll)
+        XCTAssertNotEqual(VoiceCommandParser.parse("每逢双休开机")?.command, .setPower(true))
+        XCTAssertNotEqual(VoiceCommandParser.parse("每逢双休开机")?.command, .turnOnAll)
+        XCTAssertNotEqual(VoiceCommandParser.parse("双休日关机")?.command, .setPower(false))
+        XCTAssertNotEqual(VoiceCommandParser.parse("双休日关机")?.command, .turnOffAll)
+    }
+
     // MARK: - 无效输入测试
 
     func testInvalidCommands() {

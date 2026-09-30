@@ -6,6 +6,20 @@ A native SwiftUI app to control Haier / Leader (统帅) smart air conditioners o
 
 ## Features
 
+- 🏷 **Colloquial "Single-Day-Off / Shift Weekend" Repeat Scheduling Logic Defect Closed, macOS Status Bar Whole-House Mode Sync Submenu, Mute Gear 0 Dynamics Alignment & Siri Whole-House Power Control Integration (v1.9.94)**:
+  - ⏱️ **"Single Day Off / Shift Weekend" Colloquial Schedule Logic Defect Resolution & Accidental Trigger Defense (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)**:
+    - **Fixed Inverted Schedule Defect Caused by Greedy Generic Single-Day-Off Match**: Previously, missing explicit keywords in the parsing pipeline caused commands like "逢单休开机" (turn on on single day off), "单休日关机", "逢单休半开机" to fall through into the generic "单休" rule (`[2, 3, 4, 5, 6, 7]`, Mon-Sat), inverting user intent by running on workdays instead of Sundays. v1.9.94 establishes prioritized front-line parsing, accurately mapping "逢单休/每逢单休/单休日" to Sunday (`[1]`) and "逢双休/每逢双休/双休日" to weekend (`[1, 7]`);
+    - **Single/Dual Shift-Off Half-Hour Normalization & Accidental Trigger Protection**: Added comprehensive coverage in `hasTimingOrCountdownIntent` to ensure commands like "每逢单休开机", "每逢单休关空调", "单休日半关机" never penetrate into instant power triggers;
+    - **100% Unit Test Coverage**: Added `testSingleWeekendAndMultiScheduleHardeningV1994` in `VoiceCommandParserTests.swift` with 16 assertions validating correct mapping and anti-misoperation defense.
+  - 🖥️ **macOS Native Status Bar Whole-House Mode Synchronization Submenu (`StatusItemController.swift`)**:
+    - **One-Click Mode Synchronization Matrix**: Added a dedicated "🔄 全屋模式协同" (Whole-House Mode Sync) submenu to the right-click context menu, covering cooling (❄️), heating (🔥), dehumidifying (💧), fan (🍃), and auto (🔄) via `AppModel.setModeAll(mode:)`;
+    - **Multi-Device State Perception & Consistency Indication**: Automatically senses whether all running units share the same mode, dynamically displaying `(N units running · Cooling)` with a checkmark `✓` or `(N units running · Mixed modes)`, maintaining visual symmetry with whole-house temperature and wind controls.
+  - 🍃 **Mute Gear 0 Hardware Primitives Thermodynamic & Aerodynamic Convergence (`AppModel.swift` / `EnergyAnalyticsEngine.swift`)**:
+    - **Fixed Hanzi Character "零" Primitive in Power & Filter Models**: Added `speed == "零"` and `wind == "零"` to `AppModel.filterAccumulationFactor` and `EnergyAnalyticsEngine.calculateTheoreticalPower`, ensuring 15W standby power and 0.60 low-resistance aerodynamic factor even when hardware reports Chinese character "零".
+  - 🍎 **Siri & App Shortcuts (`AppIntents.swift`) Whole-House Power Control & Scene Application Integration (`AppIntents.swift`)**:
+    - **Unified Whole-House Power Control (`SetACPowerIntent`)**: Recognizes "全" / "所有" / "全部" in `deviceName` to invoke `turnOnAllDevices()` or `turnOffAllDevices()`, providing friendly dialogs with device names for single units;
+    - **Whole-House Scene Application (`ApplyACSceneIntent`)**: Automatically detects whole-house intent via `deviceName`, bridging Siri scene invocation without manual boolean flags.
+
 - 🏷 **Colloquial Far-Future Week/Weekend/Single-Day-Off Repeat Scheduling Unified Engine, Full Accidental Power Protection, Mute Gear 0 Breeze Primitives Model Alignment & Siri Whole-House Control/Dashboard Integration (v1.9.93)**:
   - ⏱️ **"Week-After-Next-Next / Alternate Weekend / Single Day Off" Colloquial Shift Scheduling & Full Anti-Misoperation Guard (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)**:
     - **Eradicated Critical Flaw Where Far-Future Week and Shift-Off Commands Triggered Immediate Power Operations**: Previously, commands like "大后周关空调" (turn off AC three weeks later), "逢双休关空调" (turn off on weekends), "逢单休开机" (turn on on single days off), "单休日关机" penetrated through `hasTimingOrCountdownIntent`, triggering unintended instant shutdowns or turn-ons (`turnOffAll` / `turnOnAll`). v1.9.93 builds complete front-line protections and maps them seamlessly to Monday base (`[2]`), weekend base (`[1, 7]`), or Sunday base (`[1]`) at 08:00;

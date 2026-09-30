@@ -72,14 +72,44 @@ struct SetACPowerIntent: AppIntent {
     @Parameter(title: "打开")
     var powerOn: Bool
 
-    @Parameter(title: "设备名称", description: "可选；留空使用第一台设备")
+    @Parameter(title: "设备名称", description: "可选；留空使用主设备，填“全屋”或“全部”统一开关所有设备")
     var deviceName: String?
 
     @MainActor
     func perform() async throws -> some IntentResult & ProvidesDialog {
+        let model = AppModel.shared
+        guard model.gatewayConnected else {
+            throw ACIntentError.message("空调连接中断，请稍后重试")
+        }
+
+        let isAll = (deviceName?.contains("全") == true) || (deviceName?.contains("所有") == true)
+        if isAll {
+            if powerOn {
+                let openedCount = model.turnOnAllDevices()
+                if openedCount > 0 {
+                    return .result(dialog: "已开启全屋 \(openedCount) 台空调")
+                } else {
+                    let controllable = model.allUnifiedDevices.filter { model.reachability(for: $0.id).isControllable }
+                    if !controllable.isEmpty {
+                        return .result(dialog: "全屋空调当前均已处于开机运行状态")
+                    } else {
+                        return .result(dialog: "未发现可控制的就绪空调设备")
+                    }
+                }
+            } else {
+                let closedCount = model.turnOffAllDevices()
+                if closedCount > 0 {
+                    return .result(dialog: "已关闭全屋 \(closedCount) 台运行中的空调")
+                } else {
+                    return .result(dialog: "全屋空调当前均已处于关机或待机状态")
+                }
+            }
+        }
+
         let deviceId = try requireGatewayAndDevice(deviceName)
-        AppModel.shared.sendAttribute("onOffStatus", value: .bool(powerOn), deviceId: deviceId)
-        return .result(dialog: "已\(powerOn ? "打开" : "关闭")空调电源")
+        model.sendAttribute("onOffStatus", value: .bool(powerOn), deviceId: deviceId)
+        let devName = model.deviceName(for: deviceId)
+        return .result(dialog: "已\(powerOn ? "打开" : "关闭")「\(devName)」空调电源")
     }
 }
 
@@ -265,7 +295,7 @@ struct ApplyACSceneIntent: AppIntent {
     @Parameter(title: "情景名称", description: "如：睡眠、离家")
     var sceneName: String
 
-    @Parameter(title: "设备名称", description: "可选；留空使用默认设备")
+    @Parameter(title: "设备名称", description: "可选；留空使用默认设备，填“全屋”或“全部”应用至所有设备")
     var deviceName: String?
 
     @Parameter(title: "全屋应用", default: false)
@@ -273,19 +303,21 @@ struct ApplyACSceneIntent: AppIntent {
 
     @MainActor
     func perform() async throws -> some IntentResult & ProvidesDialog {
-        guard AppModel.shared.gatewayConnected else {
+        let model = AppModel.shared
+        guard model.gatewayConnected else {
             throw ACIntentError.message("空调连接中断，请稍后重试")
         }
-        guard let scene = AppModel.shared.scenes.first(where: { $0.name.contains(sceneName) }) else {
+        guard let scene = model.scenes.first(where: { $0.name.contains(sceneName) }) else {
             throw ACIntentError.message("未找到情景「\(sceneName)」，请先在应用内创建")
         }
+        let isAll = allDevices || (deviceName?.contains("全") == true) || (deviceName?.contains("所有") == true)
         let targetId = resolveDeviceId(named: deviceName)
-        AppModel.shared.applyScene(scene, targetDeviceId: targetId, allDevices: allDevices)
-        if allDevices {
+        model.applyScene(scene, targetDeviceId: targetId, allDevices: isAll)
+        if isAll {
             return .result(dialog: "已为全屋空调应用情景「\(scene.name)」")
         } else if let targetId {
-            let name = AppModel.shared.deviceName(for: targetId)
-            return .result(dialog: "已为\(name)应用情景「\(scene.name)」")
+            let name = model.deviceName(for: targetId)
+            return .result(dialog: "已为「\(name)」应用情景「\(scene.name)」")
         } else {
             return .result(dialog: "已应用情景「\(scene.name)」")
         }
