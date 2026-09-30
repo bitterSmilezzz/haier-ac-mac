@@ -1039,6 +1039,38 @@ final class StatusItemController: NSObject {
                 devSubmenu.setSubmenu(devScheduleMenu, for: devScheduleParent)
                 devSubmenu.addItem(devScheduleParent)
 
+                // 单设备情景预设快捷应用 (v1.9.101 全景矩阵对称)
+                let devScenes = model.scenes
+                if !devScenes.isEmpty {
+                    let devScenesMenu = NSMenu()
+                    devScenesMenu.autoenablesItems = false
+                    for scene in devScenes {
+                        let actionDesc = scene.actions.map(\.attrDesc).joined(separator: " · ")
+                        let sceneGlyph: String = {
+                            switch scene.name {
+                            case "睡眠": return "🌙"
+                            case "离家": return "🚪"
+                            case "回家": return "🏠"
+                            default: return "✨"
+                            }
+                        }()
+                        let sItem = NSMenuItem(
+                            title: "\(sceneGlyph) \(scene.name) (\(actionDesc))",
+                            action: #selector(applySceneToDeviceFromMenu(_:)),
+                            keyEquivalent: ""
+                        )
+                        sItem.target = self
+                        sItem.representedObject = ["deviceId": devId, "sceneId": scene.id.uuidString]
+                        sItem.isEnabled = isControllable
+                        sItem.toolTip = "一键将「\(scene.name)」情景动作（\(actionDesc)）下发至「\(dev.name)」"
+                        devScenesMenu.addItem(sItem)
+                    }
+                    let devScenesParentItem = NSMenuItem(title: "✨ 应用情景预设 (\(devScenes.count)项)...", action: nil, keyEquivalent: "")
+                    devScenesParentItem.toolTip = "展开情景预设菜单，一键为「\(dev.name)」单独应用「睡眠」、「离家」、「回家」等情景调控"
+                    devSubmenu.setSubmenu(devScenesMenu, for: devScenesParentItem)
+                    devSubmenu.addItem(devScenesParentItem)
+                }
+
                 let statusBadge: String
                 switch reach {
                 case .gatewayReconnecting: statusBadge = "⏳ 重连中"
@@ -1771,6 +1803,16 @@ final class StatusItemController: NSObject {
               let uuid = UUID(uuidString: uuidStr),
               let scene = model.scenes.first(where: { $0.id == uuid }) else { return }
         model.applyScene(scene)
+        refreshTemperature()
+    }
+
+    @objc private func applySceneToDeviceFromMenu(_ sender: NSMenuItem) {
+        guard let dict = sender.representedObject as? [String: String],
+              let devId = dict["deviceId"],
+              let sceneIdStr = dict["sceneId"],
+              let uuid = UUID(uuidString: sceneIdStr),
+              let scene = model.scenes.first(where: { $0.id == uuid }) else { return }
+        model.applyScene(scene, targetDeviceId: devId)
         refreshTemperature()
     }
 

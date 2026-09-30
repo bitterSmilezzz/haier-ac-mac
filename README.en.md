@@ -6,6 +6,16 @@ A native SwiftUI app to control Haier / Leader (统帅) smart air conditioners o
 
 ## Features
 
+- 🏷 **Unified Range-and-Keyword Repeat Scheduling, Whole-House Scene Preset Broadcast Penetration & Per-Device Status Bar Scene Matrix (v1.9.101)**:
+  - ⏱️ **"Range + Core Keyword" & "Core Keyword + Range" Universal Natural Repeat Scheduling Engine (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)**:
+    - **Full Core Keyword Alignment & Disambiguation**: Expanded `rangeWithKeywordRegex` and `keywordWithRangeRegex` to align across the complete keyword lexicon including `平日|双休日|休息日|公休日|休假日|放假日|节假日|大休|小休`, completely closing matching gaps where phrases like "周一至周三和双休日" or "周一至周四以及休息日" missed keyword union or dropped out of branches;
+    - **Unified Keyword Extraction Engine**: Introduced `daysFromKeyword` helper function to normalize core keyword mappings across dual-keyword combinations, multi-day sandwiches, and prefixed/suffixed composite schedules, eliminating duplicated if-else ladders;
+    - **100% Unit Test Coverage**: Added `testRangeAndKeywordUnificationV19101` covering forward/reverse range combinations, shift rests, big/small weekends, and strict anti-misoperation assertions, with all 109 unit tests passing.
+  - 🖥️ **Whole-House Scene Broadcast Penetration & macOS Native Per-Device Scene Presets Submenu (`AppModel.swift` / `StatusItemController.swift`)**:
+    - **Fixed Whole-House Scene Broadcast Penetration**: Refactored `AppModel.applyScene` so that when `allDevices == true`, all scene actions are unconditionally broadcast to all unified online devices, eliminating the bug where preset actions bound to a specific `deviceId` failed to broadcast;
+    - **macOS Native Status Bar Per-Device Scene Presets**: Embedded dedicated "✨ 应用情景预设..." (Apply Scene Preset) submenus inside each individual unit's `devSubmenu`, allowing users to directly apply sleep, away, home, or custom scenes to any specific room unit from the menu bar;
+    - **Precise Directional Feedback & Action Count**: Enhanced `operationNotice` and status bar tooltips to explicitly indicate the target device ("全屋 N 台空调" vs. specific unit) and exact count of applied actions.
+
 - 🏷 **Comprehensive Multi-Range Repeat Scheduling, Weekday/Time Boundary Collision Guards & Status Bar Quick Scene Presets Submenu (v1.9.100)**:
   - ⏱️ **"Multi-Range Repeat Scheduling & Dual-Keyword Combination" Natural Language Parsing Engine (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)**:
     - **Dual Core Keyword Combination Interception**: Introduced `keywordWithKeywordRegex` (e.g. "工作日加周末", "工作日和双休", "周末和平时") to seamlessly union dual core keyword sets (`[1, 2, 3, 4, 5, 6, 7]`), eliminating word truncation and partial character mismatches;

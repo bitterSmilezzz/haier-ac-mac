@@ -2687,23 +2687,33 @@ final class AppModel: ObservableObject {
         AppLog.log("更新情景: \(scene.name) (\(scene.actions.count) 个动作)")
     }
 
-    /// 一键应用情景：逐个下发动作（静默，不回 toast）。
-    /// - 动作 deviceId 为空时默认作用于第一台设备（可在 UI 中选目标设备）；
-    /// - `allDevices=true` 时，空 deviceId 的动作会下发给所有设备（批量场景）。
+    /// 一键应用情景：逐个下发动作 (v1.9.101 修复全屋广播穿透与定向单设备路由)
+    /// - `allDevices=true` 时，无条件将情景全部动作统一广播分发给全屋所有空调；
+    /// - 若指定 `targetDeviceId`（如单设备菜单应用或主显设备应用），动作统一作用于该目标设备；
+    /// - 默认未指定时，根据动作绑定的 deviceId 下发，为空则 fallback 至主显设备。
     func applyScene(_ scene: ScenePreset, targetDeviceId: String? = nil, allDevices: Bool = false) {
         guard gatewayConnected else {
             operationNotice = OperationNotice(text: "⚠️ 连接中断，情景未应用", isError: true)
             return
         }
         let fallbackId = targetDeviceId ?? primaryDeviceId
-        // 空 deviceId 动作的目标设备列表：全部设备 or 单台
-        let emptyTargets: [String] = allDevices
+        let defaultTargets: [String] = allDevices
             ? allUnifiedDevices.map(\.id)
             : (fallbackId.map { [$0] } ?? [])
         var sent = 0
         for action in scene.actions {
             guard let value = action.value else { continue }
-            let targets = action.deviceId.isEmpty ? emptyTargets : [action.deviceId]
+            let targets: [String] = {
+                if allDevices {
+                    return defaultTargets
+                } else if let targetDeviceId = targetDeviceId, !targetDeviceId.isEmpty {
+                    return [targetDeviceId]
+                } else if !action.deviceId.isEmpty {
+                    return [action.deviceId]
+                } else {
+                    return defaultTargets
+                }
+            }()
             for deviceId in targets where !deviceId.isEmpty {
                 guard reachability(for: deviceId).isControllable else { continue }
                 gatewayHandle?.sendControl(deviceId: deviceId, attributes: [action.attrName: value.jsonValue], completion: nil)
@@ -2715,8 +2725,22 @@ final class AppModel: ObservableObject {
                 sent += 1
             }
         }
-        AppLog.log("应用情景: \(scene.name) (\(sent) 个动作, allDevices=\(allDevices))")
-        operationNotice = OperationNotice(text: sent > 0 ? "✅ 情景「\(scene.name)」已下发（\(sent) 项）" : "⚠️ 情景「\(scene.name)」无可下发的动作（目标设备可能离线）", isError: sent == 0)
+        AppLog.log("应用情景: \(scene.name) (\(sent) 个动作, allDevices=\(allDevices), targetDeviceId=\(targetDeviceId ?? "none"))")
+        let targetDesc: String = {
+            if allDevices {
+                return "全屋 \(allUnifiedDevices.count) 台空调"
+            } else if let tid = targetDeviceId, let dev = allUnifiedDevices.first(where: { $0.id == tid }) {
+                return "「\(dev.name)」"
+            } else if let pId = primaryDeviceId, let dev = allUnifiedDevices.first(where: { $0.id == pId }) {
+                return "「\(dev.name)」"
+            } else {
+                return "空调"
+            }
+        }()
+        operationNotice = OperationNotice(
+            text: sent > 0 ? "✅ 情景「\(scene.name)」已应用至 \(targetDesc)（\(sent) 项动作）" : "⚠️ 情景「\(scene.name)」无可下发的动作（目标设备可能离线）",
+            isError: sent == 0
+        )
     }
 
     private var provider: (any DeviceProvider)?
