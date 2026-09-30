@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 import Charts
 import HaierACCore
 
@@ -10,6 +11,8 @@ struct MenuBarControlsView: View {
 
     /// 菜单栏选中的睡眠曲线方案
     @State private var selectedSleepCurveId: UUID?
+    /// 一键情景下发生效范围：false 为当前机，true 为全屋多联 (v1.9.104)
+    @State private var sceneScopeAll = false
 
     private var selectedSleepCurve: SleepCurveConfig {
         if let id = selectedSleepCurveId, let curve = model.allSleepCurves.first(where: { $0.id == id }) {
@@ -103,7 +106,12 @@ struct MenuBarControlsView: View {
                     ambientSoundPod
                 }
 
-                // 2.4 一键情景预设 Bento 矩阵 (若存在配置情景) (v1.9.103)
+                // 2.4 活跃定时与倒计时任务快捷指示胶囊 (若存在活跃任务) (v1.9.104)
+                if hasActiveSchedules(device: device) {
+                    activeSchedulePod(device: device)
+                }
+
+                // 2.5 一键情景预设 Bento 矩阵 (若存在配置情景) (v1.9.103/v1.9.104)
                 if !model.scenes.isEmpty {
                     scenesPod(device: device, reachability: reachability)
                 }
@@ -329,6 +337,7 @@ struct MenuBarControlsView: View {
         HStack(spacing: 8) {
             // 电源主开关
             Button {
+                triggerHaptic()
                 withAnimation(Theme.spring) {
                     model.sendAttribute("onOffStatus", value: .bool(!isPowerOn), deviceId: device.id)
                 }
@@ -357,6 +366,7 @@ struct MenuBarControlsView: View {
             if let light = attrs["lightStatus"], light.writable {
                 let isLightOn = light.boolValue ?? false
                 Button {
+                    triggerHaptic()
                     withAnimation(Theme.spring) {
                         model.sendAttribute("lightStatus", value: .bool(!isLightOn), deviceId: device.id)
                     }
@@ -373,10 +383,10 @@ struct MenuBarControlsView: View {
                     .background(
                         RoundedRectangle(cornerRadius: Theme.radiusSM, style: .continuous)
                             .fill(isLightOn ? Theme.surface3 : Theme.surface1)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: Theme.radiusSM, style: .continuous)
-                                    .strokeBorder(isLightOn ? Theme.accent.opacity(0.4) : Theme.hairline, lineWidth: 1)
-                            )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: Theme.radiusSM, style: .continuous)
+                                .strokeBorder(isLightOn ? Theme.accent.opacity(0.4) : Theme.hairline, lineWidth: 1)
+                        )
                     )
                 }
                 .buttonStyle(.plain)
@@ -384,7 +394,146 @@ struct MenuBarControlsView: View {
         }
     }
 
-    // MARK: - 2.4 一键情景预设 Bento 矩阵 (v1.9.103)
+    // MARK: - 2.4 活跃定时与倒计时任务指示胶囊 (v1.9.104)
+
+    private func hasActiveSchedules(device: DeviceInfo) -> Bool {
+        model.scheduledActions.contains { $0.enabled && ($0.deviceId == device.id || $0.deviceId.isEmpty) }
+    }
+
+    @ViewBuilder
+    private func activeSchedulePod(device: DeviceInfo) -> some View {
+        let schedules = model.scheduledActions
+            .filter { $0.enabled && ($0.deviceId == device.id || $0.deviceId.isEmpty) }
+            .sorted { $0.fireDate < $1.fireDate }
+
+        if let nearest = schedules.first {
+            let remainingSeconds = nearest.fireDate.timeIntervalSince(Date())
+            let timeDesc: String = {
+                let df = DateFormatter()
+                df.dateFormat = "HH:mm"
+                let timeStr = df.string(from: nearest.fireDate)
+                if remainingSeconds > 0 && remainingSeconds < 86400 {
+                    let mins = max(1, Int(remainingSeconds / 60))
+                    if mins >= 60 {
+                        let h = mins / 60
+                        let m = mins % 60
+                        return m > 0 ? "今天 \(timeStr) (\(h)小时\(m)分后)" : "今天 \(timeStr) (\(h)小时后)"
+                    } else {
+                        return "今天 \(timeStr) (\(mins)分钟后)"
+                    }
+                } else if remainingSeconds <= 0 {
+                    return "即将触发"
+                } else {
+                    let dfFull = DateFormatter()
+                    dfFull.dateFormat = "M月d日 HH:mm"
+                    return dfFull.string(from: nearest.fireDate)
+                }
+            }()
+
+            let repeatDesc = nearest.repeatLabel
+
+            HStack(spacing: 8) {
+                Image(systemName: "timer")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(Color.dynamic(light: 0x007AFF, dark: 0x0A84FF))
+
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack(spacing: 5) {
+                        Text(nearest.name)
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(Theme.ink)
+                            .lineLimit(1)
+
+                        if let repeatDesc = repeatDesc {
+                            Text(repeatDesc)
+                                .font(.system(size: 8, weight: .bold))
+                                .foregroundStyle(Color.dynamic(light: 0x007AFF, dark: 0x0A84FF))
+                                .padding(.horizontal, 4)
+                                .padding(.vertical, 1)
+                                .background(Color.dynamic(light: 0x007AFF, dark: 0x0A84FF).opacity(0.12))
+                                .clipShape(Capsule())
+                        }
+                    }
+
+                    Text(schedules.count > 1 ? "\(timeDesc) · 共 \(schedules.count) 个计划" : timeDesc)
+                        .font(.system(size: 10))
+                        .foregroundStyle(Theme.inkSubtle)
+                        .lineLimit(1)
+                }
+
+                Spacer()
+
+                if schedules.count == 1 {
+                    Button {
+                        triggerHaptic()
+                        withAnimation(Theme.springFast) {
+                            model.removeScheduledAction(nearest)
+                        }
+                    } label: {
+                        Text("取消")
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundStyle(Theme.danger)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 3)
+                            .background(Theme.danger.opacity(0.12))
+                            .cornerRadius(Theme.radiusSM)
+                    }
+                    .buttonStyle(.plain)
+                    .help("取消当前「\(nearest.name)」任务")
+                } else {
+                    Menu {
+                        Button("取消此任务 (\(nearest.name))") {
+                            triggerHaptic()
+                            withAnimation(Theme.springFast) {
+                                model.removeScheduledAction(nearest)
+                            }
+                        }
+                        Button("取消「\(device.deviceName)」全部定时 (\(schedules.count))") {
+                            triggerHaptic()
+                            withAnimation(Theme.springFast) {
+                                _ = model.cancelSchedules(for: device.id)
+                            }
+                        }
+                        if model.allUnifiedDevices.count > 1 {
+                            Divider()
+                            Button("取消全屋所有定时") {
+                                triggerHaptic()
+                                withAnimation(Theme.springFast) {
+                                    _ = model.cancelAllSchedules()
+                                }
+                            }
+                        }
+                    } label: {
+                        HStack(spacing: 3) {
+                            Text("管理")
+                                .font(.system(size: 10, weight: .medium))
+                            Image(systemName: "chevron.down")
+                                .font(.system(size: 8))
+                        }
+                        .foregroundStyle(Theme.danger)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 3)
+                        .background(Theme.danger.opacity(0.12))
+                        .cornerRadius(Theme.radiusSM)
+                    }
+                    .menuStyle(.borderlessButton)
+                    .fixedSize()
+                }
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(
+                RoundedRectangle(cornerRadius: Theme.radiusMD, style: .continuous)
+                    .fill(Color.dynamic(light: 0xF0F7FF, dark: 0x142033))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: Theme.radiusMD, style: .continuous)
+                            .strokeBorder(Color.dynamic(light: 0xC5DCFF, dark: 0x1E3A5F), lineWidth: 1)
+                    )
+            )
+        }
+    }
+
+    // MARK: - 2.5 一键情景预设 Bento 矩阵 (v1.9.103/v1.9.104)
 
     private func scenesPod(device: DeviceInfo, reachability: AppModel.DeviceReachability) -> some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -396,7 +545,48 @@ struct MenuBarControlsView: View {
                     .font(.system(size: 10, weight: .medium))
                     .foregroundStyle(Theme.inkSubtle)
                 Spacer()
+
                 if model.allUnifiedDevices.count > 1 {
+                    HStack(spacing: 2) {
+                        Button {
+                            withAnimation(Theme.springFast) {
+                                sceneScopeAll = false
+                                triggerHaptic()
+                            }
+                        } label: {
+                            Text("当前机")
+                                .font(.system(size: 9, weight: !sceneScopeAll ? .semibold : .regular))
+                                .padding(.horizontal, 5)
+                                .padding(.vertical, 2)
+                                .foregroundStyle(!sceneScopeAll ? Theme.ink : Theme.inkTertiary)
+                                .background(
+                                    Capsule()
+                                        .fill(!sceneScopeAll ? Theme.surface3 : Color.clear)
+                                )
+                        }
+                        .buttonStyle(.plain)
+
+                        Button {
+                            withAnimation(Theme.springFast) {
+                                sceneScopeAll = true
+                                triggerHaptic()
+                            }
+                        } label: {
+                            Text("全屋 (\(model.allUnifiedDevices.count))")
+                                .font(.system(size: 9, weight: sceneScopeAll ? .semibold : .regular))
+                                .padding(.horizontal, 5)
+                                .padding(.vertical, 2)
+                                .foregroundStyle(sceneScopeAll ? Theme.ink : Theme.inkTertiary)
+                                .background(
+                                    Capsule()
+                                        .fill(sceneScopeAll ? Theme.surface3 : Color.clear)
+                                )
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    .padding(2)
+                    .background(Capsule().fill(Theme.surface2))
+                } else {
                     Text("当前: \(device.deviceName)")
                         .font(.system(size: 9))
                         .foregroundStyle(Theme.inkTertiary)
@@ -416,8 +606,13 @@ struct MenuBarControlsView: View {
                         }
                     }()
                     Button {
+                        triggerHaptic()
                         withAnimation(Theme.springFast) {
-                            model.applyScene(scene, targetDeviceId: device.id)
+                            if sceneScopeAll {
+                                model.applyScene(scene, allDevices: true)
+                            } else {
+                                model.applyScene(scene, targetDeviceId: device.id)
+                            }
                         }
                     } label: {
                         HStack(spacing: 4) {
@@ -440,7 +635,7 @@ struct MenuBarControlsView: View {
                         )
                     }
                     .buttonStyle(.plain)
-                    .help("为「\(device.deviceName)」一键应用「\(scene.name)」情景")
+                    .help(sceneScopeAll ? "为全屋所有空调一键应用「\(scene.name)」情景" : "为「\(device.deviceName)」一键应用「\(scene.name)」情景")
                 }
             }
         }
@@ -483,6 +678,7 @@ struct MenuBarControlsView: View {
                 // 加减步进胶囊
                 HStack(spacing: 12) {
                     Button {
+                        triggerHaptic()
                         let new = Swift.max(min, current - step)
                         withAnimation(Theme.spring) {
                             model.sendAttribute("targetTemperature", value: .double(Theme.roundStep(value: new, step: step)), deviceId: device.id)
@@ -499,6 +695,7 @@ struct MenuBarControlsView: View {
                     .disabled(!isPowerOn || current <= min)
 
                     Button {
+                        triggerHaptic()
                         let new = Swift.min(max, current + step)
                         withAnimation(Theme.spring) {
                             model.sendAttribute("targetTemperature", value: .double(Theme.roundStep(value: new, step: step)), deviceId: device.id)
@@ -553,6 +750,7 @@ struct MenuBarControlsView: View {
                         let optCat = Theme.modeCategory(modeDesc: opt.desc, isOn: true)
 
                         Button {
+                            triggerHaptic()
                             withAnimation(Theme.springFast) {
                                 model.sendAttribute("operationMode", value: opt.data, deviceId: device.id)
                             }
@@ -599,6 +797,7 @@ struct MenuBarControlsView: View {
                         let isSelected = opt.data.stringValue == currentVal
 
                         Button {
+                            triggerHaptic()
                             withAnimation(Theme.springFast) {
                                 model.sendAttribute("windSpeed", value: opt.data, deviceId: device.id)
                             }
@@ -1020,6 +1219,12 @@ struct MenuBarControlsView: View {
                         .strokeBorder(Theme.hairline, lineWidth: 1)
                 )
         )
+    }
+
+    // MARK: - 微触感反馈 (v1.9.104)
+
+    private func triggerHaptic() {
+        NSHapticFeedbackManager.defaultPerformer.perform(.generic, performanceTime: .default)
     }
 }
 

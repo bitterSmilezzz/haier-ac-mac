@@ -6,6 +6,18 @@ A native SwiftUI app to control Haier / Leader (统帅) smart air conditioners o
 
 ## Features
 
+- 🏷 **Universal Tri-Range & Core Keyword Repeat Scheduling, Menu Bar Whole-House Scene Switcher & Active Schedule Pod (v1.9.104)**:
+  - ⏱️ **"Tri-Range & Core Keyword Bi-directional Universal Repeat Scheduling, Range + Discrete Days + Keyword Ternary Engine" (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)**:
+    - **Triangular Topology for Tri-Ranges and Core Keywords**: Added `triRangeWithKeywordRegex` (tri-range + keyword), `keywordWithTriRangeRegex` (keyword + tri-range), `rangeWithKeywordAndDualRangeRegex` (range + keyword + dual-range sandwich), and `dualRangeWithKeywordAndRangeRegex` (dual-range + keyword + range sandwich) macro regex engines;
+    - **Range + Discrete Weekdays + Keyword Ternary Composition**: Introduced `rangeWithMultiDaysAndKeywordRegex`, `keywordWithRangeAndMultiDaysRegex`, and `multiDaysWithRangeAndKeywordRegex`, fully closing combinations of single/dual continuous ranges, discrete weekdays, and core shift/weekend keywords;
+    - **Eliminated Hidden Keyword Tail Character Truncation**: Added negative lookbehind `(?<!(?:工作|平时|平日|单休日|单休|双休日|双休|休息|公休|休假|放假|节假|大休日|大休|大周|小休日|小休|小周|生|次|翌|当|昨|今|明|后|大后))` to all discrete weekday regex macros, preventing trailing "日" characters in words like "双休日", "工作日", or "节假日" from being greedily misparsed as an isolated Sunday;
+    - **Full Spoken Schedule Benchmark Coverage**: Seamlessly handles "周一到周二、周四到周五、周六到周日和大休早8点开机" (`[1, 2, 3, 5, 6, 7]`), "周一至周二、周三至周四、周五至周六加单休日早8点开机" (`[1, 2, 3, 4, 5, 6, 7]`), "周一至周三加周四、周五和大休早8点开机" (`[1, 2, 3, 4, 5, 6, 7]`), and "周一至周三加双休日和双休早8点开机" (`[1, 2, 3, 4, 7]`);
+    - **100% Unit Test Suite Coverage**: Added `testTriRangeAndKeywordAndTernaryUnificationV19104` test suite with 112 unit tests passing without errors.
+  - 🖥️ **macOS Menu Bar Bento Popover Control Center Whole-House Scene Switcher & Active Schedule Pod (`MenuBarControlsView.swift`)**:
+    - **Active Schedule & Countdown Pod (`activeSchedulePod`)**: Embedded a native Bento capsule into the menu bar popover directly under quick actions, displaying upcoming scheduled tasks, recurrence badges ("每天", "工作日", "一次性"), and precise countdowns with one-click cancellation and batch schedule management;
+    - **Segmented "Current Unit / Whole House" Scene Preset Switcher**: Added a micro-capsule toggle in the "One-Click Scenes" section of the menu bar control center, enabling instant switching between per-unit execution and whole-house broadcast dispatch;
+    - **System-Wide Native Haptic Feedback (`NSHapticFeedbackManager`)**: Infused native macOS trackpad haptic pulses into power switches, scene lighting, temperature stepping, operating modes, fan speeds, scene triggers, and schedule cancellations.
+
 - 🏷 **Universal Dual-Range & Core Keyword Repeat Scheduling, Menu Bar & Main Window Scene Presets Matrix, and Power-On Runtime Consistency (v1.9.103)**:
   - ⏱️ **"Dual-Range & Core Keyword Bi-directional Universal Repeat Scheduling" Engine (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)**:
     - **Triangular Topology for Dual Ranges and Core Keywords**: Added `dualRangeWithKeywordRegex` (dual range + keyword), `keywordWithDualRangeRegex` (keyword + dual range), and `rangeWithKeywordAndRangeRegex` (range + keyword + range sandwich) macro regex engines, completely eliminating the historical bug where `rangeWithRangeRegex` greedily truncated two ranges and silently discarded trailing or sandwiched keywords (such as "大休", "双休日", "单休日");

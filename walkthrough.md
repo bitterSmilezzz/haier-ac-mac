@@ -1,19 +1,19 @@
-# Haier AC Mac v1.9.103 发布与巡检演进报告
+# Haier AC Mac v1.9.104 发布与巡检演进报告
 
 ## 1. 概述与版本定位
-- **版本号**：`v1.9.103`
-- **发版主题**：闭环双连续区间与核心关键词全景复合调度、状态栏与主窗口一键情景预设 Bento 矩阵及开机机时自洽
+- **版本号**：`v1.9.104`
+- **发版主题**：闭环三连续区间与核心关键词全景复合调度、菜单栏控制中心全屋情景切换与活跃定时胶囊
 - **核心目标与架构演进**：
-  1. **“双连续区间与核心关键词双向全景复合”调度大一统引擎 (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)**：
-     - **双区间与关键词三角拓扑大一统**：新增 `dualRangeWithKeywordRegex`（双区间在前+核心词在后）、`keywordWithDualRangeRegex`（核心词在前+双区间在后）与 `rangeWithKeywordAndRangeRegex`（区间在先+核心词居中+区间在后夹心）三大宏正则引擎，彻底解决因 `rangeWithRangeRegex` 提前贪婪截断双区间导致尾部或中间的“大休/双休日/单休日”等核心关键词被静默丢弃的历史缺陷；
-     - **全向复合自然口语无缝覆盖**：全面闭环“周一至周二、周四至周五和大休早8点开机”（`[1, 2, 3, 5, 6, 7]`）、“周一到周三、周五到周六加双休日早8点开机”（`[1, 2, 3, 4, 6, 7]`）、“周一至周二、周四至周五加单休日晚9点关空调”（`[1, 2, 3, 5, 6]`）、“大休和周一至周二、周四至周五早8点开机”（`[1, 2, 3, 5, 6, 7]`）、“周一至周二、大休和周四至周五早8点开机”（`[1, 2, 3, 5, 6, 7]`）等高阶自然口语调度；
-     - **单元测试 100% 满分覆盖**：新增 `testDualRangeAndKeywordUnificationV19103` 严苛测试套件，包含正向双区间、反向双区间、夹心双区间及严格防即时误触断言，全套 111 个单元测试零缺陷通过。
-  2. **macOS 状态栏 Bento 控制中心与主窗口一键情景预设矩阵贯通 (`MenuBarControlsView.swift` / `DeviceControlView.swift`)**：
-     - **菜单栏 Bento 控制中心新增「一键情景」快捷矩阵**：在菜单栏 Popover 控制中心紧随快控区域植入原生 Bento 风格的快捷情景卡片，直观展现情景图标（🌙 睡眠、🚪 离家、🏠 回家、✨ 自定义）与名称，用户单击菜单栏图标即可为当前设备一键应用情景，伴随微触感弹簧动效与操作反馈 Toast；
-     - **主窗口设备详情面板打通情景模式快捷网格**：在主窗口 `DeviceControlView` 快控区植入情景模式卡片网格，支持在主界面直接向当前选中的空调下发复合情景，达成右键菜单、批量面板、菜单栏 Popover、主窗口、快捷指令与语音胶囊的全域对称自洽；
-     - **离线与断网状态安全门禁**：情景卡片严格遵从设备可达性三态模型，在网关重连中或设备离线时自动禁用并平滑降级，杜绝盲目下发。
-  3. **开机与状态变迁时机时初始化与状态同步保障 (`AppModel.swift`)**：
-     - **开机场景运行机时自洽重置**：重构 `applyScene`、`fireDueActions`、`sendAttribute` 与 `sendAttributeToDevices`，在下发开机动作（`onOffStatus == true`）且设备原状态为待机时，将 `deviceContinuousMinutes` 归零重新计时，彻底消除待机漂移与机时残留；关机时保持即刻清零，确保能耗热动力学模型的 100% 精确度。
+  1. **“三连续区间与核心关键词双向全景复合、区间+离散+关键词三元大一统”调度引擎 (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)**：
+     - **三连续区间与关键词全景拓扑大一统**：新增 `triRangeWithKeywordRegex`（三连续区间在前+核心词在后）、`keywordWithTriRangeRegex`（核心词在前+三连续区间在后）、`rangeWithKeywordAndDualRangeRegex`（单区间在前+核心词居中+双区间在后夹心）与 `dualRangeWithKeywordAndRangeRegex`（双区间在前+核心词居中+单区间在后夹心）等高阶宏正则引擎；
+     - **区间+离散星期+核心关键词三元复合大一统**：新增 `rangeWithMultiDaysAndKeywordRegex`、`keywordWithRangeAndMultiDaysRegex` 与 `multiDaysWithRangeAndKeywordRegex`，彻底闭环“单/双连续区间”、“离散多星期”与“核心关键词”任意排列组合的超高复杂度自然调度表达；
+     - **彻底修复潜伏的核心关键词字尾字符截断漏洞**：为所有前置离散星期正则宏全面补齐防词尾“日”截断的负向后行断言 `(?<!(?:工作|平时|平日|单休日|单休|双休日|双休|休息|公休|休假|放假|节假|大休日|大休|大周|小休日|小休|小周|生|次|翌|当|昨|今|明|后|大后))`，坚决阻断“双休日/工作日/节假日”等词尾的“日”被贪婪误判为单个“周日”的重大解析隐患；
+     - **全向复合自然口语无缝覆盖**：全面覆盖“周一到周二、周四到周五、周六到周日和大休早8点开机”（`[1, 2, 3, 5, 6, 7]`）、“周一至周二、周三至周四、周五至周六加单休日早8点开机”（`[1, 2, 3, 4, 5, 6, 7]`）、“周一至周三加周四、周五和大休早8点开机”（`[1, 2, 3, 4, 5, 6, 7]`）、“周一至周三加双休日和双休早8点开机”（`[1, 2, 3, 4, 7]`）等口语调度；
+     - **单元测试 100% 满分覆盖**：新增 `testTriRangeAndKeywordAndTernaryUnificationV19104` 严苛测试套件，全套 112 个单元测试零缺陷通过，杜绝误触。
+  2. **macOS 菜单栏 Bento Popover 控制中心全屋情景切换与活跃定时指示胶囊 (`MenuBarControlsView.swift`)**：
+     - **活跃定时与倒计时任务快捷指示胶囊 (`activeSchedulePod`)**：在菜单栏控制中心快捷操作区下方无缝嵌入活跃调度胶囊，实时计算并展示最近即将触发的任务名称、周期类型（如“每天”、“工作日”、“一次性”）及精确倒计时；支持单任务一键快捷取消与多任务展开管理（取消单任务、取消当前机所有定时、全屋取消定时）；
+     - **一键情景多设备「当前机 / 全屋」分段微型切换胶囊**：在菜单栏控制中心的「一键情景」区域引入多设备协同切换胶囊，支持用户秒级切换“当前机”独立下发与“全屋 (N台)”统一广播预设，达成与状态栏菜单、批量面板的 100% 全对称协同体验；
+     - **全交互原生微触感反馈 (`NSHapticFeedbackManager`)**：为菜单栏 Bento 控制中心的电源开关、情景灯光、目标温度步进调节、运行模式切换、风速挡位选择、情景预设应用及定时任务管理全量注入 macOS 原生系统级微触感震动反馈，让交互更具物理质感。
 
 ---
 
@@ -27,64 +27,39 @@
    - **死分支清理 (P2-2)**：`.adjustTemperatureAll` 死分支已彻底清理；
    - **调温 16/30°C 边界防护 (P2-3)**：单设备与全屋协同均已严格实施边界限制并同步至状态栏与 UI Stepper 使能状态。
 2. **本轮走查发现的高价值优化与缺陷闭环**：
-   - **双连续区间与核心关键词组合调度脱靶缺陷 (P1 修复)**：在自然语言周期排班中，当用户表达“周一至周二、周四至周五和大休”时，原先流程会被 `rangeWithRangeRegex` 提前匹配拦截并把末尾“和大休”截断丢弃；当关键词居中或在前时更无法识别。本次新增三组全景复合正则并在流水线中提前拦截，完整闭环了双连续区间与核心词的三角拓扑；
-   - **菜单栏 Popover 控制中心与主窗口情景预设缺失 (高价值体验优化)**：以往一键情景只能在状态栏右键二级菜单或批量控制窗口触发，核心的菜单栏 Bento Popover 与主控制面板中无法便捷使用。本次在两个核心视图均植入一键情景卡片，实现全平台统一对称；
-   - **开机场景持续机时残留风险 (P2 修复)**：在设备由待机状态唤醒开机时，补齐了持续机时清零初始化保护，防止跨周期累计导致能耗动力学模型热饱和阻尼计算失真。
+   - **三连续区间与核心关键词复合调度脱靶漏洞 (P1 修复)**：在自然语言周期排班中，当用户表达“周一至周二、周四至周五、周六至周日和大休”时，若没有三连续区间宏正则，会在双区间匹配后把第三段区间与末尾关键词截断；同时深入分析发现历史正则中由于缺乏前置负向后行断言，当“周六加单休日”或“周五加双休日”被离散正则处理时，“双休日/工作日”结尾的“日”会被贪婪误匹配为星期天 `[1]`。本次在补齐三连续区间拓扑的同时，全面筑牢字符截断防线，彻底根除此隐蔽缺陷；
+   - **菜单栏 Popover 控制中心全屋情景与活跃调度缺失 (高价值体验优化)**：用户在日常使用中高频呼出菜单栏控制中心，但以往菜单栏缺乏活跃定时任务的直观指示，也无法一键广播全屋情景，更缺乏触控板微触感。本次在菜单栏 Popover 中无缝集成活跃定时指示胶囊与全屋情景切换，并注入原生 AppKit 微触感反馈。
 
 ---
 
 ## 3. 关键架构变更与代码实现
 
-### 3.1 双连续区间与核心关键词正则宏与流式提取
+### 3.1 三连续区间、三元复合宏正则与关键词防截断
 - **`VoiceCommandParser.swift`**：
   ```swift
-  // 双连续区间在前 + 核心关键词在后
-  private static let dualRangeWithKeywordRegex: NSRegularExpression? = { ... }()
+  // 三连续区间在前 + 核心关键词在后
+  private static let triRangeWithKeywordRegex: NSRegularExpression? = { ... }()
 
-  // 核心关键词在前 + 双连续区间在后
-  private static let keywordWithDualRangeRegex: NSRegularExpression? = { ... }()
+  // 核心关键词在前 + 三连续区间在后
+  private static let keywordWithTriRangeRegex: NSRegularExpression? = { ... }()
 
-  // 连续区间在先、核心关键词居中、连续区间在后
-  private static let rangeWithKeywordAndRangeRegex: NSRegularExpression? = { ... }()
+  // 离散多星期匹配宏增加关键词尾字符负向断言防线
+  private static let multiDaysNegativeLookbehind = #"(?<!(?:工作|平时|平日|单休日|单休|双休日|双休|休息|公休|休假|放假|节假|大休日|大休|大周|小休日|小休|小周|生|次|翌|当|昨|今|明|后|大后))"#
   ```
 
-### 3.2 菜单栏 Popover 控制中心一键情景 Bento 卡片
+### 3.2 菜单栏 Bento 控制中心活跃定时胶囊与全屋情景微型切换
 - **`MenuBarControlsView.swift`**：
   ```swift
-  private func scenesPod(device: DeviceInfo, reachability: AppModel.DeviceReachability) -> some View {
-      VStack(alignment: .leading, spacing: 6) {
-          HStack(spacing: 4) {
-              Image(systemName: "sparkles")
-              Text("一键情景")
-              Spacer()
-          }
-          LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: min(model.scenes.count, 3)), spacing: 6) {
-              ForEach(model.scenes) { scene in
-                  Button {
-                      withAnimation(Theme.springFast) {
-                          model.applyScene(scene, targetDeviceId: device.id)
-                      }
-                  } label: { ... }
-              }
-          }
-      }
-      .disabled(!reachability.isControllable)
-      .opacity(reachability.isControllable ? 1.0 : 0.6)
-  }
-  ```
+  // 活跃定时指示胶囊
+  @ViewBuilder
+  private func activeSchedulePod(device: DeviceInfo) -> some View { ... }
 
-### 3.3 开关机双向机时管理与状态自洽
-- **`AppModel.swift`**：
-  ```swift
-  if var map = attributes[deviceId], let old = map[name] {
-      let wasOff = (old.boolValue != true)
-      map[name] = old.updating(value: value)
-      attributes[deviceId] = map
-      if name == "onOffStatus" {
-          if value.boolValue == false || wasOff {
-              deviceContinuousMinutes[deviceId] = 0
-          }
-      }
+  // 一键情景支持当前机 / 全屋 (N台) 分段切换
+  private func scenesPod(device: DeviceInfo, reachability: AppModel.DeviceReachability) -> some View { ... }
+
+  // AppKit 系统微触感反馈
+  private func triggerHaptic() {
+      NSHapticFeedbackManager.defaultPerformer.perform(.generic, performanceTime: .default)
   }
   ```
 
@@ -94,17 +69,17 @@
 
 1. **自动化单元测试全通**：
    - 执行 `SDKROOT=/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk swift test`：
-   - 包含 `VoiceCommandParserTests`、`ZlibTests` 等在内共 **111 个单元测试 100% 成功通过（0 failures, 0 unexpected）**。
+   - 包含 `VoiceCommandParserTests`、`ZlibTests` 等在内共 **112 个单元测试 100% 成功通过（0 failures, 0 unexpected）**。
 2. **Release 编译构建**：
    - 执行 `SDKROOT=/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk swift build`：
    - 编译顺利通过，零警告零报错。
 3. **应用打包与签名**：
-   - 执行 `./build_app.sh`：
-   - 顺利生成 App 产物 `dist/HaierAC.app` 与发布安装包 `dist/HaierAC-v1.9.103-macOS.zip`（体积 2.9MB，内置桌面小组件扩展与签名，SHA256: `759a6be75658d16bbe2b0064da4d84ee8a98024370e56fa53c8241cc521a2615`）。
+   - 执行 `./build_app.sh 1.9.104`：
+   - 顺利生成 App 产物 `dist/HaierAC.app` 与发布安装包 `dist/HaierAC-v1.9.104-macOS.zip`（体积 2.9MB，内置桌面小组件扩展与签名，SHA256: `567d7b7d6d3b5fa5b6c3b8567fd130a08af81c6d25cb65ba5210a42dde067ca5`）。
 
 ---
 
 ## 5. 发版信息与提交记录
-- **Git Commit**：`feat & fix: 闭环双连续区间与核心关键词全景复合调度、状态栏与主窗口一键情景预设 Bento 矩阵及开机机时自洽 (v1.9.103)`
-- **Git Tag**：`v1.9.103`
-- **Release Asset**：`dist/HaierAC-v1.9.103-macOS.zip`
+- **Git Commit**：`feat & fix: 闭环三连续区间与核心关键词全景复合调度、菜单栏控制中心全屋情景切换与活跃定时胶囊 (v1.9.104)`
+- **Git Tag**：`v1.9.104`
+- **Release Asset**：`dist/HaierAC-v1.9.104-macOS.zip`
