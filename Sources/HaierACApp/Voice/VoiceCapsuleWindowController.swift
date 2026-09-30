@@ -1089,9 +1089,7 @@ public final class VoiceCapsuleWindowController: NSObject, NSWindowDelegate {
 
         case .applyScene(let sceneName):
             if let scene = model.scenes.first(where: { $0.name.contains(sceneName) }) {
-                for dev in controllable {
-                    model.applyScene(scene, targetDeviceId: dev.id)
-                }
+                model.applyScene(scene, targetDeviceIds: controllable.map(\.id))
                 VoiceControlManager.shared.markSuccess("已为\(prefix)应用「\(scene.name)」情景")
             } else {
                 VoiceControlManager.shared.markFailed("未找到「\(sceneName)」情景")

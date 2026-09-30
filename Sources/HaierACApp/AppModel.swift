@@ -1538,6 +1538,15 @@ final class AppModel: ObservableObject {
             // 静默下发（不走操作反馈 toast，避免批量触发刷屏）
             gatewayHandle?.sendControl(deviceId: action.deviceId, attributes: [action.attrName: value.jsonValue], completion: nil)
 
+            // 本地状态乐观更新与运行机时重置 (v1.9.102 状态即时同步)
+            if var map = attributes[action.deviceId], let old = map[action.attrName] {
+                map[action.attrName] = old.updating(value: value)
+                attributes[action.deviceId] = map
+            }
+            if action.attrName == "onOffStatus" && value.boolValue == false {
+                deviceContinuousMinutes[action.deviceId] = 0
+            }
+
             guard let idx = scheduledActions.firstIndex(where: { $0.id == action.id }) else { continue }
 
             if !action.repeatWeekdays.isEmpty {
@@ -2687,25 +2696,35 @@ final class AppModel: ObservableObject {
         AppLog.log("更新情景: \(scene.name) (\(scene.actions.count) 个动作)")
     }
 
-    /// 一键应用情景：逐个下发动作 (v1.9.101 修复全屋广播穿透与定向单设备路由)
+    /// 一键应用情景：逐个下发动作 (v1.9.101 修复全屋广播穿透与定向单设备路由, v1.9.102 支持多设备批量分发与关机机时清零闭环)
     /// - `allDevices=true` 时，无条件将情景全部动作统一广播分发给全屋所有空调；
+    /// - 若指定 `targetDeviceIds`（如批量控制面板多选设备），动作统一作用于所选的目标设备列表；
     /// - 若指定 `targetDeviceId`（如单设备菜单应用或主显设备应用），动作统一作用于该目标设备；
     /// - 默认未指定时，根据动作绑定的 deviceId 下发，为空则 fallback 至主显设备。
-    func applyScene(_ scene: ScenePreset, targetDeviceId: String? = nil, allDevices: Bool = false) {
+    func applyScene(_ scene: ScenePreset, targetDeviceId: String? = nil, targetDeviceIds: [String]? = nil, allDevices: Bool = false) {
         guard gatewayConnected else {
             operationNotice = OperationNotice(text: "⚠️ 连接中断，情景未应用", isError: true)
             return
         }
         let fallbackId = targetDeviceId ?? primaryDeviceId
-        let defaultTargets: [String] = allDevices
-            ? allUnifiedDevices.map(\.id)
-            : (fallbackId.map { [$0] } ?? [])
+        let defaultTargets: [String] = {
+            if allDevices {
+                return allUnifiedDevices.map(\.id)
+            } else if let ids = targetDeviceIds, !ids.isEmpty {
+                return ids
+            } else {
+                return fallbackId.map { [$0] } ?? []
+            }
+        }()
         var sent = 0
+        var controlledDeviceIds = Set<String>()
         for action in scene.actions {
             guard let value = action.value else { continue }
             let targets: [String] = {
                 if allDevices {
                     return defaultTargets
+                } else if let ids = targetDeviceIds, !ids.isEmpty {
+                    return ids
                 } else if let targetDeviceId = targetDeviceId, !targetDeviceId.isEmpty {
                     return [targetDeviceId]
                 } else if !action.deviceId.isEmpty {
@@ -2722,13 +2741,23 @@ final class AppModel: ObservableObject {
                     map[action.attrName] = old.updating(value: value)
                     attributes[deviceId] = map
                 }
+                if action.attrName == "onOffStatus" && value.boolValue == false {
+                    deviceContinuousMinutes[deviceId] = 0
+                }
+                controlledDeviceIds.insert(deviceId)
                 sent += 1
             }
         }
-        AppLog.log("应用情景: \(scene.name) (\(sent) 个动作, allDevices=\(allDevices), targetDeviceId=\(targetDeviceId ?? "none"))")
+        AppLog.log("应用情景: \(scene.name) (\(sent) 个动作, allDevices=\(allDevices), targetDeviceIds=\(targetDeviceIds?.joined(separator: ",") ?? "none"), targetDeviceId=\(targetDeviceId ?? "none"))")
         let targetDesc: String = {
             if allDevices {
                 return "全屋 \(allUnifiedDevices.count) 台空调"
+            } else if let ids = targetDeviceIds, !ids.isEmpty {
+                if ids.count == 1, let dev = allUnifiedDevices.first(where: { $0.id == ids[0] }) {
+                    return "「\(dev.name)」"
+                } else {
+                    return "所选 \(controlledDeviceIds.count) 台空调"
+                }
             } else if let tid = targetDeviceId, let dev = allUnifiedDevices.first(where: { $0.id == tid }) {
                 return "「\(dev.name)」"
             } else if let pId = primaryDeviceId, let dev = allUnifiedDevices.first(where: { $0.id == pId }) {

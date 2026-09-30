@@ -6,6 +6,17 @@ A native SwiftUI app to control Haier / Leader (统帅) smart air conditioners o
 
 ## Features
 
+- 🏷 **Universal Natural Schedule Parsing for Big/Small Weekend & Shift Variants, Batch Scene Presets Matrix & Immediate Scheduled State Sync (v1.9.102)**:
+  - ⏱️ **"大休日/小休日/大周/小周/单休日" Extended Core Keywords Repeat Scheduling Engine (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)**:
+    - **Full Core Keyword Lexicon Alignment & Alternation Order Hardening**: Systematically integrated `大休日|大周` (weekend `[1, 7]`) and `小休日|小周|单休日` (single rest day Sunday `[1]`) across `daysFromKeyword` and all 8 composite schedule regexes. Reordered regex alternation patterns so longer prefixes precede shorter ones, completely preventing "单休日" from being greedily truncated by "单休" and resolving historical edge cases;
+    - **Seamless Natural Spoken Coverage**: Full benchmark coverage for complex spoken schedules including "周一至周三和大休日早8点开机" (`[1, 2, 3, 4, 7]`), "周一至周四加小休日晚9点关空调" (`[1, 2, 3, 4, 5]`), "大周和周二至周四早8点开机" (`[1, 3, 4, 5, 7]`), "工作日加单休日早8点开机" (`[1, 2, 3, 4, 5, 6]`), and "周六加单休日早8点开机" (`[1, 7]`);
+    - **100% Unit Test Coverage**: Added `testExtendedKeywordAndRangeUnificationV19102` with 110 unit tests passing without errors, including strict anti-misoperation assertions.
+  - 🖥️ **Batch Control Panel Scene Presets Matrix & Operating Minutes Reset on Power-Off (`AppModel.swift` / `BatchControlView.swift` / `VoiceCapsuleWindowController.swift`)**:
+    - **Native Multi-Device Batch Scene Dispatch in `AppModel.applyScene`**: Upgraded API signature with `targetDeviceIds: [String]?`, allowing batch dispatch of scene preset actions across any multi-selected devices, skipping offline units and providing aggregated notices (e.g. "已应用至所选 2 台空调（4 项动作）");
+    - **Batch Scene Preset Shortcut Capsules in `BatchControlPanel`**: Integrated dedicated scene preset grid capsules (🌙 Sleep, 🚪 Away, 🏠 Home, etc.) into the multi-device control panel for one-click batch application;
+    - **Continuous Operating Minutes Reset on Scene Power-Off**: Fixed omission where turning off devices via scene presets (`onOffStatus == false`) failed to reset `deviceContinuousMinutes`, ensuring zeroed runtime on shutdown;
+    - **Immediate Scheduled State Optimistic Sync**: Triggering due scheduled actions in `fireDueActions` now immediately applies optimistic local attribute updates and resets continuous runtime on power off, ensuring real-time UI consistency without waiting for slow gateway polls.
+
 - 🏷 **Unified Range-and-Keyword Repeat Scheduling, Whole-House Scene Preset Broadcast Penetration & Per-Device Status Bar Scene Matrix (v1.9.101)**:
   - ⏱️ **"Range + Core Keyword" & "Core Keyword + Range" Universal Natural Repeat Scheduling Engine (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)**:
     - **Full Core Keyword Alignment & Disambiguation**: Expanded `rangeWithKeywordRegex` and `keywordWithRangeRegex` to align across the complete keyword lexicon including `平日|双休日|休息日|公休日|休假日|放假日|节假日|大休|小休`, completely closing matching gaps where phrases like "周一至周三和双休日" or "周一至周四以及休息日" missed keyword union or dropped out of branches;

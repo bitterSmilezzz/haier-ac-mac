@@ -200,6 +200,50 @@ struct BatchControlPanel: View {
             .disabled(!isBatchAvailable)
             .opacity(isBatchAvailable ? 1.0 : 0.6)
 
+            // 批量情景预设快捷下发 (v1.9.102 矩阵打通)
+            if !model.scenes.isEmpty {
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack {
+                        Label("情景预设（\(model.scenes.count) 项）", systemImage: "sparkles")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(Theme.inkSubtle)
+                        Spacer()
+                    }
+                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 6) {
+                        ForEach(model.scenes) { scene in
+                            let sceneGlyph: String = {
+                                switch scene.name {
+                                case "睡眠": return "🌙"
+                                case "离家": return "🚪"
+                                case "回家": return "🏠"
+                                default: return "✨"
+                                }
+                            }()
+                            Button {
+                                model.applyScene(scene, targetDeviceIds: deviceIds)
+                            } label: {
+                                HStack(spacing: 4) {
+                                    Text(sceneGlyph)
+                                        .font(.system(size: 11))
+                                    Text(scene.name)
+                                        .font(.system(size: 11, weight: .medium))
+                                        .lineLimit(1)
+                                }
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 5)
+                                .background(Theme.surface2)
+                                .foregroundStyle(Theme.ink)
+                                .clipShape(RoundedRectangle(cornerRadius: Theme.radiusSM, style: .continuous))
+                            }
+                            .buttonStyle(.plain)
+                            .help("一键将「\(scene.name)」情景动作下发至所选 \(deviceIds.count) 台空调")
+                        }
+                    }
+                }
+                .disabled(!isBatchAvailable)
+                .opacity(isBatchAvailable ? 1.0 : 0.6)
+            }
+
             VStack(spacing: 0) {
                 if let onOff = attrs["onOffStatus"], onOff.writable {
                     batchToggleRow(title: "电源", icon: "power", attr: onOff)
