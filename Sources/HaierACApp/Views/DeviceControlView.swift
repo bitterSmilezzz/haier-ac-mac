@@ -266,8 +266,8 @@ struct DeviceControlView: View {
                             .clipShape(Circle())
                     }
                     .buttonStyle(.plain)
-                    .foregroundStyle(Theme.ink)
-                    .disabled(!isPowerOn)
+                    .foregroundStyle(isPowerOn && current > min ? Theme.ink : Theme.inkTertiary)
+                    .disabled(!isPowerOn || current <= min)
 
                     Button {
                         let new = Swift.min(max, current + step)
@@ -282,8 +282,8 @@ struct DeviceControlView: View {
                             .clipShape(Circle())
                     }
                     .buttonStyle(.plain)
-                    .foregroundStyle(Theme.ink)
-                    .disabled(!isPowerOn)
+                    .foregroundStyle(isPowerOn && current < max ? Theme.ink : Theme.inkTertiary)
+                    .disabled(!isPowerOn || current >= max)
                 }
                 .padding(5)
                 .background(

@@ -847,7 +847,7 @@ final class StatusItemController: NSObject {
                 downItem.toolTip = "将「\(dev.name)」温度降低 1°C（下限 16°C）"
                 devSubmenu.addItem(downItem)
 
-                // 运行模式协同切换 (v1.9.95)
+                // 运行模式协同切换 (v1.9.95, v1.9.96 支持待机一键模式唤醒)
                 let devModeMenu = NSMenu()
                 devModeMenu.autoenablesItems = false
                 for itemDef in Self.modeLevels {
@@ -856,9 +856,15 @@ final class StatusItemController: NSObject {
                     let item = NSMenuItem(title: "\(check)\(itemDef.title)", action: #selector(setDeviceModeFromMenu(_:)), keyEquivalent: "")
                     item.target = self
                     item.representedObject = ["deviceId": devId, "mode": itemDef.code.rawValue]
-                    item.isEnabled = isControllable && isPowerOn
+                    item.isEnabled = isControllable
                     if !isPowerOn {
-                        item.toolTip = "「\(dev.name)」当前处于关机待机状态，请先开启电源再切换运行模式"
+                        switch itemDef.code {
+                        case .cooling: item.toolTip = "开启「\(dev.name)」并设为制冷模式，保持当前设定温度"
+                        case .heating: item.toolTip = "开启「\(dev.name)」并设为制热模式，保持当前设定温度"
+                        case .dehumidify: item.toolTip = "开启「\(dev.name)」并设为除湿模式，降低室内湿度"
+                        case .fan: item.toolTip = "开启「\(dev.name)」并设为送风模式，促进室内空气流通"
+                        case .auto: item.toolTip = "开启「\(dev.name)」并设为智能自适应模式"
+                        }
                     } else {
                         switch itemDef.code {
                         case .cooling: item.toolTip = "将「\(dev.name)」设为制冷模式，保持当前设定温度"
@@ -870,9 +876,9 @@ final class StatusItemController: NSObject {
                     }
                     devModeMenu.addItem(item)
                 }
-                let modeTitle = isPowerOn ? "🔄 运行模式 (当前: \(modeCode?.desc ?? "制冷"))" : "🔄 运行模式 (待机中)"
+                let modeTitle = isPowerOn ? "🔄 运行模式 (当前: \(modeCode?.desc ?? "制冷"))" : "🔄 运行模式 (待机中 · 点击开启模式)"
                 let devModeParentItem = NSMenuItem(title: modeTitle, action: nil, keyEquivalent: "")
-                devModeParentItem.toolTip = isPowerOn ? "切换「\(dev.name)」运行模式（当前: \(modeCode?.desc ?? "制冷")）" : "「\(dev.name)」当前处于关机待机状态"
+                devModeParentItem.toolTip = isPowerOn ? "切换「\(dev.name)」运行模式（当前: \(modeCode?.desc ?? "制冷")）" : "「\(dev.name)」当前处于关机待机状态，点击模式项可直接唤醒并切换"
                 devSubmenu.setSubmenu(devModeMenu, for: devModeParentItem)
                 devSubmenu.addItem(devModeParentItem)
 
@@ -1188,7 +1194,7 @@ final class StatusItemController: NSObject {
             stepDownItem.toolTip = "将「\(dev.name)」温度降低 1°C（下限 16°C）"
             menu.addItem(stepDownItem)
 
-            // 运行模式协同切换 (v1.9.95)
+            // 运行模式协同切换 (v1.9.95, v1.9.96 支持待机一键模式唤醒)
             let singleModeMenu = NSMenu()
             singleModeMenu.autoenablesItems = false
             for itemDef in Self.modeLevels {
@@ -1197,9 +1203,15 @@ final class StatusItemController: NSObject {
                 let item = NSMenuItem(title: "\(check)\(itemDef.title)", action: #selector(setPrimaryModeFromMenu(_:)), keyEquivalent: "")
                 item.target = self
                 item.representedObject = itemDef.code.rawValue
-                item.isEnabled = isControllable && isPowerOn
+                item.isEnabled = isControllable
                 if !isPowerOn {
-                    item.toolTip = "「\(dev.name)」当前处于关机待机状态，请先开启电源再切换运行模式"
+                    switch itemDef.code {
+                    case .cooling: item.toolTip = "开启「\(dev.name)」并设为制冷模式，保持当前设定温度"
+                    case .heating: item.toolTip = "开启「\(dev.name)」并设为制热模式，保持当前设定温度"
+                    case .dehumidify: item.toolTip = "开启「\(dev.name)」并设为除湿模式，降低室内湿度"
+                    case .fan: item.toolTip = "开启「\(dev.name)」并设为送风模式，促进室内空气流通"
+                    case .auto: item.toolTip = "开启「\(dev.name)」并设为智能自适应模式"
+                    }
                 } else {
                     switch itemDef.code {
                     case .cooling: item.toolTip = "将「\(dev.name)」设为制冷模式，保持当前设定温度"
@@ -1211,9 +1223,9 @@ final class StatusItemController: NSObject {
                 }
                 singleModeMenu.addItem(item)
             }
-            let singleModeTitle = isPowerOn ? "🔄 运行模式 (当前: \(modeCode?.desc ?? "制冷"))" : "🔄 运行模式 (待机中)"
+            let singleModeTitle = isPowerOn ? "🔄 运行模式 (当前: \(modeCode?.desc ?? "制冷"))" : "🔄 运行模式 (待机中 · 点击开启模式)"
             let singleModeParentItem = NSMenuItem(title: singleModeTitle, action: nil, keyEquivalent: "")
-            singleModeParentItem.toolTip = isPowerOn ? "切换「\(dev.name)」运行模式（当前: \(modeCode?.desc ?? "制冷")）" : "「\(dev.name)」当前处于关机待机状态"
+            singleModeParentItem.toolTip = isPowerOn ? "切换「\(dev.name)」运行模式（当前: \(modeCode?.desc ?? "制冷")）" : "「\(dev.name)」当前处于关机待机状态，点击模式项可直接唤醒并切换"
             menu.setSubmenu(singleModeMenu, for: singleModeParentItem)
             menu.addItem(singleModeParentItem)
 

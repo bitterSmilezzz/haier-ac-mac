@@ -555,16 +555,42 @@ public struct VoiceCommandParser {
         return try? NSRegularExpression(pattern: pattern)
     }()
 
-    /// 匹配排除型否定星期口语模式（如“除了周末每天晚上10点关机”、“除周末外每天早8点开机”、“除了工作日每天晚上11点关空调”、“除了周日每天早8点开机”、“除周一外每天晚10点关机”、“工作日除了周三早8点开机”、“周一至周五除周二外晚10点关空调”） (v1.9.68, v1.9.69 补全限定基准集约束)
+    /// 匹配排除型否定星期口语模式（如“除了周末每天晚上10点关机”、“除周末外每天早8点开机”、“除了工作日每天晚上11点关空调”、“除了周日每天早8点开机”、“除周一外每天晚10点关机”、“工作日除了周三早8点开机”、“周一至周五除周二外晚10点关空调”、“除非工作日外每天早8点开机”） (v1.9.68, v1.9.69 补全限定基准集约束, v1.9.96 闭环前置反相时态贪婪截断)
     private static let exclusionRepeatRegex: NSRegularExpression? = {
-        let pattern = #"(?:除了|除)\s*([^，,。！？\s]+?)\s*(?:(?:之|以)?外)?(?=[，,。！？\s]|工作日|平时|平日|周末|双休|双休日|休息日|公休日|休假日|放假日|节假日|单休|一三五|二四六|每天|天天|每日|每晚|每早|每晨|每夜|日日|\d|早|晚|夜|中|上|下|凌晨|午|点|时|:|$|开|关|停)"#
+        let pattern = #"(?:除了|除)\s*([^，,。！？\s]+?)\s*(?:(?:之|以)?外|(?=[，,。！？\s]|每天|天天|每日|每晚|每早|每晨|每夜|日日|\d|早|晚|夜|中|上|下|凌晨|午|点|时|:|$|开|关|停))"#
         return try? NSRegularExpression(pattern: pattern)
     }()
 
-    /// 从排除文本中提取被排除的星期集合 (v1.9.68, v1.9.71 纳管周末三天与单休排除, v1.9.95 纳管双休日与休息日)
+    /// 从排除文本中提取被排除的星期集合 (v1.9.68, v1.9.71 纳管周末三天与单休排除, v1.9.95 纳管双休日与休息日, v1.9.96 闭环前置反相时态与单休日精准排除)
     private static func extractExcludedDays(from target: String) -> Set<Int>? {
         var excluded = Set<Int>()
         var remainingTarget = target
+
+        // 1. 前置反相时态与否定周期的排除拦截（杜绝被下方正相词贪婪截断导致排除极性反向） (v1.9.96)
+        if remainingTarget.contains("非工作日") || remainingTarget.contains("非平时") || remainingTarget.contains("非平日") {
+            excluded.formUnion([1, 7]) // 排除非工作日（即排除周末），保留工作日 [2, 3, 4, 5, 6]
+            remainingTarget = remainingTarget.replacingOccurrences(of: "非工作日", with: "").replacingOccurrences(of: "非平时", with: "").replacingOccurrences(of: "非平日", with: "")
+        }
+        if remainingTarget.contains("非周末") || remainingTarget.contains("非双休") || remainingTarget.contains("非双休日") || remainingTarget.contains("非休息日") || remainingTarget.contains("非公休日") {
+            excluded.formUnion([2, 3, 4, 5, 6]) // 排除非周末（即排除工作日），保留周末 [1, 7]
+            remainingTarget = remainingTarget.replacingOccurrences(of: "非双休日", with: "").replacingOccurrences(of: "非双休", with: "").replacingOccurrences(of: "非周末", with: "").replacingOccurrences(of: "非休息日", with: "").replacingOccurrences(of: "非公休日", with: "")
+        }
+        if remainingTarget.contains("非单休日") {
+            excluded.formUnion([2, 3, 4, 5, 6, 7]) // 排除非单休日（周一至周六），保留单休日周日 [1]
+            remainingTarget = remainingTarget.replacingOccurrences(of: "非单休日", with: "")
+        }
+        if remainingTarget.contains("非单休") {
+            excluded.formUnion([1, 7]) // 排除非单休（周末双休），保留单休
+            remainingTarget = remainingTarget.replacingOccurrences(of: "非单休", with: "")
+        }
+
+        // 2. 单休日与逢单休精准排除（周日 [1]），前置拦截杜绝误入下方“单休”周一至周六 (v1.9.96)
+        if remainingTarget.contains("单休日") || remainingTarget.contains("逢单休") || remainingTarget.contains("每逢单休") {
+            excluded.insert(1)
+            remainingTarget = remainingTarget.replacingOccurrences(of: "每逢单休", with: "").replacingOccurrences(of: "逢单休", with: "").replacingOccurrences(of: "单休日", with: "")
+        }
+
+        // 3. 正相工作日、周末三天、周末/双休/休息日与单休排除
         if remainingTarget.contains("工作日") || remainingTarget.contains("平时") || remainingTarget.contains("平日") {
             excluded.formUnion([2, 3, 4, 5, 6])
             remainingTarget = remainingTarget.replacingOccurrences(of: "工作日", with: "").replacingOccurrences(of: "平时", with: "").replacingOccurrences(of: "平日", with: "")
@@ -1184,12 +1210,18 @@ public struct VoiceCommandParser {
         }
 
         // 4. 语义化独立核心短语识别
-        // 4.-1 非工作日/非平日与非周末/非双休反相调度核心前置拦截（非工作日/非平日精准映射至周末 [1, 7]，非周末/非双休/非双休日/非休息日/非公休日精准映射至工作日 [2, 3, 4, 5, 6]）(v1.9.95)
+        // 4.-1 非工作日/非平日与非周末/非双休反相调度核心前置拦截（非工作日/非平日精准映射至周末 [1, 7]，非周末/非双休/非双休日/非休息日/非公休日精准映射至工作日 [2, 3, 4, 5, 6]，非单休日映射至周一至周六 [2, 3, 4, 5, 6, 7]，非单休映射至周末 [1, 7]）(v1.9.95, v1.9.96)
         if text.contains("非工作日") || text.contains("非平时") || text.contains("非平日") {
             return ([1, 7], "周末")
         }
         if text.contains("非周末") || text.contains("非双休") || text.contains("非双休日") || text.contains("非休息日") || text.contains("非公休日") {
             return ([2, 3, 4, 5, 6], "工作日")
+        }
+        if text.contains("非单休日") {
+            return ([2, 3, 4, 5, 6, 7], "周一至周六")
+        }
+        if text.contains("非单休") {
+            return ([1, 7], "周末")
         }
 
         // 4.0 逢单休/单休日与逢双休口语调度（逢单休精准映射至周日 [1]，逢双休映射至周末 [1, 7]），前置拦截杜绝误入单休 (v1.9.94)
@@ -1709,6 +1741,7 @@ public struct VoiceCommandParser {
            text.contains("每天半") || text.contains("天天半") || text.contains("每日半") || text.contains("日日半") ||
            text.contains("工作日") || text.contains("平时") || text.contains("平日") || text.contains("工作日半") || text.contains("平时半") || text.contains("平日半") ||
            text.contains("周末") || text.contains("双休") || text.contains("双休日") || text.contains("单休") || text.contains("周末半") || text.contains("双休半") || text.contains("双休日半") || text.contains("单休半") ||
+           text.contains("非单休") || text.contains("非单休半") || text.contains("非单休日") || text.contains("非单休日半") ||
            text.contains("非工作日") || text.contains("非工作日半") || text.contains("非平时") || text.contains("非平日") || text.contains("非平日半") ||
            text.contains("非周末") || text.contains("非周末半") || text.contains("非双休") || text.contains("非双休半") || text.contains("非双休日") || text.contains("非双休日半") ||
            text.contains("非休息日") || text.contains("非休息日半") || text.contains("非公休日") || text.contains("非公休日半") ||
@@ -2531,6 +2564,8 @@ public struct VoiceCommandParser {
         str = str.replacingOccurrences(of: "逢单休半", with: "逢单休8点30分")
         str = str.replacingOccurrences(of: "每逢单休半", with: "每逢单休8点30分")
         str = str.replacingOccurrences(of: "单休日半", with: "单休日8点30分")
+        str = str.replacingOccurrences(of: "非单休半", with: "非单休8点30分")
+        str = str.replacingOccurrences(of: "非单休日半", with: "非单休日8点30分")
         str = str.replacingOccurrences(of: "非工作日半", with: "非工作日8点30分")
         str = str.replacingOccurrences(of: "非平日半", with: "非平日8点30分")
         str = str.replacingOccurrences(of: "非周末半", with: "非周末8点30分")

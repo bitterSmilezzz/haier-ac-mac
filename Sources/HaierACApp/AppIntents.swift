@@ -419,6 +419,105 @@ struct GetACHumidityIntent: AppIntent {
     }
 }
 
+// MARK: - 查询综合状态看板 (v1.9.96)
+
+struct GetACStatusIntent: AppIntent {
+    static var title: LocalizedStringResource = "查询空调综合状态"
+    static var description = IntentDescription("查询空调当前运行状态、模式、温度与湿度", categoryName: "空调控制")
+
+    @Parameter(title: "设备名称", description: "可选；留空使用主设备，填“全屋”或“全部”查询全屋设备状态")
+    var deviceName: String?
+
+    @MainActor
+    func perform() async throws -> some IntentResult & ProvidesDialog {
+        let model = AppModel.shared
+        let isAll = (deviceName?.contains("全") == true) || (deviceName?.contains("所有") == true)
+        if isAll {
+            let all = model.allUnifiedDevices
+            guard !all.isEmpty else {
+                throw ACIntentError.message("未检测到已绑定的空调设备")
+            }
+            let active = all.filter { dev in
+                model.reachability(for: dev.id).isControllable &&
+                (model.attributes[dev.id]?["onOffStatus"]?.boolValue == true)
+            }
+            var summaries: [String] = []
+            var temps: [Double] = []
+            var hums: [Double] = []
+            for dev in all {
+                let devId = dev.id
+                let reach = model.reachability(for: devId)
+                if !reach.isControllable {
+                    summaries.append("「\(dev.name)」离线")
+                    continue
+                }
+                let isPower = model.attributes[devId]?["onOffStatus"]?.boolValue ?? false
+                let indoorT = model.currentIndoorTemperature(for: devId)
+                let indoorH = model.currentIndoorHumidity(for: devId)
+                if let t = indoorT { temps.append(t) }
+                if let h = indoorH { hums.append(h) }
+
+                if isPower {
+                    let modeDesc = ACModeCode.match(from: model.attributes[devId]?["operationMode"]?.stringValue)?.desc ?? "制冷"
+                    let targetT = model.attributes[devId]?["targetTemperature"]?.doubleValue ?? 26.0
+                    let targetStr = targetT.truncatingRemainder(dividingBy: 1.0) == 0 ? "\(Int(targetT))°C" : String(format: "%.1f°C", targetT)
+                    let wind = AppModel.normalizeWindSpeed(model.attributes[devId]?["windSpeed"]?.stringValue ?? "微风")
+                    summaries.append("「\(dev.name)」\(modeDesc) \(targetStr) [\(wind)]")
+                } else {
+                    summaries.append("「\(dev.name)」待机")
+                }
+            }
+            let runningDesc = active.isEmpty ? "全屋空调当前均处于待机状态" : "全屋 \(all.count) 台空调中 \(active.count) 台正在运行"
+            var envDesc = ""
+            if !temps.isEmpty {
+                let avgT = temps.reduce(0.0, +) / Double(temps.count)
+                let avgTStr = String(format: "%.1f°C", avgT)
+                envDesc += "，平均室温 \(avgTStr)"
+            }
+            if !hums.isEmpty {
+                let avgH = hums.reduce(0.0, +) / Double(hums.count)
+                envDesc += "，平均湿度 \(Int(round(avgH)))%"
+            }
+            let dialog = "\(runningDesc)\(envDesc)（" + summaries.joined(separator: "；") + "）"
+            return .result(value: runningDesc, dialog: IntentDialog(stringLiteral: dialog))
+        }
+
+        guard let deviceId = resolveDeviceId(named: deviceName) else {
+            throw ACIntentError.message("没有可控制的空调设备")
+        }
+        let reach = model.reachability(for: deviceId)
+        let name = model.deviceName(for: deviceId)
+        guard reach.isControllable else {
+            throw ACIntentError.message("「\(name)」当前离线，无法获取状态")
+        }
+        let isPower = model.attributes[deviceId]?["onOffStatus"]?.boolValue ?? false
+        let indoorT = model.currentIndoorTemperature(for: deviceId)
+        let indoorH = model.currentIndoorHumidity(for: deviceId)
+        var envParts: [String] = []
+        if let t = indoorT {
+            let tStr = t.truncatingRemainder(dividingBy: 1.0) == 0 ? "\(Int(t))°C" : String(format: "%.1f°C", t)
+            envParts.append("室内温度 \(tStr)")
+        }
+        if let h = indoorH {
+            envParts.append("相对湿度 \(Int(round(h)))%")
+        }
+        let envStr = envParts.isEmpty ? "" : "，" + envParts.joined(separator: "，")
+
+        if isPower {
+            let modeDesc = ACModeCode.match(from: model.attributes[deviceId]?["operationMode"]?.stringValue)?.desc ?? "制冷"
+            let targetT = model.attributes[deviceId]?["targetTemperature"]?.doubleValue ?? 26.0
+            let targetStr = targetT.truncatingRemainder(dividingBy: 1.0) == 0 ? "\(Int(targetT))°C" : String(format: "%.1f°C", targetT)
+            let rawWind = model.attributes[deviceId]?["windSpeed"]?.stringValue ?? "微风"
+            let wind = AppModel.normalizeWindSpeed(rawWind)
+            let dialog = "「\(name)」正在运行，当前为\(modeDesc)模式，设定温度 \(targetStr)，风速\(wind)\(envStr)"
+            return .result(value: "\(modeDesc) \(targetStr)", dialog: IntentDialog(stringLiteral: dialog))
+        } else {
+            let dialog = "「\(name)」当前处于关机待机状态\(envStr)"
+            return .result(value: "待机", dialog: IntentDialog(stringLiteral: dialog))
+        }
+    }
+}
+
 // MARK: - 开启智能睡眠曲线
 
 struct StartSleepCurveIntent: AppIntent {
@@ -974,6 +1073,27 @@ struct ACAppShortcuts: AppShortcutsProvider {
                     systemImageName: "thermometer.sun.fill"
                 ),
                 AppShortcut(
+                    intent: GetACHumidityIntent(),
+                    phrases: [
+                        "用 \(.applicationName) 查询湿度",
+                        "\(.applicationName) 室内湿度",
+                        "\(.applicationName) 现在湿度多少",
+                    ],
+                    shortTitle: "查询湿度",
+                    systemImageName: "humidity.fill"
+                ),
+                AppShortcut(
+                    intent: GetACStatusIntent(),
+                    phrases: [
+                        "用 \(.applicationName) 查询状态",
+                        "用 \(.applicationName) 查询空调状态",
+                        "\(.applicationName) 状态怎么样",
+                        "\(.applicationName) 当前状态",
+                    ],
+                    shortTitle: "查询状态",
+                    systemImageName: "info.circle.fill"
+                ),
+                AppShortcut(
                     intent: StartSleepCurveIntent(),
                     phrases: [
                         "用 \(.applicationName) 开启睡眠模式",
@@ -1186,6 +1306,15 @@ struct ACAppShortcuts: AppShortcutsProvider {
                     phrases: [
                         "用 \(.applicationName) 查询湿度",
                         "\(.applicationName) 室内湿度",
+                    ]
+                ),
+                AppShortcut(
+                    intent: GetACStatusIntent(),
+                    phrases: [
+                        "用 \(.applicationName) 查询状态",
+                        "用 \(.applicationName) 查询空调状态",
+                        "\(.applicationName) 状态怎么样",
+                        "\(.applicationName) 当前状态",
                     ]
                 ),
                 AppShortcut(

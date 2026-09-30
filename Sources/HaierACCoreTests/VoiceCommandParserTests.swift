@@ -4047,6 +4047,92 @@ final class VoiceCommandParserTests: XCTestCase {
         XCTAssertNotEqual(VoiceCommandParser.parse("全屋休息日关空调")?.command, .turnOffAll)
     }
 
+    // MARK: - v1.9.96 排除型否定周期调度与非单休/非单休日调度脱靶缺陷闭环
+
+    func testExclusionAndNonSingleRestScheduleHardeningV1996() {
+        // 1. 单休日与逢单休在排除型语义中精准排除周日（[1]），保留周一至周六（[2, 3, 4, 5, 6, 7]）
+        let exceptSingleRestOn = VoiceCommandParser.parse("除单休日外每天开机")
+        XCTAssertEqual(exceptSingleRestOn?.command, .scheduleRepeatPower(hour: 8, minute: 0, power: true, repeatWeekdays: [2, 3, 4, 5, 6, 7], repeatLabel: "周一至周六"))
+        XCTAssertTrue(exceptSingleRestOn?.displayText.contains("周一至周六 08:00 开机") == true)
+
+        let exceptSingleRestOn2 = VoiceCommandParser.parse("除了单休日每天开机")
+        XCTAssertEqual(exceptSingleRestOn2?.command, .scheduleRepeatPower(hour: 8, minute: 0, power: true, repeatWeekdays: [2, 3, 4, 5, 6, 7], repeatLabel: "周一至周六"))
+
+        let exceptSingleRestOff = VoiceCommandParser.parse("除单休日外每天关机")
+        XCTAssertEqual(exceptSingleRestOff?.command, .scheduleRepeatPower(hour: 8, minute: 0, power: false, repeatWeekdays: [2, 3, 4, 5, 6, 7], repeatLabel: "周一至周六"))
+        XCTAssertTrue(exceptSingleRestOff?.displayText.contains("周一至周六 08:00 关机") == true)
+
+        // 2. 非单休日精准映射至周一至周六（[2, 3, 4, 5, 6, 7]）调度闭环
+        let nonSingleRestDayOn = VoiceCommandParser.parse("非单休日开机")
+        XCTAssertEqual(nonSingleRestDayOn?.command, .scheduleRepeatPower(hour: 8, minute: 0, power: true, repeatWeekdays: [2, 3, 4, 5, 6, 7], repeatLabel: "周一至周六"))
+        XCTAssertTrue(nonSingleRestDayOn?.displayText.contains("周一至周六 08:00 开机") == true)
+
+        let nonSingleRestDayOff = VoiceCommandParser.parse("非单休日关机")
+        XCTAssertEqual(nonSingleRestDayOff?.command, .scheduleRepeatPower(hour: 8, minute: 0, power: false, repeatWeekdays: [2, 3, 4, 5, 6, 7], repeatLabel: "周一至周六"))
+        XCTAssertTrue(nonSingleRestDayOff?.displayText.contains("周一至周六 08:00 关机") == true)
+
+        // 3. 非单休精准映射至双休周末（[1, 7]）调度闭环
+        let nonSingleRestOn = VoiceCommandParser.parse("非单休开机")
+        XCTAssertEqual(nonSingleRestOn?.command, .scheduleRepeatPower(hour: 8, minute: 0, power: true, repeatWeekdays: [1, 7], repeatLabel: "周末"))
+        XCTAssertTrue(nonSingleRestOn?.displayText.contains("周末 08:00 开机") == true)
+
+        let nonSingleRestOff = VoiceCommandParser.parse("非单休关机")
+        XCTAssertEqual(nonSingleRestOff?.command, .scheduleRepeatPower(hour: 8, minute: 0, power: false, repeatWeekdays: [1, 7], repeatLabel: "周末"))
+        XCTAssertTrue(nonSingleRestOff?.displayText.contains("周末 08:00 关机") == true)
+
+        // 4. 前置反相时态在排除型语义中精准计算补集闭环
+        let exceptNonWorkdayOn = VoiceCommandParser.parse("除非工作日外每天开机")
+        XCTAssertEqual(exceptNonWorkdayOn?.command, .scheduleRepeatPower(hour: 8, minute: 0, power: true, repeatWeekdays: [2, 3, 4, 5, 6], repeatLabel: "工作日"))
+        XCTAssertTrue(exceptNonWorkdayOn?.displayText.contains("工作日 08:00 开机") == true)
+
+        let exceptNonWorkdayOn2 = VoiceCommandParser.parse("除了非工作日每天开机")
+        XCTAssertEqual(exceptNonWorkdayOn2?.command, .scheduleRepeatPower(hour: 8, minute: 0, power: true, repeatWeekdays: [2, 3, 4, 5, 6], repeatLabel: "工作日"))
+
+        let exceptNonWeekdayOn = VoiceCommandParser.parse("除非平日外每天开机")
+        XCTAssertEqual(exceptNonWeekdayOn?.command, .scheduleRepeatPower(hour: 8, minute: 0, power: true, repeatWeekdays: [2, 3, 4, 5, 6], repeatLabel: "工作日"))
+
+        let exceptNonWeekendOn = VoiceCommandParser.parse("除非周末外每天开机")
+        XCTAssertEqual(exceptNonWeekendOn?.command, .scheduleRepeatPower(hour: 8, minute: 0, power: true, repeatWeekdays: [1, 7], repeatLabel: "周末"))
+        XCTAssertTrue(exceptNonWeekendOn?.displayText.contains("周末 08:00 开机") == true)
+
+        let exceptNonDoubleOn = VoiceCommandParser.parse("除非双休外每天开机")
+        XCTAssertEqual(exceptNonDoubleOn?.command, .scheduleRepeatPower(hour: 8, minute: 0, power: true, repeatWeekdays: [1, 7], repeatLabel: "周末"))
+
+        let exceptNonDoubleDayOn = VoiceCommandParser.parse("除非双休日外每天开机")
+        XCTAssertEqual(exceptNonDoubleDayOn?.command, .scheduleRepeatPower(hour: 8, minute: 0, power: true, repeatWeekdays: [1, 7], repeatLabel: "周末"))
+
+        // 5. 自然半点时相归一化（映射至 08:30）
+        let nonSingleRestHalf = VoiceCommandParser.parse("非单休半开机")
+        XCTAssertEqual(nonSingleRestHalf?.command, .scheduleRepeatPower(hour: 8, minute: 30, power: true, repeatWeekdays: [1, 7], repeatLabel: "周末"))
+        XCTAssertTrue(nonSingleRestHalf?.displayText.contains("周末 08:30 开机") == true)
+
+        let nonSingleRestDayHalf = VoiceCommandParser.parse("非单休日半关机")
+        XCTAssertEqual(nonSingleRestDayHalf?.command, .scheduleRepeatPower(hour: 8, minute: 30, power: false, repeatWeekdays: [2, 3, 4, 5, 6, 7], repeatLabel: "周一至周六"))
+        XCTAssertTrue(nonSingleRestDayHalf?.displayText.contains("周一至周六 08:30 关机") == true)
+
+        // 6. 严苛防即时误触断言（针对上述所有口语，严格禁止掉入 setPower/turnOffAll/turnOnAll 即时开关机）
+        XCTAssertNotEqual(VoiceCommandParser.parse("除单休日外每天开机")?.command, .setPower(true))
+        XCTAssertNotEqual(VoiceCommandParser.parse("除单休日外每天开机")?.command, .turnOnAll)
+        XCTAssertNotEqual(VoiceCommandParser.parse("除单休日外每天关机")?.command, .setPower(false))
+        XCTAssertNotEqual(VoiceCommandParser.parse("除单休日外每天关机")?.command, .turnOffAll)
+        XCTAssertNotEqual(VoiceCommandParser.parse("非单休日开机")?.command, .setPower(true))
+        XCTAssertNotEqual(VoiceCommandParser.parse("非单休日开机")?.command, .turnOnAll)
+        XCTAssertNotEqual(VoiceCommandParser.parse("非单休日关机")?.command, .setPower(false))
+        XCTAssertNotEqual(VoiceCommandParser.parse("非单休日关机")?.command, .turnOffAll)
+        XCTAssertNotEqual(VoiceCommandParser.parse("非单休开机")?.command, .setPower(true))
+        XCTAssertNotEqual(VoiceCommandParser.parse("非单休开机")?.command, .turnOnAll)
+        XCTAssertNotEqual(VoiceCommandParser.parse("非单休关机")?.command, .setPower(false))
+        XCTAssertNotEqual(VoiceCommandParser.parse("非单休关机")?.command, .turnOffAll)
+        XCTAssertNotEqual(VoiceCommandParser.parse("除非工作日外每天开机")?.command, .setPower(true))
+        XCTAssertNotEqual(VoiceCommandParser.parse("除非工作日外每天开机")?.command, .turnOnAll)
+        XCTAssertNotEqual(VoiceCommandParser.parse("除非周末外每天开机")?.command, .setPower(true))
+        XCTAssertNotEqual(VoiceCommandParser.parse("除非周末外每天开机")?.command, .turnOnAll)
+        XCTAssertNotEqual(VoiceCommandParser.parse("非单休半开机")?.command, .setPower(true))
+        XCTAssertNotEqual(VoiceCommandParser.parse("非单休半开机")?.command, .turnOnAll)
+        XCTAssertNotEqual(VoiceCommandParser.parse("非单休日半关机")?.command, .setPower(false))
+        XCTAssertNotEqual(VoiceCommandParser.parse("非单休日半关机")?.command, .turnOffAll)
+    }
+
     // MARK: - 无效输入测试
 
     func testInvalidCommands() {
