@@ -1265,7 +1265,9 @@ public struct VoiceCommandParser {
         } else if text.contains("每周日") || text.contains("每周天") || text.contains("每个周日") || text.contains("每个周天") || text.contains("每个星期天") || text.contains("每个星期日") || text.contains("每周星期天") || text.contains("每周星期日") || text.contains("逢周日") || text.contains("每逢周日") || text.contains("每逢星期天") || text.contains("每逢星期日") || text.contains("逢星期日") || text.contains("逢星期天") || text.contains("每个礼拜天") || text.contains("每个礼拜日") || text.contains("每周礼拜天") || text.contains("每周礼拜日") || text.contains("逢礼拜天") || text.contains("逢礼拜日") || text.contains("每逢礼拜天") || text.contains("每逢礼拜日") ||
            text.contains("周日") || text.contains("周天") || text.contains("周7") || text.contains("星期日") || text.contains("星期天") || text.contains("星期7") || text.contains("礼拜日") || text.contains("礼拜天") || text.contains("礼拜7") {
             return ([1], "每周日")
-        } else if text.contains("下周") || text.contains("下个周") || text.contains("下星期") || text.contains("下个星期") || text.contains("下礼拜") || text.contains("下个礼拜") ||
+        } else if text.contains("下下周") || text.contains("下下个周") || text.contains("下下星期") || text.contains("下下个星期") || text.contains("下下礼拜") || text.contains("下下个礼拜") ||
+                   text.contains("后周") || text.contains("后个周") || text.contains("后星期") || text.contains("后个星期") || text.contains("后礼拜") || text.contains("后个礼拜") ||
+                   text.contains("下周") || text.contains("下个周") || text.contains("下星期") || text.contains("下个星期") || text.contains("下礼拜") || text.contains("下个礼拜") ||
                    text.contains("这周") || text.contains("这个周") || text.contains("这星期") || text.contains("这个星期") || text.contains("这礼拜") || text.contains("这个礼拜") ||
                    text.contains("本周") || text.contains("本个周") || text.contains("本星期") || text.contains("本个星期") || text.contains("本礼拜") || text.contains("本个礼拜") ||
                    text.contains("隔周") || text.contains("隔个周") {
@@ -1683,14 +1685,18 @@ public struct VoiceCommandParser {
            text.contains("每天") || text.contains("天天") || text.contains("每日") || text.contains("每晚") || text.contains("每早") || text.contains("每晨") || text.contains("每夜") || text.contains("日日") ||
            text.contains("每天半") || text.contains("天天半") || text.contains("每日半") || text.contains("日日半") ||
            text.contains("工作日") || text.contains("平时") || text.contains("工作日半") || text.contains("平时半") ||
-           text.contains("周末") || text.contains("双休") || text.contains("单休") || text.contains("周末半") || text.contains("双休半") || text.contains("单休半") ||
+           text.contains("周末") || text.contains("双休") || text.contains("双休日") || text.contains("单休") || text.contains("周末半") || text.contains("双休半") || text.contains("双休日半") || text.contains("单休半") ||
            text.contains("每周") || text.contains("每逢") || text.contains("逢周") || text.contains("每个周") || text.contains("每个星期") ||
            text.contains("礼拜") || text.contains("逢星期") || text.contains("一三五") || text.contains("二四六") || text.contains("二四") ||
            text.contains("周末三天") ||
+           text.contains("下下周") || text.contains("下下个周") || text.contains("下下星期") || text.contains("下下个星期") || text.contains("下下礼拜") || text.contains("下下个礼拜") ||
+           text.contains("后周") || text.contains("后个周") || text.contains("后星期") || text.contains("后个星期") || text.contains("后礼拜") || text.contains("后个礼拜") ||
            text.contains("下周") || text.contains("下个周") || text.contains("下星期") || text.contains("下个星期") || text.contains("下礼拜") || text.contains("下个礼拜") ||
            text.contains("这周") || text.contains("这个周") || text.contains("这星期") || text.contains("这个星期") || text.contains("这礼拜") || text.contains("这个礼拜") ||
            text.contains("本周") || text.contains("本个周") || text.contains("本星期") || text.contains("本个星期") || text.contains("本礼拜") || text.contains("本个礼拜") ||
            text.contains("隔周") || text.contains("隔个周") || text.contains("下周末") || text.contains("这周末") || text.contains("本周末") ||
+           text.contains("下下周半") || text.contains("下下个周半") || text.contains("下下星期半") || text.contains("下下个星期半") || text.contains("下下礼拜半") || text.contains("下下个礼拜半") ||
+           text.contains("后周半") || text.contains("后个周半") || text.contains("后星期半") || text.contains("后礼拜半") ||
            text.contains("下周半") || text.contains("下个周半") || text.contains("这周半") || text.contains("这个周半") || text.contains("本周半") ||
            text.contains("下星期半") || text.contains("下个星期半") || text.contains("这星期半") || text.contains("这个星期半") || text.contains("本星期半") ||
            text.contains("下礼拜半") || text.contains("下个礼拜半") || text.contains("这礼拜半") || text.contains("这个礼拜半") || text.contains("本礼拜半") ||
@@ -2457,6 +2463,17 @@ public struct VoiceCommandParser {
         str = str.replacingOccurrences(of: "本个礼拜半", with: "本个礼拜8点30分")
         str = str.replacingOccurrences(of: "隔周半", with: "隔周8点30分")
         str = str.replacingOccurrences(of: "隔个周半", with: "隔个周8点30分")
+        str = str.replacingOccurrences(of: "双休日半", with: "双休日8点30分")
+        str = str.replacingOccurrences(of: "下下周半", with: "下下周8点30分")
+        str = str.replacingOccurrences(of: "下下个周半", with: "下下个周8点30分")
+        str = str.replacingOccurrences(of: "下下星期半", with: "下下星期8点30分")
+        str = str.replacingOccurrences(of: "下下个星期半", with: "下下个星期8点30分")
+        str = str.replacingOccurrences(of: "下下礼拜半", with: "下下礼拜8点30分")
+        str = str.replacingOccurrences(of: "下下个礼拜半", with: "下下个礼拜8点30分")
+        str = str.replacingOccurrences(of: "后周半", with: "后周8点30分")
+        str = str.replacingOccurrences(of: "后个周半", with: "后个周8点30分")
+        str = str.replacingOccurrences(of: "后星期半", with: "后星期8点30分")
+        str = str.replacingOccurrences(of: "后礼拜半", with: "后礼拜8点30分")
         str = str.replacingOccurrences(of: "今晨半", with: "今晨7点30分")
         str = str.replacingOccurrences(of: "明晨半", with: "明晨7点30分")
         str = str.replacingOccurrences(of: "每晨半", with: "每晨7点30分")

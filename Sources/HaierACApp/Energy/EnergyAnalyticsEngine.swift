@@ -265,7 +265,9 @@ public final class EnergyAnalyticsEngine: ObservableObject {
                    wind.contains("level1") || wind.contains("level_1") || wind.contains("speed1") || wind.contains("speed_1") || wind.contains("gear1") || wind.contains("gear_1") {
                     return 35.0
                 }
-                if wind.contains("微") || wind.contains("静") || wind.contains("quiet") || wind.contains("mute") || wind.contains("micro") || wind.contains("柔") {
+                if wind.contains("微") || wind.contains("静") || wind.contains("quiet") || wind.contains("mute") || wind.contains("micro") || wind.contains("柔") ||
+                   wind.contains("0档") || wind.contains("零档") || wind == "0" ||
+                   wind.contains("level0") || wind.contains("level_0") || wind.contains("speed0") || wind.contains("speed_0") || wind.contains("gear0") || wind.contains("gear_0") {
                     return 15.0
                 }
             }

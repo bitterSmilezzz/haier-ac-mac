@@ -68,8 +68,7 @@ private struct ScheduleRow: View {
     var onEdit: () -> Void
 
     private var deviceName: String {
-        model.allUnifiedDevices.first(where: { $0.id == action.deviceId })?.name
-            ?? action.deviceId
+        model.deviceName(for: action.deviceId)
     }
 
     private var timeText: String {

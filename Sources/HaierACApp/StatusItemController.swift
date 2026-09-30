@@ -1330,9 +1330,8 @@ final class StatusItemController: NSObject {
         let quickCountdownMenu = NSMenu()
         quickCountdownMenu.autoenablesItems = false
 
-        let primaryDev = model.allUnifiedDevices.first(where: { $0.id == primaryDeviceId }) ?? model.allUnifiedDevices.first
-        let primaryName = primaryDev?.name ?? "主显设备"
-        let primaryId = primaryDev?.id
+        let primaryId = primaryDeviceId ?? model.allUnifiedDevices.first?.id
+        let primaryName = primaryId.map { model.deviceName(for: $0) } ?? "主显设备"
 
         let countdownPresets: [(title: String, mins: Int, powerOn: Bool)] = [
             ("⏱ 「\(primaryName)」30 分钟后关机", 30, false),
@@ -1792,8 +1791,8 @@ final class StatusItemController: NSObject {
         let newEnabled = !anyEnabled
         let modified = model.setScheduledActionsEnabled(ids: uuids, enabled: newEnabled)
         let actionDesc = newEnabled ? "恢复" : "暂停"
-        let devNames = targets.compactMap { act in
-            model.allUnifiedDevices.first(where: { $0.id == act.deviceId })?.name
+        let devNames = targets.map { act in
+            model.deviceName(for: act.deviceId)
         }
         let devListDesc = devNames.isEmpty ? "" : "（\(devNames.joined(separator: "、"))）"
         model.operationNotice = AppModel.OperationNotice(text: "\(newEnabled ? "▶️" : "⏸") 已\(actionDesc)同频批次任务\(devListDesc)（共 \(modified) 台空调）", isError: false)
@@ -1804,8 +1803,8 @@ final class StatusItemController: NSObject {
         guard let idStrs = sender.representedObject as? [String] else { return }
         let uuids = Set(idStrs.compactMap { UUID(uuidString: $0) })
         let targets = model.scheduledActions.filter { uuids.contains($0.id) }
-        let devNames = targets.compactMap { act in
-            model.allUnifiedDevices.first(where: { $0.id == act.deviceId })?.name
+        let devNames = targets.map { act in
+            model.deviceName(for: act.deviceId)
         }
         let devListDesc = devNames.isEmpty ? "" : "（\(devNames.joined(separator: "、"))）"
         let removed = model.removeScheduledActions(ids: uuids)
@@ -1859,8 +1858,8 @@ final class StatusItemController: NSObject {
         let siblingActions = allSchedules.filter { StatusItemController.isSiblingSchedule($0, action) }
         if siblingActions.count > 1 {
             singleMenu.addItem(.separator())
-            let siblingDevNames = siblingActions.compactMap { act in
-                self.model.allUnifiedDevices.first(where: { $0.id == act.deviceId })?.name
+            let siblingDevNames = siblingActions.map { act in
+                self.model.deviceName(for: act.deviceId)
             }
             let devListStr = siblingDevNames.isEmpty ? "\(siblingActions.count) 台设备" : siblingDevNames.joined(separator: "、")
             let infoItem = NSMenuItem(title: "👥 协同设备: \(devListStr)", action: nil, keyEquivalent: "")

@@ -27,7 +27,7 @@ struct EcoEnergySection: View {
             if !targetTemps.isEmpty {
                 return targetTemps.reduce(0.0, +) / Double(targetTemps.count)
             }
-            let fallbackId = model.menuBarDeviceId ?? model.allUnifiedDevices.first?.id ?? ""
+            let fallbackId = model.primaryDeviceId ?? ""
             return model.attribute("targetTemperature", deviceId: fallbackId)?.doubleValue
         }()
 

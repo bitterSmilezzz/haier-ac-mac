@@ -792,7 +792,9 @@ final class AppModel: ObservableObject {
                   speed.contains("1档") || speed.contains("一档") || speed == "1" || speed.contains("小风") || speed.contains("低速") ||
                   speed.contains("level1") || speed.contains("level_1") || speed.contains("speed1") || speed.contains("speed_1") || speed.contains("gear1") || speed.contains("gear_1") {
             windFactor = 0.80
-        } else if speed.contains("微") || speed.contains("静") || speed.contains("quiet") || speed.contains("mute") || speed.contains("micro") || speed.contains("柔") {
+        } else if speed.contains("微") || speed.contains("静") || speed.contains("quiet") || speed.contains("mute") || speed.contains("micro") || speed.contains("柔") ||
+                  speed.contains("0档") || speed.contains("零档") || speed == "0" ||
+                  speed.contains("level0") || speed.contains("level_0") || speed.contains("speed0") || speed.contains("speed_0") || speed.contains("gear0") || speed.contains("gear_0") {
             windFactor = 0.60
         } else {
             // 自动风速热物理自适应通量校准 (v1.9.59, v1.9.60)

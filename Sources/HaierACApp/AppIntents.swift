@@ -39,10 +39,10 @@ private func resolveDeviceId(named name: String?) -> String? {
        let device = model.allUnifiedDevices.first(where: { $0.name.contains(name) }) {
         return device.id
     }
-    return model.menuBarDeviceId ?? model.allUnifiedDevices.first?.id
+    return model.primaryDeviceId
 }
 
-/// 网关未连接/无设备或设备离线时抛错，让 Siri/快捷指令给出明确失败信息 (v1.9.29)
+/// 网关未连接/无设备或设备离线时抛错，让 Siri/快捷指令给出明确失败信息 (v1.9.29, v1.9.92)
 @MainActor
 private func requireGatewayAndDevice(_ name: String?) throws -> String {
     guard AppModel.shared.gatewayConnected else {
@@ -53,7 +53,7 @@ private func requireGatewayAndDevice(_ name: String?) throws -> String {
     }
     let reach = AppModel.shared.reachability(for: deviceId)
     guard reach.isControllable else {
-        let devName = AppModel.shared.allUnifiedDevices.first(where: { $0.id == deviceId })?.name ?? "目标空调"
+        let devName = AppModel.shared.deviceName(for: deviceId)
         if reach == .gatewayReconnecting {
             throw ACIntentError.message("\(devName)网关重连中，请稍后重试")
         } else {
@@ -146,12 +146,12 @@ struct AdjustACTemperatureIntent: AppIntent {
         }
         let reach = model.reachability(for: deviceId)
         guard reach.isControllable else {
-            let devName = model.allUnifiedDevices.first(where: { $0.id == deviceId })?.name ?? "目标空调"
+            let devName = model.deviceName(for: deviceId)
             throw ACIntentError.message("\(devName)当前离线或不可控")
         }
 
         let count = model.adjustTemperature(deviceIds: [deviceId], delta: delta)
-        let devName = model.allUnifiedDevices.first(where: { $0.id == deviceId })?.name ?? "空调"
+        let devName = model.deviceName(for: deviceId)
         if count > 0 {
             let cur = model.attribute("targetTemperature", deviceId: deviceId)?.doubleValue ?? 26.0
             let curStr = cur.truncatingRemainder(dividingBy: 1.0) == 0 ? "\(Int(cur))" : String(format: "%.1f", cur)
@@ -222,14 +222,14 @@ struct SetACWindSpeedIntent: AppIntent {
         }
         let reach = model.reachability(for: deviceId)
         guard reach.isControllable else {
-            let devName = model.allUnifiedDevices.first(where: { $0.id == deviceId })?.name ?? "目标空调"
+            let devName = model.deviceName(for: deviceId)
             throw ACIntentError.message("\(devName)当前离线或不可控")
         }
         let count = model.setWindSpeed(deviceIds: [deviceId], speedName: windSpeed, autoPowerOn: false)
         guard count > 0 else {
             throw ACIntentError.message("风速「\(windSpeed)」设置失败")
         }
-        let devName = model.allUnifiedDevices.first(where: { $0.id == deviceId })?.name ?? "空调"
+        let devName = model.deviceName(for: deviceId)
         return .result(dialog: "已将「\(devName)」风速设为「\(windSpeed)」")
     }
 }
@@ -261,7 +261,8 @@ struct ApplyACSceneIntent: AppIntent {
         AppModel.shared.applyScene(scene, targetDeviceId: targetId, allDevices: allDevices)
         if allDevices {
             return .result(dialog: "已为全屋空调应用情景「\(scene.name)」")
-        } else if let targetId, let name = AppModel.shared.allUnifiedDevices.first(where: { $0.id == targetId })?.name {
+        } else if let targetId {
+            let name = AppModel.shared.deviceName(for: targetId)
             return .result(dialog: "已为\(name)应用情景「\(scene.name)」")
         } else {
             return .result(dialog: "已应用情景「\(scene.name)」")
@@ -288,7 +289,7 @@ struct GetACTemperatureIntent: AppIntent {
               let temp = attr.doubleValue else {
             throw ACIntentError.message("暂未获取到室内温度")
         }
-        let name = model.allUnifiedDevices.first(where: { $0.id == deviceId })?.name ?? "空调"
+        let name = model.deviceName(for: deviceId)
         let text = String(format: "%.0f°", temp)
         return .result(value: text, dialog: "\(name)当前室内温度 \(text)")
     }
@@ -326,7 +327,7 @@ struct StartSleepCurveIntent: AppIntent {
         }
 
         model.startSleepCurve(curve: targetCurve, deviceId: deviceId)
-        let name = model.allUnifiedDevices.first(where: { $0.id == deviceId })?.name ?? "空调"
+        let name = model.deviceName(for: deviceId)
         return .result(dialog: "已为\(name)启动「\(targetCurve.name)」智能睡眠温阶")
     }
 }
@@ -411,7 +412,7 @@ struct StartSelfCleaningIntent: AppIntent {
             return .result(dialog: "56°C 蒸发器自清洁已在运行中")
         }
         model.startSelfCleaning(deviceId: deviceId)
-        let name = model.allUnifiedDevices.first(where: { $0.id == deviceId })?.name ?? "海尔空调"
+        let name = model.deviceName(for: deviceId)
         return .result(dialog: "已为\(name)启动 56°C 蒸发器高温自清洁")
     }
 }
@@ -448,7 +449,7 @@ struct GetFilterHealthIntent: AppIntent {
         guard let deviceId = resolveDeviceId(named: deviceName) else {
             throw ACIntentError.message("没有可控制的空调设备")
         }
-        let devName = model.allUnifiedDevices.first(where: { $0.id == deviceId })?.name ?? "海尔空调"
+        let devName = model.deviceName(for: deviceId)
         let pct = model.filterCleanlinessPercentage(for: deviceId)
         let hours = Double(model.filterAccumulatedMinutes(for: deviceId)) / 60.0
         let hoursStr = String(format: "%.1f", hours)
@@ -479,7 +480,7 @@ struct ResetFilterMaintenanceIntent: AppIntent {
         guard let deviceId = resolveDeviceId(named: deviceName) else {
             throw ACIntentError.message("没有可控制的空调设备")
         }
-        let devName = model.allUnifiedDevices.first(where: { $0.id == deviceId })?.name ?? "海尔空调"
+        let devName = model.deviceName(for: deviceId)
         model.resetFilterMaintenance(for: deviceId)
         return .result(dialog: "已重置「\(devName)」滤网保养计时，洁净度恢复 100%")
     }
@@ -501,7 +502,7 @@ struct CancelACSchedulesIntent: AppIntent {
             guard let deviceId = resolveDeviceId(named: name) else {
                 throw ACIntentError.message("未找到指定名称的空调设备")
             }
-            let devName = model.allUnifiedDevices.first(where: { $0.id == deviceId })?.name ?? "目标空调"
+            let devName = model.deviceName(for: deviceId)
             let count = model.cancelSchedules(for: [deviceId])
             if count > 0 {
                 return .result(dialog: "已为您取消「\(devName)」的 \(count) 个定时任务")
@@ -535,7 +536,7 @@ struct PauseACSchedulesIntent: AppIntent {
             guard let deviceId = resolveDeviceId(named: name) else {
                 throw ACIntentError.message("未找到指定名称的空调设备")
             }
-            let devName = model.allUnifiedDevices.first(where: { $0.id == deviceId })?.name ?? "目标空调"
+            let devName = model.deviceName(for: deviceId)
             let count = model.setScheduledActionsEnabled(for: [deviceId], enabled: false)
             if count > 0 {
                 return .result(dialog: "已为您暂停「\(devName)」的 \(count) 个定时任务")
@@ -567,7 +568,7 @@ struct ResumeACSchedulesIntent: AppIntent {
             guard let deviceId = resolveDeviceId(named: name) else {
                 throw ACIntentError.message("未找到指定名称的空调设备")
             }
-            let devName = model.allUnifiedDevices.first(where: { $0.id == deviceId })?.name ?? "目标空调"
+            let devName = model.deviceName(for: deviceId)
             let count = model.setScheduledActionsEnabled(for: [deviceId], enabled: true)
             if count > 0 {
                 return .result(dialog: "已为您恢复「\(devName)」的 \(count) 个定时任务生效")
@@ -618,16 +619,24 @@ struct ScheduleACPowerIntent: AppIntent {
 
         let targetDeviceIds: [String]
         let scopeName: String
-        if let name = deviceName, !name.isEmpty && !name.contains("全") && !name.contains("所有") {
+        let isAllScope = (deviceName?.contains("全") == true) || (deviceName?.contains("所有") == true)
+        if isAllScope {
+            let controllable = model.allUnifiedDevices.filter { model.reachability(for: $0.id).isControllable }
+            guard !controllable.isEmpty else {
+                throw ACIntentError.message("未发现可控制的就绪空调设备")
+            }
+            targetDeviceIds = controllable.map(\.id)
+            scopeName = targetDeviceIds.count > 1 ? "全屋 \(targetDeviceIds.count) 台空调" : "空调"
+        } else if let name = deviceName, !name.isEmpty {
             if let dev = model.allUnifiedDevices.first(where: { $0.name.contains(name) }) {
                 targetDeviceIds = [dev.id]
                 scopeName = "「\(dev.name)」"
             } else {
                 throw ACIntentError.message("未找到名称包含「\(name)」的空调设备")
             }
-        } else if let menuId = model.menuBarDeviceId, let dev = model.allUnifiedDevices.first(where: { $0.id == menuId }) {
-            targetDeviceIds = [dev.id]
-            scopeName = "「\(dev.name)」"
+        } else if let primaryId = model.primaryDeviceId {
+            targetDeviceIds = [primaryId]
+            scopeName = "「\(model.deviceName(for: primaryId))」"
         } else {
             let controllable = model.allUnifiedDevices.filter { model.reachability(for: $0.id).isControllable }
             guard !controllable.isEmpty else {
@@ -651,7 +660,7 @@ struct ScheduleACPowerIntent: AppIntent {
             let actionName = "\(timeDesc)后\(actionDesc)"
 
             for devId in targetDeviceIds {
-                let devName = model.allUnifiedDevices.first(where: { $0.id == devId })?.name ?? "空调"
+                let devName = model.deviceName(for: devId)
                 let action = ScheduledAction(
                     name: "「\(devName)」\(actionName)",
                     deviceId: devId,
@@ -714,7 +723,7 @@ struct ScheduleACPowerIntent: AppIntent {
         let actionName = "\(repeatPrefix)\(timeStr) \(actionDesc)"
 
         for devId in targetDeviceIds {
-            let devName = model.allUnifiedDevices.first(where: { $0.id == devId })?.name ?? "空调"
+            let devName = model.deviceName(for: devId)
             let action = ScheduledAction(
                 name: "「\(devName)」\(actionName)",
                 deviceId: devId,

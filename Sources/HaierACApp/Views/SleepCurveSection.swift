@@ -17,7 +17,7 @@ struct SleepCurveSection: View {
         if !targetDeviceId.isEmpty && model.allUnifiedDevices.contains(where: { $0.id == targetDeviceId }) {
             return targetDeviceId
         }
-        return model.menuBarDeviceId ?? model.allUnifiedDevices.first?.id ?? ""
+        return model.primaryDeviceId ?? ""
     }
 
     var body: some View {
@@ -642,8 +642,8 @@ struct SleepCurveSection: View {
                 HStack(spacing: 6) {
                     Image(systemName: "moon.fill")
                         .font(.system(size: 12))
-                    let targetName = model.allUnifiedDevices.first(where: { $0.id == effectiveDeviceId })?.name
-                    if let targetName, model.allUnifiedDevices.count > 1 {
+                    let targetName = model.deviceName(for: effectiveDeviceId)
+                    if model.allUnifiedDevices.count > 1 {
                         Text("为 \(targetName) 开启「\(selectedConfig.name)」睡眠温阶")
                             .font(.system(size: 13, weight: .semibold))
                     } else {

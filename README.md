@@ -8,6 +8,17 @@
 
 ## 功能
 
+- 🏷 **闭环自然口语下下周/后周/双休日循环调度大一统引擎、防即时误触全景加固、静音 0 档原生硬件原语热动力学对齐与 Siri/快捷指令设备路由收敛 (v1.9.92)**：
+  - ⏱️ **“下下周/后周/双休日”自然口语跨周循环调度大一统与防即时误触全闭环 (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)**：
+    - **彻底解决“下下周”、“后周”、“双休日”等时态口语被判定为即时开关机导致立即关机/开机的严重安全隐患**：此前用户说“下下周关空调”、“下下周开机”、“后周关空调”、“后周开机”、“双休日关空调”、“双休日开机”、“每逢双休开空调”、“全屋下下周关空调”等高频家庭口语时，因未命中旧有单周匹配，`hasTimingOrCountdownIntent` 返回 false，直接穿透至 `isPowerOff` / `isPowerOn` / `turnOffAll` / `turnOnAll`，造成**全屋或单机立即误关机/开机**的重大误触隐患；本版本在 `hasTimingOrCountdownIntent` 与 `parseBaseRepeatWeekdays` 中全面建立防线，在无具体星期时统一映射为周一或周末基准并生成 `.scheduleRepeatPower` 循环调度；
+    - **下下周/后周/双休日半点时相标准化归一流水线 (`convertChineseNumbers`)**：新增“下下周半”、“下下个周半”、“下下星期半”、“下下个星期半”、“下下礼拜半”、“下下个礼拜半”、“后周半”、“后个周半”、“后星期半”、“后礼拜半”、“双休日半”等全量口语标准化映射至 08:30；
+    - **单元测试 100% 满分覆盖**：在 `VoiceCommandParserTests.swift` 中新增 `testAdvancedWeekAndWeekendRepeatScheduleAndProtectionV1992`，包含 16 组单机与全屋调度、半点归一及严苛防即时误触断言，全部通过。
+  - 🍃 **静音 0 档原生硬件原语热动力学与滤网气动力学精准对齐 (`EnergyAnalyticsEngine.swift` / `AppModel.swift`)**：
+    - **消除 0 档/静音原生原语掉入自动风速的物理失真缺陷**：部分海尔/卡萨帝机型或网关协议在静音/微风工况下上报 `0档`、`零档`、`0`、`level0`、`level_0`、`speed0`、`speed_0`、`gear0`、`gear_0`，此前由于缺少匹配而错漏落入自动风速，在大温差时被严重高估为大风量重载（120W / 1.30 负荷），产生高达 8 倍功率与 2 倍以上滤网磨损的物理虚标；本版本在 `EnergyAnalyticsEngine.estimateInstantaneousPower` 与 `AppModel.calculateFilterWearFactor` 中全面纳管 0 档原生原语至静音微风档位（15W / 0.60 负荷），彻底消除估算偏差。
+  - 🍎 **Siri 与快捷指令 (`AppIntents.swift`) 全屋调度修复与全仓设备模型路由彻底收敛 (`AppIntents.swift` / `StatusItemController.swift` / `ScheduleViews.swift` / `SleepCurveSection.swift` / `EcoEnergySection.swift` / `HaierACApp.swift`)**：
+    - **修复 `SetACScheduleIntent` 全屋调度被 `menuBarDeviceId` 覆盖拦截缺陷**：当用户传入 `deviceName = "全屋"` 时，此前因 `else if let menuId = model.menuBarDeviceId` 优先级过高导致全屋调度被拦截降级为单设备任务；重构后优先判定全屋范围（`isAllScope`），并在默认未填设备时收敛至 `primaryDeviceId`；
+    - **全仓 AppIntents 与状态栏/视图层设备路由彻底收敛**：全面收敛 `AppIntents.swift`、`StatusItemController.swift`（同频批次任务管理与快速倒计时菜单）、`ScheduleViews.swift`、`SleepCurveSection.swift`、`EcoEnergySection.swift` 与 `HaierACApp.swift` 中的设备名称与目标设备解析至 `primaryDeviceId` 与 `deviceName(for:)`，消除局域网手动添加设备在各层级的漂移与回退缺陷。
+
 - 🏷 **闭环自然口语下周/这周/本周循环调度大一统引擎、防即时误触全景加固、macOS 桌面小组件与全屋设备模型路由收敛 (v1.9.91)**：
   - ⏱️ **“下周/下个周/下星期/这周/这个周/这星期/本周/本星期/下礼拜/这礼拜/本礼拜”自然口语跨周循环调度大一统与防即时误触全闭环 (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)**：
     - **彻底解决跨周/本周口语被判定为即时开关机导致立即关机/开机的严重安全隐患**：此前用户说“下周关空调”、“下周开机”、“这周关空调”、“本周开机”、“下星期关空调”、“下礼拜关机”、“这星期关机”、“本星期开机”、“全屋下周关空调”等高频跨周时态指令时，因未指明具体单星期数字（如“周一”），`hasTimingOrCountdownIntent` 返回 false，直接穿透至 `isPowerOff` / `isPowerOn` / `turnOffAll` / `turnOnAll`，造成全屋或单机**立即误关机/开机**的重大误触安全隐患；本版本在 `hasTimingOrCountdownIntent` 中全面筑牢“下周/下个周/下星期/下个星期/下礼拜/下个礼拜/这周/这个周/这星期/这个星期/这礼拜/这个礼拜/本周/本个周/本星期/本个星期/本礼拜/本个礼拜/隔周/隔个周/下周末/这周末/本周末”全景前置防线；
