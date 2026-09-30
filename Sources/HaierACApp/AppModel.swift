@@ -495,7 +495,7 @@ final class AppModel: ObservableObject {
 
     /// 当前菜单栏温度文案（如 "26.0°"），无数据或设备离线时返回 nil
     var menuBarTemperatureText: String? {
-        guard menuBarShowTemperature, let deviceId = menuBarDeviceId ?? allUnifiedDevices.first?.id,
+        guard menuBarShowTemperature, let deviceId = primaryDeviceId,
               reachability(for: deviceId) == .available,
               let attr = Self.indoorTemperatureAttribute(in: attributes[deviceId] ?? [:]),
               let value = attr.doubleValue else { return nil }
@@ -1073,7 +1073,7 @@ final class AppModel: ObservableObject {
             stopSelfCleaning()
         }
 
-        let devName = allUnifiedDevices.first(where: { $0.id == deviceId })?.name ?? "海尔空调"
+        let devName = deviceName(for: deviceId)
 
         // 尝试下发海尔标准自清洁控制指令
         let attrs = attributes[deviceId] ?? [:]
@@ -2471,8 +2471,8 @@ final class AppModel: ObservableObject {
                 )
                 center.add(request)
             } else {
-                let devNames = actions.compactMap { act in
-                    self.allUnifiedDevices.first(where: { $0.id == act.deviceId })?.name
+                let devNames = actions.map { act in
+                    self.deviceName(for: act.deviceId)
                 }
                 let devList = devNames.isEmpty ? "\(actions.count) 台空调" : devNames.joined(separator: "、")
                 let sampleAction = actions[0]
@@ -2557,7 +2557,7 @@ final class AppModel: ObservableObject {
             guard now.timeIntervalSince(lastSnapshotWrite) >= Self.snapshotThrottle else { return }
         }
         lastSnapshotWrite = now
-        guard let deviceId = devices.first?.id else { return }
+        guard let deviceId = primaryDeviceId else { return }
         let attrs = attributes[deviceId] ?? [:]
         var dict: [String: Any] = [:]
         if let temp = AppModel.indoorTemperatureAttribute(in: attrs)?.doubleValue {
@@ -2572,7 +2572,7 @@ final class AppModel: ObservableObject {
         if let hum = AppModel.indoorHumidityAttribute(in: attrs)?.doubleValue {
             dict["humidity"] = hum
         }
-        dict["deviceName"] = devices.first?.deviceName ?? ""
+        dict["deviceName"] = deviceName(for: deviceId)
         dict["updatedAt"] = ISO8601DateFormatter().string(from: Date())
 
         // 智能睡眠温阶状态同步到小组件
@@ -2690,7 +2690,7 @@ final class AppModel: ObservableObject {
             operationNotice = OperationNotice(text: "⚠️ 连接中断，情景未应用", isError: true)
             return
         }
-        let fallbackId = targetDeviceId ?? allUnifiedDevices.first?.id
+        let fallbackId = targetDeviceId ?? primaryDeviceId
         // 空 deviceId 动作的目标设备列表：全部设备 or 单台
         let emptyTargets: [String] = allDevices
             ? allUnifiedDevices.map(\.id)
@@ -3111,7 +3111,7 @@ final class AppModel: ObservableObject {
         // 防御性校验：设备可达性拦截（未连网或未知设备无法执行控制，避免产生虚假的乐观更新）
         let reach = reachability(for: deviceId)
         if reach == .deviceOffline {
-            let devName = allUnifiedDevices.first(where: { $0.id == deviceId })?.name ?? "设备"
+            let devName = deviceName(for: deviceId)
             operationNotice = OperationNotice(text: "⚠️ 设备离线：\(devName) 未连网，无法执行控制", isError: true)
             return
         }
@@ -3301,7 +3301,7 @@ final class AppModel: ObservableObject {
         }
         let current = attribute("targetTemperature", deviceId: deviceId)?.doubleValue ?? 26.0
         let target = min(30.0, max(16.0, current + delta))
-        let devName = allUnifiedDevices.first(where: { $0.id == deviceId })?.name ?? "空调"
+        let devName = deviceName(for: deviceId)
         if target == current {
             let limitDesc = delta > 0 ? "已达到最高温度上限 30°C" : "已达到最低温度下限 16°C"
             operationNotice = OperationNotice(text: "「\(devName)」\(limitDesc)", isError: false)

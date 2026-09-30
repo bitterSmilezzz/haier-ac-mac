@@ -8,6 +8,16 @@
 
 ## 功能
 
+- 🏷 **闭环自然口语下周/这周/本周循环调度大一统引擎、防即时误触全景加固、macOS 桌面小组件与全屋设备模型路由收敛 (v1.9.91)**：
+  - ⏱️ **“下周/下个周/下星期/这周/这个周/这星期/本周/本星期/下礼拜/这礼拜/本礼拜”自然口语跨周循环调度大一统与防即时误触全闭环 (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)**：
+    - **彻底解决跨周/本周口语被判定为即时开关机导致立即关机/开机的严重安全隐患**：此前用户说“下周关空调”、“下周开机”、“这周关空调”、“本周开机”、“下星期关空调”、“下礼拜关机”、“这星期关机”、“本星期开机”、“全屋下周关空调”等高频跨周时态指令时，因未指明具体单星期数字（如“周一”），`hasTimingOrCountdownIntent` 返回 false，直接穿透至 `isPowerOff` / `isPowerOn` / `turnOffAll` / `turnOnAll`，造成全屋或单机**立即误关机/开机**的重大误触安全隐患；本版本在 `hasTimingOrCountdownIntent` 中全面筑牢“下周/下个周/下星期/下个星期/下礼拜/下个礼拜/这周/这个周/这星期/这个星期/这礼拜/这个礼拜/本周/本个周/本星期/本个星期/本礼拜/本个礼拜/隔周/隔个周/下周末/这周末/本周末”全景前置防线；
+    - **跨周自然口语大一统调度解析流水线 (`parseBaseRepeatWeekdays`)**：在调度规则提取中新增通用时相规则，将“下周/下个周/下星期/这周/本周/下礼拜”等口语在无显式星期钟点时自动映射为周一基准（`[2]`）及 08:00 执行时点，完整生成 `.scheduleRepeatPower` 循环调度指令，杜绝掉入即时开关机；
+    - **跨周半点时相标准化归一流水线全量补齐 (`convertChineseNumbers`)**：新增“下周半”、“下个周半”、“这周半”、“这个周半”、“本周半”、“本个周半”、“下星期半”、“下个星期半”、“这星期半”、“这个星期半”、“本星期半”、“本个星期半”、“下礼拜半”、“下个礼拜半”、“这礼拜半”、“这个礼拜半”、“本礼拜半”、“本个礼拜半”、“隔周半”、“隔个周半”等 20+ 组口语半点时相映射至 08:30；
+    - **单元测试 100% 满分覆盖**：在 `VoiceCommandParserTests.swift` 中新增 `testNaturalWeekRepeatScheduleAndProtectionV1991`，包含 24 组单机与全屋跨周无钟点调度、带钟点调度、半点归一及严苛防即时误触断言，全部通过。
+  - 🖥️ **macOS Desktop WidgetKit 桌面小组件与全屋设备模型路由彻底收敛 (`AppModel.swift` / `StatusItemController.swift` / `VoiceCapsuleWindowController.swift` / `FilterCareSheet.swift`)**：
+    - **消除局域网手动设备桌面小组件空白与主显设备漂移缺陷 (`AppModel.writeWidgetSnapshot`)**：此前桌面小组件数据落盘硬编码使用 `devices.first?.id` 与 `devices.first?.deviceName`，导致纯手动设备（局域网网关直连、无云端账号）环境下 `devices` 为空，小组件快照无法写入、桌面组件永远空白；且多设备拓扑下小组件无法跟随用户设定的主控设备。本版本重构对齐至 `primaryDeviceId` 与 `deviceName(for:)`，局域网手动设备与多设备拓扑均能 100% 准确同步至 WidgetKit 桌面小组件；
+    - **设备路由与统一名称解析全仓收敛**：在菜单栏主显温度（`menuBarTemperatureText`）、自清洁启动（`startSelfCleaning`）、情景应用回退（`applyScene`）、离线防护拦截、温度调节（`adjustTemperature`）、状态栏调度与维护 Tooltip（`StatusItemController`）、语音胶囊主显（`VoiceCapsuleWindowController`）及滤网保养面板（`FilterCareSheet`）中，彻底消除散落的 `allUnifiedDevices.first` 边缘依赖，全面收敛至 `primaryDeviceId` 与 `deviceName(for:)`，达成全仓架构 100% 统一自洽。
+
 - 🏷 **闭环自然口语单星期循环调度大一统引擎、防即时误触全景加固、全屋设备模型路由收敛与变频热阻尼全工况对齐 (v1.9.90)**：
   - ⏱️ **“周一至周日/星期一至星期日/礼拜一至礼拜天”自然口语单星期循环调度大一统与防即时误触全闭环 (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)**：
     - **彻底解决单星期口语被即时开关机误吞或星期参数丢失的重大缺陷**：此前用户说“周一关空调”、“周五开机”、“星期三关空调”、“星期天开机”、“礼拜六关机”、“全屋周一关空调”等高频家庭口语时，因不含“每/逢/每个”或连接词“到/至”，`hasTimingOrCountdownIntent` 返回 false，直接穿透至 `isPowerOff` / `turnOffAll` 造成全屋立即误关机的严重误触风险；若带钟点（如“周一早上8点开机”），`parseRepeatWeekdays` 无法识别，导致退化为次日单次定时（丢弃周一周期设定）。本版本在 `parseBaseRepeatWeekdays` 第 7 步中全面纳管“周一”~“周日/周天”、“星期一”~“星期日/星期天”、“礼拜一”~“礼拜日/礼拜天”、“周1”~“周7”等单星期自然口语，在无显式钟点时自动对齐 08:00 基准并无缝映射为 `.scheduleRepeatPower` 循环任务；

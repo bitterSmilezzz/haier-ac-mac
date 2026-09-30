@@ -123,9 +123,8 @@ public final class VoiceCapsuleWindowController: NSObject, NSWindowDelegate {
     }
 
     private func currentDeviceDisplayName(model: AppModel) -> String {
-        let targetId = model.menuBarDeviceId ?? model.allUnifiedDevices.first?.id
-        if let targetId, let u = model.allUnifiedDevices.first(where: { $0.id == targetId }) {
-            return u.name
+        if let targetId = model.primaryDeviceId {
+            return model.deviceName(for: targetId)
         }
         return "未发现空调"
     }
@@ -164,8 +163,8 @@ public final class VoiceCapsuleWindowController: NSObject, NSWindowDelegate {
         }
 
         // 3. 回退为菜单栏选中的设备或首个设备
-        let fallbackId = model.menuBarDeviceId ?? model.allUnifiedDevices.first?.id
-        if let fallbackDev = model.allUnifiedDevices.first(where: { $0.id == fallbackId }) {
+        let fallbackId = model.primaryDeviceId
+        if let fallbackId, let fallbackDev = model.allUnifiedDevices.first(where: { $0.id == fallbackId }) {
             return [fallbackDev]
         }
         return []

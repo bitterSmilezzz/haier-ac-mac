@@ -19,7 +19,7 @@ struct FilterCareSheet: View {
     }
 
     private var targetDeviceName: String {
-        allDeviceList.first(where: { $0.id == currentDeviceId })?.name ?? "海尔空调"
+        model.deviceName(for: currentDeviceId)
     }
 
     private var cleanlinessPercentage: Int {

@@ -3649,6 +3649,107 @@ final class VoiceCommandParserTests: XCTestCase {
         XCTAssertNotEqual(VoiceCommandParser.parse("全屋星期天关空调")?.command, .turnOffAll)
     }
 
+    // MARK: - v1.9.91 自然口语下周/这周/本周/下星期/下礼拜循环调度大一统、半点归一与严苛防即时误触加固测试
+
+    func testNaturalWeekRepeatScheduleAndProtectionV1991() {
+        // 1. 无钟点跨周/本周口语大一统调度（映射至默认基准周一 08:00）
+        let nextWeekOff = VoiceCommandParser.parse("下周关空调")
+        XCTAssertEqual(nextWeekOff?.command, .scheduleRepeatPower(hour: 8, minute: 0, power: false, repeatWeekdays: [2], repeatLabel: "每周一"))
+        XCTAssertTrue(nextWeekOff?.displayText.contains("每周一 08:00 关机") == true)
+
+        let nextWeekOn = VoiceCommandParser.parse("下周开机")
+        XCTAssertEqual(nextWeekOn?.command, .scheduleRepeatPower(hour: 8, minute: 0, power: true, repeatWeekdays: [2], repeatLabel: "每周一"))
+        XCTAssertTrue(nextWeekOn?.displayText.contains("每周一 08:00 开机") == true)
+
+        let thisWeekOff = VoiceCommandParser.parse("这周关空调")
+        XCTAssertEqual(thisWeekOff?.command, .scheduleRepeatPower(hour: 8, minute: 0, power: false, repeatWeekdays: [2], repeatLabel: "每周一"))
+        XCTAssertTrue(thisWeekOff?.displayText.contains("每周一 08:00 关机") == true)
+
+        let currentWeekOn = VoiceCommandParser.parse("本周开机")
+        XCTAssertEqual(currentWeekOn?.command, .scheduleRepeatPower(hour: 8, minute: 0, power: true, repeatWeekdays: [2], repeatLabel: "每周一"))
+        XCTAssertTrue(currentWeekOn?.displayText.contains("每周一 08:00 开机") == true)
+
+        let nextXingqiOff = VoiceCommandParser.parse("下星期关空调")
+        XCTAssertEqual(nextXingqiOff?.command, .scheduleRepeatPower(hour: 8, minute: 0, power: false, repeatWeekdays: [2], repeatLabel: "每周一"))
+        XCTAssertTrue(nextXingqiOff?.displayText.contains("每周一 08:00 关机") == true)
+
+        let nextLibaiOff = VoiceCommandParser.parse("下礼拜关机")
+        XCTAssertEqual(nextLibaiOff?.command, .scheduleRepeatPower(hour: 8, minute: 0, power: false, repeatWeekdays: [2], repeatLabel: "每周一"))
+        XCTAssertTrue(nextLibaiOff?.displayText.contains("每周一 08:00 关机") == true)
+
+        let allNextWeekOff = VoiceCommandParser.parse("全屋下周关空调")
+        XCTAssertEqual(allNextWeekOff?.command, .scheduleRepeatPower(hour: 8, minute: 0, power: false, repeatWeekdays: [2], repeatLabel: "每周一"))
+        XCTAssertTrue(allNextWeekOff?.displayText.contains("全屋在 每周一 08:00 关机") == true)
+
+        let allThisWeekOn = VoiceCommandParser.parse("全屋这周开机")
+        XCTAssertEqual(allThisWeekOn?.command, .scheduleRepeatPower(hour: 8, minute: 0, power: true, repeatWeekdays: [2], repeatLabel: "每周一"))
+        XCTAssertTrue(allThisWeekOn?.displayText.contains("全屋在 每周一 08:00 开机") == true)
+
+        // 2. 带具体钟点的复合口语调度
+        let nextWeekMorning = VoiceCommandParser.parse("下周早上8点开机")
+        XCTAssertEqual(nextWeekMorning?.command, .scheduleRepeatPower(hour: 8, minute: 0, power: true, repeatWeekdays: [2], repeatLabel: "每周一"))
+        XCTAssertTrue(nextWeekMorning?.displayText.contains("每周一 08:00 开机") == true)
+
+        let nextWeekNight = VoiceCommandParser.parse("下周晚上10点关空调")
+        XCTAssertEqual(nextWeekNight?.command, .scheduleRepeatPower(hour: 22, minute: 0, power: false, repeatWeekdays: [2], repeatLabel: "每周一"))
+        XCTAssertTrue(nextWeekNight?.displayText.contains("每周一 22:00 关机") == true)
+
+        let thisFriNight = VoiceCommandParser.parse("本周五晚上9点关空调")
+        XCTAssertEqual(thisFriNight?.command, .scheduleRepeatPower(hour: 21, minute: 0, power: false, repeatWeekdays: [6], repeatLabel: "每周五"))
+        XCTAssertTrue(thisFriNight?.displayText.contains("每周五 21:00 关机") == true)
+
+        let nextWedAfternoon = VoiceCommandParser.parse("下周三下午3点关空调")
+        XCTAssertEqual(nextWedAfternoon?.command, .scheduleRepeatPower(hour: 15, minute: 0, power: false, repeatWeekdays: [4], repeatLabel: "每周三"))
+        XCTAssertTrue(nextWedAfternoon?.displayText.contains("每周三 15:00 关机") == true)
+
+        // 3. 口语半点归一测试（映射至 08:30）
+        let nextWeekHalf = VoiceCommandParser.parse("下周半关机")
+        XCTAssertEqual(nextWeekHalf?.command, .scheduleRepeatPower(hour: 8, minute: 30, power: false, repeatWeekdays: [2], repeatLabel: "每周一"))
+        XCTAssertTrue(nextWeekHalf?.displayText.contains("每周一 08:30 关机") == true)
+
+        let thisWeekHalf = VoiceCommandParser.parse("这周半开机")
+        XCTAssertEqual(thisWeekHalf?.command, .scheduleRepeatPower(hour: 8, minute: 30, power: true, repeatWeekdays: [2], repeatLabel: "每周一"))
+        XCTAssertTrue(thisWeekHalf?.displayText.contains("每周一 08:30 开机") == true)
+
+        let currentWeekHalf = VoiceCommandParser.parse("本周半关机")
+        XCTAssertEqual(currentWeekHalf?.command, .scheduleRepeatPower(hour: 8, minute: 30, power: false, repeatWeekdays: [2], repeatLabel: "每周一"))
+        XCTAssertTrue(currentWeekHalf?.displayText.contains("每周一 08:30 关机") == true)
+
+        let nextXingqiHalf = VoiceCommandParser.parse("下星期半关空调")
+        XCTAssertEqual(nextXingqiHalf?.command, .scheduleRepeatPower(hour: 8, minute: 30, power: false, repeatWeekdays: [2], repeatLabel: "每周一"))
+        XCTAssertTrue(nextXingqiHalf?.displayText.contains("每周一 08:30 关机") == true)
+
+        let nextLibaiHalf = VoiceCommandParser.parse("下礼拜半关机")
+        XCTAssertEqual(nextLibaiHalf?.command, .scheduleRepeatPower(hour: 8, minute: 30, power: false, repeatWeekdays: [2], repeatLabel: "每周一"))
+        XCTAssertTrue(nextLibaiHalf?.displayText.contains("每周一 08:30 关机") == true)
+
+        // 4. 严苛防即时误触全景加固断言（杜绝掉入 setPower / turnOffAll / turnOnAll）
+        XCTAssertNotEqual(VoiceCommandParser.parse("下周关空调")?.command, .setPower(false))
+        XCTAssertNotEqual(VoiceCommandParser.parse("下周关空调")?.command, .turnOffAll)
+        XCTAssertNotEqual(VoiceCommandParser.parse("下周开机")?.command, .setPower(true))
+        XCTAssertNotEqual(VoiceCommandParser.parse("下周开机")?.command, .turnOnAll)
+        XCTAssertNotEqual(VoiceCommandParser.parse("这周关空调")?.command, .setPower(false))
+        XCTAssertNotEqual(VoiceCommandParser.parse("这周关空调")?.command, .turnOffAll)
+        XCTAssertNotEqual(VoiceCommandParser.parse("这周开机")?.command, .setPower(true))
+        XCTAssertNotEqual(VoiceCommandParser.parse("这周开机")?.command, .turnOnAll)
+        XCTAssertNotEqual(VoiceCommandParser.parse("本周关空调")?.command, .setPower(false))
+        XCTAssertNotEqual(VoiceCommandParser.parse("本周关空调")?.command, .turnOffAll)
+        XCTAssertNotEqual(VoiceCommandParser.parse("本周开机")?.command, .setPower(true))
+        XCTAssertNotEqual(VoiceCommandParser.parse("本周开机")?.command, .turnOnAll)
+        XCTAssertNotEqual(VoiceCommandParser.parse("下星期关空调")?.command, .setPower(false))
+        XCTAssertNotEqual(VoiceCommandParser.parse("下星期关空调")?.command, .turnOffAll)
+        XCTAssertNotEqual(VoiceCommandParser.parse("下星期开机")?.command, .setPower(true))
+        XCTAssertNotEqual(VoiceCommandParser.parse("下星期开机")?.command, .turnOnAll)
+        XCTAssertNotEqual(VoiceCommandParser.parse("下礼拜关机")?.command, .setPower(false))
+        XCTAssertNotEqual(VoiceCommandParser.parse("下礼拜关机")?.command, .turnOffAll)
+        XCTAssertNotEqual(VoiceCommandParser.parse("下礼拜开机")?.command, .setPower(true))
+        XCTAssertNotEqual(VoiceCommandParser.parse("下礼拜开机")?.command, .turnOnAll)
+        XCTAssertNotEqual(VoiceCommandParser.parse("全屋下周关空调")?.command, .turnOffAll)
+        XCTAssertNotEqual(VoiceCommandParser.parse("全屋下周开机")?.command, .turnOnAll)
+        XCTAssertNotEqual(VoiceCommandParser.parse("全屋这周关机")?.command, .turnOffAll)
+        XCTAssertNotEqual(VoiceCommandParser.parse("全屋本周开机")?.command, .turnOnAll)
+    }
+
     // MARK: - 无效输入测试
 
     func testInvalidCommands() {

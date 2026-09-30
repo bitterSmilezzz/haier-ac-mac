@@ -1633,7 +1633,7 @@ final class StatusItemController: NSObject {
         guard let devId = sender.representedObject as? String else { return }
         model.menuBarDeviceId = devId
         refreshTemperature()
-        let name = model.allUnifiedDevices.first(where: { $0.id == devId })?.name ?? "目标空调"
+        let name = model.deviceName(for: devId)
         model.operationNotice = AppModel.OperationNotice(text: "已将「\(name)」设为菜单栏主显设备", isError: false)
     }
 
@@ -1925,7 +1925,7 @@ final class StatusItemController: NSObject {
 
     /// 生成单台空调滤网运行与健康保养悬浮感知提示 (v1.9.76)
     private func filterMaintenanceTooltip(for deviceId: String, deviceName: String? = nil) -> String {
-        let name = deviceName ?? model.allUnifiedDevices.first(where: { $0.id == deviceId })?.name ?? "空调"
+        let name = deviceName ?? model.deviceName(for: deviceId)
         let cleanPct = model.filterCleanlinessPercentage(for: deviceId)
         let accMins = model.filterAccumulatedMinutes(for: deviceId)
         let accHours = accMins / 60
@@ -1949,8 +1949,8 @@ final class StatusItemController: NSObject {
     private func scheduleItemTooltip(for action: ScheduledAction, devName: String, cleanActionName: String, timeStr: String, remainingDesc: String) -> String {
         let siblingActions = model.scheduledActions.filter { StatusItemController.isSiblingSchedule($0, action) }
         if siblingActions.count > 1 {
-            let siblingDevNames = siblingActions.compactMap { act in
-                model.allUnifiedDevices.first(where: { $0.id == act.deviceId })?.name
+            let siblingDevNames = siblingActions.map { act in
+                model.deviceName(for: act.deviceId)
             }
             let devListStr = siblingDevNames.isEmpty ? "\(siblingActions.count) 台设备" : siblingDevNames.joined(separator: "、")
             return "同频批次任务（共 \(siblingActions.count) 台设备：\(devListStr)）\n动作：\(cleanActionName)\n下次触发：\(timeStr)\(remainingDesc)\n展开子菜单可进行单任务管理或同步协同批处理"
@@ -1963,7 +1963,7 @@ final class StatusItemController: NSObject {
         guard let devId = sender.representedObject as? String else { return }
         let count = model.setScheduledActionsEnabled(for: devId, enabled: false)
         if count > 0 {
-            let devName = model.allUnifiedDevices.first(where: { $0.id == devId })?.name ?? "设备"
+            let devName = model.deviceName(for: devId)
             model.operationNotice = AppModel.OperationNotice(text: "⏸ 已临时暂停「\(devName)」所有定时任务（共 \(count) 个）", isError: false)
             refreshTemperature()
         }
@@ -1973,7 +1973,7 @@ final class StatusItemController: NSObject {
         guard let devId = sender.representedObject as? String else { return }
         let count = model.setScheduledActionsEnabled(for: devId, enabled: true)
         if count > 0 {
-            let devName = model.allUnifiedDevices.first(where: { $0.id == devId })?.name ?? "设备"
+            let devName = model.deviceName(for: devId)
             model.operationNotice = AppModel.OperationNotice(text: "▶️ 已恢复「\(devName)」所有定时任务生效（共 \(count) 个）", isError: false)
             refreshTemperature()
         }
@@ -1983,7 +1983,7 @@ final class StatusItemController: NSObject {
         guard let devId = sender.representedObject as? String else { return }
         let count = model.cancelSchedules(for: devId)
         if count > 0 {
-            let devName = model.allUnifiedDevices.first(where: { $0.id == devId })?.name ?? "设备"
+            let devName = model.deviceName(for: devId)
             model.operationNotice = AppModel.OperationNotice(text: "🗑 已取消「\(devName)」所有定时与倒计时（共 \(count) 个）", isError: false)
             refreshTemperature()
         }
