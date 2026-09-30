@@ -6,6 +6,19 @@ A native SwiftUI app to control Haier / Leader (统帅) smart air conditioners o
 
 ## Features
 
+- 🏷 **Universal Dual-Keyword Interleaved Quad-Compound Scheduling, Evaporator Self-Cleaning C^0 Continuous Damping Model, and Control Center Synchronized Whole-House Temperature Control (v1.9.108)**:
+  - ⏱️ **"Dual-Keyword Interleaved Quad-Compound Scheduling, Timing Guard Breakdown Prevention, and Conjunction '同' Unification" Engine (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)**:
+    - **Quad-Compound Topology Unification**: Added `dualKeywordsWithRangeAndKeywordRegex` (dual keywords prefix + continuous range infix + keyword suffix, e.g., "大休和小休、周一至周三加单休日每天晚8点开机" `[1, 2, 3, 4, 7]`, "工作日同双休、周六至周日加单休每天晚8点开机" `[1..7]`) and `keywordWithRangeAndDualKeywordsRegex` (keyword prefix + continuous range infix + dual keywords suffix, e.g., "大休、周一至周三加小休和单休日每天晚8点开机" `[1, 2, 3, 4, 7]`, "工作日同周二至周四加双休和大休每天晚8点开机" `[1..7]`), closing the complete set of all 6 quad-compound topological combinations;
+    - **Timing Intent Guard Breakdown Prevention**: Added timing intent check in `parseRelativeTemperature` to strictly intercept commands containing scheduling keywords ("每天", "天天", "每晚", "定时", "倒计时", "除") combined with power actions, completely preventing scheduling commands from breaking down into unintended instant relative temperature adjustments;
+    - **100% Unit Test Suite Coverage**: Added `testQuadScheduleDualKeywordsAndTongConjunctionV19108` test suite, with all 116 tests passing with zero errors.
+  - 🧼 **Air Conditioner Filter Evaporator High-Temperature Self-Cleaning C^0 Continuous Thermal Damping Model (`AppModel.swift`)**:
+    - **Eliminated 7-Day Step Cliff**: Added `selfCleaningProtectionFactor(for:)` continuous decay model: days 0–7 provide full protection (0.90 factor, 10% load deduction incentive), days 7–14 linearly interpolate from 0.90 to 1.00 following physical damping behavior, and day 14+ restores 1.00 neutral baseline, eliminating the abrupt 10% step cliff in wear factor and filter lifespan jitter;
+    - Backward-compatible with existing `isSelfCleaningProtectionActive(for:)` API.
+  - 🖥️ **macOS Menu Bar Bento Control Center Temperature Card Whole-House Symmetrical Architecture (`MenuBarControlsView.swift`)**:
+    - **"Current Unit / Whole House" Symmetrical Scope Capsule**: Embedded scope toggling capsule directly atop `temperatureBentoPod`, matching the exact design language of `scenesPod`;
+    - **Whole-House Real-Time State Awareness**: Dynamically reflects running air conditioner count, average temperature, and temperature spread, providing helpful guidance during standby;
+    - **Synchronized Whole-House Step Adjustment**: Step buttons directly invoke `adjustTemperatureAll`, seamlessly respecting 16°C ~ 30°C whole-house boundary limits, offline reachability guards, and native trackpad haptics (`triggerHaptic`).
+
 - 🏷 **Interleaved Quad/Ternary Scheduling & Conjunction Hardening, Thermal Mass Continuity Alignment, and Status Bar Scene & Countdown Reachability Gating (v1.9.107)**:
   - ⏱️ **"Core Keyword & Range Interleaved Quad/Ternary Scheduling, Oral Conjunction '同' Coverage" Spoken Engine (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)**:
     - **Core Keyword & Continuous Range Interleaved Scheduling Engine**: Introduced `keywordWithRangeAndKeywordRegex` (keyword prefix + continuous range infix + keyword suffix, e.g., "大休、周一至周三加小休每天晚8点开机" `[1, 2, 3, 4, 7]`, "工作日加周六至周日和单休每天晚8点开机" `[1..7]`, "平时加周六至周日和大休每天晚8点开机" `[1..7]`, "双休加周一至周三加小休每天晚8点开机" `[1, 2, 3, 4, 7]`), completely eliminating greedy truncation by prefix range regexes that previously dropped trailing keywords or corrupted subsequent time and action parsing;

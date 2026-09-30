@@ -13,6 +13,8 @@ struct MenuBarControlsView: View {
     @State private var selectedSleepCurveId: UUID?
     /// 一键情景下发生效范围：false 为当前机，true 为全屋多联 (v1.9.104)
     @State private var sceneScopeAll = false
+    /// 目标温度调节生效范围：false 为当前机，true 为全屋多联联动 (v1.9.108)
+    @State private var tempScopeAll = false
 
     private var selectedSleepCurve: SleepCurveConfig {
         if let id = selectedSleepCurveId, let curve = model.allSleepCurves.first(where: { $0.id == id }) {
@@ -752,7 +754,7 @@ struct MenuBarControlsView: View {
         .opacity(canApplyScene ? 1.0 : 0.6)
     }
 
-    // MARK: - 3. 核心温控 Bento 卡片
+    // MARK: - 3. 核心温控 Bento 卡片 (v1.9.108 支持当前机/全屋多联联动调温双模式)
 
     @ViewBuilder
     private func temperatureBentoPod(
@@ -765,61 +767,215 @@ struct MenuBarControlsView: View {
            case .step(let min, let max, let step) = temp.valueRange {
             let current = temp.doubleValue ?? min
 
-            HStack(alignment: .center) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("目标温度")
-                        .font(.system(size: 10, weight: .medium))
-                        .foregroundStyle(Theme.inkSubtle)
-                    Text(String(format: "%.1f°C", current))
-                        .font(.system(size: 24, weight: .bold, design: .rounded))
-                        .monospacedDigit()
-                        .foregroundStyle(isPowerOn ? tint : Theme.inkTertiary)
+            // 全屋运行中与可控设备状态感知
+            let allDevices = model.allUnifiedDevices
+            let onDevices = allDevices.filter {
+                model.reachability(for: $0.id) == .available &&
+                (model.attributes[$0.id]?["onOffStatus"]?.boolValue == true)
+            }
+            let controllableDevices = allDevices.filter { model.reachability(for: $0.id).isControllable }
+            let allTemps = onDevices.compactMap { model.attribute("targetTemperature", deviceId: $0.id)?.doubleValue }
+
+            VStack(spacing: 8) {
+                // 若全屋多联机（>1台），展示顶部作用域切换条，与一键情景 Bento 保持设计语言完全统一
+                if allDevices.count > 1 {
+                    HStack {
+                        Image(systemName: "thermometer.medium")
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundStyle(tint)
+                        Text(tempScopeAll ? "全屋目标温度" : "目标温度")
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundStyle(Theme.inkSubtle)
+
+                        Spacer()
+
+                        HStack(spacing: 2) {
+                            Button {
+                                withAnimation(Theme.springFast) {
+                                    tempScopeAll = false
+                                    triggerHaptic()
+                                }
+                            } label: {
+                                Text("当前机")
+                                    .font(.system(size: 9, weight: !tempScopeAll ? .semibold : .regular))
+                                    .padding(.horizontal, 5)
+                                    .padding(.vertical, 2)
+                                    .foregroundStyle(!tempScopeAll ? Theme.ink : Theme.inkTertiary)
+                                    .background(
+                                        Capsule().fill(!tempScopeAll ? Theme.surface3 : Color.clear)
+                                    )
+                            }
+                            .buttonStyle(.plain)
+
+                            Button {
+                                withAnimation(Theme.springFast) {
+                                    tempScopeAll = true
+                                    triggerHaptic()
+                                }
+                            } label: {
+                                Text("全屋 (\(onDevices.count)台运行)")
+                                    .font(.system(size: 9, weight: tempScopeAll ? .semibold : .regular))
+                                    .padding(.horizontal, 5)
+                                    .padding(.vertical, 2)
+                                    .foregroundStyle(tempScopeAll ? Theme.ink : Theme.inkTertiary)
+                                    .background(
+                                        Capsule().fill(tempScopeAll ? Theme.surface3 : Color.clear)
+                                    )
+                            }
+                            .buttonStyle(.plain)
+                        }
+                        .padding(2)
+                        .background(Capsule().fill(Theme.surface2))
+                    }
                 }
 
-                Spacer()
-
-                // 加减步进胶囊
-                HStack(spacing: 12) {
-                    Button {
-                        triggerHaptic()
-                        let new = Swift.max(min, current - step)
-                        withAnimation(Theme.spring) {
-                            model.sendAttribute("targetTemperature", value: .double(Theme.roundStep(value: new, step: step)), deviceId: device.id)
+                HStack(alignment: .center) {
+                    if !tempScopeAll || allDevices.count <= 1 {
+                        // 单机模式
+                        VStack(alignment: .leading, spacing: 2) {
+                            if allDevices.count <= 1 {
+                                Text("目标温度")
+                                    .font(.system(size: 10, weight: .medium))
+                                    .foregroundStyle(Theme.inkSubtle)
+                            }
+                            Text(String(format: "%.1f°C", current))
+                                .font(.system(size: 24, weight: .bold, design: .rounded))
+                                .monospacedDigit()
+                                .foregroundStyle(isPowerOn ? tint : Theme.inkTertiary)
                         }
-                    } label: {
-                        Image(systemName: "minus")
-                            .font(.system(size: 12, weight: .bold))
-                            .frame(width: 28, height: 28)
-                            .background(Theme.surface2)
-                            .clipShape(Circle())
-                    }
-                    .buttonStyle(.plain)
-                    .foregroundStyle(isPowerOn && current > min ? Theme.ink : Theme.inkTertiary)
-                    .disabled(!isPowerOn || current <= min)
 
-                    Button {
-                        triggerHaptic()
-                        let new = Swift.min(max, current + step)
-                        withAnimation(Theme.spring) {
-                            model.sendAttribute("targetTemperature", value: .double(Theme.roundStep(value: new, step: step)), deviceId: device.id)
+                        Spacer()
+
+                        // 单机加减步进胶囊
+                        HStack(spacing: 12) {
+                            Button {
+                                triggerHaptic()
+                                let new = Swift.max(min, current - step)
+                                withAnimation(Theme.spring) {
+                                    model.sendAttribute("targetTemperature", value: .double(Theme.roundStep(value: new, step: step)), deviceId: device.id)
+                                }
+                            } label: {
+                                Image(systemName: "minus")
+                                    .font(.system(size: 12, weight: .bold))
+                                    .frame(width: 28, height: 28)
+                                    .background(Theme.surface2)
+                                    .clipShape(Circle())
+                            }
+                            .buttonStyle(.plain)
+                            .foregroundStyle(isPowerOn && current > min ? Theme.ink : Theme.inkTertiary)
+                            .disabled(!isPowerOn || current <= min)
+
+                            Button {
+                                triggerHaptic()
+                                let new = Swift.min(max, current + step)
+                                withAnimation(Theme.spring) {
+                                    model.sendAttribute("targetTemperature", value: .double(Theme.roundStep(value: new, step: step)), deviceId: device.id)
+                                }
+                            } label: {
+                                Image(systemName: "plus")
+                                    .font(.system(size: 12, weight: .bold))
+                                    .frame(width: 28, height: 28)
+                                    .background(Theme.surface2)
+                                    .clipShape(Circle())
+                            }
+                            .buttonStyle(.plain)
+                            .foregroundStyle(isPowerOn && current < max ? Theme.ink : Theme.inkTertiary)
+                            .disabled(!isPowerOn || current >= max)
                         }
-                    } label: {
-                        Image(systemName: "plus")
-                            .font(.system(size: 12, weight: .bold))
-                            .frame(width: 28, height: 28)
-                            .background(Theme.surface2)
-                            .clipShape(Circle())
+                        .padding(3)
+                        .background(
+                            Capsule()
+                                .fill(Theme.surface1)
+                                .overlay(Capsule().strokeBorder(Theme.hairline, lineWidth: 1))
+                        )
+                    } else {
+                        // 全屋联动模式
+                        let hasRunning = !onDevices.isEmpty
+                        let canStepDownAll = model.gatewayConnected && (hasRunning
+                            ? onDevices.contains { (model.attribute("targetTemperature", deviceId: $0.id)?.doubleValue ?? 26.0) > 16.0 }
+                            : !controllableDevices.isEmpty)
+                        let canStepUpAll = model.gatewayConnected && (hasRunning
+                            ? onDevices.contains { (model.attribute("targetTemperature", deviceId: $0.id)?.doubleValue ?? 26.0) < 30.0 }
+                            : !controllableDevices.isEmpty)
+
+                        VStack(alignment: .leading, spacing: 2) {
+                            if hasRunning {
+                                let avgTemp = allTemps.isEmpty ? 26.0 : (allTemps.reduce(0.0, +) / Swift.Double(allTemps.count))
+                                let minTemp = allTemps.min() ?? avgTemp
+                                let maxTemp = allTemps.max() ?? avgTemp
+                                if minTemp == maxTemp {
+                                    Text(String(format: "%.1f°C", avgTemp))
+                                        .font(.system(size: 24, weight: .bold, design: .rounded))
+                                        .monospacedDigit()
+                                        .foregroundStyle(tint)
+                                } else {
+                                    Text(String(format: "%.1f°C", avgTemp))
+                                        .font(.system(size: 22, weight: .bold, design: .rounded))
+                                        .monospacedDigit()
+                                        .foregroundStyle(tint)
+                                }
+                                Text(minTemp == maxTemp ? "全屋同步中" : "\(String(format: "%.0f", minTemp))~\(String(format: "%.0f", maxTemp))°C 均温 · 统一步进")
+                                    .font(.system(size: 9))
+                                    .foregroundStyle(Theme.inkSubtle)
+                                    .lineLimit(1)
+                            } else {
+                                Text("--.-°C")
+                                    .font(.system(size: 24, weight: .bold, design: .rounded))
+                                    .monospacedDigit()
+                                    .foregroundStyle(Theme.inkTertiary)
+                                Text("全屋待机中 · 点击唤醒调温")
+                                    .font(.system(size: 9))
+                                    .foregroundStyle(Theme.inkSubtle)
+                                    .lineLimit(1)
+                            }
+                        }
+
+                        Spacer()
+
+                        // 全屋统一步进胶囊
+                        HStack(spacing: 12) {
+                            Button {
+                                triggerHaptic()
+                                withAnimation(Theme.spring) {
+                                    _ = model.adjustTemperatureAll(delta: -1.0)
+                                }
+                            } label: {
+                                Image(systemName: "minus")
+                                    .font(.system(size: 12, weight: .bold))
+                                    .frame(width: 28, height: 28)
+                                    .background(Theme.surface2)
+                                    .clipShape(Circle())
+                            }
+                            .buttonStyle(.plain)
+                            .foregroundStyle(canStepDownAll ? Theme.ink : Theme.inkTertiary)
+                            .disabled(!canStepDownAll)
+                            .help(hasRunning ? "全屋运行中空调统一降温 1°C" : "开启全屋空调并统一降温 1°C")
+
+                            Button {
+                                triggerHaptic()
+                                withAnimation(Theme.spring) {
+                                    _ = model.adjustTemperatureAll(delta: 1.0)
+                                }
+                            } label: {
+                                Image(systemName: "plus")
+                                    .font(.system(size: 12, weight: .bold))
+                                    .frame(width: 28, height: 28)
+                                    .background(Theme.surface2)
+                                    .clipShape(Circle())
+                            }
+                            .buttonStyle(.plain)
+                            .foregroundStyle(canStepUpAll ? Theme.ink : Theme.inkTertiary)
+                            .disabled(!canStepUpAll)
+                            .help(hasRunning ? "全屋运行中空调统一升温 1°C" : "开启全屋空调并统一升温 1°C")
+                        }
+                        .padding(3)
+                        .background(
+                            Capsule()
+                                .fill(Theme.surface1)
+                                .overlay(Capsule().strokeBorder(Theme.hairline, lineWidth: 1))
+                        )
                     }
-                    .buttonStyle(.plain)
-                    .foregroundStyle(isPowerOn && current < max ? Theme.ink : Theme.inkTertiary)
-                    .disabled(!isPowerOn || current >= max)
                 }
-                .padding(3)
-                .background(
-                    Capsule()
-                        .fill(Theme.surface1)
-                        .overlay(Capsule().strokeBorder(Theme.hairline, lineWidth: 1))
-                )
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 10)

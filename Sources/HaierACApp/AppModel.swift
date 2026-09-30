@@ -632,6 +632,26 @@ final class AppModel: ObservableObject {
         return Date().timeIntervalSince(lastDate) < 7 * 86400
     }
 
+    /// 计算指定设备蒸发器自清洁健康保护系数（C^0 级平滑连续热阻尼模型） (v1.9.108)
+    /// - 0 ~ 7 天（全效保护期）：0.90（负荷减免 10% 激励）
+    /// - 7 ~ 14 天（微尘积聚过渡期）：从 0.90 线性平滑插值过渡至 1.00，消除第 7 天 10% 阶跃断崖
+    /// - 14 天以上或无自清洁记录：1.00（标准基准）
+    public func selfCleaningProtectionFactor(for deviceId: String) -> Double {
+        guard let lastDate = deviceSelfCleaningDates[deviceId] else { return 1.00 }
+        let elapsed = Date().timeIntervalSince(lastDate)
+        if elapsed < 0 { return 0.90 }
+        let fullProtectionDuration: TimeInterval = 7 * 86400
+        let transitionDuration: TimeInterval = 7 * 86400
+        if elapsed < fullProtectionDuration {
+            return 0.90
+        } else if elapsed < fullProtectionDuration + transitionDuration {
+            let progress = (elapsed - fullProtectionDuration) / transitionDuration
+            return 0.90 + (progress * 0.10)
+        } else {
+            return 1.00
+        }
+    }
+
     /// 指定设备的滤网清洁度百分比 (0 ~ 100%)，基于建议保养周期
     public func filterCleanlinessPercentage(for deviceId: String) -> Int {
         let maxMinutes = Self.filterServiceLifeMinutes
@@ -1003,10 +1023,10 @@ final class AppModel: ObservableObject {
             humidityFactor = 1.00
         }
 
-        // 4. 蒸发器自清洁健康激励策略因子 (产品策略激励：完成 56°C 高温自清洁后 7 天内，空调处于深度洁净健康维护期，作为主动保养激励给予等效负荷 10% 减免奖励；注：此项为产品策略激励而非物理截留过滤差异)
+        // 4. 蒸发器自清洁健康激励策略因子 (产品策略激励：完成 56°C 高温自清洁后 7 天内处于深度洁净期，7~14天内遵循 C^0 级平滑连续阻尼过渡，避免断崖突变) (v1.9.27, v1.9.108 平滑连续阻尼重构)
         let selfCleaningBonus: Double
-        if let devId = deviceId, isSelfCleaningProtectionActive(for: devId) {
-            selfCleaningBonus = 0.90
+        if let devId = deviceId {
+            selfCleaningBonus = selfCleaningProtectionFactor(for: devId)
         } else {
             selfCleaningBonus = 1.00
         }

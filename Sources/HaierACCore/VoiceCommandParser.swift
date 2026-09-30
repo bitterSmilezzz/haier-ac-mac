@@ -545,19 +545,31 @@ public struct VoiceCommandParser {
 
     /// 匹配连续区间在先、双核心关键词居中、连续区间在后的夹心复合口语（如“周一至周二、大休和小休加周五至周六”、“周一到周二加工作日和双休以及周六至周日”） (v1.9.107)
     private static let rangeWithDualKeywordsAndRangeRegex: NSRegularExpression? = {
-        let pattern = #"(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])\s*(?:[、,，和与及跟以及还有或者或加/／\s]+)\s*(工作日|平时|平日|双休日|双休|周末三天|周末|休息日|公休日|休假日|放假日|节假日|单休日|单休|大休日|大休|大周|小休日|小休|小周)\s*(?:[、,，和与及跟以及还有或者或加/／\s]+)\s*(工作日|平时|平日|双休日|双休|周末三天|周末|休息日|公休日|休假日|放假日|节假日|单休日|单休|大休日|大休|大周|小休日|小休|小周)\s*(?:[、,，和与及跟以及还有或者或加/／\s]+)\s*(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])"#
+        let pattern = #"(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(工作日|平时|平日|双休日|双休|周末三天|周末|休息日|公休日|休假日|放假日|节假日|单休日|单休|大休日|大休|大周|小休日|小休|小周)\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(工作日|平时|平日|双休日|双休|周末三天|周末|休息日|公休日|休假日|放假日|节假日|单休日|单休|大休日|大休|大周|小休日|小休|小周)\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])"#
         return try? NSRegularExpression(pattern: pattern)
     }()
 
     /// 匹配核心关键词在先、双连续区间居中、核心关键词在后的夹心复合口语（如“大休、周一至周二、周四至周五加小休”、“工作日加周一到周二、周四到周五和双休”） (v1.9.107)
     private static let keywordWithDualRangeAndKeywordRegex: NSRegularExpression? = {
-        let pattern = #"(工作日|平时|平日|双休日|双休|周末三天|周末|休息日|公休日|休假日|放假日|节假日|单休日|单休|大休日|大休|大周|小休日|小休|小周)\s*(?:[、,，和与及跟以及还有或者或加/／\s]+)\s*(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])\s*(?:[、,，和与及跟以及还有或者或加/／\s]+)\s*(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])\s*(?:[、,，和与及跟以及还有或者或加/／\s]+)\s*(工作日|平时|平日|双休日|双休|周末三天|周末|休息日|公休日|休假日|放假日|节假日|单休日|单休|大休日|大休|大周|小休日|小休|小周)"#
+        let pattern = #"(工作日|平时|平日|双休日|双休|周末三天|周末|休息日|公休日|休假日|放假日|节假日|单休日|单休|大休日|大休|大周|小休日|小休|小周)\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(工作日|平时|平日|双休日|双休|周末三天|周末|休息日|公休日|休假日|放假日|节假日|单休日|单休|大休日|大休|大周|小休日|小休|小周)"#
+        return try? NSRegularExpression(pattern: pattern)
+    }()
+
+    /// 匹配双核心关键词在先、连续区间居中、核心关键词在后的四元复合口语（如“大休和小休、周一至周三加单休”、“工作日同双休、周六至周日加单休日”） (v1.9.108)
+    private static let dualKeywordsWithRangeAndKeywordRegex: NSRegularExpression? = {
+        let pattern = #"(工作日|平时|平日|双休日|双休|周末三天|周末|休息日|公休日|休假日|放假日|节假日|单休日|单休|大休日|大休|大周|小休日|小休|小周)\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(工作日|平时|平日|双休日|双休|周末三天|周末|休息日|公休日|休假日|放假日|节假日|单休日|单休|大休日|大休|大周|小休日|小休|小周)\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(工作日|平时|平日|双休日|双休|周末三天|周末|休息日|公休日|休假日|放假日|节假日|单休日|单休|大休日|大休|大周|小休日|小休|小周)"#
+        return try? NSRegularExpression(pattern: pattern)
+    }()
+
+    /// 匹配核心关键词在先、连续区间居中、双核心关键词在后的四元复合口语（如“大休、周一至周三加小休和单休”、“工作日同周二至周四加双休和大休”） (v1.9.108)
+    private static let keywordWithRangeAndDualKeywordsRegex: NSRegularExpression? = {
+        let pattern = #"(工作日|平时|平日|双休日|双休|周末三天|周末|休息日|公休日|休假日|放假日|节假日|单休日|单休|大休日|大休|大周|小休日|小休|小周)\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(工作日|平时|平日|双休日|双休|周末三天|周末|休息日|公休日|休假日|放假日|节假日|单休日|单休|大休日|大休|大周|小休日|小休|小周)\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(工作日|平时|平日|双休日|双休|周末三天|周末|休息日|公休日|休假日|放假日|节假日|单休日|单休|大休日|大休|大周|小休日|小休|小周)"#
         return try? NSRegularExpression(pattern: pattern)
     }()
 
     /// 匹配核心关键词在前、连续区间居中、核心关键词在后夹心复合口语（如“大休、周一至周三加小休”、“工作日加周六至周日和单休”、“平时加周六至周日和大休”、“双休加周一至周三和平日”） (v1.9.107)
     private static let keywordWithRangeAndKeywordRegex: NSRegularExpression? = {
-        let pattern = #"(工作日|平时|平日|双休日|双休|周末三天|周末|休息日|公休日|休假日|放假日|节假日|单休日|单休|大休日|大休|大周|小休日|小休|小周)\s*(?:[、,，和与及跟以及还有或者或加/／\s]+)\s*(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])\s*(?:[、,，和与及跟以及还有或者或加/／\s]+)\s*(工作日|平时|平日|双休日|双休|周末三天|周末|休息日|公休日|休假日|放假日|节假日|单休日|单休|大休日|大休|大周|小休日|小休|小周)"#
+        let pattern = #"(工作日|平时|平日|双休日|双休|周末三天|周末|休息日|公休日|休假日|放假日|节假日|单休日|单休|大休日|大休|大周|小休日|小休|小周)\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(工作日|平时|平日|双休日|双休|周末三天|周末|休息日|公休日|休假日|放假日|节假日|单休日|单休|大休日|大休|大周|小休日|小休|小周)"#
         return try? NSRegularExpression(pattern: pattern)
     }()
 
@@ -1232,6 +1244,60 @@ public struct VoiceCommandParser {
                 days.formUnion(generateWeeklyRange(start: s2Wd, end: e2Wd))
                 if let kw2Days = daysFromKeyword(kw2) {
                     days.formUnion(kw2Days)
+                }
+                let sorted = days.sorted()
+                return (sorted, formatWeekdayLabel(from: sorted))
+            }
+        }
+
+        // 0.00005 双核心关键词在先、连续区间居中、核心关键词在后（如“大休和小休、周一至周三加单休”、“工作日同双休、周六至周日加单休日”） (v1.9.108)
+        if let regex = dualKeywordsWithRangeAndKeywordRegex,
+           let match = regex.firstMatch(in: text, options: [], range: fullRange),
+           match.numberOfRanges >= 6 {
+            let kw1 = nsString.substring(with: match.range(at: 1))
+            let kw2 = nsString.substring(with: match.range(at: 2))
+            let s1 = nsString.substring(with: match.range(at: 3))
+            let e1 = nsString.substring(with: match.range(at: 4))
+            let kw3 = nsString.substring(with: match.range(at: 5))
+            if let s1Ch = s1.first, let s1Wd = chineseDayCharToWeekday(s1Ch),
+               let e1Ch = e1.first, let e1Wd = chineseDayCharToWeekday(e1Ch) {
+                var days = Set<Int>()
+                if let kw1Days = daysFromKeyword(kw1) {
+                    days.formUnion(kw1Days)
+                }
+                if let kw2Days = daysFromKeyword(kw2) {
+                    days.formUnion(kw2Days)
+                }
+                days.formUnion(generateWeeklyRange(start: s1Wd, end: e1Wd))
+                if let kw3Days = daysFromKeyword(kw3) {
+                    days.formUnion(kw3Days)
+                }
+                let sorted = days.sorted()
+                return (sorted, formatWeekdayLabel(from: sorted))
+            }
+        }
+
+        // 0.00006 核心关键词在先、连续区间居中、双核心关键词在后（如“大休、周一至周三加小休和单休”、“工作日同周二至周四加双休和大休”） (v1.9.108)
+        if let regex = keywordWithRangeAndDualKeywordsRegex,
+           let match = regex.firstMatch(in: text, options: [], range: fullRange),
+           match.numberOfRanges >= 6 {
+            let kw1 = nsString.substring(with: match.range(at: 1))
+            let s1 = nsString.substring(with: match.range(at: 2))
+            let e1 = nsString.substring(with: match.range(at: 3))
+            let kw2 = nsString.substring(with: match.range(at: 4))
+            let kw3 = nsString.substring(with: match.range(at: 5))
+            if let s1Ch = s1.first, let s1Wd = chineseDayCharToWeekday(s1Ch),
+               let e1Ch = e1.first, let e1Wd = chineseDayCharToWeekday(e1Ch) {
+                var days = Set<Int>()
+                if let kw1Days = daysFromKeyword(kw1) {
+                    days.formUnion(kw1Days)
+                }
+                days.formUnion(generateWeeklyRange(start: s1Wd, end: e1Wd))
+                if let kw2Days = daysFromKeyword(kw2) {
+                    days.formUnion(kw2Days)
+                }
+                if let kw3Days = daysFromKeyword(kw3) {
+                    days.formUnion(kw3Days)
                 }
                 let sorted = days.sorted()
                 return (sorted, formatWeekdayLabel(from: sorted))
@@ -2916,6 +2982,11 @@ public struct VoiceCommandParser {
 
     private static func parseRelativeTemperature(_ text: String) -> VoiceParseResult? {
         guard !containsNegativeAction(text) else { return nil }
+        // 排除包含明确定时开关机动作的时间调度语义（如“每天早8点开机”、“工作日晚10点关空调”、“30分钟后关机”），杜绝口语连词“加/升/高”误触发即时相对调温 (v1.9.108)
+        if (text.contains("开") || text.contains("关") || text.contains("停")) &&
+           (text.contains("定时") || text.contains("倒计时") || text.contains("预约") || text.contains("每天") || text.contains("天天") || text.contains("每晚") || text.contains("每早") || text.contains("每日") || text.contains("每周") || text.contains("除") || text.contains("小时后") || text.contains("分钟后")) {
+            return nil
+        }
         if text.contains("不要") || text.contains("别") || text.contains("不用") || text.contains("暂不") {
             return nil
         }
