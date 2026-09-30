@@ -392,13 +392,13 @@ public struct VoiceCommandParser {
             }
 
             let dayDesc: String = {
-                if text.contains("明天") || text.contains("明早") || text.contains("明晚") || text.contains("明午") || text.contains("明夜") || text.contains("明晨") || text.contains("次日") || text.contains("次晨") || text.contains("明儿") || text.contains("隔日") || text.contains("翌日") || text.contains("翌晨") {
-                    return "明天 "
-                } else if text.contains("大后天") {
+                if text.contains("大后天") || text.contains("大后日") {
                     return "大后天 "
-                } else if text.contains("后天") {
+                } else if text.contains("后天") || text.contains("后日") || text.contains("后儿个") {
                     return "后天 "
-                } else if text.contains("今晚") || text.contains("今早") || text.contains("今夜") || text.contains("今晨") {
+                } else if text.contains("明天") || text.contains("明早") || text.contains("明晚") || text.contains("明午") || text.contains("明夜") || text.contains("明晨") || text.contains("次日") || text.contains("次晨") || text.contains("明儿") || text.contains("隔日") || text.contains("翌日") || text.contains("翌晨") || text.contains("明日") || text.contains("隔天") || text.contains("明儿个") {
+                    return "明天 "
+                } else if text.contains("今天") || text.contains("今日") || text.contains("今晚") || text.contains("今早") || text.contains("今夜") || text.contains("今晨") || text.contains("今儿") || text.contains("今儿个") {
                     return "今天 "
                 }
                 return ""
@@ -1362,7 +1362,8 @@ public struct VoiceCommandParser {
                            normalized.contains("次日") || normalized.contains("隔日") || normalized.contains("翌日") ||
                            normalized.contains("明儿") ||
                            normalized.contains("明日") || normalized.contains("隔天") || normalized.contains("后日") ||
-                           normalized.contains("大后日") || normalized.contains("明儿个")
+                           normalized.contains("大后日") || normalized.contains("明儿个") ||
+                           normalized.contains("后儿个") || normalized.contains("今儿") || normalized.contains("今儿个")
         guard (normalized.contains("点") || normalized.contains("时") || normalized.contains(":") || hasTimePhase) && !normalized.contains("小时") else {
             return nil
         }
@@ -1521,7 +1522,8 @@ public struct VoiceCommandParser {
             } else if normalized.contains("明天") || normalized.contains("后天") || normalized.contains("大后天") ||
                        normalized.contains("次日") || normalized.contains("隔日") || normalized.contains("翌日") ||
                        normalized.contains("明儿") || normalized.contains("明日") || normalized.contains("隔天") ||
-                       normalized.contains("后日") || normalized.contains("大后日") || normalized.contains("明儿个") {
+                       normalized.contains("后日") || normalized.contains("大后日") || normalized.contains("明儿个") ||
+                       normalized.contains("后儿个") {
                 hour = 8
                 minute = 0
             }
@@ -1673,6 +1675,7 @@ public struct VoiceCommandParser {
            text.contains("明天") || text.contains("后天") || text.contains("大后天") || text.contains("次日") ||
            text.contains("隔日") || text.contains("翌日") || text.contains("明儿") ||
            text.contains("明日") || text.contains("隔天") || text.contains("后日") || text.contains("大后日") || text.contains("明儿个") ||
+           text.contains("后儿个") || text.contains("今儿") || text.contains("今儿个") ||
            (text.contains("暂停") && (text.contains("定时") || text.contains("倒计时") || text.contains("计划") || text.contains("调度"))) ||
            (text.contains("恢复") && (text.contains("定时") || text.contains("倒计时") || text.contains("计划") || text.contains("调度"))) {
             return true
@@ -2300,8 +2303,16 @@ public struct VoiceCommandParser {
         str = str.replacingOccurrences(of: "隔日半", with: "隔日8点30分")
         str = str.replacingOccurrences(of: "翌日半", with: "翌日8点30分")
         str = str.replacingOccurrences(of: "明日半", with: "明日8点30分")
+        str = str.replacingOccurrences(of: "明天半", with: "明天8点30分")
         str = str.replacingOccurrences(of: "隔天半", with: "隔天8点30分")
+        str = str.replacingOccurrences(of: "大后日半", with: "大后日8点30分")
         str = str.replacingOccurrences(of: "后日半", with: "后日8点30分")
+        str = str.replacingOccurrences(of: "大后天半", with: "大后天8点30分")
+        str = str.replacingOccurrences(of: "后天半", with: "后天8点30分")
+        str = str.replacingOccurrences(of: "今天半", with: "今天8点30分")
+        str = str.replacingOccurrences(of: "今日半", with: "今日8点30分")
+        str = str.replacingOccurrences(of: "今儿个半", with: "今儿个8点30分")
+        str = str.replacingOccurrences(of: "后儿个半", with: "后儿个8点30分")
         str = str.replacingOccurrences(of: "明儿个半", with: "明儿个8点30分")
         str = str.replacingOccurrences(of: "今晨半", with: "今晨7点30分")
         str = str.replacingOccurrences(of: "明晨半", with: "明晨7点30分")

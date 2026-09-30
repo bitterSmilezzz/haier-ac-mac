@@ -3380,20 +3380,28 @@ final class AppModel: ObservableObject {
         return setTemperature(deviceIds: nil, temperature: temperature)
     }
 
-    /// 归一化风速标准名称 (v1.9.47 支持一至四档/1~4档/低中高极速/静音等全量别名, v1.9.81 补齐 4 档/5 档/暴风全量映射, v1.9.82 提炼公共标准化函数)
+    /// 归一化风速标准名称 (v1.9.47 支持一至四档/1~4档/低中高极速/静音等全量别名, v1.9.81 补齐 4 档/5 档/暴风全量映射, v1.9.82 提炼公共标准化函数, v1.9.87 支持 level/speed/gear 设备原语与全量英文枚举)
     public static func normalizeWindSpeed(_ speedName: String) -> String {
-        if speedName.contains("微") || speedName.contains("低") || speedName.contains("静") ||
-           speedName.contains("柔") || speedName.contains("小") || speedName.contains("1") || speedName.contains("一") {
+        let speed = speedName.lowercased()
+        if speed.contains("微") || speed.contains("低") || speed.contains("静") ||
+           speed.contains("柔") || speed.contains("小") || speed.contains("1") || speed.contains("一") ||
+           speed.contains("level1") || speed.contains("level_1") || speed.contains("speed1") || speed.contains("speed_1") || speed.contains("quiet") || speed.contains("mute") {
             return "微风"
         }
-        if speedName.contains("中") || speedName.contains("2") || speedName.contains("二") || speedName.contains("两") {
+        if speed.contains("中") || speed.contains("2") || speed.contains("二") || speed.contains("两") ||
+           speed.contains("level2") || speed.contains("level_2") || speed.contains("speed2") || speed.contains("speed_2") || speed.contains("mid") || speed.contains("medium") {
             return "中风"
         }
-        if speedName.contains("强") || speedName.contains("高") || speedName.contains("大") ||
-           speedName.contains("极") || speedName.contains("暴") ||
-           speedName.contains("3") || speedName.contains("三") ||
-           speedName.contains("4") || speedName.contains("四") ||
-           speedName.contains("5") || speedName.contains("五") {
+        if speed.contains("强") || speed.contains("高") || speed.contains("大") ||
+           speed.contains("极") || speed.contains("暴") ||
+           speed.contains("3") || speed.contains("三") ||
+           speed.contains("4") || speed.contains("四") ||
+           speed.contains("5") || speed.contains("五") ||
+           speed.contains("level3") || speed.contains("level4") || speed.contains("level5") ||
+           speed.contains("level_3") || speed.contains("level_4") || speed.contains("level_5") ||
+           speed.contains("speed3") || speed.contains("speed4") || speed.contains("speed5") ||
+           speed.contains("speed_3") || speed.contains("speed_4") || speed.contains("speed_5") ||
+           speed.contains("turbo") || speed.contains("high") {
             return "强劲"
         }
         return "自动"

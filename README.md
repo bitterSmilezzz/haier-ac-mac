@@ -8,6 +8,19 @@
 
 ## 功能
 
+- 🏷 **闭环自然口语全景调度大一统反馈、次日顺延智能明示、除湿工况能耗 C^0 级平滑热阻尼与原生硬件风速原语感知 (v1.9.87)**：
+  - ⏱️ **跨天自然口语大一统调度反馈与半点归一闭环 (`VoiceCommandParser.swift` / `VoiceCapsuleWindowController.swift` / `VoiceCommandParserTests.swift`)**：
+    - **补全 `dayDesc` 跨天日期前缀缺失重大体验断层**：深度补齐 `"大后天"`、`"大后日"`、`"后天"`、`"后日"`、`"后儿个"`、`"明天"`、`"明早"`、`"明晚"`、`"明日"`、`"隔天"`、`"明儿个"`、`"今天"`、`"今日"`、`"今晚"`、`"今晨"`、`"今儿"`、`"今儿个"` 全量口语前缀，彻底根除此前口述“明日7点关空调”但胶囊弹窗与反馈文案仅显示“定时在 07:00 关机”遗漏跨天日期前缀的历史缺陷，现精准对齐为“定时在 明天 07:00 关机”、“定时在 后天 08:00 关机”等；
+    - **高频口语半点时相归一流水线全量补全**：在 `convertChineseNumbers` 中新增“明天半”(08:30)、“后天半”(08:30)、“大后天半”(08:30)、“大后日半”(08:30)、“今天半”(08:30)、“今日半”(08:30)、“今儿个半”(08:30)、“后儿个半”(08:30) 标准化映射，彻底补齐全时相口语表达；
+    - **全景防即时误触防线加固 (`hasTimingOrCountdownIntent` / `hasTimePhase` / `parseScheduleTime`)**：将“后儿个”、“今儿”、“今儿个”全量注入前置语义防护，彻底杜绝方言口语调度穿透至 `isPowerOff` / `isPowerOn` 造成立即误关机/开机的安全缺陷；
+    - **跨天调度全链路与胶囊反馈对齐 (`VoiceCapsuleWindowController.swift`)**：在多设备、单设备、全屋三处 `schedulePower` 调度逻辑中，将 `isExplicitDayAfter` 覆盖“后儿个”，`isExplicitToday` 覆盖“今天”/“今日”/“今儿个”；并引入**次日顺延智能明示机制**，当设定的时间已在过去被系统顺延至次日时，`dayPrefix` 自动明示为“明天 ”，向用户清晰展示确切执行时点；
+    - **单元测试 100% 满分覆盖**：在 `VoiceCommandParserTests.swift` 中新增 `testCrossDayAndColloquialTimingPrecisionV1987`，涵盖半点时相归一、dayDesc 日期前缀精准对齐及 10 组严苛防即时误触断言，全部通过。
+  - ⚡️ **变频压缩机除湿工况能耗动力学 $C^0$ 级平滑连续热阻尼重构 (`EnergyAnalyticsEngine.swift`)**：
+    - **消除除湿工况湿度临界点阶跃断崖**：在 `estimateInstantaneousPower` 中，此前除湿模式在 55% RH 处功耗从 320W 跳跃至 380W (Δ=60W)，在 70% RH 处从 500W 跳跃至 520W (Δ=20W)，产生非物理瞬态阶跃断崖；
+    - **双线性平滑动态阻尼插值模型引入**：重构除湿能耗动力学曲线，在 $< 50\%$ RH 维持 260~340W 线性过渡，在 $50\% \sim 70\%$ RH 引入动态热阻尼连续插值（$P = 340.0 + \frac{\text{rh} - 50.0}{20.0} \times 180.0$），在 $\ge 70\%$ RH 锚定 $520.0\text{W} + (\text{rh} - 70.0) \times 4.0$，达成左极限严格等于右极限的 $C^0$ 级全域平滑连续，与热力学潜热负荷完美自洽。
+  - 🍃 **状态栏与应用模型原生硬件风速原语全量纳管 (`AppModel.swift` / `StatusItemController.swift`)**：
+    - **全量纳管原生硬件风速枚举原语**：在 `AppModel.normalizeWindSpeed` 与 `StatusItemController.formatDisplayWindSpeed` 中，全面纳管 `level1~5`、`speed1~5`、`gear1~5` 以及全量大小写英文原语（low/mid/high/mute/turbo/quiet 等），彻底消除部分机型上报原生代码时展示为硬件原始字符串或回退失真的问题。
+
 - 🏷 **闭环自然口语跨天全时相调度大一统引擎、防即时误触全景加固、未识别工况能耗连续热阻尼与状态栏 Tooltip 100% 盲区清零 (v1.9.86)**：
   - ⏱️ **明日 / 隔天 / 后日 / 大后日 / 明儿个 跨天自然口语大一统调度引擎与防即时误触全闭环 (`VoiceCommandParser.swift` / `VoiceCapsuleWindowController.swift` / `VoiceCommandParserTests.swift`)**：
     - **跨天高频口语词群全景闭环**：深度纳管“明日”、“隔天”、“后日”、“大后日”、“明儿个”无钟点独立时相（自适应映射为晨间黄金时段 08:00），支持“明日关空调”、“明日开机”、“隔天关空调”、“隔天开机”、“后日关机”、“大后日关机”、“明儿个关空调”等自然跨天调度；

@@ -520,7 +520,8 @@ public final class VoiceCapsuleWindowController: NSObject, NSWindowDelegate {
                     return
                 }
                 let isExplicitTomorrow = spokenText.contains("明天") || spokenText.contains("明早") || spokenText.contains("明晚") || spokenText.contains("明午") || spokenText.contains("明夜") || spokenText.contains("明晨") || spokenText.contains("次日") || spokenText.contains("次晨") || spokenText.contains("明儿") || spokenText.contains("隔日") || spokenText.contains("翌日") || spokenText.contains("翌晨") || spokenText.contains("明日") || spokenText.contains("隔天") || spokenText.contains("明儿个")
-                let isExplicitDayAfter = (spokenText.contains("大后天") || spokenText.contains("大后日")) ? 3 : ((spokenText.contains("后天") || spokenText.contains("后日")) ? 2 : 0)
+                let isExplicitDayAfter = (spokenText.contains("大后天") || spokenText.contains("大后日")) ? 3 : ((spokenText.contains("后天") || spokenText.contains("后日") || spokenText.contains("后儿个")) ? 2 : 0)
+                let isExplicitToday = spokenText.contains("今天") || spokenText.contains("今日") || spokenText.contains("今晚") || spokenText.contains("今早") || spokenText.contains("今夜") || spokenText.contains("今晨") || spokenText.contains("今儿") || spokenText.contains("今儿个")
                 if isExplicitDayAfter > 0 {
                     targetDate = calendar.date(byAdding: .day, value: isExplicitDayAfter, to: targetDate) ?? targetDate
                 } else if isExplicitTomorrow {
@@ -529,7 +530,20 @@ public final class VoiceCapsuleWindowController: NSObject, NSWindowDelegate {
                     targetDate = calendar.date(byAdding: .day, value: 1, to: targetDate) ?? targetDate
                 }
                 let timeStr = String(format: "%02d:%02d", hour, minute)
-                let dayPrefix = isExplicitDayAfter == 3 ? "大后天 " : (isExplicitDayAfter == 2 ? "后天 " : (isExplicitTomorrow ? "明天 " : ""))
+                let dayPrefix: String = {
+                    if isExplicitDayAfter == 3 {
+                        return "大后天 "
+                    } else if isExplicitDayAfter == 2 {
+                        return "后天 "
+                    } else if isExplicitTomorrow {
+                        return "明天 "
+                    } else if targetDate > Date() && calendar.isDateInTomorrow(targetDate) {
+                        return "明天 "
+                    } else if isExplicitToday {
+                        return "今天 "
+                    }
+                    return ""
+                }()
                 let actionName = "\(dayPrefix)\(timeStr) \(on ? "开机" : "关机")"
                 let attrVal = AttrValue.bool(on)
                 guard let valJSON = ScheduledAction.valueJSON(attrVal) else {
@@ -804,7 +818,8 @@ public final class VoiceCapsuleWindowController: NSObject, NSWindowDelegate {
                 return
             }
             let isExplicitTomorrow = spokenText.contains("明天") || spokenText.contains("明早") || spokenText.contains("明晚") || spokenText.contains("明午") || spokenText.contains("明夜") || spokenText.contains("明晨") || spokenText.contains("次日") || spokenText.contains("次晨") || spokenText.contains("明儿") || spokenText.contains("隔日") || spokenText.contains("翌日") || spokenText.contains("翌晨") || spokenText.contains("明日") || spokenText.contains("隔天") || spokenText.contains("明儿个")
-            let isExplicitDayAfter = (spokenText.contains("大后天") || spokenText.contains("大后日")) ? 3 : ((spokenText.contains("后天") || spokenText.contains("后日")) ? 2 : 0)
+            let isExplicitDayAfter = (spokenText.contains("大后天") || spokenText.contains("大后日")) ? 3 : ((spokenText.contains("后天") || spokenText.contains("后日") || spokenText.contains("后儿个")) ? 2 : 0)
+            let isExplicitToday = spokenText.contains("今天") || spokenText.contains("今日") || spokenText.contains("今晚") || spokenText.contains("今早") || spokenText.contains("今夜") || spokenText.contains("今晨") || spokenText.contains("今儿") || spokenText.contains("今儿个")
             if isExplicitDayAfter > 0 {
                 targetDate = calendar.date(byAdding: .day, value: isExplicitDayAfter, to: targetDate) ?? targetDate
             } else if isExplicitTomorrow {
@@ -814,7 +829,20 @@ public final class VoiceCapsuleWindowController: NSObject, NSWindowDelegate {
                 targetDate = calendar.date(byAdding: .day, value: 1, to: targetDate) ?? targetDate
             }
             let timeStr = String(format: "%02d:%02d", hour, minute)
-            let dayPrefix = isExplicitDayAfter == 3 ? "大后天 " : (isExplicitDayAfter == 2 ? "后天 " : (isExplicitTomorrow ? "明天 " : ""))
+            let dayPrefix: String = {
+                if isExplicitDayAfter == 3 {
+                    return "大后天 "
+                } else if isExplicitDayAfter == 2 {
+                    return "后天 "
+                } else if isExplicitTomorrow {
+                    return "明天 "
+                } else if targetDate > Date() && calendar.isDateInTomorrow(targetDate) {
+                    return "明天 "
+                } else if isExplicitToday {
+                    return "今天 "
+                }
+                return ""
+            }()
             let actionName = "\(dayPrefix)\(timeStr) \(on ? "开机" : "关机")"
             let attrVal = AttrValue.bool(on)
             guard let valJSON = ScheduledAction.valueJSON(attrVal) else {
@@ -1149,7 +1177,8 @@ public final class VoiceCapsuleWindowController: NSObject, NSWindowDelegate {
                 return
             }
             let isExplicitTomorrow = spokenText.contains("明天") || spokenText.contains("明早") || spokenText.contains("明晚") || spokenText.contains("明午") || spokenText.contains("明夜") || spokenText.contains("明晨") || spokenText.contains("次日") || spokenText.contains("次晨") || spokenText.contains("明儿") || spokenText.contains("隔日") || spokenText.contains("翌日") || spokenText.contains("翌晨") || spokenText.contains("明日") || spokenText.contains("隔天") || spokenText.contains("明儿个")
-            let isExplicitDayAfter = (spokenText.contains("大后天") || spokenText.contains("大后日")) ? 3 : ((spokenText.contains("后天") || spokenText.contains("后日")) ? 2 : 0)
+            let isExplicitDayAfter = (spokenText.contains("大后天") || spokenText.contains("大后日")) ? 3 : ((spokenText.contains("后天") || spokenText.contains("后日") || spokenText.contains("后儿个")) ? 2 : 0)
+            let isExplicitToday = spokenText.contains("今天") || spokenText.contains("今日") || spokenText.contains("今晚") || spokenText.contains("今早") || spokenText.contains("今夜") || spokenText.contains("今晨") || spokenText.contains("今儿") || spokenText.contains("今儿个")
             if isExplicitDayAfter > 0 {
                 targetDate = calendar.date(byAdding: .day, value: isExplicitDayAfter, to: targetDate) ?? targetDate
             } else if isExplicitTomorrow {
@@ -1158,7 +1187,20 @@ public final class VoiceCapsuleWindowController: NSObject, NSWindowDelegate {
                 targetDate = calendar.date(byAdding: .day, value: 1, to: targetDate) ?? targetDate
             }
             let timeStr = String(format: "%02d:%02d", hour, minute)
-            let dayPrefix = isExplicitDayAfter == 3 ? "大后天 " : (isExplicitDayAfter == 2 ? "后天 " : (isExplicitTomorrow ? "明天 " : ""))
+            let dayPrefix: String = {
+                if isExplicitDayAfter == 3 {
+                    return "大后天 "
+                } else if isExplicitDayAfter == 2 {
+                    return "后天 "
+                } else if isExplicitTomorrow {
+                    return "明天 "
+                } else if targetDate > Date() && calendar.isDateInTomorrow(targetDate) {
+                    return "明天 "
+                } else if isExplicitToday {
+                    return "今天 "
+                }
+                return ""
+            }()
             let actionName = "\(dayPrefix)\(timeStr) \(on ? "开机" : "关机")"
             let attrVal = AttrValue.bool(on)
             guard let valJSON = ScheduledAction.valueJSON(attrVal) else {

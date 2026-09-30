@@ -3322,6 +3322,83 @@ final class VoiceCommandParserTests: XCTestCase {
         XCTAssertNotEqual(VoiceCommandParser.parse("大后日关机")?.command, .turnOffAll)
         XCTAssertNotEqual(VoiceCommandParser.parse("明儿个关机")?.command, .setPower(false))
         XCTAssertNotEqual(VoiceCommandParser.parse("明儿个关机")?.command, .turnOffAll)
+        XCTAssertNotEqual(VoiceCommandParser.parse("后儿个关空调")?.command, .setPower(false))
+        XCTAssertNotEqual(VoiceCommandParser.parse("后儿个关空调")?.command, .turnOffAll)
+        XCTAssertNotEqual(VoiceCommandParser.parse("后儿个开机")?.command, .setPower(true))
+        XCTAssertNotEqual(VoiceCommandParser.parse("今儿个关机")?.command, .setPower(false))
+        XCTAssertNotEqual(VoiceCommandParser.parse("今儿个关机")?.command, .turnOffAll)
+        XCTAssertNotEqual(VoiceCommandParser.parse("明天半关空调")?.command, .setPower(false))
+        XCTAssertNotEqual(VoiceCommandParser.parse("今天半开机")?.command, .setPower(true))
+    }
+
+    // MARK: - v1.9.87 跨天口语半点时相归一、dayDesc 文本反馈与顺延明示测试
+
+    func testCrossDayAndColloquialTimingPrecisionV1987() {
+        // 1. 口语半点时相归一化精准映射
+        let r1 = VoiceCommandParser.parse("明天半关空调")
+        XCTAssertEqual(r1?.command, .schedulePower(hour: 8, minute: 30, power: false))
+        XCTAssertTrue(r1?.displayText.contains("明天 08:30 关机") == true)
+
+        let r2 = VoiceCommandParser.parse("后天半开机")
+        XCTAssertEqual(r2?.command, .schedulePower(hour: 8, minute: 30, power: true))
+        XCTAssertTrue(r2?.displayText.contains("后天 08:30 开机") == true)
+
+        let r3 = VoiceCommandParser.parse("大后天半关机")
+        XCTAssertEqual(r3?.command, .schedulePower(hour: 8, minute: 30, power: false))
+        XCTAssertTrue(r3?.displayText.contains("大后天 08:30 关机") == true)
+
+        let r4 = VoiceCommandParser.parse("大后日半关空调")
+        XCTAssertEqual(r4?.command, .schedulePower(hour: 8, minute: 30, power: false))
+        XCTAssertTrue(r4?.displayText.contains("大后天 08:30 关机") == true)
+
+        let r5 = VoiceCommandParser.parse("今天半开机")
+        XCTAssertEqual(r5?.command, .schedulePower(hour: 8, minute: 30, power: true))
+        XCTAssertTrue(r5?.displayText.contains("今天 08:30 开机") == true)
+
+        let r6 = VoiceCommandParser.parse("今日半关机")
+        XCTAssertEqual(r6?.command, .schedulePower(hour: 8, minute: 30, power: false))
+        XCTAssertTrue(r6?.displayText.contains("今天 08:30 关机") == true)
+
+        let r7 = VoiceCommandParser.parse("后儿个关空调")
+        XCTAssertEqual(r7?.command, .schedulePower(hour: 8, minute: 0, power: false))
+        XCTAssertTrue(r7?.displayText.contains("后天 08:00 关机") == true)
+
+        let r8 = VoiceCommandParser.parse("后儿个半开机")
+        XCTAssertEqual(r8?.command, .schedulePower(hour: 8, minute: 30, power: true))
+        XCTAssertTrue(r8?.displayText.contains("后天 08:30 开机") == true)
+
+        // 2. dayDesc 跨天与当日词群文本反馈精准对齐
+        let d1 = VoiceCommandParser.parse("明日7点关空调")
+        XCTAssertEqual(d1?.command, .schedulePower(hour: 7, minute: 0, power: false))
+        XCTAssertTrue(d1?.displayText.contains("明天 07:00 关机") == true)
+
+        let d2 = VoiceCommandParser.parse("后日8点关机")
+        XCTAssertEqual(d2?.command, .schedulePower(hour: 8, minute: 0, power: false))
+        XCTAssertTrue(d2?.displayText.contains("后天 08:00 关机") == true)
+
+        let d3 = VoiceCommandParser.parse("大后日8点关机")
+        XCTAssertEqual(d3?.command, .schedulePower(hour: 8, minute: 0, power: false))
+        XCTAssertTrue(d3?.displayText.contains("大后天 08:00 关机") == true)
+
+        let d4 = VoiceCommandParser.parse("大后天8点关机")
+        XCTAssertEqual(d4?.command, .schedulePower(hour: 8, minute: 0, power: false))
+        XCTAssertTrue(d4?.displayText.contains("大后天 08:00 关机") == true)
+
+        let d5 = VoiceCommandParser.parse("全屋明日关空调")
+        XCTAssertEqual(d5?.command, .schedulePower(hour: 8, minute: 0, power: false))
+        XCTAssertTrue(d5?.displayText.contains("全屋在 明天 08:00 关机") == true)
+
+        let d6 = VoiceCommandParser.parse("全屋后日关空调")
+        XCTAssertEqual(d6?.command, .schedulePower(hour: 8, minute: 0, power: false))
+        XCTAssertTrue(d6?.displayText.contains("全屋在 后天 08:00 关机") == true)
+
+        let d7 = VoiceCommandParser.parse("今天晚上10点关空调")
+        XCTAssertEqual(d7?.command, .schedulePower(hour: 22, minute: 0, power: false))
+        XCTAssertTrue(d7?.displayText.contains("今天 22:00 关机") == true)
+
+        let d8 = VoiceCommandParser.parse("今晚10点关空调")
+        XCTAssertEqual(d8?.command, .schedulePower(hour: 22, minute: 0, power: false))
+        XCTAssertTrue(d8?.displayText.contains("今天 22:00 关机") == true)
     }
 
     // MARK: - 无效输入测试
