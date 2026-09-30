@@ -8,6 +8,17 @@
 
 ## 功能
 
+- 🏷 **闭环自然口语单星期循环调度大一统引擎、防即时误触全景加固、全屋设备模型路由收敛与变频热阻尼全工况对齐 (v1.9.90)**：
+  - ⏱️ **“周一至周日/星期一至星期日/礼拜一至礼拜天”自然口语单星期循环调度大一统与防即时误触全闭环 (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)**：
+    - **彻底解决单星期口语被即时开关机误吞或星期参数丢失的重大缺陷**：此前用户说“周一关空调”、“周五开机”、“星期三关空调”、“星期天开机”、“礼拜六关机”、“全屋周一关空调”等高频家庭口语时，因不含“每/逢/每个”或连接词“到/至”，`hasTimingOrCountdownIntent` 返回 false，直接穿透至 `isPowerOff` / `turnOffAll` 造成全屋立即误关机的严重误触风险；若带钟点（如“周一早上8点开机”），`parseRepeatWeekdays` 无法识别，导致退化为次日单次定时（丢弃周一周期设定）。本版本在 `parseBaseRepeatWeekdays` 第 7 步中全面纳管“周一”~“周日/周天”、“星期一”~“星期日/星期天”、“礼拜一”~“礼拜日/礼拜天”、“周1”~“周7”等单星期自然口语，在无显式钟点时自动对齐 08:00 基准并无缝映射为 `.scheduleRepeatPower` 循环任务；
+    - **单星期高频半点时相归一流水线全量补齐 (`convertChineseNumbers`)**：新增“周一半”~“周日/天半”、“星期一半”~“星期天半”、“礼拜一半”~“礼拜天半”、“周1半”~“周7半”、“每周一半”~“每周日半”等全部 30+ 种口语标准化映射至 08:30；
+    - **全景防即时误触语义防线加固 (`hasTimingOrCountdownIntent`)**：将全部单星期、阿拉伯数字星期及其半点形态纳管为一级前置语义防护，彻底杜绝任何单星期调度口令掉入即时开关机；
+    - **单元测试 100% 满分覆盖**：在 `VoiceCommandParserTests.swift` 中新增 `testSingleWeekdayRepeatSchedulePrecisionAndProtectionV1990`，包含 22 组单机与全屋单星期无钟点调度、带钟点调度、半点归一及严苛防即时误触断言，全部通过。
+  - 🏠 **AppModel 全屋设备模型路由大一统、设备名称解析收敛与能耗热阻尼全工况对齐 (`AppModel.swift` / `EnergyAnalyticsEngine.swift` / `StatusItemController.swift`)**：
+    - **设备路由大一统与名称解析全仓收敛 (`AppModel.swift`)**：新增公共 API `deviceName(for deviceId: String) -> String`，并在睡前预冷（`triggerBedtimePrecooling`）、定时就寝（`triggerBedtimeCurve`）、全局快捷键 ⌃⌥S（`toggleSleepCurve`）、滤网机时（`filterAccumulatedMinutes`）、清洗日期（`lastFilterCleanedDate`）、滤网重置（`resetFilterMaintenance`）、滤网告警（`checkFilterHealthAlert`）及睡眠归档（`archiveSleepSession`）中全仓统一收敛至 `primaryDeviceId` 与 `deviceName(for:)`，彻底修复多设备环境下盲目回退 `devices.first` 导致操控错误设备的架构缺陷；
+    - **变频能耗动力学连续热阻抗阻尼全工况对齐 (`EnergyAnalyticsEngine.swift`)**：将 `soakMultiplier`（变频连续高负荷热饱和阻抗衰减微补偿，连续运行 >120 分钟平滑上升至 1.045x）前置到工况分支之前，彻底消除此前未知工况（`modeCode == nil`）运行超 120 分钟时因提前 `return` 导致热饱和补偿被遗漏的物理模型漏洞；
+    - **macOS 状态栏多设备协同与计划看板细节打磨 (`StatusItemController.swift`)**：在状态栏全屋计划调度与任务悬浮看板中全面采用 `model.deviceName(for:)` 统一名称解析，提示更精准自洽。
+
 - 🏷 **闭环自然口语循环调度大一统引擎、防即时误触全景加固、滤网动力学与状态栏多设备监控全域对齐 (v1.9.89)**：
   - ⏱️ **“每天/工作日/周末/双休/单休”全时相循环调度大一统引擎与防即时误触全闭环 (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)**：
     - **彻底解决无钟点循环定时口语被解析器拦截丢弃的重大缺陷**：此前用户说“工作日关空调”、“工作日开机”、“周末关空调”、“周末开机”、“双休关机”、“单休关空调”、“每天关空调”、“天天关机”、“每日开机”、“全屋工作日关空调”、“全屋每天关空调”等高频日常调度时，因未显式提及具体钟点，`parseScheduleTime` 无法识别，导致整个口令解析失败返回 `nil`，界面提示“未识别到有效的控制指令”；本版本在 `parseScheduleTime` 的 `hasTimePhase` 中纳管“每天/天天/每日/日日/工作日/平时/周末/双休/单休”及 `parseRepeatWeekdays(normalized) != nil`，在独立时相体系中将其默认时相基准对齐至 `08:00`，使所有独立循环调度自然口语无缝映射为 `.scheduleRepeatPower` 循环任务；

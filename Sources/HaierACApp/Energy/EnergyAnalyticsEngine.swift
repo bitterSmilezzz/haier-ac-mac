@@ -307,7 +307,16 @@ public final class EnergyAnalyticsEngine: ObservableObject {
             return 1.5 // 待机微功耗 1.5W
         }
 
-        // 未识别模式采用物理中性功率估算策略（冷热综合无偏估计 + 恒温维持态平滑热阻尼模型，v1.9.86）：
+        // 变频压缩机与换热器连续高负荷热饱和阻抗衰减微补偿 (Continuous Thermal Soak Drift) (v1.9.79, v1.9.90 全工况包含未识别工况统一纳管):
+        // 变频空调机组连续运转超 120 分钟时，外机冷凝器热积累或蒸发器化霜热阻导致稳态 COP 产生 2% ~ 5% 的微漂移：
+        // 120 分钟内为 1.00 基准；120 ~ 360 分钟平滑线性上升至 1.045；超过 360 分钟钳制在 1.05。
+        let soakMultiplier: Double = {
+            guard isPowerOn && !isSelfCleaning && continuousMinutes > 120 else { return 1.0 }
+            let progress = min(1.0, Double(continuousMinutes - 120) / 240.0)
+            return 1.0 + (progress * 0.045)
+        }()
+
+        // 未识别模式采用物理中性功率估算策略（冷热综合无偏估计 + 恒温维持态平滑热阻尼模型 + 热饱和漂移微补偿，v1.9.86, v1.9.90）：
         // 1. 若室内温度与设定温度均有效，采用制冷动力曲线与制热动力曲线在温差绝对值 |ΔT| 下的双向无偏中性基准：
         //    - 恒温稳态区 (|ΔT| <= 0.0°C)：制冷(220W)与制热(300W)平衡态无偏均值基准 260.0W + (windOffset * 0.6)；
         //    - 接近平衡区 (0.0 < |ΔT| < 1.0°C)：平滑阻尼动态插值过渡至 465.0W (windFactor = 0.6 + |ΔT|*0.4, P = 260.0 + |ΔT|*205.0 + windOffset*windFactor)；
@@ -327,20 +336,12 @@ public final class EnergyAnalyticsEngine: ObservableObject {
                 } else {
                     neutralPower = 465.0 + ((delta - 1.0) * 102.5) + windOffset
                 }
-                return min(max(neutralPower, 200.0), 1550.0)
+                return min(max(neutralPower * soakMultiplier, 200.0), 1550.0)
             } else {
                 let neutralPower = 350.0 + windOffset
-                return min(max(neutralPower, 180.0), 600.0)
+                return min(max(neutralPower * soakMultiplier, 180.0), 600.0)
             }
         }
-        // 变频压缩机与换热器连续高负荷热饱和阻抗衰减微补偿 (Continuous Thermal Soak Drift) (v1.9.79):
-        // 变频空调机组连续运转超 120 分钟时，外机冷凝器热积累或蒸发器化霜热阻导致稳态 COP 产生 2% ~ 5% 的微漂移：
-        // 120 分钟内为 1.00 基准；120 ~ 360 分钟平滑线性上升至 1.045；超过 360 分钟钳制在 1.05。
-        let soakMultiplier: Double = {
-            guard isPowerOn && !isSelfCleaning && continuousMinutes > 120 else { return 1.0 }
-            let progress = min(1.0, Double(continuousMinutes - 120) / 240.0)
-            return 1.0 + (progress * 0.045)
-        }()
 
         switch mode {
         case .fan:

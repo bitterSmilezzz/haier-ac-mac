@@ -1243,20 +1243,27 @@ public struct VoiceCommandParser {
             }
         }
 
-        // 7. 单星期与每天自然语言识别
-        if text.contains("每周一") || text.contains("每个周一") || text.contains("每个星期一") || text.contains("每周星期一") || text.contains("逢周一") || text.contains("每逢周一") || text.contains("每逢星期一") || text.contains("逢星期一") || text.contains("每个礼拜一") || text.contains("每周礼拜一") || text.contains("逢礼拜一") || text.contains("每逢礼拜一") {
+        // 7. 单星期与每天自然语言识别 (v1.9.90 全景闭环“周一/星期一/礼拜一/周1”等口语单星期表达)
+        if text.contains("每周一") || text.contains("每个周一") || text.contains("每个星期一") || text.contains("每周星期一") || text.contains("逢周一") || text.contains("每逢周一") || text.contains("每逢星期一") || text.contains("逢星期一") || text.contains("每个礼拜一") || text.contains("每周礼拜一") || text.contains("逢礼拜一") || text.contains("每逢礼拜一") ||
+           text.contains("周一") || text.contains("周1") || text.contains("星期一") || text.contains("星期1") || text.contains("礼拜一") || text.contains("礼拜1") {
             return ([2], "每周一")
-        } else if text.contains("每周二") || text.contains("每个周二") || text.contains("每个星期二") || text.contains("每周星期二") || text.contains("逢周二") || text.contains("每逢周二") || text.contains("每逢星期二") || text.contains("逢星期二") || text.contains("每个礼拜二") || text.contains("每周礼拜二") || text.contains("逢礼拜二") || text.contains("每逢礼拜二") {
+        } else if text.contains("每周二") || text.contains("每个周二") || text.contains("每个星期二") || text.contains("每周星期二") || text.contains("逢周二") || text.contains("每逢周二") || text.contains("每逢星期二") || text.contains("逢星期二") || text.contains("每个礼拜二") || text.contains("每周礼拜二") || text.contains("逢礼拜二") || text.contains("每逢礼拜二") ||
+           text.contains("周二") || text.contains("周2") || text.contains("星期二") || text.contains("星期2") || text.contains("礼拜二") || text.contains("礼拜2") {
             return ([3], "每周二")
-        } else if text.contains("每周三") || text.contains("每个周三") || text.contains("每个星期三") || text.contains("每周星期三") || text.contains("逢周三") || text.contains("每逢周三") || text.contains("每逢星期三") || text.contains("逢星期三") || text.contains("每个礼拜三") || text.contains("每周礼拜三") || text.contains("逢礼拜三") || text.contains("每逢礼拜三") {
+        } else if text.contains("每周三") || text.contains("每个周三") || text.contains("每个星期三") || text.contains("每周星期三") || text.contains("逢周三") || text.contains("每逢周三") || text.contains("每逢星期三") || text.contains("逢星期三") || text.contains("每个礼拜三") || text.contains("每周礼拜三") || text.contains("逢礼拜三") || text.contains("每逢礼拜三") ||
+           text.contains("周三") || text.contains("周3") || text.contains("星期三") || text.contains("星期3") || text.contains("礼拜三") || text.contains("礼拜3") {
             return ([4], "每周三")
-        } else if text.contains("每周四") || text.contains("每个周四") || text.contains("每个星期四") || text.contains("每周星期四") || text.contains("逢周四") || text.contains("每逢周四") || text.contains("每逢星期四") || text.contains("逢星期四") || text.contains("每个礼拜四") || text.contains("每周礼拜四") || text.contains("逢礼拜四") || text.contains("每逢礼拜四") {
+        } else if text.contains("每周四") || text.contains("每个周四") || text.contains("每个星期四") || text.contains("每周星期四") || text.contains("逢周四") || text.contains("每逢周四") || text.contains("每逢星期四") || text.contains("逢星期四") || text.contains("每个礼拜四") || text.contains("每周礼拜四") || text.contains("逢礼拜四") || text.contains("每逢礼拜四") ||
+           text.contains("周四") || text.contains("周4") || text.contains("星期四") || text.contains("星期4") || text.contains("礼拜四") || text.contains("礼拜4") {
             return ([5], "每周四")
-        } else if text.contains("每周五") || text.contains("每个周五") || text.contains("每个星期五") || text.contains("每周星期五") || text.contains("逢周五") || text.contains("每逢周五") || text.contains("每逢星期五") || text.contains("逢星期五") || text.contains("每个礼拜五") || text.contains("每周礼拜五") || text.contains("逢礼拜五") || text.contains("每逢礼拜五") {
+        } else if text.contains("每周五") || text.contains("每个周五") || text.contains("每个星期五") || text.contains("每周星期五") || text.contains("逢周五") || text.contains("每逢周五") || text.contains("每逢星期五") || text.contains("逢星期五") || text.contains("每个礼拜五") || text.contains("每周礼拜五") || text.contains("逢礼拜五") || text.contains("每逢礼拜五") ||
+           text.contains("周五") || text.contains("周5") || text.contains("星期五") || text.contains("星期5") || text.contains("礼拜五") || text.contains("礼拜5") {
             return ([6], "每周五")
-        } else if text.contains("每周六") || text.contains("每个周六") || text.contains("每个星期六") || text.contains("每周星期六") || text.contains("逢周六") || text.contains("每逢周六") || text.contains("每逢星期六") || text.contains("逢星期六") || text.contains("每个礼拜六") || text.contains("每周礼拜六") || text.contains("逢礼拜六") || text.contains("每逢礼拜六") {
+        } else if text.contains("每周六") || text.contains("每个周六") || text.contains("每个星期六") || text.contains("每周星期六") || text.contains("逢周六") || text.contains("每逢周六") || text.contains("每逢星期六") || text.contains("逢星期六") || text.contains("每个礼拜六") || text.contains("每周礼拜六") || text.contains("逢礼拜六") || text.contains("每逢礼拜六") ||
+           text.contains("周六") || text.contains("周6") || text.contains("星期六") || text.contains("星期6") || text.contains("礼拜六") || text.contains("礼拜6") {
             return ([7], "每周六")
-        } else if text.contains("每周日") || text.contains("每周天") || text.contains("每个周日") || text.contains("每个周天") || text.contains("每个星期天") || text.contains("每个星期日") || text.contains("每周星期天") || text.contains("每周星期日") || text.contains("逢周日") || text.contains("每逢周日") || text.contains("每逢星期天") || text.contains("每逢星期日") || text.contains("逢星期日") || text.contains("逢星期天") || text.contains("每个礼拜天") || text.contains("每个礼拜日") || text.contains("每周礼拜天") || text.contains("每周礼拜日") || text.contains("逢礼拜天") || text.contains("逢礼拜日") || text.contains("每逢礼拜天") || text.contains("每逢礼拜日") {
+        } else if text.contains("每周日") || text.contains("每周天") || text.contains("每个周日") || text.contains("每个周天") || text.contains("每个星期天") || text.contains("每个星期日") || text.contains("每周星期天") || text.contains("每周星期日") || text.contains("逢周日") || text.contains("每逢周日") || text.contains("每逢星期天") || text.contains("每逢星期日") || text.contains("逢星期日") || text.contains("逢星期天") || text.contains("每个礼拜天") || text.contains("每个礼拜日") || text.contains("每周礼拜天") || text.contains("每周礼拜日") || text.contains("逢礼拜天") || text.contains("逢礼拜日") || text.contains("每逢礼拜天") || text.contains("每逢礼拜日") ||
+           text.contains("周日") || text.contains("周天") || text.contains("周7") || text.contains("星期日") || text.contains("星期天") || text.contains("星期7") || text.contains("礼拜日") || text.contains("礼拜天") || text.contains("礼拜7") {
             return ([1], "每周日")
         } else if text.contains("每天") || text.contains("天天") || text.contains("每日") || text.contains("每晚") || text.contains("每早") || text.contains("每晨") || text.contains("每夜") || text.contains("日日") {
             return ([], "每天")
@@ -1675,6 +1682,15 @@ public struct VoiceCommandParser {
            text.contains("每周") || text.contains("每逢") || text.contains("逢周") || text.contains("每个周") || text.contains("每个星期") ||
            text.contains("礼拜") || text.contains("逢星期") || text.contains("一三五") || text.contains("二四六") || text.contains("二四") ||
            text.contains("周末三天") ||
+           text.contains("周一") || text.contains("周二") || text.contains("周三") || text.contains("周四") || text.contains("周五") || text.contains("周六") || text.contains("周日") || text.contains("周天") ||
+           text.contains("周1") || text.contains("周2") || text.contains("周3") || text.contains("周4") || text.contains("周5") || text.contains("周6") || text.contains("周7") ||
+           text.contains("星期一") || text.contains("星期二") || text.contains("星期三") || text.contains("星期四") || text.contains("星期五") || text.contains("星期六") || text.contains("星期日") || text.contains("星期天") ||
+           text.contains("星期1") || text.contains("星期2") || text.contains("星期3") || text.contains("星期4") || text.contains("星期5") || text.contains("星期6") || text.contains("星期7") ||
+           text.contains("礼拜一") || text.contains("礼拜二") || text.contains("礼拜三") || text.contains("礼拜四") || text.contains("礼拜五") || text.contains("礼拜六") || text.contains("礼拜日") || text.contains("礼拜天") ||
+           text.contains("礼拜1") || text.contains("礼拜2") || text.contains("礼拜3") || text.contains("礼拜4") || text.contains("礼拜5") || text.contains("礼拜6") || text.contains("礼拜7") ||
+           text.contains("周一半") || text.contains("周二半") || text.contains("周三半") || text.contains("周四半") || text.contains("周五半") || text.contains("周六半") || text.contains("周日半") || text.contains("周天半") ||
+           text.contains("星期一半") || text.contains("星期二半") || text.contains("星期三半") || text.contains("星期四半") || text.contains("星期五半") || text.contains("星期六半") || text.contains("星期日半") || text.contains("星期天半") ||
+           text.contains("礼拜一半") || text.contains("礼拜二半") || text.contains("礼拜三半") || text.contains("礼拜四半") || text.contains("礼拜五半") || text.contains("礼拜六半") || text.contains("礼拜日半") || text.contains("礼拜天半") ||
            text.contains("午夜") || text.contains("子夜") || text.contains("正午") || text.contains("中午") || text.contains("晌午") ||
            text.contains("傍晚") || text.contains("黄昏") || text.contains("天黑") ||
            text.contains("清晨") || text.contains("早晨") || text.contains("黎明") || text.contains("拂晓") || text.contains("破晓") || text.contains("清早") ||
@@ -2348,6 +2364,66 @@ public struct VoiceCommandParser {
         str = str.replacingOccurrences(of: "天天半", with: "天天8点30分")
         str = str.replacingOccurrences(of: "每日半", with: "每日8点30分")
         str = str.replacingOccurrences(of: "日日半", with: "日日8点30分")
+        str = str.replacingOccurrences(of: "周一半", with: "周一8点30分")
+        str = str.replacingOccurrences(of: "周1半", with: "周1 8点30分")
+        str = str.replacingOccurrences(of: "星期一半", with: "星期一8点30分")
+        str = str.replacingOccurrences(of: "星期1半", with: "星期1 8点30分")
+        str = str.replacingOccurrences(of: "礼拜一半", with: "礼拜一8点30分")
+        str = str.replacingOccurrences(of: "礼拜1半", with: "礼拜1 8点30分")
+        str = str.replacingOccurrences(of: "每周一半", with: "每周一8点30分")
+        str = str.replacingOccurrences(of: "每周1半", with: "每周1 8点30分")
+        str = str.replacingOccurrences(of: "周二半", with: "周二8点30分")
+        str = str.replacingOccurrences(of: "周2半", with: "周2 8点30分")
+        str = str.replacingOccurrences(of: "星期二半", with: "星期二8点30分")
+        str = str.replacingOccurrences(of: "星期2半", with: "星期2 8点30分")
+        str = str.replacingOccurrences(of: "礼拜二半", with: "礼拜二8点30分")
+        str = str.replacingOccurrences(of: "礼拜2半", with: "礼拜2 8点30分")
+        str = str.replacingOccurrences(of: "每周二半", with: "每周二8点30分")
+        str = str.replacingOccurrences(of: "每周2半", with: "每周2 8点30分")
+        str = str.replacingOccurrences(of: "周三半", with: "周三8点30分")
+        str = str.replacingOccurrences(of: "周3半", with: "周3 8点30分")
+        str = str.replacingOccurrences(of: "星期三半", with: "星期三8点30分")
+        str = str.replacingOccurrences(of: "星期3半", with: "星期3 8点30分")
+        str = str.replacingOccurrences(of: "礼拜三半", with: "礼拜三8点30分")
+        str = str.replacingOccurrences(of: "礼拜3半", with: "礼拜3 8点30分")
+        str = str.replacingOccurrences(of: "每周三半", with: "每周三8点30分")
+        str = str.replacingOccurrences(of: "每周3半", with: "每周3 8点30分")
+        str = str.replacingOccurrences(of: "周四半", with: "周四8点30分")
+        str = str.replacingOccurrences(of: "周4半", with: "周4 8点30分")
+        str = str.replacingOccurrences(of: "星期四半", with: "星期四8点30分")
+        str = str.replacingOccurrences(of: "星期4半", with: "星期4 8点30分")
+        str = str.replacingOccurrences(of: "礼拜四半", with: "礼拜四8点30分")
+        str = str.replacingOccurrences(of: "礼拜4半", with: "礼拜4 8点30分")
+        str = str.replacingOccurrences(of: "每周四半", with: "每周四8点30分")
+        str = str.replacingOccurrences(of: "每周4半", with: "每周4 8点30分")
+        str = str.replacingOccurrences(of: "周五半", with: "周五8点30分")
+        str = str.replacingOccurrences(of: "周5半", with: "周5 8点30分")
+        str = str.replacingOccurrences(of: "星期五半", with: "星期五8点30分")
+        str = str.replacingOccurrences(of: "星期5半", with: "星期5 8点30分")
+        str = str.replacingOccurrences(of: "礼拜五半", with: "礼拜五8点30分")
+        str = str.replacingOccurrences(of: "礼拜5半", with: "礼拜5 8点30分")
+        str = str.replacingOccurrences(of: "每周五半", with: "每周五8点30分")
+        str = str.replacingOccurrences(of: "每周5半", with: "每周5 8点30分")
+        str = str.replacingOccurrences(of: "周六半", with: "周六8点30分")
+        str = str.replacingOccurrences(of: "周6半", with: "周6 8点30分")
+        str = str.replacingOccurrences(of: "星期六半", with: "星期六8点30分")
+        str = str.replacingOccurrences(of: "星期6半", with: "星期6 8点30分")
+        str = str.replacingOccurrences(of: "礼拜六半", with: "礼拜六8点30分")
+        str = str.replacingOccurrences(of: "礼拜6半", with: "礼拜6 8点30分")
+        str = str.replacingOccurrences(of: "每周六半", with: "每周六8点30分")
+        str = str.replacingOccurrences(of: "每周6半", with: "每周6 8点30分")
+        str = str.replacingOccurrences(of: "周日半", with: "周日8点30分")
+        str = str.replacingOccurrences(of: "周天半", with: "周天8点30分")
+        str = str.replacingOccurrences(of: "周7半", with: "周7 8点30分")
+        str = str.replacingOccurrences(of: "星期日半", with: "星期日8点30分")
+        str = str.replacingOccurrences(of: "星期天半", with: "星期天8点30分")
+        str = str.replacingOccurrences(of: "星期7半", with: "星期7 8点30分")
+        str = str.replacingOccurrences(of: "礼拜日半", with: "礼拜日8点30分")
+        str = str.replacingOccurrences(of: "礼拜天半", with: "礼拜天8点30分")
+        str = str.replacingOccurrences(of: "礼拜7半", with: "礼拜7 8点30分")
+        str = str.replacingOccurrences(of: "每周日半", with: "每周日8点30分")
+        str = str.replacingOccurrences(of: "每周天半", with: "每周天8点30分")
+        str = str.replacingOccurrences(of: "每周7半", with: "每周7 8点30分")
         str = str.replacingOccurrences(of: "今晨半", with: "今晨7点30分")
         str = str.replacingOccurrences(of: "明晨半", with: "明晨7点30分")
         str = str.replacingOccurrences(of: "每晨半", with: "每晨7点30分")

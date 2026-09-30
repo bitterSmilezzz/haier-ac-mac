@@ -1394,7 +1394,7 @@ final class StatusItemController: NSObject {
 
         if !activeSchedules.isEmpty {
             for action in activeSchedules {
-                let devName = model.allUnifiedDevices.first(where: { $0.id == action.deviceId })?.name ?? "空调"
+                let devName = model.deviceName(for: action.deviceId)
                 let timeStr = DateFormatter.localizedString(from: action.fireDate, dateStyle: .none, timeStyle: .short)
                 let cleanActionName = Self.extractPlanActionVerb(from: action, devName: devName)
                 let repeatTag = action.repeatLabel.map { " [\($0)]" } ?? ""
@@ -1450,7 +1450,7 @@ final class StatusItemController: NSObject {
                 scheduleParentTitle = "⏱ 计划调度 (\(enabledCount) 生效 / \(pausedCount) 暂停)..."
             }
             let scheduleParentItem = NSMenuItem(title: scheduleParentTitle, action: nil, keyEquivalent: "")
-            let affectedDevices = Set(activeSchedules.map(\.deviceId)).compactMap { id in model.allUnifiedDevices.first(where: { $0.id == id })?.name }
+            let affectedDevices = Set(activeSchedules.map(\.deviceId)).map { model.deviceName(for: $0) }
             let devSummary = affectedDevices.isEmpty ? "\(activeSchedules.count) 个任务" : affectedDevices.joined(separator: "、")
             scheduleParentItem.toolTip = "【全屋计划调度全景】\n• 生效中任务：\(enabledCount) 个\n• 已暂停任务：\(pausedCount) 个\n• 纳管设备：\(devSummary)\n展开子菜单可查看下次执行时间、单任务管理或全屋批量协同管理"
             menu.setSubmenu(scheduleMenu, for: scheduleParentItem)

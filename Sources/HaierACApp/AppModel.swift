@@ -346,6 +346,11 @@ final class AppModel: ObservableObject {
         menuBarDeviceId ?? allUnifiedDevices.first?.id
     }
 
+    /// 统一获取设备显示名称（优先匹配云端与手动设备，不存在时安全兜底）(v1.9.90)
+    public func deviceName(for deviceId: String) -> String {
+        allUnifiedDevices.first(where: { $0.id == deviceId })?.name ?? "海尔空调"
+    }
+
     /// 获取指定设备的可达状态（三态判定：网关是否连通、设备是否连网）
     public func reachability(for device: DeviceInfo) -> DeviceReachability {
         if !gatewayConnected {
@@ -597,7 +602,7 @@ final class AppModel: ObservableObject {
         if let minutes = deviceFilterMinutes[deviceId] {
             return minutes
         }
-        let primaryId = devices.first?.id ?? manualDevices.first?.deviceId
+        let primaryId = primaryDeviceId
         if primaryId == deviceId {
             return filterAccumulatedMinutes
         }
@@ -609,7 +614,7 @@ final class AppModel: ObservableObject {
         if let date = deviceFilterCleanedDates[deviceId] {
             return date
         }
-        let primaryId = devices.first?.id ?? manualDevices.first?.deviceId
+        let primaryId = primaryDeviceId
         if primaryId == deviceId {
             return lastFilterCleanedDate
         }
@@ -647,7 +652,7 @@ final class AppModel: ObservableObject {
         return percentages.min() ?? 100
     }
 
-    /// 重置滤网保养计时 (支持指定设备，默认主设备) (v1.9.42 对齐 primaryDeviceId)
+    /// 重置滤网保养计时 (支持指定设备，默认主设备) (v1.9.42 对齐 primaryDeviceId, v1.9.90 收敛统一设备名称)
     func resetFilterMaintenance(for deviceId: String? = nil) {
         let primaryId = primaryDeviceId ?? ""
         let targetId = deviceId ?? primaryId
@@ -661,8 +666,7 @@ final class AppModel: ObservableObject {
             lastFilterCleanedDate = Date()
         }
 
-        let devName = devices.first(where: { $0.id == targetId })?.deviceName ??
-                      manualDevices.first(where: { $0.deviceId == targetId })?.name ?? "海尔空调"
+        let devName = deviceName(for: targetId)
         operationNotice = OperationNotice(text: "🧼 \(devName) 滤网运行计时已重置，洁净度恢复 100%", isError: false)
     }
 
@@ -1028,8 +1032,7 @@ final class AppModel: ObservableObject {
         }
         deviceFilterAlertDates[deviceId] = Date()
 
-        let devName = devices.first(where: { $0.id == deviceId })?.deviceName ??
-                      manualDevices.first(where: { $0.deviceId == deviceId })?.name ?? "海尔空调"
+        let devName = deviceName(for: deviceId)
         let content = UNMutableNotificationContent()
         content.title = "⚠️ 滤网建议清洗保养"
         content.body = "「\(devName)」滤网综合洁净度已降至 \(percentage)%，积尘可能会导致风阻增大并增加用电负荷，建议拆下水洗并晾干。"
@@ -1694,10 +1697,10 @@ final class AppModel: ObservableObject {
         }
     }
 
-    /// 执行睡前预冷
+    /// 执行睡前预冷 (v1.9.90 对齐 primaryDeviceId)
     private func triggerBedtimePrecooling() {
         guard activeSleepSession == nil else { return }
-        guard let deviceId = devices.first?.id ?? manualDevices.first?.deviceId else { return }
+        guard let deviceId = primaryDeviceId else { return }
         let curve = allSleepCurves.first(where: { $0.name == bedtimeSchedule.curveName }) ?? allSleepCurves.first ?? .standard
         let targetTemp = curve.stages.first?.targetTemperature ?? 25.0
 
@@ -1715,9 +1718,9 @@ final class AppModel: ObservableObject {
         operationNotice = OperationNotice(text: "已启动睡前预冷（\(String(format: "%.0f°C", targetTemp))）", isError: false)
     }
 
-    /// 执行定时就寝睡眠温阶
+    /// 执行定时就寝睡眠温阶 (v1.9.90 对齐 primaryDeviceId)
     private func triggerBedtimeCurve() {
-        guard let deviceId = devices.first?.id ?? manualDevices.first?.deviceId else { return }
+        guard let deviceId = primaryDeviceId else { return }
         let curve = allSleepCurves.first(where: { $0.name == bedtimeSchedule.curveName }) ?? allSleepCurves.first ?? .standard
         startSleepCurve(curve: curve, deviceId: deviceId)
 
@@ -1729,12 +1732,12 @@ final class AppModel: ObservableObject {
         )
     }
 
-    /// 一键启停智能睡眠温阶（全局快捷键 ⌃⌥S 或菜单栏/快捷指令调用）
+    /// 一键启停智能睡眠温阶（全局快捷键 ⌃⌥S 或菜单栏/快捷指令调用，v1.9.90 对齐 primaryDeviceId）
     func toggleSleepCurve() {
         if activeSleepSession != nil {
             stopSleepCurve()
         } else {
-            guard let deviceId = devices.first?.id ?? manualDevices.first?.deviceId else {
+            guard let deviceId = primaryDeviceId else {
                 operationNotice = OperationNotice(text: "未找到可用空调设备", isError: true)
                 return
             }
@@ -2011,11 +2014,9 @@ final class AppModel: ObservableObject {
 
     // MARK: - 智能睡眠历史记录管理（v1.9.16）
 
-    /// 归档一次睡眠会话到历史记录
+    /// 归档一次睡眠会话到历史记录 (v1.9.90 收敛统一设备名称)
     func archiveSleepSession(_ session: SleepSession, endReason: SleepEndReason) {
-        let devName = devices.first(where: { $0.id == session.deviceId })?.deviceName
-            ?? manualDevices.first(where: { $0.deviceId == session.deviceId })?.name
-            ?? "海尔空调"
+        let devName = deviceName(for: session.deviceId)
         let record = SleepRecord(
             curveName: session.curveConfig.name,
             deviceId: session.deviceId,
