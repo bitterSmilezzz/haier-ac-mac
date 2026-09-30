@@ -16,6 +16,14 @@ final class StatusItemController: NSObject {
     private let model: AppModel
     private var cancellables: Set<AnyCancellable> = []
 
+    private static let modeLevels: [(code: ACModeCode, title: String)] = [
+        (.cooling, "❄️ 制冷模式"),
+        (.heating, "🔥 制热模式"),
+        (.dehumidify, "💧 除湿模式"),
+        (.fan, "🍃 送风模式"),
+        (.auto, "🔄 自动模式")
+    ]
+
     init(model: AppModel) {
         self.model = model
         super.init()
@@ -564,13 +572,7 @@ final class StatusItemController: NSObject {
             // 全屋统一模式协同 (v1.9.94)
             let modeMenu = NSMenu()
             modeMenu.autoenablesItems = false
-            let modeLevels: [(code: ACModeCode, title: String)] = [
-                (.cooling, "❄️ 制冷模式"),
-                (.heating, "🔥 制热模式"),
-                (.dehumidify, "💧 除湿模式"),
-                (.fan, "🍃 送风模式"),
-                (.auto, "🔄 自动模式")
-            ]
+            let modeLevels = Self.modeLevels
             let allOnSameMode: ACModeCode? = {
                 guard !onDevices.isEmpty else { return nil }
                 let modes = Set(onDevices.compactMap { dev -> ACModeCode? in
@@ -844,6 +846,35 @@ final class StatusItemController: NSObject {
                 downItem.isEnabled = isControllable && isPowerOn && curTemp > 16.0
                 downItem.toolTip = "将「\(dev.name)」温度降低 1°C（下限 16°C）"
                 devSubmenu.addItem(downItem)
+
+                // 运行模式协同切换 (v1.9.95)
+                let devModeMenu = NSMenu()
+                devModeMenu.autoenablesItems = false
+                for itemDef in Self.modeLevels {
+                    let isSelected = (modeCode == itemDef.code)
+                    let check = isSelected ? "✓ " : ""
+                    let item = NSMenuItem(title: "\(check)\(itemDef.title)", action: #selector(setDeviceModeFromMenu(_:)), keyEquivalent: "")
+                    item.target = self
+                    item.representedObject = ["deviceId": devId, "mode": itemDef.code.rawValue]
+                    item.isEnabled = isControllable && isPowerOn
+                    if !isPowerOn {
+                        item.toolTip = "「\(dev.name)」当前处于关机待机状态，请先开启电源再切换运行模式"
+                    } else {
+                        switch itemDef.code {
+                        case .cooling: item.toolTip = "将「\(dev.name)」设为制冷模式，保持当前设定温度"
+                        case .heating: item.toolTip = "将「\(dev.name)」设为制热模式，保持当前设定温度"
+                        case .dehumidify: item.toolTip = "将「\(dev.name)」设为除湿模式，降低室内湿度"
+                        case .fan: item.toolTip = "将「\(dev.name)」设为送风模式，促进室内空气流通"
+                        case .auto: item.toolTip = "将「\(dev.name)」设为智能自适应模式"
+                        }
+                    }
+                    devModeMenu.addItem(item)
+                }
+                let modeTitle = isPowerOn ? "🔄 运行模式 (当前: \(modeCode?.desc ?? "制冷"))" : "🔄 运行模式 (待机中)"
+                let devModeParentItem = NSMenuItem(title: modeTitle, action: nil, keyEquivalent: "")
+                devModeParentItem.toolTip = isPowerOn ? "切换「\(dev.name)」运行模式（当前: \(modeCode?.desc ?? "制冷")）" : "「\(dev.name)」当前处于关机待机状态"
+                devSubmenu.setSubmenu(devModeMenu, for: devModeParentItem)
+                devSubmenu.addItem(devModeParentItem)
 
                 // 调节风速 (v1.9.46, v1.9.82 采用 AppModel.normalizeWindSpeed 统一高精识别勾选)
                 let curWind = model.attribute("windSpeed", deviceId: devId)?.stringValue ?? "微风"
@@ -1156,6 +1187,35 @@ final class StatusItemController: NSObject {
             stepDownItem.isEnabled = isControllable && isPowerOn && curTemp > 16.0
             stepDownItem.toolTip = "将「\(dev.name)」温度降低 1°C（下限 16°C）"
             menu.addItem(stepDownItem)
+
+            // 运行模式协同切换 (v1.9.95)
+            let singleModeMenu = NSMenu()
+            singleModeMenu.autoenablesItems = false
+            for itemDef in Self.modeLevels {
+                let isSelected = (modeCode == itemDef.code)
+                let check = isSelected ? "✓ " : ""
+                let item = NSMenuItem(title: "\(check)\(itemDef.title)", action: #selector(setPrimaryModeFromMenu(_:)), keyEquivalent: "")
+                item.target = self
+                item.representedObject = itemDef.code.rawValue
+                item.isEnabled = isControllable && isPowerOn
+                if !isPowerOn {
+                    item.toolTip = "「\(dev.name)」当前处于关机待机状态，请先开启电源再切换运行模式"
+                } else {
+                    switch itemDef.code {
+                    case .cooling: item.toolTip = "将「\(dev.name)」设为制冷模式，保持当前设定温度"
+                    case .heating: item.toolTip = "将「\(dev.name)」设为制热模式，保持当前设定温度"
+                    case .dehumidify: item.toolTip = "将「\(dev.name)」设为除湿模式，降低室内湿度"
+                    case .fan: item.toolTip = "将「\(dev.name)」设为送风模式，促进室内空气流通"
+                    case .auto: item.toolTip = "将「\(dev.name)」设为智能自适应模式"
+                    }
+                }
+                singleModeMenu.addItem(item)
+            }
+            let singleModeTitle = isPowerOn ? "🔄 运行模式 (当前: \(modeCode?.desc ?? "制冷"))" : "🔄 运行模式 (待机中)"
+            let singleModeParentItem = NSMenuItem(title: singleModeTitle, action: nil, keyEquivalent: "")
+            singleModeParentItem.toolTip = isPowerOn ? "切换「\(dev.name)」运行模式（当前: \(modeCode?.desc ?? "制冷")）" : "「\(dev.name)」当前处于关机待机状态"
+            menu.setSubmenu(singleModeMenu, for: singleModeParentItem)
+            menu.addItem(singleModeParentItem)
 
             // 调节风速 (v1.9.46, v1.9.82 采用 AppModel.normalizeWindSpeed 统一高精识别勾选)
             let curWind = model.attribute("windSpeed", deviceId: dev.id)?.stringValue ?? "微风"
@@ -2116,6 +2176,26 @@ final class StatusItemController: NSObject {
         }.map(\.id)
         if !onIds.isEmpty {
             _ = model.setMode(deviceIds: onIds, mode: mode)
+        } else {
+            _ = model.setModeAll(mode: mode)
+        }
+        refreshTemperature()
+    }
+
+    @objc private func setDeviceModeFromMenu(_ sender: NSMenuItem) {
+        guard let dict = sender.representedObject as? [String: String],
+              let devId = dict["deviceId"],
+              let modeRaw = dict["mode"],
+              let mode = ACModeCode(rawValue: modeRaw) else { return }
+        _ = model.setMode(deviceIds: [devId], mode: mode)
+        refreshTemperature()
+    }
+
+    @objc private func setPrimaryModeFromMenu(_ sender: NSMenuItem) {
+        guard let raw = sender.representedObject as? String,
+              let mode = ACModeCode(rawValue: raw) else { return }
+        if let primaryId = primaryDeviceId {
+            _ = model.setMode(deviceIds: [primaryId], mode: mode)
         } else {
             _ = model.setModeAll(mode: mode)
         }

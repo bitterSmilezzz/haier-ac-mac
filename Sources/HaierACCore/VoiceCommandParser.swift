@@ -519,15 +519,15 @@ public struct VoiceCommandParser {
         return try? NSRegularExpression(pattern: pattern)
     }()
 
-    /// 匹配多个离散星期在前、核心关键词在后口语（如“周六周日和工作日”、“周二周四和周末”、“周五和周日加工作日”） (v1.9.73)
+    /// 匹配多个离散星期在前、核心关键词在后口语（如“周六周日和工作日”、“周二周四和周末”、“周五和周日加工作日”） (v1.9.73, v1.9.95)
     private static let multiDaysWithKeywordRegex: NSRegularExpression? = {
-        let pattern = #"((?:(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)?([一二三四五六日天1-7])[、,，和与及跟以及还有或者或加/／\s]*)+)\s*(?:[、,，和与及跟以及还有或者或加/／\s]+)\s*(工作日|平时|周末|双休|单休|周末三天)"#
+        let pattern = #"((?:(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)?([一二三四五六日天1-7])[、,，和与及跟以及还有或者或加/／\s]*)+)\s*(?:[、,，和与及跟以及还有或者或加/／\s]+)\s*(工作日|平时|平日|周末|双休|双休日|休息日|公休日|休假日|放假日|节假日|单休|周末三天)"#
         return try? NSRegularExpression(pattern: pattern)
     }()
 
-    /// 匹配核心关键词在前、多个离散星期在后口语（如“工作日和周六周日”、“周末和周二周四”、“周末加周三、周五”） (v1.9.73)
+    /// 匹配核心关键词在前、多个离散星期在后口语（如“工作日和周六周日”、“周末和周二周四”、“周末加周三、周五”） (v1.9.73, v1.9.95)
     private static let keywordWithMultiDaysRegex: NSRegularExpression? = {
-        let pattern = #"(工作日|平时|周末|双休|单休|周末三天)\s*(?:[、,，和与及跟以及还有或者或加/／\s]+)\s*(?!(?:每天|天天|每日|每晚|每早|每晨|每夜|日日))((?:(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)?([一二三四五六日天1-7])[、,，和与及跟以及还有或者或加/／\s]*)+)"#
+        let pattern = #"(工作日|平时|平日|周末|双休|双休日|休息日|公休日|休假日|放假日|节假日|单休|周末三天)\s*(?:[、,，和与及跟以及还有或者或加/／\s]+)\s*(?!(?:每天|天天|每日|每晚|每早|每晨|每夜|日日))((?:(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)?([一二三四五六日天1-7])[、,，和与及跟以及还有或者或加/／\s]*)+)"#
         return try? NSRegularExpression(pattern: pattern)
     }()
 
@@ -537,15 +537,15 @@ public struct VoiceCommandParser {
         return try? NSRegularExpression(pattern: pattern)
     }()
 
-    /// 匹配核心关键词复合星期口语（如“工作日和周六”、“工作日及周日”、“工作日还有周六”、“工作日加周日”、“工作日加周末”、“周末和周一”、“周末以及周五”、“单休和周日”） (v1.9.67, v1.9.70 增加每天负向断言防误判为星期天, v1.9.71 纳管单休与周末三天)
+    /// 匹配核心关键词复合星期口语（如“工作日和周六”、“工作日及周日”、“工作日还有周六”、“工作日加周日”、“工作日加周末”、“周末和周一”、“周末以及周五”、“单休和周日”） (v1.9.67, v1.9.70 增加每天负向断言防误判为星期天, v1.9.71 纳管单休与周末三天, v1.9.95 纳管双休日与休息日)
     private static let keywordWithExtraDayRegex: NSRegularExpression? = {
-        let pattern = #"(工作日|平时|周末|双休|单休|周末三天)\s*(?:[、,，和与及跟以及还有或者或加/／\s]+)\s*(?!(?:每天|天天|每日|每晚|每早|每晨|每夜|日日))(?:(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)?([一二三四五六日天1-7]|工作日|平时|周末|双休|单休|周末三天))"#
+        let pattern = #"(工作日|平时|平日|周末|双休|双休日|休息日|公休日|休假日|放假日|节假日|单休|周末三天)\s*(?:[、,，和与及跟以及还有或者或加/／\s]+)\s*(?!(?:每天|天天|每日|每晚|每早|每晨|每夜|日日))(?:(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)?([一二三四五六日天1-7]|工作日|平时|平日|周末|双休|双休日|休息日|公休日|休假日|放假日|节假日|单休|周末三天))"#
         return try? NSRegularExpression(pattern: pattern)
     }()
 
-    /// 匹配离散星期在前、核心关键词在后口语（如“周六和工作日”、“周一和周末”、“周日和单休”） (v1.9.67, v1.9.71 纳管单休与周末三天)
+    /// 匹配离散星期在前、核心关键词在后口语（如“周六和工作日”、“周一和周末”、“周日和单休”） (v1.9.67, v1.9.71 纳管单休与周末三天, v1.9.95)
     private static let extraDayWithKeywordRegex: NSRegularExpression? = {
-        let pattern = #"(?:(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7]))\s*(?:[、,，和与及跟以及还有或者或加/／\s]+)\s*(工作日|平时|周末|双休|单休|周末三天)"#
+        let pattern = #"(?:(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7]))\s*(?:[、,，和与及跟以及还有或者或加/／\s]+)\s*(工作日|平时|平日|周末|双休|双休日|休息日|公休日|休假日|放假日|节假日|单休|周末三天)"#
         return try? NSRegularExpression(pattern: pattern)
     }()
 
@@ -557,25 +557,25 @@ public struct VoiceCommandParser {
 
     /// 匹配排除型否定星期口语模式（如“除了周末每天晚上10点关机”、“除周末外每天早8点开机”、“除了工作日每天晚上11点关空调”、“除了周日每天早8点开机”、“除周一外每天晚10点关机”、“工作日除了周三早8点开机”、“周一至周五除周二外晚10点关空调”） (v1.9.68, v1.9.69 补全限定基准集约束)
     private static let exclusionRepeatRegex: NSRegularExpression? = {
-        let pattern = #"(?:除了|除)\s*([^，,。！？\s]+?)\s*(?:(?:之|以)?外)?(?=[，,。！？\s]|工作日|平时|周末|双休|单休|一三五|二四六|每天|天天|每日|每晚|每早|每晨|每夜|日日|\d|早|晚|夜|中|上|下|凌晨|午|点|时|:|$|开|关|停)"#
+        let pattern = #"(?:除了|除)\s*([^，,。！？\s]+?)\s*(?:(?:之|以)?外)?(?=[，,。！？\s]|工作日|平时|平日|周末|双休|双休日|休息日|公休日|休假日|放假日|节假日|单休|一三五|二四六|每天|天天|每日|每晚|每早|每晨|每夜|日日|\d|早|晚|夜|中|上|下|凌晨|午|点|时|:|$|开|关|停)"#
         return try? NSRegularExpression(pattern: pattern)
     }()
 
-    /// 从排除文本中提取被排除的星期集合 (v1.9.68, v1.9.71 纳管周末三天与单休排除)
+    /// 从排除文本中提取被排除的星期集合 (v1.9.68, v1.9.71 纳管周末三天与单休排除, v1.9.95 纳管双休日与休息日)
     private static func extractExcludedDays(from target: String) -> Set<Int>? {
         var excluded = Set<Int>()
         var remainingTarget = target
-        if remainingTarget.contains("工作日") || remainingTarget.contains("平时") {
+        if remainingTarget.contains("工作日") || remainingTarget.contains("平时") || remainingTarget.contains("平日") {
             excluded.formUnion([2, 3, 4, 5, 6])
-            remainingTarget = remainingTarget.replacingOccurrences(of: "工作日", with: "").replacingOccurrences(of: "平时", with: "")
+            remainingTarget = remainingTarget.replacingOccurrences(of: "工作日", with: "").replacingOccurrences(of: "平时", with: "").replacingOccurrences(of: "平日", with: "")
         }
         if remainingTarget.contains("周末三天") {
             excluded.formUnion([1, 6, 7])
             remainingTarget = remainingTarget.replacingOccurrences(of: "周末三天", with: "")
         }
-        if remainingTarget.contains("周末") || remainingTarget.contains("双休") {
+        if remainingTarget.contains("周末") || remainingTarget.contains("双休") || remainingTarget.contains("双休日") || remainingTarget.contains("休息日") || remainingTarget.contains("公休日") || remainingTarget.contains("休假日") || remainingTarget.contains("放假日") || remainingTarget.contains("节假日") {
             excluded.formUnion([1, 7])
-            remainingTarget = remainingTarget.replacingOccurrences(of: "周末", with: "").replacingOccurrences(of: "双休", with: "")
+            remainingTarget = remainingTarget.replacingOccurrences(of: "双休日", with: "").replacingOccurrences(of: "周末", with: "").replacingOccurrences(of: "双休", with: "").replacingOccurrences(of: "休息日", with: "").replacingOccurrences(of: "公休日", with: "").replacingOccurrences(of: "休假日", with: "").replacingOccurrences(of: "放假日", with: "").replacingOccurrences(of: "节假日", with: "")
         }
         if remainingTarget.contains("单休") {
             excluded.formUnion([2, 3, 4, 5, 6, 7])
@@ -1061,9 +1061,9 @@ public struct VoiceCommandParser {
             let multiStr = nsString.substring(with: match.range(at: 1))
             let kw = nsString.substring(with: match.range(at: 3))
             var days = Set<Int>()
-            if kw == "工作日" || kw == "平时" {
+            if kw == "工作日" || kw == "平时" || kw == "平日" {
                 days.formUnion([2, 3, 4, 5, 6])
-            } else if kw == "周末" || kw == "双休" {
+            } else if kw == "周末" || kw == "双休" || kw == "双休日" || kw == "休息日" || kw == "公休日" || kw == "休假日" || kw == "放假日" || kw == "节假日" {
                 days.formUnion([1, 7])
             } else if kw == "单休" {
                 days.formUnion([2, 3, 4, 5, 6, 7])
@@ -1081,16 +1081,16 @@ public struct VoiceCommandParser {
             }
         }
 
-        // 4.3 核心关键词在前 + 多个离散星期在后（如“工作日和周六周日”、“周末和周二周四”、“周末加周三、周五”）(v1.9.73)
+        // 4.3 核心关键词在前 + 多个离散星期在后（如“工作日和周六周日”、“周末和周二周四”、“周末加周三、周五”）(v1.9.73, v1.9.95)
         if let regex = keywordWithMultiDaysRegex,
            let match = regex.firstMatch(in: text, options: [], range: fullRange),
            match.numberOfRanges >= 3 {
             let kw = nsString.substring(with: match.range(at: 1))
             let multiStr = nsString.substring(with: match.range(at: 2))
             var days = Set<Int>()
-            if kw == "工作日" || kw == "平时" {
+            if kw == "工作日" || kw == "平时" || kw == "平日" {
                 days.formUnion([2, 3, 4, 5, 6])
-            } else if kw == "周末" || kw == "双休" {
+            } else if kw == "周末" || kw == "双休" || kw == "双休日" || kw == "休息日" || kw == "公休日" || kw == "休假日" || kw == "放假日" || kw == "节假日" {
                 days.formUnion([1, 7])
             } else if kw == "单休" {
                 days.formUnion([2, 3, 4, 5, 6, 7])
@@ -1125,25 +1125,25 @@ public struct VoiceCommandParser {
             }
         }
 
-        // 2. 复合语义优先匹配：核心关键词 + 附加星期（如“工作日和周六”、“工作日及周日”、“工作日加周末”、“周末和周一”、“周末以及周五”、“单休和周日”）(v1.9.67, v1.9.71)
+        // 2. 复合语义优先匹配：核心关键词 + 附加星期（如“工作日和周六”、“工作日及周日”、“工作日加周末”、“周末和周一”、“周末以及周五”、“单休和周日”）(v1.9.67, v1.9.71, v1.9.95)
         if let regex = keywordWithExtraDayRegex,
            let match = regex.firstMatch(in: text, options: [], range: fullRange),
            match.numberOfRanges >= 3 {
             let kw = nsString.substring(with: match.range(at: 1))
             let extra = nsString.substring(with: match.range(at: 2))
             var days = Set<Int>()
-            if kw == "工作日" || kw == "平时" {
+            if kw == "工作日" || kw == "平时" || kw == "平日" {
                 days.formUnion([2, 3, 4, 5, 6])
-            } else if kw == "周末" || kw == "双休" {
+            } else if kw == "周末" || kw == "双休" || kw == "双休日" || kw == "休息日" || kw == "公休日" || kw == "休假日" || kw == "放假日" || kw == "节假日" {
                 days.formUnion([1, 7])
             } else if kw == "单休" {
                 days.formUnion([2, 3, 4, 5, 6, 7])
             } else if kw == "周末三天" {
                 days.formUnion([1, 6, 7])
             }
-            if extra == "工作日" || extra == "平时" {
+            if extra == "工作日" || extra == "平时" || extra == "平日" {
                 days.formUnion([2, 3, 4, 5, 6])
-            } else if extra == "周末" || extra == "双休" {
+            } else if extra == "周末" || extra == "双休" || extra == "双休日" || extra == "休息日" || extra == "公休日" || extra == "休假日" || extra == "放假日" || extra == "节假日" {
                 days.formUnion([1, 7])
             } else if extra == "单休" {
                 days.formUnion([2, 3, 4, 5, 6, 7])
@@ -1158,7 +1158,7 @@ public struct VoiceCommandParser {
             }
         }
 
-        // 3. 复合语义优先匹配：附加星期在前 + 核心关键词在后（如“周六和工作日”、“周一和周末”、“周日和单休”）(v1.9.67, v1.9.71)
+        // 3. 复合语义优先匹配：附加星期在前 + 核心关键词在后（如“周六和工作日”、“周一和周末”、“周日和单休”）(v1.9.67, v1.9.71, v1.9.95)
         if let regex = extraDayWithKeywordRegex,
            let match = regex.firstMatch(in: text, options: [], range: fullRange),
            match.numberOfRanges >= 3 {
@@ -1168,9 +1168,9 @@ public struct VoiceCommandParser {
             if let ch = dayChar.first, let wd = chineseDayCharToWeekday(ch) {
                 days.insert(wd)
             }
-            if kw == "工作日" || kw == "平时" {
+            if kw == "工作日" || kw == "平时" || kw == "平日" {
                 days.formUnion([2, 3, 4, 5, 6])
-            } else if kw == "周末" || kw == "双休" {
+            } else if kw == "周末" || kw == "双休" || kw == "双休日" || kw == "休息日" || kw == "公休日" || kw == "休假日" || kw == "放假日" || kw == "节假日" {
                 days.formUnion([1, 7])
             } else if kw == "单休" {
                 days.formUnion([2, 3, 4, 5, 6, 7])
@@ -1184,6 +1184,14 @@ public struct VoiceCommandParser {
         }
 
         // 4. 语义化独立核心短语识别
+        // 4.-1 非工作日/非平日与非周末/非双休反相调度核心前置拦截（非工作日/非平日精准映射至周末 [1, 7]，非周末/非双休/非双休日/非休息日/非公休日精准映射至工作日 [2, 3, 4, 5, 6]）(v1.9.95)
+        if text.contains("非工作日") || text.contains("非平时") || text.contains("非平日") {
+            return ([1, 7], "周末")
+        }
+        if text.contains("非周末") || text.contains("非双休") || text.contains("非双休日") || text.contains("非休息日") || text.contains("非公休日") {
+            return ([2, 3, 4, 5, 6], "工作日")
+        }
+
         // 4.0 逢单休/单休日与逢双休口语调度（逢单休精准映射至周日 [1]，逢双休映射至周末 [1, 7]），前置拦截杜绝误入单休 (v1.9.94)
         if text.contains("逢单休") || text.contains("每逢单休") || text.contains("单休日") {
             return ([1], "周日")
@@ -1191,7 +1199,14 @@ public struct VoiceCommandParser {
         if text.contains("逢双休") || text.contains("每逢双休") || text.contains("双休日") {
             return ([1, 7], "周末")
         }
-        if text.contains("工作日") || text.contains("平时") {
+        // 4.01 休息日/公休日/休假日/放假日/节假日/平日独立语义识别 (v1.9.95)
+        if text.contains("休息日") || text.contains("公休日") || text.contains("休假日") || text.contains("放假日") || text.contains("节假日") ||
+           text.contains("逢休息日") || text.contains("每逢休息日") || text.contains("逢公休日") || text.contains("每逢公休日") ||
+           text.contains("逢休假日") || text.contains("每逢休假日") || text.contains("逢放假日") || text.contains("每逢放假日") ||
+           text.contains("逢节假日") || text.contains("每逢节假日") {
+            return ([1, 7], "周末")
+        }
+        if text.contains("工作日") || text.contains("平时") || text.contains("平日") || text.contains("逢平日") || text.contains("每逢平日") {
             return ([2, 3, 4, 5, 6], "工作日")
         }
         if text.contains("周末三天") {
@@ -1692,8 +1707,20 @@ public struct VoiceCommandParser {
            text.contains("延迟") || text.contains("延后") || text.contains("稍后") ||
            text.contains("每天") || text.contains("天天") || text.contains("每日") || text.contains("每晚") || text.contains("每早") || text.contains("每晨") || text.contains("每夜") || text.contains("日日") ||
            text.contains("每天半") || text.contains("天天半") || text.contains("每日半") || text.contains("日日半") ||
-           text.contains("工作日") || text.contains("平时") || text.contains("工作日半") || text.contains("平时半") ||
+           text.contains("工作日") || text.contains("平时") || text.contains("平日") || text.contains("工作日半") || text.contains("平时半") || text.contains("平日半") ||
            text.contains("周末") || text.contains("双休") || text.contains("双休日") || text.contains("单休") || text.contains("周末半") || text.contains("双休半") || text.contains("双休日半") || text.contains("单休半") ||
+           text.contains("非工作日") || text.contains("非工作日半") || text.contains("非平时") || text.contains("非平日") || text.contains("非平日半") ||
+           text.contains("非周末") || text.contains("非周末半") || text.contains("非双休") || text.contains("非双休半") || text.contains("非双休日") || text.contains("非双休日半") ||
+           text.contains("非休息日") || text.contains("非休息日半") || text.contains("非公休日") || text.contains("非公休日半") ||
+           text.contains("休息日") || text.contains("休息日半") || text.contains("公休日") || text.contains("公休日半") ||
+           text.contains("休假日") || text.contains("休假日半") || text.contains("放假日") || text.contains("放假日半") ||
+           text.contains("节假日") || text.contains("节假日半") ||
+           text.contains("逢休息日") || text.contains("逢休息日半") || text.contains("每逢休息日") || text.contains("每逢休息日半") ||
+           text.contains("逢公休日") || text.contains("逢公休日半") || text.contains("每逢公休日") || text.contains("每逢公休日半") ||
+           text.contains("逢休假日") || text.contains("逢休假日半") || text.contains("每逢休假日") || text.contains("每逢休假日半") ||
+           text.contains("逢放假日") || text.contains("逢放假日半") || text.contains("每逢放假日") || text.contains("每逢放假日半") ||
+           text.contains("逢节假日") || text.contains("逢节假日半") || text.contains("每逢节假日") || text.contains("每逢节假日半") ||
+           text.contains("逢平日") || text.contains("逢平日半") || text.contains("每逢平日") || text.contains("每逢平日半") ||
            text.contains("每周") || text.contains("每逢") || text.contains("逢周") || text.contains("每个周") || text.contains("每个星期") ||
            text.contains("礼拜") || text.contains("逢星期") || text.contains("一三五") || text.contains("二四六") || text.contains("二四") ||
            text.contains("周末三天") ||
@@ -2504,6 +2531,31 @@ public struct VoiceCommandParser {
         str = str.replacingOccurrences(of: "逢单休半", with: "逢单休8点30分")
         str = str.replacingOccurrences(of: "每逢单休半", with: "每逢单休8点30分")
         str = str.replacingOccurrences(of: "单休日半", with: "单休日8点30分")
+        str = str.replacingOccurrences(of: "非工作日半", with: "非工作日8点30分")
+        str = str.replacingOccurrences(of: "非平日半", with: "非平日8点30分")
+        str = str.replacingOccurrences(of: "非周末半", with: "非周末8点30分")
+        str = str.replacingOccurrences(of: "非双休半", with: "非双休8点30分")
+        str = str.replacingOccurrences(of: "非双休日半", with: "非双休日8点30分")
+        str = str.replacingOccurrences(of: "非休息日半", with: "非休息日8点30分")
+        str = str.replacingOccurrences(of: "非公休日半", with: "非公休日8点30分")
+        str = str.replacingOccurrences(of: "逢休息日半", with: "逢休息日8点30分")
+        str = str.replacingOccurrences(of: "每逢休息日半", with: "每逢休息日8点30分")
+        str = str.replacingOccurrences(of: "逢公休日半", with: "逢公休日8点30分")
+        str = str.replacingOccurrences(of: "每逢公休日半", with: "每逢公休日8点30分")
+        str = str.replacingOccurrences(of: "逢休假日半", with: "逢休假日8点30分")
+        str = str.replacingOccurrences(of: "每逢休假日半", with: "每逢休假日8点30分")
+        str = str.replacingOccurrences(of: "逢放假日半", with: "逢放假日8点30分")
+        str = str.replacingOccurrences(of: "每逢放假日半", with: "每逢放假日8点30分")
+        str = str.replacingOccurrences(of: "逢节假日半", with: "逢节假日8点30分")
+        str = str.replacingOccurrences(of: "每逢节假日半", with: "每逢节假日8点30分")
+        str = str.replacingOccurrences(of: "逢平日半", with: "逢平日8点30分")
+        str = str.replacingOccurrences(of: "每逢平日半", with: "每逢平日8点30分")
+        str = str.replacingOccurrences(of: "休息日半", with: "休息日8点30分")
+        str = str.replacingOccurrences(of: "公休日半", with: "公休日8点30分")
+        str = str.replacingOccurrences(of: "休假日半", with: "休假日8点30分")
+        str = str.replacingOccurrences(of: "放假日半", with: "放假日8点30分")
+        str = str.replacingOccurrences(of: "节假日半", with: "节假日8点30分")
+        str = str.replacingOccurrences(of: "平日半", with: "平日8点30分")
         str = str.replacingOccurrences(of: "今晨半", with: "今晨7点30分")
         str = str.replacingOccurrences(of: "明晨半", with: "明晨7点30分")
         str = str.replacingOccurrences(of: "每晨半", with: "每晨7点30分")

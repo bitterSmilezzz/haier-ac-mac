@@ -141,7 +141,7 @@ struct SetACTemperatureIntent: AppIntent {
             return .result(dialog: "已将全屋 \(count) 台空调温度统一设为 \(tempStr) 度")
         }
         let deviceId = try requireGatewayAndDevice(deviceName)
-        model.sendAttribute("targetTemperature", value: .double(temperature), deviceId: deviceId)
+        _ = model.setTemperature(deviceIds: [deviceId], temperature: temperature)
         let devName = model.deviceName(for: deviceId)
         return .result(dialog: "已将「\(devName)」温度设置为 \(tempStr) 度")
     }
@@ -236,7 +236,7 @@ struct SetACModeIntent: AppIntent {
             return .result(dialog: "已将全屋 \(count) 台空调统一切换为「\(matched.desc)」模式")
         }
         let deviceId = try requireGatewayAndDevice(deviceName)
-        model.sendAttribute("operationMode", value: .string(matched.rawValue), deviceId: deviceId)
+        _ = model.setMode(deviceIds: [deviceId], mode: matched)
         let devName = model.deviceName(for: deviceId)
         return .result(dialog: "已将「\(devName)」切换为「\(matched.desc)」模式")
     }
@@ -368,6 +368,54 @@ struct GetACTemperatureIntent: AppIntent {
         let name = model.deviceName(for: deviceId)
         let text = temp.truncatingRemainder(dividingBy: 1.0) == 0 ? "\(Int(temp))°C" : String(format: "%.1f°C", temp)
         return .result(value: text, dialog: "\(name)当前室内温度 \(text)")
+    }
+}
+
+// MARK: - 查询湿度 (v1.9.95)
+
+struct GetACHumidityIntent: AppIntent {
+    static var title: LocalizedStringResource = "查询空调湿度"
+    static var description = IntentDescription("查询空调当前室内相对湿度", categoryName: "空调控制")
+
+    @Parameter(title: "设备名称", description: "可选；留空使用主设备，填“全屋”或“全部”查询全屋平均湿度")
+    var deviceName: String?
+
+    @MainActor
+    func perform() async throws -> some IntentResult & ProvidesDialog {
+        let model = AppModel.shared
+        let isAll = (deviceName?.contains("全") == true) || (deviceName?.contains("所有") == true)
+        if isAll {
+            let all = model.allUnifiedDevices
+            var hums: [Double] = []
+            var summaries: [String] = []
+            for dev in all {
+                if let attr = AppModel.indoorHumidityAttribute(in: model.attributes[dev.id] ?? [:]),
+                   let hum = attr.doubleValue {
+                    hums.append(hum)
+                    let humStr = "\(Int(round(hum)))%"
+                    summaries.append("「\(dev.name)」\(humStr)")
+                }
+            }
+            guard !hums.isEmpty else {
+                throw ACIntentError.message("暂未获取到全屋空调室内湿度数据（可能设备未配备湿度传感器）")
+            }
+            let avg = hums.reduce(0.0, +) / Double(hums.count)
+            let avgStr = "\(Int(round(avg)))%"
+            let dialog = "全屋平均相对湿度 \(avgStr)（" + summaries.joined(separator: "、") + "）"
+            return .result(value: avgStr, dialog: IntentDialog(stringLiteral: dialog))
+        }
+
+        guard let deviceId = resolveDeviceId(named: deviceName) else {
+            throw ACIntentError.message("没有可控制的空调设备")
+        }
+        guard let attr = AppModel.indoorHumidityAttribute(in: model.attributes[deviceId] ?? [:]),
+              let hum = attr.doubleValue else {
+            let name = model.deviceName(for: deviceId)
+            throw ACIntentError.message("「\(name)」暂未获取到室内湿度（可能未配备湿度传感器）")
+        }
+        let name = model.deviceName(for: deviceId)
+        let text = "\(Int(round(hum)))%"
+        return .result(value: text, dialog: "\(name)当前室内相对湿度 \(text)")
     }
 }
 
@@ -1131,6 +1179,13 @@ struct ACAppShortcuts: AppShortcutsProvider {
                     intent: GetACTemperatureIntent(),
                     phrases: [
                         "用 \(.applicationName) 查询温度",
+                    ]
+                ),
+                AppShortcut(
+                    intent: GetACHumidityIntent(),
+                    phrases: [
+                        "用 \(.applicationName) 查询湿度",
+                        "\(.applicationName) 室内湿度",
                     ]
                 ),
                 AppShortcut(

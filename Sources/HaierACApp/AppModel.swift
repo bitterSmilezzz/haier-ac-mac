@@ -3399,9 +3399,15 @@ final class AppModel: ObservableObject {
             sendAttributeToDevices("onOffStatus", value: .bool(true), deviceIds: standbyIds)
         }
         sendAttributeToDevices("operationMode", value: .string(mode.rawValue), deviceIds: controllableIds)
-        let desc = isAll
-            ? "✅ 已将全屋 \(controllableIds.count) 台空调模式统一设为「\(mode.desc)」"
-            : "✅ 已将所选 \(controllableIds.count) 台空调模式统一设为「\(mode.desc)」"
+        let desc: String
+        if isAll {
+            desc = "✅ 已将全屋 \(controllableIds.count) 台空调模式统一设为「\(mode.desc)」"
+        } else if controllableIds.count == 1 {
+            let singleName = deviceName(for: controllableIds[0])
+            desc = "✅ 已将「\(singleName)」模式设为「\(mode.desc)」"
+        } else {
+            desc = "✅ 已将所选 \(controllableIds.count) 台空调模式统一设为「\(mode.desc)」"
+        }
         operationNotice = OperationNotice(text: desc, isError: false)
         return controllableIds.count
     }
