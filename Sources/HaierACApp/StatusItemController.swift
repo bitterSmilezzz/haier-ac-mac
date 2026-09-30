@@ -1458,6 +1458,9 @@ final class StatusItemController: NSObject {
                     let primaryDev = model.allUnifiedDevices.first(where: { $0.id == primaryDeviceId }) ?? model.allUnifiedDevices.first
                     let primaryName = primaryDev?.name ?? "主显设备"
 
+                    let isPrimaryControllable = model.gatewayConnected && (primaryDev.map { model.reachability(for: $0.id).isControllable } ?? false)
+                    let hasControllable = model.gatewayConnected && allDevices.contains { model.reachability(for: $0.id).isControllable }
+
                     let applyPrimaryItem = NSMenuItem(
                         title: "应用至「\(primaryName)」",
                         action: #selector(applySceneToPrimaryFromMenu(_:)),
@@ -1465,7 +1468,7 @@ final class StatusItemController: NSObject {
                     )
                     applyPrimaryItem.target = self
                     applyPrimaryItem.representedObject = scene.id.uuidString
-                    applyPrimaryItem.isEnabled = model.gatewayConnected
+                    applyPrimaryItem.isEnabled = isPrimaryControllable
                     applyPrimaryItem.toolTip = "将「\(scene.name)」情景动作（\(actionDesc)）下发至菜单栏主显设备「\(primaryName)」"
                     sceneSubmenu.addItem(applyPrimaryItem)
 
@@ -1476,7 +1479,7 @@ final class StatusItemController: NSObject {
                     )
                     applyAllItem.target = self
                     applyAllItem.representedObject = scene.id.uuidString
-                    applyAllItem.isEnabled = model.gatewayConnected
+                    applyAllItem.isEnabled = hasControllable
                     applyAllItem.toolTip = "将「\(scene.name)」情景动作（\(actionDesc)）统一批量下发至全屋 \(allDevices.count) 台空调设备"
                     sceneSubmenu.addItem(applyAllItem)
 
@@ -1485,6 +1488,7 @@ final class StatusItemController: NSObject {
                     scenesMenu.setSubmenu(sceneSubmenu, for: sceneParentItem)
                     scenesMenu.addItem(sceneParentItem)
                 } else {
+                    let isSingleControllable = model.gatewayConnected && (model.allUnifiedDevices.first.map { model.reachability(for: $0.id).isControllable } ?? false)
                     let singleItem = NSMenuItem(
                         title: "\(sceneGlyph) \(scene.name) (\(actionDesc))",
                         action: #selector(applySceneSingleFromMenu(_:)),
@@ -1492,7 +1496,7 @@ final class StatusItemController: NSObject {
                     )
                     singleItem.target = self
                     singleItem.representedObject = scene.id.uuidString
-                    singleItem.isEnabled = model.gatewayConnected
+                    singleItem.isEnabled = isSingleControllable
                     singleItem.toolTip = "一键应用「\(scene.name)」情景动作：\(actionDesc)"
                     scenesMenu.addItem(singleItem)
                 }
@@ -1583,6 +1587,9 @@ final class StatusItemController: NSObject {
         let primaryId = primaryDeviceId ?? model.allUnifiedDevices.first?.id
         let primaryName = primaryId.map { model.deviceName(for: $0) } ?? "主显设备"
 
+        let isPrimaryControllable = model.gatewayConnected && (primaryId.map { model.reachability(for: $0).isControllable } ?? false)
+        let hasControllable = model.gatewayConnected && allDevices.contains { model.reachability(for: $0.id).isControllable }
+
         let countdownPresets: [(title: String, mins: Int, powerOn: Bool)] = [
             ("⏱ 「\(primaryName)」30 分钟后关机", 30, false),
             ("⏱ 「\(primaryName)」1 小时后关机", 60, false),
@@ -1594,6 +1601,7 @@ final class StatusItemController: NSObject {
         for preset in countdownPresets {
             let pItem = NSMenuItem(title: preset.title, action: #selector(quickCountdownFromMenu(_:)), keyEquivalent: "")
             pItem.target = self
+            pItem.isEnabled = isPrimaryControllable
             var repObj: [String: Any] = ["minutes": preset.mins, "powerOn": preset.powerOn]
             if let primaryId {
                 repObj["deviceId"] = primaryId
@@ -1615,6 +1623,7 @@ final class StatusItemController: NSObject {
         for p in allOffPresets {
             let pItem = NSMenuItem(title: p.title, action: #selector(quickCountdownFromMenu(_:)), keyEquivalent: "")
             pItem.target = self
+            pItem.isEnabled = hasControllable
             pItem.representedObject = ["minutes": p.mins, "powerOn": false, "all": true] as [String: Any]
             let targetDate = Date().addingTimeInterval(Double(p.mins * 60))
             let targetTimeStr = DateFormatter.localizedString(from: targetDate, dateStyle: .none, timeStyle: .short)
@@ -1629,6 +1638,7 @@ final class StatusItemController: NSObject {
         for p in allOnPresets {
             let pItem = NSMenuItem(title: p.title, action: #selector(quickCountdownFromMenu(_:)), keyEquivalent: "")
             pItem.target = self
+            pItem.isEnabled = hasControllable
             pItem.representedObject = ["minutes": p.mins, "powerOn": true, "all": true] as [String: Any]
             let targetDate = Date().addingTimeInterval(Double(p.mins * 60))
             let targetTimeStr = DateFormatter.localizedString(from: targetDate, dateStyle: .none, timeStyle: .short)

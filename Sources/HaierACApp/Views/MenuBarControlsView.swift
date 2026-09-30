@@ -632,10 +632,14 @@ struct MenuBarControlsView: View {
         }
     }
 
-    // MARK: - 2.5 一键情景预设 Bento 矩阵 (v1.9.103/v1.9.104)
+    // MARK: - 2.5 一键情景预设 Bento 矩阵 (v1.9.103/v1.9.104, v1.9.107 可达性门禁与全景联动)
 
     private func scenesPod(device: DeviceInfo, reachability: AppModel.DeviceReachability) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
+        let canApplyScene = sceneScopeAll
+            ? (model.gatewayConnected && model.allUnifiedDevices.contains { model.reachability(for: $0.id).isControllable })
+            : reachability.isControllable
+
+        return VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 4) {
                 Image(systemName: "sparkles")
                     .font(.system(size: 10, weight: .semibold))
@@ -744,8 +748,8 @@ struct MenuBarControlsView: View {
             RoundedRectangle(cornerRadius: Theme.radiusMD, style: .continuous)
                 .fill(Color.primary.opacity(0.03))
         )
-        .disabled(!reachability.isControllable)
-        .opacity(reachability.isControllable ? 1.0 : 0.6)
+        .disabled(!canApplyScene)
+        .opacity(canApplyScene ? 1.0 : 0.6)
     }
 
     // MARK: - 3. 核心温控 Bento 卡片

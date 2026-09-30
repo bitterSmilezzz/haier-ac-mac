@@ -1,19 +1,21 @@
-# Haier AC Mac v1.9.106 发布与巡检演进报告
+# Haier AC Mac v1.9.107 发布与巡检演进报告
 
 ## 1. 概述与版本定位
-- **版本号**：`v1.9.106`
-- **发版主题**：闭环双区间双关键词四元调度与口语连词排除防断裂、macOS状态栏全屋调度暂停态全感知与机组热容物理衰减模型
+- **版本号**：`v1.9.107`
+- **发版主题**：闭环口语夹心四元/三元调度与连词纳管、机组热容物理衰减自洽及状态栏情景与倒计时门禁加固
 - **核心目标与架构演进**：
-  1. **“双连续区间与双核心关键词四元复合周期调度、口语连词排除防断裂”自然口语调度引擎 (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)**：
-     - **双连续区间与双核心关键词四元复合调度引擎**：新增 `dualRangeWithDualKeywordsRegex`（双区间在前+双核心词在后）与 `dualKeywordsWithDualRangeRegex`（双核心词在前+双区间在后），全面覆盖“周一至周二、周四至周五、大休和小休每天早8点开机”（`[1, 2, 3, 5, 6, 7]`）、“大休和小休加周一至周二、周四至周五每天早8点开机”（`[1, 2, 3, 5, 6, 7]`）、“周一到周二、周四到周五加工作日和双休每天早8点开机”（`[1..7]`）等四元复合周期调度；
-     - **隐式排除口语连词全面纳管防断裂**：在 `implicitExclusionRepeatRegex` 负向后行断言中全面补齐口语常见连词 `跟`、`或者`、`或`、`并且`、`并`，彻底根除如“除了周末跟大休每天早8点开机”、“除了周末或者大休每天早8点开机”、“除了大休并且小休每天早8点开机”因连词缺失导致预查提前触发断裂留下悬挂文本造成逆向误执行的隐患；
-     - **显式排除（带外/之外/以外）标点符号容错**：优化 `explicitExclusionRepeatRegex` 结构，允许排除子句内包含中文/英文逗号及空格分界（如“除周一至周二，周三至周四外每天早8点开机”、“除周末，大休 之外每天早8点开机”），在 `extractExcludedDays` 中平滑解耦提取；
-     - **单元测试 100% 满分覆盖**：新增 `testDualRangeDualKeywordsAndExclusionHardeningV19106` 测试套件，全套 114 个单元测试零缺陷通过，杜绝误触。
-  2. **macOS 原生状态栏全屋计划调度暂停态全感知与历史空ID任务归属 (`StatusItemController.swift` / `AppModel.swift` / `MenuBarControlsView.swift`)**：
-     - **状态栏 Tooltip 全屋计划调度暂停态全感知**：当全屋计划任务全部处于临时暂停状态时，状态栏悬浮 Tooltip 显式提示 `⏸ 计划调度: 全屋共 X 个定时任务已全部暂停生效 (右键菜单可一键恢复)`，打破信息盲区；
-     - **历史空白 `deviceId` 调度任务归属主显设备闭环**：在 `cancelSchedules(for:)`、`setScheduledActionsEnabled(for:enabled:)`、状态栏设备级联子菜单及控制中心菜单中，针对空 `deviceId` 的历史遗留任务智能对齐匹配 `primaryDeviceId`，彻底根除历史任务在单机面板中无法取消、无法暂停或变成幽灵任务的隐患。
-  3. **变频机组热容量连续性物理散热衰减模型 (`AppModel.swift`)**：
-     - **HVAC 热容量连续性物理衰减 (Thermal Mass Dissipation Model)**：变频空调停机或待机时，换热器翅片与压缩机机体热饱和积累随时间遵循牛顿冷却定律平滑自然散热，采用 3 倍速线性散热衰减（`max(0, current - elapsedMinutes * 3)`），既避免瞬间归零导致短时停机/调档丢失热饱和稳态阻抗，又确保长时间停机（连续待机 40~60 分钟以上）自然彻底冷却至零，极大提升了能耗动力学物理仿真保真度。
+  1. **“核心关键词与连续区间夹心四元/三元调度、口语连词‘同’全景纳管”自然口语调度引擎 (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)**：
+     - **核心关键词与连续区间夹心复合调度引擎**：新增 `keywordWithRangeAndKeywordRegex`（核心词在前+连续区间居中+核心词在后，如“大休、周一至周三加小休每天晚8点开机” `[1, 2, 3, 4, 7]`、“工作日加周六至周日和单休每天晚8点开机” `[1..7]`、“平时加周六至周日和大休每天晚8点开机” `[1..7]`、“双休加周一至周三加小休每天晚8点开机” `[1, 2, 3, 4, 7]`），彻底消灭前置区间正则贪婪截断导致末尾核心词丢失或时间/动作指令解析错位的顽疾；
+     - **四元交替夹心全景拓扑大一统**：新增 `rangeWithDualKeywordsAndRangeRegex`（区间在先+双核心词居中+区间在后，如“周一至周二、大休和小休加周五至周六每天晚8点开机” `[1, 2, 3, 6, 7]`）与 `keywordWithDualRangeAndKeywordRegex`（核心词在先+双区间居中+核心词在后，如“大休、周一至周二、周四至周五加小休每天晚8点开机” `[1, 2, 3, 5, 6, 7]`），四元周期全排列拓扑自洽闭环；
+     - **自然口语连词“同”全景纳管防断裂**：在 `implicitExclusionRepeatRegex` 负向预查断言与 `extractExcludedDays` 中全面补齐口语常见连词 `同`（如“除了周末同大休每天早8点开机”、“除周末同大休外每天早8点开机”），根除连词缺失导致的预查断裂隐患；
+     - **单元测试 100% 满分覆盖**：新增 `testInterleavedRangeAndKeywordScheduleHardeningV19107` 测试套件，全套 115 个单元测试零缺陷通过，杜绝误触。
+  2. **闭环变频机组热容量物理散热衰减模型在手动关机/开机/场景/定时触发时的强行置零冲突 (`AppModel.swift`)**：
+     - 彻底清理 `sendAttribute`、`sendAttributeToDevices`、`turnOffDevices`、`applyScene` 与 `triggerAction` 5 处历史遗留的手动清零代码；
+     - 变频机组换热器连续机时热阻阻抗与热饱和度严格遵循牛顿冷却物理散热衰减模型（待机时 3x 线性散热衰减），短时间关机/调档再开机平滑继承换热器残余物理热容量，长时间待机（连续 40~60 分钟以上）自然彻底冷却归零，消除算法自相矛盾。
+  3. **macOS 原生状态栏与菜单栏控制中心情景预设及快捷倒计时可达性全状态门禁 (`StatusItemController.swift` / `MenuBarControlsView.swift`)**：
+     - **状态栏情景预设可达性门禁精细化**：状态栏顶层「一键情景预设」子菜单中的「应用至主显设备」、「应用至全屋所有空调」及单设备项全面接入设备可达性（Reachability）精准判定，设备物理离线时灰显并禁用，杜绝无效点击；
+     - **快捷倒计时调度门禁补齐**：状态栏「快捷倒计时调度」子菜单中的单机倒计时与全屋关机/开机预冷预热项全面补齐 `isEnabled` 门禁与离线防护；
+     - **菜单栏 Bento 控制中心「一键情景」动态禁用与透明度同步**：根据当前选定生效范围（当前机/全屋），动态感知设备连通性与可达性状态，未连网或无可控设备时平滑禁用并呈现 0.6 不透明度防护态。
 
 ---
 
@@ -27,55 +29,43 @@
    - **死分支清理 (P2-2)**：`.adjustTemperatureAll` 死分支已彻底清理；
    - **调温 16/30°C 边界防护 (P2-3)**：单设备与全屋协同均已严格实施边界限制并同步至状态栏与 UI Stepper 使能状态。
 2. **本轮走查发现的高价值优化与缺陷闭环**：
-   - **口语连词在隐式排除中的负向预查断裂隐患 (P0 修复)**：在自然语言排班中，用户使用“除了周末跟大休”、“除了周末或者大休”、“除了大休并且小休”等口语表达时，旧版预查断言仅支持 `和|与|及|加|以及|还有|另外|、|\s`，缺少 `跟|或者|或|并且|并`，导致正则在遇到“跟”或“或者”前意外断开，截断残留进入执行文本。本轮全面补充连词后，完全防范了此解析断裂隐患；
-   - **历史遗留空 deviceId 调度任务无法在单机视图取消或暂停 (P1 修复)**：早期版本的某些定时任务未显式绑定 `deviceId`（为空字符串），在状态栏单机子菜单或控制中心操作该设备时无法被识别。本轮在单机操作逻辑中全面引入 `primaryDeviceId` 智能降级对齐，彻底消除幽灵任务；
-   - **机组热容量物理衰减模型 (高价值算法优化)**：在真实工况中，停机不会导致机组换热器内部热量或冷量瞬间归零。引入 3x 线性衰减散热模型后，短期停机后重启能准确延续物理热惯性，长期停机后平滑衰减至零。
+   - **变频机组热容量物理散热模型与手动控制强行置零的冲突 (P1 修复)**：在 v1.9.106 引入牛顿冷却连续性衰减模型后，`AppModel` 中 5 处历史遗留的开关机置零逻辑依然强制生效，导致用户手动操作、定时触发或场景应用时机组热容被瞬间粗暴清零。本轮彻底移除该强制置零逻辑，使热饱和度完全受物理衰减曲线接管；
+   - **口语夹心排班正则缺失导致词尾截断 (P0 修复)**：当用户说出“大休、周一至周三加小休”或“工作日加周六至周日和单休”时，由于缺乏夹心排班宏，正则贪婪截断导致末尾核心词被当成正文残留或丢弃。本轮完整补齐夹心三元与四元排班正则引擎；
+   - **原生状态栏与控制中心情景/倒计时离线可达性门禁穿透 (P1 修复)**：状态栏中的情景子菜单与快捷倒计时菜单原先仅判定网关连接，未判定具体目标设备物理在线状态。本轮全面接入 Reachability 门禁并同步控制中心动态透明度。
 
 ---
 
 ## 3. 关键架构变更与代码实现
 
-### 3.1 四元复合宏正则与口语连词排除防断裂
+### 3.1 夹心四元与三元复合宏正则与连词“同”纳管
 - **`VoiceCommandParser.swift`**：
   ```swift
-  // 双连续区间在前 + 双核心词在后
-  private static let dualRangeWithDualKeywordsRegex: NSRegularExpression? = {
-      let r = #"(?:周|星期|礼拜)?([一二三四五六日天])\s*(?:至|到|~|-)\s*(?:周|星期|礼拜)?([一二三四五六日天])"#
-      let kw = #"(?:工作日|平时|平日|双休日|双休|周末三天|周末|休息日|公休日|休假日|放假日|节假日|单休日|单休|大休日|大休|大周|小休日|小休|小周)"#
-      let conj = #"(?:[、，,\s]|和|与|及|加|以及|还有|另外|跟|或者|或|并且|并)+"#
-      let pattern = #"(?:^|[^\w])\#(r)\#(conj)\#(r)\#(conj)\#(kw)\#(conj)\#(kw)\s*(?:每天|天天|每日|每晚|每早|每晨|每夜|日日)?\s*"#
+  // 核心关键词在前、连续区间居中、核心关键词在后夹心复合口语
+  private static let keywordWithRangeAndKeywordRegex: NSRegularExpression? = {
+      let pattern = #"(工作日|平时|平日|双休日|双休|周末三天|周末|休息日|公休日|休假日|放假日|节假日|单休日|单休|大休日|大休|大周|小休日|小休|小周)\s*(?:[、,，和与及跟以及还有或者或加/／\s]+)\s*(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])\s*(?:[、,，和与及跟以及还有或者或加/／\s]+)\s*(工作日|平时|平日|双休日|双休|周末三天|周末|休息日|公休日|休假日|放假日|节假日|单休日|单休|大休日|大休|大周|小休日|小休|小周)"#
       return try? NSRegularExpression(pattern: pattern)
   }()
 
-  // 双核心词在前 + 双连续区间在后
-  private static let dualKeywordsWithDualRangeRegex: NSRegularExpression? = {
-      let r = #"(?:周|星期|礼拜)?([一二三四五六日天])\s*(?:至|到|~|-)\s*(?:周|星期|礼拜)?([一二三四五六日天])"#
-      let kw = #"(?:工作日|平时|平日|双休日|双休|周末三天|周末|休息日|公休日|休假日|放假日|节假日|单休日|单休|大休日|大休|大周|小休日|小休|小周)"#
-      let conj = #"(?:[、，,\s]|和|与|及|加|以及|还有|另外|跟|或者|或|并且|并)+"#
-      let pattern = #"(?:^|[^\w])\#(kw)\#(conj)\#(kw)\#(conj)\#(r)\#(conj)\#(r)\s*(?:每天|天天|每日|每晚|每早|每晨|每夜|日日)?\s*"#
+  // 连续区间在先、双核心关键词居中、连续区间在后
+  private static let rangeWithDualKeywordsAndRangeRegex: NSRegularExpression? = {
+      let pattern = #"(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])\s*(?:[、,，和与及跟以及还有或者或加/／\s]+)\s*(工作日|平时|平日|双休日|双休|周末三天|周末|休息日|公休日|休假日|放假日|节假日|单休日|单休|大休日|大休|大周|小休日|小休|小周)\s*(?:[、,，和与及跟以及还有或者或加/／\s]+)\s*(工作日|平时|平日|双休日|双休|周末三天|周末|休息日|公休日|休假日|放假日|节假日|单休日|单休|大休日|大休|大周|小休日|小休|小周)\s*(?:[、,，和与及跟以及还有或者或加/／\s]+)\s*(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])"#
       return try? NSRegularExpression(pattern: pattern)
   }()
   ```
 
-### 3.2 变频机组换热器热容量连续性物理散热衰减模型
+### 3.2 变频机组热容量物理散热模型自洽化
 - **`AppModel.swift`**：
-  ```swift
-  // 停机/待机：设备换热器热饱和积累随时间遵循物理散热衰减（3倍速线性散热），连续待机一定时间后彻底冷却至零
-  let current = deviceContinuousMinutes[deviceId] ?? 0
-  if current > 0 {
-      deviceContinuousMinutes[deviceId] = max(0, current - elapsedMinutes * 3)
-  }
-  ```
+  移除 `sendAttribute`、`sendAttributeToDevices`、`turnOffDevices`、`applyScene` 与 `triggerAction` 中强制执行的 `deviceContinuousMinutes[deviceId] = 0`，确保机组停机后由 `updateEnergyAnalytics` 中的物理阻尼模型统一接管连续散热。
 
-### 3.3 macOS 状态栏全屋计划调度暂停态全感知与历史空ID兼容
-- **`StatusItemController.swift`**：
+### 3.3 macOS 状态栏与控制中心情景及倒计时门禁加固
+- **`StatusItemController.swift`** / **`MenuBarControlsView.swift`**：
   ```swift
-  // 全屋计划调度全暂停感知
-  let allActions = model.scheduledActions
-  let enabledActions = allActions.filter(\.enabled)
-  if !allActions.isEmpty && enabledActions.isEmpty {
-      tooltipLines.append("⏸ 计划调度: 全屋共 \(allActions.count) 个定时任务已全部暂停生效 (右键菜单可一键恢复)")
-  }
+  let isPrimaryControllable = model.gatewayConnected && (primaryId.map { model.reachability(for: $0).isControllable } ?? false)
+  let hasControllable = model.gatewayConnected && allDevices.contains { model.reachability(for: $0.id).isControllable }
+  
+  // 菜单项 isEnabled 完整受控
+  pItem.isEnabled = isPrimaryControllable
+  applyAllItem.isEnabled = hasControllable
   ```
 
 ---
@@ -84,18 +74,18 @@
 
 1. **自动化单元测试全通**：
    - 执行 `SDKROOT=/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk swift test`：
-   - 包含 `VoiceCommandParserTests`、`ZlibTests` 等在内共 **114 个单元测试 100% 成功通过（0 failures, 0 unexpected）**。
+   - 包含 `VoiceCommandParserTests`、`ZlibTests` 等在内共 **115 个单元测试 100% 成功通过（0 failures, 0 unexpected）**。
 2. **Release 编译构建**：
    - 执行 `SDKROOT=/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk swift build`：
    - 编译顺利通过，零警告零报错。
 3. **应用打包与签名**：
-   - 执行 `./build_app.sh 1.9.106`：
-   - 顺利生成 App 产物 `dist/HaierAC.app` 与发布安装包 `dist/HaierAC-v1.9.106-macOS.zip`（体积 2.9MB，内置桌面小组件扩展与签名，SHA256: `d8e6099a2f6a7c447e94bec833549c255500d14c23432bb0b093db22dc8adccd`）。
+   - 执行 `./build_app.sh 1.9.107`：
+   - 顺利生成 App 产物 `dist/HaierAC.app` 与发布安装包 `dist/HaierAC-v1.9.107-macOS.zip`（体积 2.9MB，内置桌面小组件扩展与签名，SHA256: `e200c905fea5a625e458159ba53f524b3ec56d51b681f2286bd8c8dfb9bfde5f`）。
 
 ---
 
 ## 5. 发版信息与提交记录
-- **Git Commit**：`feat & fix: 闭环双区间双关键词四元调度与口语连词排除防断裂、macOS状态栏全屋调度暂停态全感知与机组热容物理衰减模型 (v1.9.106)`
-- **Git Tag**：`v1.9.106`
-- **Release Asset**：`dist/HaierAC-v1.9.106-macOS.zip`
-- **SHA256**：`d8e6099a2f6a7c447e94bec833549c255500d14c23432bb0b093db22dc8adccd`
+- **Git Commit**：`feat & fix: 闭环口语夹心四元/三元调度与连词纳管、机组热容物理衰减自洽及状态栏情景与倒计时门禁加固 (v1.9.107)`
+- **Git Tag**：`v1.9.107`
+- **Release Asset**：`dist/HaierAC-v1.9.107-macOS.zip`
+- **SHA256**：`e200c905fea5a625e458159ba53f524b3ec56d51b681f2286bd8c8dfb9bfde5f`

@@ -1554,16 +1554,10 @@ final class AppModel: ObservableObject {
             // 静默下发（不走操作反馈 toast，避免批量触发刷屏）
             gatewayHandle?.sendControl(deviceId: action.deviceId, attributes: [action.attrName: value.jsonValue], completion: nil)
 
-            // 本地状态乐观更新与运行机时重置 (v1.9.102 状态即时同步, v1.9.103 开关机自洽)
+            // 本地状态乐观更新 (v1.9.102 状态即时同步, v1.9.107 遵循变频机组热容量物理散热衰减模型)
             if var map = attributes[action.deviceId], let old = map[action.attrName] {
-                let wasOff = (old.boolValue != true)
                 map[action.attrName] = old.updating(value: value)
                 attributes[action.deviceId] = map
-                if action.attrName == "onOffStatus" {
-                    if value.boolValue == false || wasOff {
-                        deviceContinuousMinutes[action.deviceId] = 0
-                    }
-                }
             }
 
             guard let idx = scheduledActions.firstIndex(where: { $0.id == action.id }) else { continue }
@@ -2755,16 +2749,10 @@ final class AppModel: ObservableObject {
             for deviceId in targets where !deviceId.isEmpty {
                 guard reachability(for: deviceId).isControllable else { continue }
                 gatewayHandle?.sendControl(deviceId: deviceId, attributes: [action.attrName: value.jsonValue], completion: nil)
-                // 乐观更新与机时管理 (v1.9.102, v1.9.103)
+                // 乐观更新 (v1.9.102, v1.9.107 遵循变频机组热容量物理散热衰减模型)
                 if var map = attributes[deviceId], let old = map[action.attrName] {
-                    let wasOff = (old.boolValue != true)
                     map[action.attrName] = old.updating(value: value)
                     attributes[deviceId] = map
-                    if action.attrName == "onOffStatus" {
-                        if value.boolValue == false || wasOff {
-                            deviceContinuousMinutes[deviceId] = 0
-                        }
-                    }
                 }
                 controlledDeviceIds.insert(deviceId)
                 sent += 1
@@ -3210,16 +3198,10 @@ final class AppModel: ObservableObject {
                 }
             }
         }
-        // 乐观更新与机时管理 (v1.9.103)
+        // 乐观更新 (v1.9.103, v1.9.107 遵循变频机组热容量物理散热衰减模型)
         if var map = attributes[deviceId], let old = map[name] {
-            let wasOff = (old.boolValue != true)
             map[name] = old.updating(value: value)
             attributes[deviceId] = map
-            if name == "onOffStatus" {
-                if value.boolValue == false || wasOff {
-                    deviceContinuousMinutes[deviceId] = 0
-                }
-            }
         }
 
         // 操作反馈：显示属性中文名（如「情景灯光」）
@@ -3265,14 +3247,8 @@ final class AppModel: ObservableObject {
                 }
             }
             if var map = attributes[deviceId], let old = map[name] {
-                let wasOff = (old.boolValue != true)
                 map[name] = old.updating(value: value)
                 attributes[deviceId] = map
-                if name == "onOffStatus" {
-                    if value.boolValue == false || wasOff {
-                        deviceContinuousMinutes[deviceId] = 0
-                    }
-                }
             }
             sent += 1
         }
@@ -3301,9 +3277,6 @@ final class AppModel: ObservableObject {
             return 0
         }
         let sent = sendAttributeToDevices("onOffStatus", value: .bool(false), deviceIds: controllableOnIds)
-        for id in controllableOnIds {
-            deviceContinuousMinutes[id] = 0
-        }
         let desc = isAll ? "✅ 已关闭全屋 \(sent) 台运行中的空调" : "✅ 已关闭所选 \(sent) 台运行中的空调"
         operationNotice = OperationNotice(text: desc, isError: false)
         return sent

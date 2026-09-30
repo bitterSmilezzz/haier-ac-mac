@@ -6,6 +6,20 @@ A native SwiftUI app to control Haier / Leader (统帅) smart air conditioners o
 
 ## Features
 
+- 🏷 **Interleaved Quad/Ternary Scheduling & Conjunction Hardening, Thermal Mass Continuity Alignment, and Status Bar Scene & Countdown Reachability Gating (v1.9.107)**:
+  - ⏱️ **"Core Keyword & Range Interleaved Quad/Ternary Scheduling, Oral Conjunction '同' Coverage" Spoken Engine (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)**:
+    - **Core Keyword & Continuous Range Interleaved Scheduling Engine**: Introduced `keywordWithRangeAndKeywordRegex` (keyword prefix + continuous range infix + keyword suffix, e.g., "大休、周一至周三加小休每天晚8点开机" `[1, 2, 3, 4, 7]`, "工作日加周六至周日和单休每天晚8点开机" `[1..7]`, "平时加周六至周日和大休每天晚8点开机" `[1..7]`, "双休加周一至周三加小休每天晚8点开机" `[1, 2, 3, 4, 7]`), completely eliminating greedy truncation by prefix range regexes that previously dropped trailing keywords or corrupted subsequent time and action parsing;
+    - **Quad-Compound Alternating Interleaved Topology**: Added `rangeWithDualKeywordsAndRangeRegex` (range prefix + dual keywords infix + range suffix, e.g., "周一至周二、大休和小休加周五至周六每天晚8点开机" `[1, 2, 3, 6, 7]`) and `keywordWithDualRangeAndKeywordRegex` (keyword prefix + dual ranges infix + keyword suffix, e.g., "大休、周一至周二、周四至周五加小休每天晚8点开机" `[1, 2, 3, 5, 6, 7]`), closing the full permutation topology of 4-element schedules;
+    - **Oral Conjunction "同" Exclusion Anti-Breakage**: Expanded `implicitExclusionRepeatRegex` negative lookbehind and `extractExcludedDays` tokenization to include colloquial conjunction `同` (e.g., "除了周末同大休每天早8点开机", "除周末同大休外每天早8点开机"), preventing lookahead truncation and inverse execution;
+    - **100% Unit Test Suite Coverage**: Added `testInterleavedRangeAndKeywordScheduleHardeningV19107` test suite with all 115 unit tests passing with zero defects.
+  - 🔋 **Resolved Manual Switch/Scene/Action Contradiction in HVAC Thermal Mass Dissipation Continuity (`AppModel.swift`)**:
+    - Removed legacy instantaneous zeroing code in `sendAttribute`, `sendAttributeToDevices`, `turnOffDevices`, `applyScene`, and `triggerAction`;
+    - Machine continuous operational thermal soaking now strictly adheres to Newton's Law of Cooling dissipation model (3x linear decay in standby), allowing air conditioners restarted shortly after shutdown or scene switch to preserve residual heat exchanger thermal saturation, while naturally dissipating to zero over prolonged standby (40–60+ minutes);
+  - 🖥️ **macOS Native Status Bar & Control Center Scene Presets and Quick Countdown Reachability Gating (`StatusItemController.swift` / `MenuBarControlsView.swift`)**:
+    - **Status Bar Scene Preset Gating**: Menu bar top-level "一键情景预设" items ("应用至主显设备", "应用至全屋所有空调", and single-device items) now strictly check device Reachability and network status, disabling items when devices are unreachable;
+    - **Quick Countdown Schedule Gating**: "快捷倒计时调度" single-device and whole-house presets now check controllability before enabling, preventing silent no-ops when offline;
+    - **Control Center Bento Scene Grid Dynamic Opacity & Disabling**: Dynamically reflects reachability according to selected scope (Current Unit vs Whole House), smoothly disabling with 0.6 opacity when devices are offline.
+
 - 🏷 **Quad-Compound Cycle Scheduling with Dual Ranges & Dual Keywords, Oral Conjunction Exclusion Hardening, Whole-House Schedule Pause Awareness & HVAC Thermal Mass Dissipation Model (v1.9.106)**:
   - ⏱️ **"Dual-Range & Dual-Keyword Quad-Compound Scheduling, Oral Conjunction Exclusion Anti-Breakage" Natural Spoken Engine (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)**:
     - **Dual Continuous Ranges & Dual Core Keywords Quad-Compound Engine**: Introduced `dualRangeWithDualKeywordsRegex` (dual ranges prefix + dual keywords suffix) and `dualKeywordsWithDualRangeRegex` (dual keywords prefix + dual ranges suffix), completely covering complex spoken schedules such as "周一至周二、周四至周五、大休和小休每天早8点开机" (`[1, 2, 3, 5, 6, 7]`), "大休和小休加周一至周二、周四至周五每天早8点开机" (`[1, 2, 3, 5, 6, 7]`), and "周一到周二、周四到周五加工作日和双休每天早8点开机" (`[1..7]`);
