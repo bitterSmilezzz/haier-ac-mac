@@ -705,11 +705,11 @@ final class AppModel: ObservableObject {
         operationNotice = OperationNotice(text: "🧼 全屋 \(count) 台空调滤网运行计时已全部重置，洁净度恢复 100%", isError: false)
     }
 
-    /// 计算指定设备当前实时工况的滤网空气动力学负荷系数 (v1.9.37)
-    public func calculateCurrentFilterWearFactor(for deviceId: String) -> Double {
+    /// 计算指定设备当前实时工况的滤网空气动力学负荷系数 (v1.9.37, v1.9.98 增加 allowStandbyConfig 支持长期寿命平滑推算)
+    public func calculateCurrentFilterWearFactor(for deviceId: String, allowStandbyConfig: Bool = false) -> Double {
         let attrs = attributes[deviceId] ?? [:]
         let isPowerOn = attrs["onOffStatus"]?.boolValue ?? false
-        if !isPowerOn { return 1.0 }
+        if !isPowerOn && !allowStandbyConfig { return 1.0 }
         let mode = attrs["operationMode"]?.stringValue ?? "0"
         let targetTemp = attrs["targetTemperature"]?.doubleValue ?? 26.0
         let indoorTemp = currentIndoorTemperature(for: deviceId)
@@ -756,7 +756,8 @@ final class AppModel: ObservableObject {
             isHistorical = false
         }
 
-        let wearFactor = calculateCurrentFilterWearFactor(for: deviceId)
+        // 采用空调已配置工况参数计算平滑负荷衰减系数，避免开关机待机瞬态导致剩余天数剧烈抖动跳变 (v1.9.98)
+        let wearFactor = calculateCurrentFilterWearFactor(for: deviceId, allowStandbyConfig: true)
         let effectiveDailyMinutes = dailyMinutes * max(0.5, wearFactor)
         let estDays = max(1, Int(ceil(remainingMinutes / effectiveDailyMinutes)))
         return (estDays, dailyMinutes / 60.0, isHistorical)

@@ -447,6 +447,20 @@ public struct VoiceCommandParser {
         return try? NSRegularExpression(pattern: pattern)
     }()
 
+    /// 匹配通用反相连续星期区间（如“非周一至周三”、“非周一到周四”、“非周二至周六”、“非周五至周日”、“非周一至五”、“非周一~周五”、“非星期一到星期三”等） (v1.9.98)
+    private static let nonRepeatWeekdayRangeRegex: NSRegularExpression? = {
+        let pattern = #"(?:每|逢|每逢)?(?:个)?\s*非\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])"#
+        return try? NSRegularExpression(pattern: pattern)
+    }()
+
+    /// 匹配通用反相离散多星期复合口语（如“非周一和周三”、“非周一周三”、“非周二周四”、“非周一、周三、周五”、“非一三五”、“非二四六”、“非二四”、“非周六周日”等） (v1.9.98)
+    private static let nonRepeatMultiWeekdaysRegex: NSRegularExpression? = {
+        let pattern = #"(?:每|逢|每逢)?(?:个)?\s*非\s*(?:周|星期|礼拜)?([一二三四五六日天1-7](?:\s*(?:[、,，和与及跟以及还有或者或加/／\s]|周|星期|礼拜)?\s*(?:周|星期|礼拜)?[一二三四五六日天1-7])+)"#
+        return try? NSRegularExpression(pattern: pattern)
+    }()
+
+
+
     /// 匹配双连续区间复合口语（如“周一至周三以及周五至周日”、“周一到周三和周五到天”、“周二至周四和周六至周日”） (v1.9.72)
     private static let rangeWithRangeRegex: NSRegularExpression? = {
         let pattern = #"(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])\s*(?:[、,，和与及跟以及还有或者或加/／\s]+)\s*(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])"#
@@ -590,6 +604,72 @@ public struct VoiceCommandParser {
         if remainingTarget.contains("非周六至周日") || remainingTarget.contains("非周六到周日") || remainingTarget.contains("非星期六到星期日") || remainingTarget.contains("非礼拜六到礼拜日") {
             excluded.formUnion([2, 3, 4, 5, 6]) // 排除非周末（即排除工作日），保留周末 [1, 7]
             remainingTarget = remainingTarget.replacingOccurrences(of: "非周六至周日", with: "").replacingOccurrences(of: "非周六到周日", with: "").replacingOccurrences(of: "非星期六到星期日", with: "").replacingOccurrences(of: "非礼拜六到礼拜日", with: "")
+        }
+
+        // 1.45 反相连续周区间在排除句型中嵌套（如“除非周一至周三外每天开机”、“除非周五至周日外每天开机”）(v1.9.98)
+        if let regex = nonRepeatWeekdayRangeRegex {
+            let ns = remainingTarget as NSString
+            let matches = regex.matches(in: remainingTarget, options: [], range: NSRange(location: 0, length: ns.length))
+            for match in matches {
+                if match.numberOfRanges >= 3 {
+                    let sStr = ns.substring(with: match.range(at: 1))
+                    let eStr = ns.substring(with: match.range(at: 2))
+                    if let sChar = sStr.first, let sWd = chineseDayCharToWeekday(sChar),
+                       let eChar = eStr.first, let eWd = chineseDayCharToWeekday(eChar) {
+                        let rangeDays = generateWeeklyRange(start: sWd, end: eWd)
+                        let otherDays = Set([1, 2, 3, 4, 5, 6, 7]).subtracting(rangeDays)
+                        excluded.formUnion(otherDays)
+                    }
+                }
+            }
+            if !matches.isEmpty {
+                remainingTarget = regex.stringByReplacingMatches(in: remainingTarget, options: [], range: NSRange(location: 0, length: ns.length), withTemplate: " ")
+            }
+        }
+
+        // 1.47 排除句型中固定习惯用语优先拦截（如“除非一三五外每天开机”、“除非二四六外每天开机”、“除非周六周日外每天开机”）(v1.9.98)
+        if remainingTarget.contains("非一三五") || remainingTarget.contains("非一、三、五") || remainingTarget.contains("非周一三五") || remainingTarget.contains("非周一、三、五") || remainingTarget.contains("非周一、周三、周五") {
+            let otherDays = Set([1, 2, 3, 4, 5, 6, 7]).subtracting([2, 4, 6])
+            excluded.formUnion(otherDays)
+            remainingTarget = remainingTarget.replacingOccurrences(of: "非周一、周三、周五", with: "").replacingOccurrences(of: "非周一、三、五", with: "").replacingOccurrences(of: "非周一三五", with: "").replacingOccurrences(of: "非一、三、五", with: "").replacingOccurrences(of: "非一三五", with: "")
+        }
+        if remainingTarget.contains("非二四六") || remainingTarget.contains("非二、四、六") || remainingTarget.contains("非周二四六") || remainingTarget.contains("非周二、四、六") || remainingTarget.contains("非周二、周四、周六") {
+            let otherDays = Set([1, 2, 3, 4, 5, 6, 7]).subtracting([3, 5, 7])
+            excluded.formUnion(otherDays)
+            remainingTarget = remainingTarget.replacingOccurrences(of: "非周二、周四、周六", with: "").replacingOccurrences(of: "非周二、四、六", with: "").replacingOccurrences(of: "非周二四六", with: "").replacingOccurrences(of: "非二、四、六", with: "").replacingOccurrences(of: "非二四六", with: "")
+        }
+        if remainingTarget.contains("非二四") || remainingTarget.contains("非二、四") || remainingTarget.contains("非周二四") || remainingTarget.contains("非周二、四") || remainingTarget.contains("非周二、周四") {
+            let otherDays = Set([1, 2, 3, 4, 5, 6, 7]).subtracting([3, 5])
+            excluded.formUnion(otherDays)
+            remainingTarget = remainingTarget.replacingOccurrences(of: "非周二、周四", with: "").replacingOccurrences(of: "非周二、四", with: "").replacingOccurrences(of: "非周二四", with: "").replacingOccurrences(of: "非二、四", with: "").replacingOccurrences(of: "非二四", with: "")
+        }
+        if remainingTarget.contains("非周六周日") || remainingTarget.contains("非周六和周日") || remainingTarget.contains("非周六周天") || remainingTarget.contains("非周六和周天") {
+            excluded.formUnion([2, 3, 4, 5, 6])
+            remainingTarget = remainingTarget.replacingOccurrences(of: "非周六和周日", with: "").replacingOccurrences(of: "非周六周日", with: "").replacingOccurrences(of: "非周六和周天", with: "").replacingOccurrences(of: "非周六周天", with: "")
+        }
+
+        // 1.48 反相离散多星期在排除句型中嵌套（如“除非周一和周三外每天开机”、“除非一三五外每天开机”、“除非周六周日外每天开机”）(v1.9.98)
+        if let regex = nonRepeatMultiWeekdaysRegex {
+            let ns = remainingTarget as NSString
+            let matches = regex.matches(in: remainingTarget, options: [], range: NSRange(location: 0, length: ns.length))
+            for match in matches {
+                if match.numberOfRanges >= 2 {
+                    let multiStr = ns.substring(with: match.range(at: 1))
+                    var multiWds = Set<Int>()
+                    for ch in multiStr {
+                        if let wd = chineseDayCharToWeekday(ch) {
+                            multiWds.insert(wd)
+                        }
+                    }
+                    if multiWds.count >= 2 {
+                        let otherDays = Set([1, 2, 3, 4, 5, 6, 7]).subtracting(multiWds)
+                        excluded.formUnion(otherDays)
+                    }
+                }
+            }
+            if !matches.isEmpty {
+                remainingTarget = regex.stringByReplacingMatches(in: remainingTarget, options: [], range: NSRange(location: 0, length: ns.length), withTemplate: " ")
+            }
         }
 
         // 1.5 非单星期前置拦截（如“非周一”、“非周日”、“非星期三”、“非礼拜五”），排除非该星期的其它所有日子，保留该星期 (v1.9.97)
@@ -1254,6 +1334,62 @@ public struct VoiceCommandParser {
             return ([2, 3, 4, 5, 6], "工作日")
         }
 
+        // 4.-03 通用反相连续星期区间解析（涵盖“非周一至周三”、“非周一到周四”、“非周二至周六”、“非周五至周日”、“非周一至五”、“非周一~周三”、“非周二-周四”等所有反相区间）(v1.9.98)
+        if let regex = nonRepeatWeekdayRangeRegex {
+            if let match = regex.firstMatch(in: text, options: [], range: fullRange),
+               match.numberOfRanges >= 3 {
+                let startStr = nsString.substring(with: match.range(at: 1))
+                let endStr = nsString.substring(with: match.range(at: 2))
+                if let startChar = startStr.first, let startWd = chineseDayCharToWeekday(startChar),
+                   let endChar = endStr.first, let endWd = chineseDayCharToWeekday(endChar) {
+                    let excludedDays = generateWeeklyRange(start: startWd, end: endWd)
+                    let targetDays = Set([1, 2, 3, 4, 5, 6, 7]).subtracting(excludedDays).sorted()
+                    let label = formatRepeatWeekdaysLabel(targetDays) ?? "每天"
+                    return (targetDays, label)
+                }
+            }
+        }
+
+        // 4.-028 反相多星期固定习惯用语优先拦截（防止被后方正相词贪婪截断导致极性颠倒）(v1.9.98)
+        if text.contains("非一三五") || text.contains("非一、三、五") || text.contains("非周一三五") || text.contains("非周一、三、五") || text.contains("非周一、周三、周五") {
+            let targetDays = Set([1, 2, 3, 4, 5, 6, 7]).subtracting([2, 4, 6]).sorted()
+            let label = formatRepeatWeekdaysLabel(targetDays) ?? "每周二、四、六、日"
+            return (targetDays, label)
+        }
+        if text.contains("非二四六") || text.contains("非二、四、六") || text.contains("非周二四六") || text.contains("非周二、四、六") || text.contains("非周二、周四、周六") {
+            let targetDays = Set([1, 2, 3, 4, 5, 6, 7]).subtracting([3, 5, 7]).sorted()
+            let label = formatRepeatWeekdaysLabel(targetDays) ?? "每周一、三、五、日"
+            return (targetDays, label)
+        }
+        if text.contains("非二四") || text.contains("非二、四") || text.contains("非周二四") || text.contains("非周二、四") || text.contains("非周二、周四") {
+            let targetDays = Set([1, 2, 3, 4, 5, 6, 7]).subtracting([3, 5]).sorted()
+            let label = formatRepeatWeekdaysLabel(targetDays) ?? "每周一、三、五、六、日"
+            return (targetDays, label)
+        }
+        if text.contains("非周六周日") || text.contains("非周六和周日") || text.contains("非周六周天") || text.contains("非周六和周天") ||
+           text.contains("非星期六和星期日") || text.contains("非礼拜六和礼拜日") {
+            return ([2, 3, 4, 5, 6], "工作日")
+        }
+
+        // 4.-025 通用反相离散多星期解析（涵盖“非周一和周三”、“非周一周三”、“非周二周四”、“非周一及周五”等）(v1.9.98)
+        if let regex = nonRepeatMultiWeekdaysRegex {
+            if let match = regex.firstMatch(in: text, options: [], range: fullRange),
+               match.numberOfRanges >= 2 {
+                let multiStr = nsString.substring(with: match.range(at: 1))
+                var excludedWds = Set<Int>()
+                for ch in multiStr {
+                    if let wd = chineseDayCharToWeekday(ch) {
+                        excludedWds.insert(wd)
+                    }
+                }
+                if excludedWds.count >= 2 {
+                    let targetDays = Set([1, 2, 3, 4, 5, 6, 7]).subtracting(excludedWds).sorted()
+                    let label = formatRepeatWeekdaysLabel(targetDays) ?? "每天"
+                    return (targetDays, label)
+                }
+            }
+        }
+
         // 4.-02 非单星期反相调度拦截（涵盖“非周一”、“非周日”、“非星期三”、“非礼拜五”、“非周1~7”等）(v1.9.97)
         let nonWeekdayRegex = try? NSRegularExpression(pattern: #"(?:每个?|每周|每逢|逢)?\s*非\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])"#)
         let baseNs = text as NSString
@@ -1801,8 +1937,10 @@ public struct VoiceCommandParser {
            text.contains("非星期一") || text.contains("非星期二") || text.contains("非星期三") || text.contains("非星期四") || text.contains("非星期五") || text.contains("非星期六") || text.contains("非星期日") || text.contains("非星期天") ||
            text.contains("非星期1") || text.contains("非星期2") || text.contains("非星期3") || text.contains("非星期4") || text.contains("非星期5") || text.contains("非星期6") || text.contains("非星期7") ||
            text.contains("非礼拜一") || text.contains("非礼拜二") || text.contains("非礼拜三") || text.contains("非礼拜四") || text.contains("非礼拜五") || text.contains("非礼拜六") || text.contains("非礼拜日") || text.contains("非礼拜天") ||
-           text.contains("非礼拜1") || text.contains("非礼拜2") || text.contains("非礼拜3") || text.contains("非礼拜4") || text.contains("非礼拜5") || text.contains("非礼拜6") || text.contains("非礼拜7") ||
            text.contains("非周一至周五") || text.contains("非周一到周五") || text.contains("非周六至周日") || text.contains("非周六到周日") ||
+           text.contains("非一三五") || text.contains("非二四六") || text.contains("非二四") ||
+           text.contains("非一三五半") || text.contains("非二四六半") || text.contains("非二四半") ||
+           text.contains("非周六周日") || text.contains("非周六和周日") || text.contains("非周六周日半") || text.contains("非周六和周日半") ||
            text.contains("非周一半") || text.contains("非周二半") || text.contains("非周三半") || text.contains("非周四半") || text.contains("非周五半") || text.contains("非周六半") || text.contains("非周日半") || text.contains("非周天半") ||
            text.contains("非星期一半") || text.contains("非星期二半") || text.contains("非星期三半") || text.contains("非星期四半") || text.contains("非星期五半") || text.contains("非星期六半") || text.contains("非星期日半") || text.contains("非星期天半") ||
            text.contains("非礼拜一半") || text.contains("非礼拜二半") || text.contains("非礼拜三半") || text.contains("非礼拜四半") || text.contains("非礼拜五半") || text.contains("非礼拜六半") || text.contains("非礼拜日半") || text.contains("非礼拜天半") ||
@@ -2640,6 +2778,25 @@ public struct VoiceCommandParser {
             str = str.replacingOccurrences(of: "非周\(d)半", with: "非周\(d)8点30分")
             str = str.replacingOccurrences(of: "非星期\(d)半", with: "非星期\(d)8点30分")
             str = str.replacingOccurrences(of: "非礼拜\(d)半", with: "非礼拜\(d)8点30分")
+        }
+        // 反相多星期与周区间半时相归一 (v1.9.98)
+        str = str.replacingOccurrences(of: "非一三五半", with: "非一三五8点30分")
+        str = str.replacingOccurrences(of: "非二四六半", with: "非二四六8点30分")
+        str = str.replacingOccurrences(of: "非二四半", with: "非二四8点30分")
+        str = str.replacingOccurrences(of: "非周六周日半", with: "非周六周日8点30分")
+        str = str.replacingOccurrences(of: "非周六和周日半", with: "非周六和周日8点30分")
+        for d1 in nonDayChars {
+            for d2 in nonDayChars {
+                str = str.replacingOccurrences(of: "非周\(d1)至周\(d2)半", with: "非周\(d1)至周\(d2)8点30分")
+                str = str.replacingOccurrences(of: "非周\(d1)到周\(d2)半", with: "非周\(d1)到周\(d2)8点30分")
+                str = str.replacingOccurrences(of: "非周\(d1)至\(d2)半", with: "非周\(d1)至\(d2)8点30分")
+                str = str.replacingOccurrences(of: "非周\(d1)到\(d2)半", with: "非周\(d1)到\(d2)8点30分")
+                str = str.replacingOccurrences(of: "非周\(d1)和周\(d2)半", with: "非周\(d1)和周\(d2)8点30分")
+                str = str.replacingOccurrences(of: "非周\(d1)周\(d2)半", with: "非周\(d1)周\(d2)8点30分")
+                str = str.replacingOccurrences(of: "非星期\(d1)至星期\(d2)半", with: "非星期\(d1)至星期\(d2)8点30分")
+                str = str.replacingOccurrences(of: "非星期\(d1)到星期\(d2)半", with: "非星期\(d1)到星期\(d2)8点30分")
+                str = str.replacingOccurrences(of: "非星期\(d1)和星期\(d2)半", with: "非星期\(d1)和星期\(d2)8点30分")
+            }
         }
         str = str.replacingOccurrences(of: "逢休息日半", with: "逢休息日8点30分")
         str = str.replacingOccurrences(of: "每逢休息日半", with: "每逢休息日8点30分")

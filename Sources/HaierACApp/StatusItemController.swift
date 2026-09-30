@@ -542,8 +542,8 @@ final class StatusItemController: NSObject {
                 return speeds.count == 1 ? speeds.first : nil
             }()
 
-            let windRunningDesc = !onDevices.isEmpty ? (allOnSameSpeed != nil ? " (\(onDevices.count)台运行中 · 当前\(allOnSameSpeed!))" : " (\(onDevices.count)台运行中 · 档位不同)") : " (当前均未开机)"
-            let canSetWindAll = model.gatewayConnected && !onDevices.isEmpty
+            let windRunningDesc = !onDevices.isEmpty ? (allOnSameSpeed != nil ? " (\(onDevices.count)台运行中 · 当前\(allOnSameSpeed!))" : " (\(onDevices.count)台运行中 · 档位不同)") : " (全屋待机中 · 点击开启风速)"
+            let canSetWindAll = model.gatewayConnected && !controllableDevices.isEmpty
 
             for itemDef in windLevels {
                 let isSelected = (allOnSameSpeed == itemDef.val)
@@ -553,7 +553,12 @@ final class StatusItemController: NSObject {
                 item.representedObject = itemDef.val
                 item.isEnabled = canSetWindAll
                 if onDevices.isEmpty {
-                    item.toolTip = "当前全屋无运行中的空调，请先开启空调后再协同调节风速"
+                    switch itemDef.val {
+                    case "微风": item.toolTip = "一键开启全屋 \(controllableDevices.count) 台空调并设为微风/低速档，出风轻柔静音，适合夜间睡眠与母婴呵护"
+                    case "中风": item.toolTip = "一键开启全屋 \(controllableDevices.count) 台空调并设为中风档，适中循环风量，兼顾体感舒适与均匀气流"
+                    case "强劲": item.toolTip = "一键开启全屋 \(controllableDevices.count) 台空调并设为强劲/高速/暴风档，输出最大通量与强对流循环，快速调节室温"
+                    default: item.toolTip = "一键开启全屋 \(controllableDevices.count) 台空调并设为智能自动风速，由各室内机自适应调节风档"
+                    }
                 } else {
                     switch itemDef.val {
                     case "微风": item.toolTip = "一键将全屋运行中空调统一设为微风/低速档，出风轻柔静音，适合夜间睡眠与母婴呵护\n受控空调：\(runningNames)"
@@ -565,7 +570,7 @@ final class StatusItemController: NSObject {
                 windMenu.addItem(item)
             }
             let windParentItem = NSMenuItem(title: "🍃 全屋风速协同\(windRunningDesc)...", action: nil, keyEquivalent: "")
-            windParentItem.toolTip = onDevices.isEmpty ? "当前全屋无运行中的空调" : "统一同步全屋 \(onDevices.count) 台运行中空调的出风档位（微风/中风/强劲/自动）\n受控设备：\(runningNames)"
+            windParentItem.toolTip = onDevices.isEmpty ? "全屋空调当前均在关机待机状态，选择任一风速档位可一键唤醒并协同设置" : "统一同步全屋 \(onDevices.count) 台运行中空调的出风档位（微风/中风/强劲/自动）\n受控设备：\(runningNames)"
             menu.setSubmenu(windMenu, for: windParentItem)
             menu.addItem(windParentItem)
 
@@ -898,10 +903,9 @@ final class StatusItemController: NSObject {
                     let check = isSelected ? "✓ " : ""
                     let item = NSMenuItem(title: "\(check)\(itemDef.title)", action: #selector(setDeviceWindSpeedFromMenu(_:)), keyEquivalent: "")
                     item.target = self
-                    item.representedObject = ["deviceId": devId, "speed": itemDef.val]
-                    item.isEnabled = isControllable && isPowerOn
+                    item.isEnabled = isControllable
                     if !isPowerOn {
-                        item.toolTip = "「\(dev.name)」当前处于关机待机状态，请先开启电源再调节风速"
+                        item.toolTip = "「\(dev.name)」当前处于关机待机状态，点击可直接唤醒并设为\(itemDef.title)"
                     } else {
                         switch itemDef.val {
                         case "微风": item.toolTip = "将「\(dev.name)」设为微风/低速档，出风轻柔静音，适合夜间睡眠与母婴呵护"
@@ -914,7 +918,7 @@ final class StatusItemController: NSObject {
                 }
                 let windTitle = isPowerOn ? "🍃 调节风速 (当前: \(normCurWind))" : "🍃 调节风速 (待机中)"
                 let devWindParentItem = NSMenuItem(title: windTitle, action: nil, keyEquivalent: "")
-                devWindParentItem.toolTip = isPowerOn ? "调节「\(dev.name)」出风风速（当前: \(normCurWind)）" : "「\(dev.name)」当前处于关机待机状态"
+                devWindParentItem.toolTip = isPowerOn ? "调节「\(dev.name)」出风风速（当前: \(normCurWind)）" : "「\(dev.name)」当前处于关机待机状态，选择风速可直接唤醒"
                 devSubmenu.setSubmenu(devWindMenu, for: devWindParentItem)
                 devSubmenu.addItem(devWindParentItem)
 
@@ -1252,9 +1256,9 @@ final class StatusItemController: NSObject {
                 let item = NSMenuItem(title: "\(check)\(itemDef.title)", action: #selector(setPrimaryWindSpeedFromMenu(_:)), keyEquivalent: "")
                 item.target = self
                 item.representedObject = itemDef.val
-                item.isEnabled = isControllable && isPowerOn
+                item.isEnabled = isControllable
                 if !isPowerOn {
-                    item.toolTip = "「\(dev.name)」当前处于关机待机状态，请先开启电源再调节风速"
+                    item.toolTip = "「\(dev.name)」当前处于关机待机状态，点击可直接唤醒并设为\(itemDef.title)"
                 } else {
                     switch itemDef.val {
                     case "微风": item.toolTip = "将「\(dev.name)」设为微风/低速档，出风轻柔静音，适合夜间睡眠与母婴呵护"
@@ -1267,7 +1271,7 @@ final class StatusItemController: NSObject {
             }
             let singleWindTitle = isPowerOn ? "🍃 调节风速 (当前: \(normCurWind))" : "🍃 调节风速 (待机中)"
             let singleWindItem = NSMenuItem(title: singleWindTitle, action: nil, keyEquivalent: "")
-            singleWindItem.toolTip = isPowerOn ? "调节「\(dev.name)」出风风速（当前: \(normCurWind)）" : "「\(dev.name)」当前处于关机待机状态"
+            singleWindItem.toolTip = isPowerOn ? "调节「\(dev.name)」出风风速（当前: \(normCurWind)）" : "「\(dev.name)」当前处于关机待机状态，选择风速可直接唤醒"
             menu.setSubmenu(singleWindMenu, for: singleWindItem)
             menu.addItem(singleWindItem)
 
@@ -2181,7 +2185,7 @@ final class StatusItemController: NSObject {
         if !onIds.isEmpty {
             _ = model.setWindSpeed(deviceIds: onIds, speedName: speed, autoPowerOn: false)
         } else {
-            _ = model.setWindSpeedAll(speedName: speed, autoPowerOn: false)
+            _ = model.setWindSpeedAll(speedName: speed, autoPowerOn: true)
         }
         refreshTemperature()
     }
@@ -2224,16 +2228,16 @@ final class StatusItemController: NSObject {
         guard let dict = sender.representedObject as? [String: String],
               let devId = dict["deviceId"],
               let speed = dict["speed"] else { return }
-        _ = model.setWindSpeed(deviceIds: [devId], speedName: speed, autoPowerOn: false)
+        _ = model.setWindSpeed(deviceIds: [devId], speedName: speed, autoPowerOn: true)
         refreshTemperature()
     }
 
     @objc private func setPrimaryWindSpeedFromMenu(_ sender: NSMenuItem) {
         guard let speed = sender.representedObject as? String else { return }
         if let primaryId = primaryDeviceId {
-            _ = model.setWindSpeed(deviceIds: [primaryId], speedName: speed, autoPowerOn: false)
+            _ = model.setWindSpeed(deviceIds: [primaryId], speedName: speed, autoPowerOn: true)
         } else {
-            _ = model.setWindSpeedAll(speedName: speed, autoPowerOn: false)
+            _ = model.setWindSpeedAll(speedName: speed, autoPowerOn: true)
         }
         refreshTemperature()
     }

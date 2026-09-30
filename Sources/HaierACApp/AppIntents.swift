@@ -262,7 +262,7 @@ struct SetACWindSpeedIntent: AppIntent {
         }
 
         if let name = deviceName, (name.contains("全") || name.contains("所有")) {
-            let count = model.setWindSpeedAll(speedName: windSpeed, autoPowerOn: false)
+            let count = model.setWindSpeedAll(speedName: windSpeed, autoPowerOn: true)
             guard count > 0 else {
                 throw ACIntentError.message("未能完成全屋风速调节，当前无可用在线空调")
             }
@@ -277,7 +277,7 @@ struct SetACWindSpeedIntent: AppIntent {
             let devName = model.deviceName(for: deviceId)
             throw ACIntentError.message("\(devName)当前离线或不可控")
         }
-        let count = model.setWindSpeed(deviceIds: [deviceId], speedName: windSpeed, autoPowerOn: false)
+        let count = model.setWindSpeed(deviceIds: [deviceId], speedName: windSpeed, autoPowerOn: true)
         guard count > 0 else {
             throw ACIntentError.message("风速「\(windSpeed)」设置失败")
         }
@@ -1158,7 +1158,10 @@ struct ACAppShortcuts: AppShortcutsProvider {
                     phrases: [
                         "用 \(.applicationName) 调节风速",
                         "用 \(.applicationName) 设置风速",
+                        "用 \(.applicationName) 开启微风",
                         "\(.applicationName) 调整风速",
+                        "\(.applicationName) 全屋微风",
+                        "\(.applicationName) 全屋自动风速",
                     ],
                     shortTitle: "调节风速",
                     systemImageName: "wind"
