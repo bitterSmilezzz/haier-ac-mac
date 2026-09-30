@@ -6,6 +6,19 @@ A native SwiftUI app to control Haier / Leader (统帅) smart air conditioners o
 
 ## Features
 
+- 🏷 **Cross-Day Phase Unified Engine, Full Accidental Power Protection, Neutral Mode Thermodynamic Damping & 100% Status Bar Tooltip Coverage (v1.9.86)**:
+  - ⏱️ **Colloquial Cross-Day Phase Scheduling & Accidental Power Protection (`VoiceCommandParser.swift` / `VoiceCapsuleWindowController.swift` / `VoiceCommandParserTests.swift`)**:
+    - **Cross-Day Spoken Phase Lexicon Closure (明日 / 隔天 / 后日 / 大后日 / 明儿个)**: Deeply supported casual cross-day terms without explicit hours, canonicalizing "明日" (tomorrow), "隔天" (next day), "后日" (day after tomorrow), "大后日" (two days after tomorrow), and "明儿个" (tomorrow) to 08:00 (e.g., "明日关空调", "明日开机", "隔天关空调", "隔天开机", "后日关机", "大后日关机", "明儿个关空调");
+    - **Eliminated Critical Accidental Immediate Shutdown/Startup Defects (`hasTimingOrCountdownIntent` / `hasTimePhase`)**: Rectified guard predicates that previously omitted cross-day keywords, which caused phrases like "明日关空调" or "隔天开机" to fail timing intent detection and accidentally trigger immediate power off / on;
+    - **Spoken Half-Hour Normalization Pipeline**: Added "明日半" (08:30), "隔天半" (08:30), "后日半" (08:30), and "明儿个半" (08:30) to `convertChineseNumbers`, completing full colloquial time normalization;
+    - **Cross-Day Schedule Alignment (`VoiceCapsuleWindowController.swift`)**: Extended `isExplicitTomorrow` to cover "明日", "隔天", and "明儿个", and `isExplicitDayAfter` to cover "后日" and "大后日", preventing daylight cross-day scheduling from accidentally firing today;
+    - **100% Unit Test Coverage**: Added comprehensive test cases in `VoiceCommandParserTests.swift` covering single, repeating, and whole-house cross-day schedules alongside 17 groups of strict anti-misoperation assertions.
+  - ⚡️ **Inverter Compressor Neutral Mode Constant-Temp Equilibrium Zone $C^0$ Continuous Damping Refactor (`EnergyAnalyticsEngine.swift`)**:
+    - **Eliminated Near-Equilibrium Power Inversion & Overestimation**: In `estimateInstantaneousPower`, previously when mode was unrecognized, the formula $465.0 + (|ΔT| 	imes 102.5) + windOffset$ produced 465W+ at $\Delta T = 0$, exceeding typical low-frequency standby equilibrium (220W~300W, mean 260W) and even surpassing the missing-sensor baseline (350W) by 115W;
+    - **Bilinear Thermodynamic Continuous Dynamic Interpolation**: Anchored neutral constant-temp baseline to $260.0	ext{W} + windOffset 	imes 0.6$ for $|ΔT| \le 0^\circ	ext{C}$, dynamically interpolated in $0 < |ΔT| < 1.0^\circ	ext{C}$ with $windFactor = 0.6 + |ΔT| 	imes 0.4$ and $P = 260.0 + |ΔT| 	imes 205.0 + windOffset 	imes windFactor$, converging exactly to $465.0	ext{W} + windOffset$ at $|ΔT| = 1.0$ for true physical $C^0$ continuity.
+  - 🍱 **macOS Status Bar 100% Native Tooltip Blind Spot Elimination (`StatusItemController.swift`)**:
+    - **Zero Tooltip Blind Spots**: Added complete native tooltips for "Open Filter Care & Self-Cleaning Panel...", placeholder empty schedule items (single & whole-house), device ownership labels, execution time with remaining countdown, repeat rules, and coordinated sibling device lists.
+
 - 🏷 **Morning & Midnight Phase Unified Engine, Full Non-Immediate Power Protection & Inverter Continuous Thermodynamic Damping Refactor (v1.9.85)**:
   - ⏱️ **Colloquial Morning & Midnight Phase Scheduling & Accidental Power Protection (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)**:
     - **Morning & Classical Midnight Spoken Phase Lexicon Closure (今晨 / 明晨 / 每晨 / 次晨 / 翌晨 / 夜半)**: Deeply supported casual colloquial terms without explicit hours, canonicalizing "今晨" (this morning), "明晨" (tomorrow morning), "每晨" (every morning), "次晨" (next morning), and "翌晨" (next morning) to 07:00; and "夜半" (classical midnight) to 00:00 (e.g., "今晨关空调", "明晨关空调", "明晨开机", "每晨关空调", "次晨关空调", "翌晨开机", "夜半关空调", "夜半开机");

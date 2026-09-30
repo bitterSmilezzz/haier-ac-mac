@@ -3180,6 +3180,55 @@ final class VoiceCommandParserTests: XCTestCase {
         let pAllMidnightOff = VoiceCommandParser.parse("全屋夜半关空调")
         XCTAssertEqual(pAllMidnightOff?.command, .schedulePower(hour: 0, minute: 0, power: false))
 
+        // v1.9.86 跨天口语词群大一统纳管 (明日/隔天/后日/大后日/明儿个)
+        let pTomorrowDayOff = VoiceCommandParser.parse("明日关空调")
+        XCTAssertEqual(pTomorrowDayOff?.command, .schedulePower(hour: 8, minute: 0, power: false))
+
+        let pTomorrowDayOn = VoiceCommandParser.parse("明日开机")
+        XCTAssertEqual(pTomorrowDayOn?.command, .schedulePower(hour: 8, minute: 0, power: true))
+
+        let pTomorrowDayHalf = VoiceCommandParser.parse("明日半关机")
+        XCTAssertEqual(pTomorrowDayHalf?.command, .schedulePower(hour: 8, minute: 30, power: false))
+
+        let pTomorrowDay7Off = VoiceCommandParser.parse("明日7点关空调")
+        XCTAssertEqual(pTomorrowDay7Off?.command, .schedulePower(hour: 7, minute: 0, power: false))
+
+        let pNextDayOff = VoiceCommandParser.parse("隔天关空调")
+        XCTAssertEqual(pNextDayOff?.command, .schedulePower(hour: 8, minute: 0, power: false))
+
+        let pNextDayOn = VoiceCommandParser.parse("隔天开机")
+        XCTAssertEqual(pNextDayOn?.command, .schedulePower(hour: 8, minute: 0, power: true))
+
+        let pNextDayHalf = VoiceCommandParser.parse("隔天半开机")
+        XCTAssertEqual(pNextDayHalf?.command, .schedulePower(hour: 8, minute: 30, power: true))
+
+        let pDayAfterOff = VoiceCommandParser.parse("后日关空调")
+        XCTAssertEqual(pDayAfterOff?.command, .schedulePower(hour: 8, minute: 0, power: false))
+
+        let pDayAfterOn = VoiceCommandParser.parse("后日开机")
+        XCTAssertEqual(pDayAfterOn?.command, .schedulePower(hour: 8, minute: 0, power: true))
+
+        let pDayAfterHalf = VoiceCommandParser.parse("后日半关机")
+        XCTAssertEqual(pDayAfterHalf?.command, .schedulePower(hour: 8, minute: 30, power: false))
+
+        let pGreatDayAfterOff = VoiceCommandParser.parse("大后日关机")
+        XCTAssertEqual(pGreatDayAfterOff?.command, .schedulePower(hour: 8, minute: 0, power: false))
+
+        let pMingErGeOff = VoiceCommandParser.parse("明儿个关机")
+        XCTAssertEqual(pMingErGeOff?.command, .schedulePower(hour: 8, minute: 0, power: false))
+
+        let pMingErGeHalf = VoiceCommandParser.parse("明儿个半开机")
+        XCTAssertEqual(pMingErGeHalf?.command, .schedulePower(hour: 8, minute: 30, power: true))
+
+        let pAllTomorrowDayOff = VoiceCommandParser.parse("全屋明日关空调")
+        XCTAssertEqual(pAllTomorrowDayOff?.command, .schedulePower(hour: 8, minute: 0, power: false))
+
+        let pAllNextDayOff = VoiceCommandParser.parse("全屋隔天关空调")
+        XCTAssertEqual(pAllNextDayOff?.command, .schedulePower(hour: 8, minute: 0, power: false))
+
+        let pAllDayAfterOff = VoiceCommandParser.parse("全屋后日关空调")
+        XCTAssertEqual(pAllDayAfterOff?.command, .schedulePower(hour: 8, minute: 0, power: false))
+
         // 4. 严苛防即时开关机误触验证（绝对禁止被误判为 setPower / turnOffAll / turnOnAll）
         XCTAssertNotEqual(VoiceCommandParser.parse("明早关空调")?.command, .setPower(false))
         XCTAssertNotEqual(VoiceCommandParser.parse("明早关空调")?.command, .turnOffAll)
@@ -3254,6 +3303,25 @@ final class VoiceCommandParserTests: XCTestCase {
         XCTAssertNotEqual(VoiceCommandParser.parse("天亮开机")?.command, .setPower(true))
         XCTAssertNotEqual(VoiceCommandParser.parse("天黑关空调")?.command, .setPower(false))
         XCTAssertNotEqual(VoiceCommandParser.parse("天黑关空调")?.command, .turnOffAll)
+
+        // v1.9.86 跨天口语词群严苛防即时误触断言
+        XCTAssertNotEqual(VoiceCommandParser.parse("明日关空调")?.command, .setPower(false))
+        XCTAssertNotEqual(VoiceCommandParser.parse("明日关空调")?.command, .turnOffAll)
+        XCTAssertNotEqual(VoiceCommandParser.parse("全屋明日关空调")?.command, .turnOffAll)
+        XCTAssertNotEqual(VoiceCommandParser.parse("明日开机")?.command, .setPower(true))
+        XCTAssertNotEqual(VoiceCommandParser.parse("明日开机")?.command, .turnOnAll)
+        XCTAssertNotEqual(VoiceCommandParser.parse("隔天关空调")?.command, .setPower(false))
+        XCTAssertNotEqual(VoiceCommandParser.parse("隔天关机")?.command, .turnOffAll)
+        XCTAssertNotEqual(VoiceCommandParser.parse("全屋隔天关空调")?.command, .turnOffAll)
+        XCTAssertNotEqual(VoiceCommandParser.parse("隔天开机")?.command, .setPower(true))
+        XCTAssertNotEqual(VoiceCommandParser.parse("后日关空调")?.command, .setPower(false))
+        XCTAssertNotEqual(VoiceCommandParser.parse("后日关机")?.command, .turnOffAll)
+        XCTAssertNotEqual(VoiceCommandParser.parse("全屋后日关空调")?.command, .turnOffAll)
+        XCTAssertNotEqual(VoiceCommandParser.parse("后日开机")?.command, .setPower(true))
+        XCTAssertNotEqual(VoiceCommandParser.parse("大后日关机")?.command, .setPower(false))
+        XCTAssertNotEqual(VoiceCommandParser.parse("大后日关机")?.command, .turnOffAll)
+        XCTAssertNotEqual(VoiceCommandParser.parse("明儿个关机")?.command, .setPower(false))
+        XCTAssertNotEqual(VoiceCommandParser.parse("明儿个关机")?.command, .turnOffAll)
     }
 
     // MARK: - 无效输入测试

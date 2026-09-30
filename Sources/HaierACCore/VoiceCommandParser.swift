@@ -1360,7 +1360,9 @@ public struct VoiceCommandParser {
                            normalized.contains("白天") || normalized.contains("日间") || normalized.contains("白昼") ||
                            normalized.contains("明天") || normalized.contains("后天") || normalized.contains("大后天") ||
                            normalized.contains("次日") || normalized.contains("隔日") || normalized.contains("翌日") ||
-                           normalized.contains("明儿")
+                           normalized.contains("明儿") ||
+                           normalized.contains("明日") || normalized.contains("隔天") || normalized.contains("后日") ||
+                           normalized.contains("大后日") || normalized.contains("明儿个")
         guard (normalized.contains("点") || normalized.contains("时") || normalized.contains(":") || hasTimePhase) && !normalized.contains("小时") else {
             return nil
         }
@@ -1518,7 +1520,8 @@ public struct VoiceCommandParser {
                 minute = 0
             } else if normalized.contains("明天") || normalized.contains("后天") || normalized.contains("大后天") ||
                        normalized.contains("次日") || normalized.contains("隔日") || normalized.contains("翌日") ||
-                       normalized.contains("明儿") {
+                       normalized.contains("明儿") || normalized.contains("明日") || normalized.contains("隔天") ||
+                       normalized.contains("后日") || normalized.contains("大后日") || normalized.contains("明儿个") {
                 hour = 8
                 minute = 0
             }
@@ -1540,7 +1543,7 @@ public struct VoiceCommandParser {
             }
         }
 
-        // 5. 钟点时段与时态校准 (v1.9.48 彻底根除午夜/零点误为正午及中午11点误为深夜23点缺陷, v1.9.55 规范半夜/午夜9~11点深宵时区, v1.9.76 规范深宵/夜里/凌晨, v1.9.77 闭环深宵/子夜/通宵/正午全时相消歧与无钟点独立时相调度引擎, v1.9.84 闭环今夜/明夜/每夜/整夜/彻夜/后夜/隔夜大一统时区校准, v1.9.85 闭环晨间与夜半时相)
+        // 5. 钟点时段与时态校准 (v1.9.48 彻底根除午夜/零点误为正午及中午11点误为深夜23点缺陷, v1.9.55 规范半夜/午夜9~11点深宵时区, v1.9.76 规范深宵/夜里/凌晨, v1.9.77 闭环深宵/子夜/通宵/正午全时相消歧与无钟点独立时相调度引擎, v1.9.84 闭环今夜/明夜/每夜/整夜/彻夜/后夜/隔夜大一统时区校准, v1.9.85 闭环晨间与夜半时相, v1.9.86 闭环明日/隔天/后日跨天口语)
         if finalHour == 12 {
             if isNightMidnight {
                 // “晚上12点”、“半夜12点”、“午夜12点”、“凌晨12点”、“深夜12点”、“深宵12点”、“子夜12点”、“今夜12点”、“夜半12点”均代表午夜 00:00
@@ -1643,7 +1646,7 @@ public struct VoiceCommandParser {
         targetRoomKeywords.contains(where: { text.contains($0) })
     }
 
-    /// 判断口令是否包含定时、倒计时或延迟执行时间语义，杜绝误触发即时开关机 (v1.9.50, v1.9.56, v1.9.57, v1.9.59, v1.9.60, v1.9.79, v1.9.80, v1.9.81, v1.9.84, v1.9.85 广义时相全防线)
+    /// 判断口令是否包含定时、倒计时或延迟执行时间语义，杜绝误触发即时开关机 (v1.9.50, v1.9.56, v1.9.57, v1.9.59, v1.9.60, v1.9.79, v1.9.80, v1.9.81, v1.9.84, v1.9.85, v1.9.86 跨天全景口语时相全防线)
     private static func hasTimingOrCountdownIntent(_ text: String) -> Bool {
         if text.contains("后") || text.contains("倒计时") || text.contains("定时") || text.contains("预约") ||
            text.contains("延迟") || text.contains("延后") || text.contains("稍后") ||
@@ -1669,6 +1672,7 @@ public struct VoiceCommandParser {
            text.contains("白天") || text.contains("日间") || text.contains("白昼") ||
            text.contains("明天") || text.contains("后天") || text.contains("大后天") || text.contains("次日") ||
            text.contains("隔日") || text.contains("翌日") || text.contains("明儿") ||
+           text.contains("明日") || text.contains("隔天") || text.contains("后日") || text.contains("大后日") || text.contains("明儿个") ||
            (text.contains("暂停") && (text.contains("定时") || text.contains("倒计时") || text.contains("计划") || text.contains("调度"))) ||
            (text.contains("恢复") && (text.contains("定时") || text.contains("倒计时") || text.contains("计划") || text.contains("调度"))) {
             return true
@@ -2295,6 +2299,10 @@ public struct VoiceCommandParser {
         str = str.replacingOccurrences(of: "后夜半", with: "后夜2点30分")
         str = str.replacingOccurrences(of: "隔日半", with: "隔日8点30分")
         str = str.replacingOccurrences(of: "翌日半", with: "翌日8点30分")
+        str = str.replacingOccurrences(of: "明日半", with: "明日8点30分")
+        str = str.replacingOccurrences(of: "隔天半", with: "隔天8点30分")
+        str = str.replacingOccurrences(of: "后日半", with: "后日8点30分")
+        str = str.replacingOccurrences(of: "明儿个半", with: "明儿个8点30分")
         str = str.replacingOccurrences(of: "今晨半", with: "今晨7点30分")
         str = str.replacingOccurrences(of: "明晨半", with: "明晨7点30分")
         str = str.replacingOccurrences(of: "每晨半", with: "每晨7点30分")

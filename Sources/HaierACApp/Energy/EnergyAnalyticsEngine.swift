@@ -302,15 +302,26 @@ public final class EnergyAnalyticsEngine: ObservableObject {
             return 1.5 // 待机微功耗 1.5W
         }
 
-        // 未识别模式采用物理中性功率估算策略（冷热综合无偏估计）：
-        // 1. 若室内温度与设定温度均有效，采用制冷动力曲线（380W + 95W/°C）与制热动力曲线（550W + 110W/°C）在温差绝对值 |ΔT| 下的均值基准：
-        //    P = ((380 + 550) / 2) + (|indoor - target| * ((95 + 110) / 2)) + windOffset = 465.0 + |ΔT| * 102.5 + windOffset
-        //    clamp 限制在 [200.0, 1550.0] W 区间，实现对称且客观的中性功率估算，避免系统性偏向制冷低估或制热高估；
+        // 未识别模式采用物理中性功率估算策略（冷热综合无偏估计 + 恒温维持态平滑热阻尼模型，v1.9.86）：
+        // 1. 若室内温度与设定温度均有效，采用制冷动力曲线与制热动力曲线在温差绝对值 |ΔT| 下的双向无偏中性基准：
+        //    - 恒温稳态区 (|ΔT| <= 0.0°C)：制冷(220W)与制热(300W)平衡态无偏均值基准 260.0W + (windOffset * 0.6)；
+        //    - 接近平衡区 (0.0 < |ΔT| < 1.0°C)：平滑阻尼动态插值过渡至 465.0W (windFactor = 0.6 + |ΔT|*0.4, P = 260.0 + |ΔT|*205.0 + windOffset*windFactor)；
+        //    - 变频重载区 (|ΔT| >= 1.0°C)：465.0 + ((|ΔT| - 1.0) * 102.5) + windOffset；
+        //    实现严格 C^0 级平滑连续，彻底消除恒温态估算高达 465W+ 导致的能耗倒挂与虚标；
+        //    clamp 限制在 [200.0, 1550.0] W 区间；
         // 2. 若温度字段缺失（室内或设定温度为 nil），则采用 1.5 匹直流变频压缩机典型低频维持中性基准功率 (350W + windOffset，clamp [180.0, 600.0] W)，避免盲目套用大温差曲线导致功率虚标。
         guard let mode = ACModeCode.match(from: modeCode) else {
             if let indoor = indoorTemp, let target = targetTemp {
                 let delta = abs(indoor - target)
-                let neutralPower = 465.0 + (delta * 102.5) + windOffset
+                let neutralPower: Double
+                if delta <= 0.0 {
+                    neutralPower = 260.0 + (windOffset * 0.6)
+                } else if delta < 1.0 {
+                    let windFactor = 0.6 + (delta * 0.4)
+                    neutralPower = 260.0 + (delta * 205.0) + (windOffset * windFactor)
+                } else {
+                    neutralPower = 465.0 + ((delta - 1.0) * 102.5) + windOffset
+                }
                 return min(max(neutralPower, 200.0), 1550.0)
             } else {
                 let neutralPower = 350.0 + windOffset

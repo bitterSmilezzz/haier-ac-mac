@@ -896,6 +896,7 @@ final class StatusItemController: NSObject {
                 } else {
                     let emptyItem = NSMenuItem(title: "当前无生效中的计划任务", action: nil, keyEquivalent: "")
                     emptyItem.isEnabled = false
+                    emptyItem.toolTip = "「\(dev.name)」名下当前暂无正在生效或暂停的计划调度任务"
                     devScheduleMenu.addItem(emptyItem)
                 }
 
@@ -1268,6 +1269,7 @@ final class StatusItemController: NSObject {
 
         let openCareItem = NSMenuItem(title: "打开滤网保养与自清洁面板...", action: #selector(openFilterCare), keyEquivalent: "")
         openCareItem.target = self
+        openCareItem.toolTip = "打开空调滤网健康监测与 56°C 蒸发器高温除菌自清洁保养管理面板"
         filterMenu.addItem(openCareItem)
 
         if allDevices.count > 1 {
@@ -1440,6 +1442,7 @@ final class StatusItemController: NSObject {
         } else {
             let noScheduleInfo = NSMenuItem(title: "当前无生效中的计划任务", action: nil, keyEquivalent: "")
             noScheduleInfo.isEnabled = false
+            noScheduleInfo.toolTip = "当前全屋各空调均无正在生效或暂停的计划调度与倒计时任务"
             scheduleMenu.addItem(noScheduleInfo)
 
             let scheduleParentItem = NSMenuItem(title: "⏱ 计划调度 (无生效任务)...", action: nil, keyEquivalent: "")
@@ -1804,6 +1807,7 @@ final class StatusItemController: NSObject {
         if let devName = showDevName, !devName.isEmpty {
             let devInfoItem = NSMenuItem(title: "空调设备: \(devName)", action: nil, keyEquivalent: "")
             devInfoItem.isEnabled = false
+            devInfoItem.toolTip = "此项计划调度任务归属的空调设备名称"
             singleMenu.addItem(devInfoItem)
         }
 
@@ -1811,11 +1815,13 @@ final class StatusItemController: NSObject {
         let remInfo = action.enabled ? " (\(Self.formatRemainingTime(fireDate: action.fireDate)))" : ""
         let timeInfo = NSMenuItem(title: "下次执行: \(fullTimeStr)\(remInfo)", action: nil, keyEquivalent: "")
         timeInfo.isEnabled = false
+        timeInfo.toolTip = action.enabled ? "该任务下次预定触发的精准系统时间（含倒计时剩余时段）" : "该任务已被暂停，恢复启用后将按此设定时间触发"
         singleMenu.addItem(timeInfo)
 
         if let rep = action.repeatLabel {
             let repInfo = NSMenuItem(title: "周期重复: \(rep)", action: nil, keyEquivalent: "")
             repInfo.isEnabled = false
+            repInfo.toolTip = "该任务的周期循环触发规则（如：\(rep)）"
             singleMenu.addItem(repInfo)
         }
         singleMenu.addItem(.separator())
@@ -1843,6 +1849,7 @@ final class StatusItemController: NSObject {
             let devListStr = siblingDevNames.isEmpty ? "\(siblingActions.count) 台设备" : siblingDevNames.joined(separator: "、")
             let infoItem = NSMenuItem(title: "👥 协同设备: \(devListStr)", action: nil, keyEquivalent: "")
             infoItem.isEnabled = false
+            infoItem.toolTip = "此批同频协同联动的全屋空调列表：\(devListStr)"
             singleMenu.addItem(infoItem)
 
             let anySiblingEnabled = siblingActions.contains(where: \.enabled)
