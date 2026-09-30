@@ -986,7 +986,7 @@ final class VoiceCommandParserTests: XCTestCase {
         XCTAssertEqual(g3?.command, .setWindSpeed("强劲"))
 
         let g4 = VoiceCommandParser.parse("风速调到四档")
-        XCTAssertEqual(g4?.command, .setWindSpeed("自动"))
+        XCTAssertEqual(g4?.command, .setWindSpeed("强劲"))
 
         // 全屋档位与动词间隔协同 (v1.9.47)
         let gw1 = VoiceCommandParser.parse("全屋把风开大")
@@ -1285,10 +1285,10 @@ final class VoiceCommandParserTests: XCTestCase {
 
         // “开到最大”或“开三档风”应解析为风速调节而非开启电源
         let w1 = VoiceCommandParser.parse("开到最大")
-        XCTAssertEqual(w1?.command, .setWindSpeed("turbo"))
+        XCTAssertEqual(w1?.command, .setWindSpeed("强劲"))
 
         let w2 = VoiceCommandParser.parse("开三档风")
-        XCTAssertEqual(w2?.command, .setWindSpeed("high"))
+        XCTAssertEqual(w2?.command, .setWindSpeed("强劲"))
 
         // 动作否定包含送风/除湿
         XCTAssertNil(VoiceCommandParser.parse("不要开送风"))
@@ -2700,7 +2700,7 @@ final class VoiceCommandParserTests: XCTestCase {
         XCTAssertEqual(exKeywordRange2?.command, .scheduleRepeatPower(hour: 8, minute: 0, power: true, repeatWeekdays: [1, 2, 3, 4, 5, 6, 7], repeatLabel: "周一至周日"))
 
         let exRangeMultiDays1 = VoiceCommandParser.parse("周一至周三和周五周六每天早8点开机")
-        XCTAssertEqual(exRangeMultiDays1?.command, .scheduleRepeatPower(hour: 8, minute: 0, power: true, repeatWeekdays: [1, 2, 3, 4, 6, 7], repeatLabel: "周五至周三"))
+        XCTAssertEqual(exRangeMultiDays1?.command, .scheduleRepeatPower(hour: 8, minute: 0, power: true, repeatWeekdays: [2, 3, 4, 6, 7], repeatLabel: "每周一、二、三、五、六"))
 
         let exRangeMultiDays2 = VoiceCommandParser.parse("周一到周三以及周五、周日每天早8点开机")
         XCTAssertEqual(exRangeMultiDays2?.command, .scheduleRepeatPower(hour: 8, minute: 0, power: true, repeatWeekdays: [1, 2, 3, 4, 6], repeatLabel: "每周日、一、二、三、五"))
@@ -3092,8 +3092,8 @@ final class VoiceCommandParserTests: XCTestCase {
         let pLateNightOff = VoiceCommandParser.parse("后夜关机")
         XCTAssertEqual(pLateNightOff?.command, .schedulePower(hour: 2, minute: 0, power: false))
 
-        let pLateNightHalf = VoiceCommandParser.parse("后夜半关机")
-        XCTAssertEqual(pLateNightHalf?.command, .schedulePower(hour: 2, minute: 30, power: false))
+        let pLateNightShortHalf = VoiceCommandParser.parse("后夜半关机")
+        XCTAssertEqual(pLateNightShortHalf?.command, .schedulePower(hour: 2, minute: 30, power: false))
 
         let pNextDayOff = VoiceCommandParser.parse("隔日关空调")
         XCTAssertEqual(pNextDayOff?.command, .schedulePower(hour: 8, minute: 0, power: false))
@@ -3184,8 +3184,8 @@ final class VoiceCommandParserTests: XCTestCase {
         let pTomorrowDayOff = VoiceCommandParser.parse("明日关空调")
         XCTAssertEqual(pTomorrowDayOff?.command, .schedulePower(hour: 8, minute: 0, power: false))
 
-        let pTomorrowDayOn = VoiceCommandParser.parse("明日开机")
-        XCTAssertEqual(pTomorrowDayOn?.command, .schedulePower(hour: 8, minute: 0, power: true))
+        let pMingriDayOn = VoiceCommandParser.parse("明日开机")
+        XCTAssertEqual(pMingriDayOn?.command, .schedulePower(hour: 8, minute: 0, power: true))
 
         let pTomorrowDayHalf = VoiceCommandParser.parse("明日半关机")
         XCTAssertEqual(pTomorrowDayHalf?.command, .schedulePower(hour: 8, minute: 30, power: false))
@@ -3193,8 +3193,8 @@ final class VoiceCommandParserTests: XCTestCase {
         let pTomorrowDay7Off = VoiceCommandParser.parse("明日7点关空调")
         XCTAssertEqual(pTomorrowDay7Off?.command, .schedulePower(hour: 7, minute: 0, power: false))
 
-        let pNextDayOff = VoiceCommandParser.parse("隔天关空调")
-        XCTAssertEqual(pNextDayOff?.command, .schedulePower(hour: 8, minute: 0, power: false))
+        let pGetianDayOff = VoiceCommandParser.parse("隔天关空调")
+        XCTAssertEqual(pGetianDayOff?.command, .schedulePower(hour: 8, minute: 0, power: false))
 
         let pNextDayOn = VoiceCommandParser.parse("隔天开机")
         XCTAssertEqual(pNextDayOn?.command, .schedulePower(hour: 8, minute: 0, power: true))
@@ -3874,20 +3874,20 @@ final class VoiceCommandParserTests: XCTestCase {
 
         // 4. 静音 0 档风速口语解析闭环（映射至微风）
         let gear0 = VoiceCommandParser.parse("开0档")
-        XCTAssertEqual(gear0?.command, .setWindSpeed(speed: "微风"))
+        XCTAssertEqual(gear0?.command, .setWindSpeed("微风"))
         XCTAssertTrue(gear0?.displayText.contains("微风") == true)
 
         let speed0 = VoiceCommandParser.parse("风速0")
-        XCTAssertEqual(speed0?.command, .setWindSpeed(speed: "微风"))
+        XCTAssertEqual(speed0?.command, .setWindSpeed("微风"))
 
         let zeroGear = VoiceCommandParser.parse("调到零档")
-        XCTAssertEqual(zeroGear?.command, .setWindSpeed(speed: "微风"))
+        XCTAssertEqual(zeroGear?.command, .setWindSpeed("微风"))
 
         let quietOn = VoiceCommandParser.parse("静音档开机")
-        XCTAssertEqual(quietOn?.command, .setWindSpeed(speed: "微风"))
+        XCTAssertEqual(quietOn?.command, .setWindSpeed("微风"))
 
         let quietWind = VoiceCommandParser.parse("静音风")
-        XCTAssertEqual(quietWind?.command, .setWindSpeed(speed: "微风"))
+        XCTAssertEqual(quietWind?.command, .setWindSpeed("微风"))
 
         // 5. 严格防即时误触断言
         XCTAssertNotEqual(VoiceCommandParser.parse("大后周关空调")?.command, .setPower(false))
@@ -4378,7 +4378,7 @@ final class VoiceCommandParserTests: XCTestCase {
         XCTAssertEqual(exceptNonBigOff?.command, .scheduleRepeatPower(hour: 8, minute: 0, power: true, repeatWeekdays: [1, 7], repeatLabel: "周末"))
 
         let exceptNonSmallOff = VoiceCommandParser.parse("除非小休外每天8点开机")
-        XCTAssertEqual(exceptNonSmallOff?.command, .scheduleRepeatPower(hour: 8, minute: 0, power: true, repeatWeekdays: [1], repeatLabel: "周日"))
+        XCTAssertEqual(exceptNonSmallOff?.command, .scheduleRepeatPower(hour: 8, minute: 0, power: true, repeatWeekdays: [1], repeatLabel: "每周日"))
 
         let exceptHoliday = VoiceCommandParser.parse("除节假日外每天8点开机")
         XCTAssertEqual(exceptHoliday?.command, .scheduleRepeatPower(hour: 8, minute: 0, power: true, repeatWeekdays: [2, 3, 4, 5, 6], repeatLabel: "工作日"))

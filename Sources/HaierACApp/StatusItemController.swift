@@ -1401,6 +1401,74 @@ final class StatusItemController: NSObject {
         openItem.toolTip = "打开海尔空调控制主界面，查看多设备卡片、环境感知、能耗洞察与智能睡眠"
         menu.addItem(openItem)
 
+        // 一键情景预设快捷菜单 (v1.9.100)
+        let scenes = model.scenes
+        if !scenes.isEmpty {
+            let scenesMenu = NSMenu()
+            scenesMenu.autoenablesItems = false
+            for scene in scenes {
+                let actionDesc = scene.actions.map(\.attrDesc).joined(separator: " · ")
+                let sceneGlyph: String = {
+                    switch scene.name {
+                    case "睡眠": return "🌙"
+                    case "离家": return "🚪"
+                    case "回家": return "🏠"
+                    default: return "✨"
+                    }
+                }()
+
+                if allDevices.count > 1 {
+                    let sceneSubmenu = NSMenu()
+                    sceneSubmenu.autoenablesItems = false
+
+                    let primaryDev = model.allUnifiedDevices.first(where: { $0.id == primaryDeviceId }) ?? model.allUnifiedDevices.first
+                    let primaryName = primaryDev?.name ?? "主显设备"
+
+                    let applyPrimaryItem = NSMenuItem(
+                        title: "应用至「\(primaryName)」",
+                        action: #selector(applySceneToPrimaryFromMenu(_:)),
+                        keyEquivalent: ""
+                    )
+                    applyPrimaryItem.target = self
+                    applyPrimaryItem.representedObject = scene.id.uuidString
+                    applyPrimaryItem.isEnabled = model.gatewayConnected
+                    applyPrimaryItem.toolTip = "将「\(scene.name)」情景动作（\(actionDesc)）下发至菜单栏主显设备「\(primaryName)」"
+                    sceneSubmenu.addItem(applyPrimaryItem)
+
+                    let applyAllItem = NSMenuItem(
+                        title: "应用至全屋所有空调 (\(allDevices.count)台)",
+                        action: #selector(applySceneToAllFromMenu(_:)),
+                        keyEquivalent: ""
+                    )
+                    applyAllItem.target = self
+                    applyAllItem.representedObject = scene.id.uuidString
+                    applyAllItem.isEnabled = model.gatewayConnected
+                    applyAllItem.toolTip = "将「\(scene.name)」情景动作（\(actionDesc)）统一批量下发至全屋 \(allDevices.count) 台空调设备"
+                    sceneSubmenu.addItem(applyAllItem)
+
+                    let sceneParentItem = NSMenuItem(title: "\(sceneGlyph) \(scene.name) (\(actionDesc))", action: nil, keyEquivalent: "")
+                    sceneParentItem.toolTip = "【\(scene.name) 情景预设】\n包含动作：\(actionDesc)\n可选择下发至主显设备「\(primaryName)」或全屋空调协同生效"
+                    scenesMenu.setSubmenu(sceneSubmenu, for: sceneParentItem)
+                    scenesMenu.addItem(sceneParentItem)
+                } else {
+                    let singleItem = NSMenuItem(
+                        title: "\(sceneGlyph) \(scene.name) (\(actionDesc))",
+                        action: #selector(applySceneSingleFromMenu(_:)),
+                        keyEquivalent: ""
+                    )
+                    singleItem.target = self
+                    singleItem.representedObject = scene.id.uuidString
+                    singleItem.isEnabled = model.gatewayConnected
+                    singleItem.toolTip = "一键应用「\(scene.name)」情景动作：\(actionDesc)"
+                    scenesMenu.addItem(singleItem)
+                }
+            }
+            let scenesParentItem = NSMenuItem(title: "✨ 一键情景预设 (\(scenes.count)项)...", action: nil, keyEquivalent: "")
+            scenesParentItem.toolTip = "展开情景预设菜单，一键下发「睡眠」、「离家」、「回家」等自定义多属性批量调控动作"
+            menu.setSubmenu(scenesMenu, for: scenesParentItem)
+            menu.addItem(scenesParentItem)
+        }
+
         menu.addItem(.separator())
 
         // 助眠白噪音快捷开关 (v1.9.21)
@@ -1677,6 +1745,32 @@ final class StatusItemController: NSObject {
         } else {
             AmbientSoundEngine.shared.play(type: model.sleepAmbientSoundType)
         }
+        refreshTemperature()
+    }
+
+    // 一键情景模式快捷应用 (v1.9.100)
+    @objc private func applySceneToPrimaryFromMenu(_ sender: NSMenuItem) {
+        guard let uuidStr = sender.representedObject as? String,
+              let uuid = UUID(uuidString: uuidStr),
+              let scene = model.scenes.first(where: { $0.id == uuid }) else { return }
+        let primaryId = primaryDeviceId ?? model.allUnifiedDevices.first?.id
+        model.applyScene(scene, targetDeviceId: primaryId)
+        refreshTemperature()
+    }
+
+    @objc private func applySceneToAllFromMenu(_ sender: NSMenuItem) {
+        guard let uuidStr = sender.representedObject as? String,
+              let uuid = UUID(uuidString: uuidStr),
+              let scene = model.scenes.first(where: { $0.id == uuid }) else { return }
+        model.applyScene(scene, allDevices: true)
+        refreshTemperature()
+    }
+
+    @objc private func applySceneSingleFromMenu(_ sender: NSMenuItem) {
+        guard let uuidStr = sender.representedObject as? String,
+              let uuid = UUID(uuidString: uuidStr),
+              let scene = model.scenes.first(where: { $0.id == uuid }) else { return }
+        model.applyScene(scene)
         refreshTemperature()
     }
 

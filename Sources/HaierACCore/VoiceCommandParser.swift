@@ -481,31 +481,31 @@ public struct VoiceCommandParser {
 
     /// 匹配连续区间附加离散星期复合口语（如“周一至周三以及周五”、“周一到周四还有周六”、“周一至五和周日”、“周一至周三和周五周六”） (v1.9.67, v1.9.70 增加每天负向断言防误判为星期天, v1.9.72 升级支持多离散星期)
     private static let rangeWithMultiDaysRegex: NSRegularExpression? = {
-        let pattern = #"(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])\s*(?:[、,，和与及跟以及还有或者或加/／\s]+)\s*(?!(?:每天|天天|每日|每晚|每早|每晨|每夜|日日))((?:(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)?([一二三四五六日天1-7])[、,，和与及跟以及还有或者或加/／\s]*)+)"#
+        let pattern = #"(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])\s*(?:[、,，和与及跟以及还有或者或加/／\s]+)\s*((?:(?!(?:每天|天天|每日|每晚|每早|每晨|每夜|日日))(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)?([一二三四五六日天1-7])[、,，和与及跟以及还有或者或加/／\s]*)+)"#
         return try? NSRegularExpression(pattern: pattern)
     }()
 
     /// 匹配离散星期在前、连续区间在后复合口语（如“周五和周一至周三”、“周日以及周一至周四”、“周五周日和周一至周三”、“周五、周六和周一至周三”、“周一和周五至周日”） (v1.9.73)
     private static let multiDaysWithRangeRegex: NSRegularExpression? = {
-        let pattern = #"((?:(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)?([一二三四五六日天1-7])[、,，和与及跟以及还有或者或加/／\s]*)+)\s*(?:[、,，和与及跟以及还有或者或加/／\s]+)\s*(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])"#
+        let pattern = #"((?:(?!(?:每天|天天|每日|每晚|每早|每晨|每夜|日日))(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)?([一二三四五六日天1-7])[、,，和与及跟以及还有或者或加/／\s]*)+)\s*(?:[、,，和与及跟以及还有或者或加/／\s]+)\s*(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])"#
         return try? NSRegularExpression(pattern: pattern)
     }()
 
     /// 匹配双连续区间附加多个离散星期复合口语（如“周一至周三、周五至周六和周日”、“周一到周二和周四到周五以及周日”） (v1.9.73)
     private static let dualRangeWithMultiDaysRegex: NSRegularExpression? = {
-        let pattern = #"(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])\s*(?:[、,，和与及跟以及还有或者或加/／\s]+)\s*(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])\s*(?:[、,，和与及跟以及还有或者或加/／\s]+)\s*(?!(?:每天|天天|每日|每晚|每早|每晨|每夜|日日))((?:(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)?([一二三四五六日天1-7])[、,，和与及跟以及还有或者或加/／\s]*)+)"#
+        let pattern = #"(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])\s*(?:[、,，和与及跟以及还有或者或加/／\s]+)\s*(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])\s*(?:[、,，和与及跟以及还有或者或加/／\s]+)\s*((?:(?!(?:每天|天天|每日|每晚|每早|每晨|每夜|日日))(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)?([一二三四五六日天1-7])[、,，和与及跟以及还有或者或加/／\s]*)+)"#
         return try? NSRegularExpression(pattern: pattern)
     }()
 
     /// 匹配连续区间在先、多个离散星期居中、连续区间在后的夹心复合口语（如“周一至周三、周五以及周六至周日”、“周一到周二、周四和周六到周日”、“周一至周三和周五加周六至周日”） (v1.9.74)
     private static let rangeWithMultiDaysAndRangeRegex: NSRegularExpression? = {
-        let pattern = #"(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])\s*(?:[、,，和与及跟以及还有或者或加/／\s]+)\s*(?!(?:每天|天天|每日|每晚|每早|每晨|每夜|日日))((?:(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)?([一二三四五六日天1-7])[、,，和与及跟以及还有或者或加/／\s]*)+)\s*(?:[、,，和与及跟以及还有或者或加/／\s]+)\s*(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])"#
+        let pattern = #"(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])\s*(?:[、,，和与及跟以及还有或者或加/／\s]+)\s*((?:(?!(?:每天|天天|每日|每晚|每早|每晨|每夜|日日))(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)?([一二三四五六日天1-7])[、,，和与及跟以及还有或者或加/／\s]*)+)\s*(?:[、,，和与及跟以及还有或者或加/／\s]+)\s*(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])"#
         return try? NSRegularExpression(pattern: pattern)
     }()
 
     /// 匹配离散星期在先、连续区间居中、离散星期在后的反向夹心复合口语（如“周一、周三至周五以及周日”、“周日和周二至周四以及周六”、“周二和周四到周五加周日”） (v1.9.75)
     private static let multiDaysWithRangeAndMultiDaysRegex: NSRegularExpression? = {
-        let pattern = #"((?:(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)?([一二三四五六日天1-7])[、,，和与及跟以及还有或者或加/／\s]*)+)\s*(?:[、,，和与及跟以及还有或者或加/／\s]+)\s*(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])\s*(?:[、,，和与及跟以及还有或者或加/／\s]+)\s*(?!(?:每天|天天|每日|每晚|每早|每晨|每夜|日日))((?:(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)?([一二三四五六日天1-7])[、,，和与及跟以及还有或者或加/／\s]*)+)"#
+        let pattern = #"((?:(?!(?:每天|天天|每日|每晚|每早|每晨|每夜|日日))(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)?([一二三四五六日天1-7])[、,，和与及跟以及还有或者或加/／\s]*)+)\s*(?:[、,，和与及跟以及还有或者或加/／\s]+)\s*(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])\s*(?:[、,，和与及跟以及还有或者或加/／\s]+)\s*((?:(?!(?:每天|天天|每日|每晚|每早|每晨|每夜|日日))(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)?([一二三四五六日天1-7])[、,，和与及跟以及还有或者或加/／\s]*)+)"#
         return try? NSRegularExpression(pattern: pattern)
     }()
 
@@ -517,37 +517,43 @@ public struct VoiceCommandParser {
 
     /// 匹配三连续区间附加多个离散星期复合口语（如“周一至周二、周四至周五、周六至周日和周三”） (v1.9.75)
     private static let triRangeWithMultiDaysRegex: NSRegularExpression? = {
-        let pattern = #"(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])\s*(?:[、,，和与及跟以及还有或者或加/／\s]+)\s*(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])\s*(?:[、,，和与及跟以及还有或者或加/／\s]+)\s*(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])\s*(?:[、,，和与及跟以及还有或者或加/／\s]+)\s*(?!(?:每天|天天|每日|每晚|每早|每晨|每夜|日日))((?:(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)?([一二三四五六日天1-7])[、,，和与及跟以及还有或者或加/／\s]*)+)"#
+        let pattern = #"(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])\s*(?:[、,，和与及跟以及还有或者或加/／\s]+)\s*(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])\s*(?:[、,，和与及跟以及还有或者或加/／\s]+)\s*(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])\s*(?:[、,，和与及跟以及还有或者或加/／\s]+)\s*((?:(?!(?:每天|天天|每日|每晚|每早|每晨|每夜|日日))(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)?([一二三四五六日天1-7])[、,，和与及跟以及还有或者或加/／\s]*)+)"#
         return try? NSRegularExpression(pattern: pattern)
     }()
 
     /// 匹配多个离散星期在先、三连续区间在后复合口语（如“周日和周一至周二、周四至周五以及周六至周日”） (v1.9.75)
     private static let multiDaysWithTriRangeRegex: NSRegularExpression? = {
-        let pattern = #"((?:(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)?([一二三四五六日天1-7])[、,，和与及跟以及还有或者或加/／\s]*)+)\s*(?:[、,，和与及跟以及还有或者或加/／\s]+)\s*(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])\s*(?:[、,，和与及跟以及还有或者或加/／\s]+)\s*(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])\s*(?:[、,，和与及跟以及还有或者或加/／\s]+)\s*(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])"#
+        let pattern = #"((?:(?!(?:每天|天天|每日|每晚|每早|每晨|每夜|日日))(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)?([一二三四五六日天1-7])[、,，和与及跟以及还有或者或加/／\s]*)+)\s*(?:[、,，和与及跟以及还有或者或加/／\s]+)\s*(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])\s*(?:[、,，和与及跟以及还有或者或加/／\s]+)\s*(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])\s*(?:[、,，和与及跟以及还有或者或加/／\s]+)\s*(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])"#
         return try? NSRegularExpression(pattern: pattern)
     }()
 
     /// 匹配多个离散星期在前、双连续区间在后复合口语（如“周日和周一至周三以及周五至周六”、“周日加周一至周二加周四至周五”） (v1.9.73)
     private static let multiDaysWithDualRangeRegex: NSRegularExpression? = {
-        let pattern = #"((?:(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)?([一二三四五六日天1-7])[、,，和与及跟以及还有或者或加/／\s]*)+)\s*(?:[、,，和与及跟以及还有或者或加/／\s]+)\s*(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])\s*(?:[、,，和与及跟以及还有或者或加/／\s]+)\s*(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])"#
+        let pattern = #"((?:(?!(?:每天|天天|每日|每晚|每早|每晨|每夜|日日))(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)?([一二三四五六日天1-7])[、,，和与及跟以及还有或者或加/／\s]*)+)\s*(?:[、,，和与及跟以及还有或者或加/／\s]+)\s*(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])\s*(?:[、,，和与及跟以及还有或者或加/／\s]+)\s*(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])"#
         return try? NSRegularExpression(pattern: pattern)
     }()
 
-    /// 匹配多个离散星期在前、核心关键词在后口语（如“周六周日和工作日”、“周二周四和周末”、“周五和周日加工作日”） (v1.9.73, v1.9.95)
+    /// 匹配多个离散星期在前、核心关键词在后口语（如“周六周日和工作日”、“周二周四和周末”、“周五和周日加工作日”） (v1.9.73, v1.9.95, v1.9.100 增加工作日等非离散日防截断断言)
     private static let multiDaysWithKeywordRegex: NSRegularExpression? = {
-        let pattern = #"((?:(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)?([一二三四五六日天1-7])[、,，和与及跟以及还有或者或加/／\s]*)+)\s*(?:[、,，和与及跟以及还有或者或加/／\s]+)\s*(工作日|平时|平日|周末|双休|双休日|休息日|公休日|休假日|放假日|节假日|单休|周末三天)"#
+        let pattern = #"((?:(?!(?:每天|天天|每日|每晚|每早|每晨|每夜|日日))(?<!(?:工作|平时|平日|单休|双休|双休日|休息|公休|休假|放假|节假|生|次|翌|当|昨|今|明|后|大后))(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)?([一二三四五六日天1-7])[、,，和与及跟以及还有或者或加/／\s]*)+)\s*(?:[、,，和与及跟以及还有或者或加/／\s]+)\s*(工作日|平时|平日|周末|双休|双休日|休息日|公休日|休假日|放假日|节假日|单休|周末三天)"#
         return try? NSRegularExpression(pattern: pattern)
     }()
 
     /// 匹配核心关键词在前、多个离散星期在后口语（如“工作日和周六周日”、“周末和周二周四”、“周末加周三、周五”） (v1.9.73, v1.9.95)
     private static let keywordWithMultiDaysRegex: NSRegularExpression? = {
-        let pattern = #"(工作日|平时|平日|周末|双休|双休日|休息日|公休日|休假日|放假日|节假日|单休|周末三天)\s*(?:[、,，和与及跟以及还有或者或加/／\s]+)\s*(?!(?:每天|天天|每日|每晚|每早|每晨|每夜|日日))((?:(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)?([一二三四五六日天1-7])[、,，和与及跟以及还有或者或加/／\s]*)+)"#
+        let pattern = #"(工作日|平时|平日|周末|双休|双休日|休息日|公休日|休假日|放假日|节假日|单休|周末三天)\s*(?:[、,，和与及跟以及还有或者或加/／\s]+)\s*((?:(?!(?:每天|天天|每日|每晚|每早|每晨|每夜|日日))(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)?([一二三四五六日天1-7])[、,，和与及跟以及还有或者或加/／\s]*)+)"#
         return try? NSRegularExpression(pattern: pattern)
     }()
 
     /// 兼容单个离散附加星期正则 (v1.9.67, v1.9.70)
     private static let rangeWithExtraDaysRegex: NSRegularExpression? = {
         let pattern = #"(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])\s*(?:[、,，和与及跟以及还有或者或加/／\s]+)\s*(?!(?:每天|天天|每日|每晚|每早|每晨|每夜|日日))(?:(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)?([一二三四五六日天1-7]))"#
+        return try? NSRegularExpression(pattern: pattern)
+    }()
+
+    /// 匹配纯核心关键词双重组合口语（如“工作日加周末”、“工作日和双休”、“周末和平时”） (v1.9.100)
+    private static let keywordWithKeywordRegex: NSRegularExpression? = {
+        let pattern = #"(工作日|平时|平日|周末|双休|双休日|休息日|公休日|休假日|放假日|节假日|单休|周末三天)\s*(?:[、,，和与及跟以及还有或者或加/／\s]+)\s*(工作日|平时|平日|周末|双休|双休日|休息日|公休日|休假日|放假日|节假日|单休|周末三天)"#
         return try? NSRegularExpression(pattern: pattern)
     }()
 
@@ -569,9 +575,9 @@ public struct VoiceCommandParser {
         return try? NSRegularExpression(pattern: pattern)
     }()
 
-    /// 匹配排除型否定星期口语模式（如“除了周末每天晚上10点关机”、“除周末外每天早8点开机”、“除了工作日每天晚上11点关空调”、“除了周日每天早8点开机”、“除周一外每天晚10点关机”、“工作日除了周三早8点开机”、“周一至周五除周二外晚10点关空调”、“除非工作日外每天早8点开机”） (v1.9.68, v1.9.69 补全限定基准集约束, v1.9.96 闭环前置反相时态贪婪截断)
+    /// 匹配排除型否定星期口语模式（如“除了周末每天晚上10点关机”、“除周末外每天早8点开机”、“除了工作日每天晚上11点关空调”、“除了周日每天早8点开机”、“除周一外每天晚10点关机”、“工作日除了周三早8点开机”、“周一至周五除周二外晚10点关空调”、“除非工作日外每天早8点开机”） (v1.9.68, v1.9.69 补全限定基准集约束, v1.9.96 闭环前置反相时态贪婪截断, v1.9.100 恢复基准集限定前置断言)
     private static let exclusionRepeatRegex: NSRegularExpression? = {
-        let pattern = #"(?:除了|除)\s*([^，,。！？\s]+?)\s*(?:(?:之|以)?外|(?=[，,。！？\s]|每天|天天|每日|每晚|每早|每晨|每夜|日日|\d|早|晚|夜|中|上|下|凌晨|午|点|时|:|$|开|关|停))"#
+        let pattern = #"(?:除了|除)\s*([^，,。！？\s]+?)\s*(?:(?:之|以)?外)?(?=[，,。！？\s]|(?<!非)(?:工作日|平时|平日|周末|双休|双休日|休息日|公休日|休假日|放假日|节假日|单休|周末三天|大休|小休|一三五|二四六)|每天|天天|每日|每晚|每早|每晨|每夜|日日|\d|早|晚|夜|中|上|下|凌晨|午|点|时|:|$|开|关|停)"#
         return try? NSRegularExpression(pattern: pattern)
     }()
 
@@ -991,6 +997,56 @@ public struct VoiceCommandParser {
             }
         }
 
+        // 0.1 双连续区间附加多个离散星期（如“周一至周三、周五至周六和周日”、“周一到周二和周四到周五以及周日”） (v1.9.73)
+        if let regex = dualRangeWithMultiDaysRegex,
+           let match = regex.firstMatch(in: text, options: [], range: fullRange),
+           match.numberOfRanges >= 6 {
+            let s1 = nsString.substring(with: match.range(at: 1))
+            let e1 = nsString.substring(with: match.range(at: 2))
+            let s2 = nsString.substring(with: match.range(at: 3))
+            let e2 = nsString.substring(with: match.range(at: 4))
+            let multi = nsString.substring(with: match.range(at: 5))
+            if let s1Ch = s1.first, let s1Wd = chineseDayCharToWeekday(s1Ch),
+               let e1Ch = e1.first, let e1Wd = chineseDayCharToWeekday(e1Ch),
+               let s2Ch = s2.first, let s2Wd = chineseDayCharToWeekday(s2Ch),
+               let e2Ch = e2.first, let e2Wd = chineseDayCharToWeekday(e2Ch) {
+                var days = Set(generateWeeklyRange(start: s1Wd, end: e1Wd))
+                days.formUnion(generateWeeklyRange(start: s2Wd, end: e2Wd))
+                for ch in multi {
+                    if let wd = chineseDayCharToWeekday(ch) {
+                        days.insert(wd)
+                    }
+                }
+                let sorted = days.sorted()
+                return (sorted, formatWeekdayLabel(from: sorted))
+            }
+        }
+
+        // 0.2 多个离散星期在前、双连续区间在后（如“周日和周一至周三以及周五至周六”、“周日加周一至周二加周四至周五”） (v1.9.73)
+        if let regex = multiDaysWithDualRangeRegex,
+           let match = regex.firstMatch(in: text, options: [], range: fullRange),
+           match.numberOfRanges >= 7 {
+            let multi = nsString.substring(with: match.range(at: 1))
+            let s1 = nsString.substring(with: match.range(at: 3))
+            let e1 = nsString.substring(with: match.range(at: 4))
+            let s2 = nsString.substring(with: match.range(at: 5))
+            let e2 = nsString.substring(with: match.range(at: 6))
+            if let s1Ch = s1.first, let s1Wd = chineseDayCharToWeekday(s1Ch),
+               let e1Ch = e1.first, let e1Wd = chineseDayCharToWeekday(e1Ch),
+               let s2Ch = s2.first, let s2Wd = chineseDayCharToWeekday(s2Ch),
+               let e2Ch = e2.first, let e2Wd = chineseDayCharToWeekday(e2Ch) {
+                var days = Set(generateWeeklyRange(start: s1Wd, end: e1Wd))
+                days.formUnion(generateWeeklyRange(start: s2Wd, end: e2Wd))
+                for ch in multi {
+                    if let wd = chineseDayCharToWeekday(ch) {
+                        days.insert(wd)
+                    }
+                }
+                let sorted = days.sorted()
+                return (sorted, formatWeekdayLabel(from: sorted))
+            }
+        }
+
         // 0.05 连续区间在先、多个离散星期居中、连续区间在后夹心复合口语（如“周一至周三、周五以及周六至周日”、“周一到周二、周四和周六到周日”） (v1.9.74)
         if let regex = rangeWithMultiDaysAndRangeRegex,
            let match = regex.firstMatch(in: text, options: [], range: fullRange),
@@ -1033,56 +1089,6 @@ public struct VoiceCommandParser {
                     }
                 }
                 for ch in multi2 {
-                    if let wd = chineseDayCharToWeekday(ch) {
-                        days.insert(wd)
-                    }
-                }
-                let sorted = days.sorted()
-                return (sorted, formatWeekdayLabel(from: sorted))
-            }
-        }
-
-        // 0.1 双连续区间附加多个离散星期（如“周一至周三、周五至周六和周日”、“周一到周二和周四到周五以及周日”） (v1.9.73)
-        if let regex = dualRangeWithMultiDaysRegex,
-           let match = regex.firstMatch(in: text, options: [], range: fullRange),
-           match.numberOfRanges >= 6 {
-            let s1 = nsString.substring(with: match.range(at: 1))
-            let e1 = nsString.substring(with: match.range(at: 2))
-            let s2 = nsString.substring(with: match.range(at: 3))
-            let e2 = nsString.substring(with: match.range(at: 4))
-            let multi = nsString.substring(with: match.range(at: 5))
-            if let s1Ch = s1.first, let s1Wd = chineseDayCharToWeekday(s1Ch),
-               let e1Ch = e1.first, let e1Wd = chineseDayCharToWeekday(e1Ch),
-               let s2Ch = s2.first, let s2Wd = chineseDayCharToWeekday(s2Ch),
-               let e2Ch = e2.first, let e2Wd = chineseDayCharToWeekday(e2Ch) {
-                var days = Set(generateWeeklyRange(start: s1Wd, end: e1Wd))
-                days.formUnion(generateWeeklyRange(start: s2Wd, end: e2Wd))
-                for ch in multi {
-                    if let wd = chineseDayCharToWeekday(ch) {
-                        days.insert(wd)
-                    }
-                }
-                let sorted = days.sorted()
-                return (sorted, formatWeekdayLabel(from: sorted))
-            }
-        }
-
-        // 0.2 多个离散星期在前、双连续区间在后（如“周日和周一至周三以及周五至周六”、“周日加周一至周二加周四至周五”） (v1.9.73)
-        if let regex = multiDaysWithDualRangeRegex,
-           let match = regex.firstMatch(in: text, options: [], range: fullRange),
-           match.numberOfRanges >= 7 {
-            let multi = nsString.substring(with: match.range(at: 1))
-            let s1 = nsString.substring(with: match.range(at: 3))
-            let e1 = nsString.substring(with: match.range(at: 4))
-            let s2 = nsString.substring(with: match.range(at: 5))
-            let e2 = nsString.substring(with: match.range(at: 6))
-            if let s1Ch = s1.first, let s1Wd = chineseDayCharToWeekday(s1Ch),
-               let e1Ch = e1.first, let e1Wd = chineseDayCharToWeekday(e1Ch),
-               let s2Ch = s2.first, let s2Wd = chineseDayCharToWeekday(s2Ch),
-               let e2Ch = e2.first, let e2Wd = chineseDayCharToWeekday(e2Ch) {
-                var days = Set(generateWeeklyRange(start: s1Wd, end: e1Wd))
-                days.formUnion(generateWeeklyRange(start: s2Wd, end: e2Wd))
-                for ch in multi {
                     if let wd = chineseDayCharToWeekday(ch) {
                         days.insert(wd)
                     }
@@ -1205,6 +1211,30 @@ public struct VoiceCommandParser {
             }
         }
 
+        // 4.18 纯核心关键词双重组合口语（如“工作日加周末”、“工作日和双休”、“周末和平时”）(v1.9.100)
+        if let regex = keywordWithKeywordRegex,
+           let match = regex.firstMatch(in: text, options: [], range: fullRange),
+           match.numberOfRanges >= 3 {
+            let kw1 = nsString.substring(with: match.range(at: 1))
+            let kw2 = nsString.substring(with: match.range(at: 2))
+            var days = Set<Int>()
+            for kw in [kw1, kw2] {
+                if kw == "工作日" || kw == "平时" || kw == "平日" {
+                    days.formUnion([2, 3, 4, 5, 6])
+                } else if kw == "周末" || kw == "双休" || kw == "双休日" || kw == "休息日" || kw == "公休日" || kw == "休假日" || kw == "放假日" || kw == "节假日" {
+                    days.formUnion([1, 7])
+                } else if kw == "单休" {
+                    days.formUnion([2, 3, 4, 5, 6, 7])
+                } else if kw == "周末三天" {
+                    days.formUnion([1, 6, 7])
+                }
+            }
+            if !days.isEmpty {
+                let sorted = days.sorted()
+                return (sorted, formatWeekdayLabel(from: sorted))
+            }
+        }
+
         // 4.2 多个离散星期在前 + 核心关键词在后（如“周六周日和工作日”、“周二周四和周末”、“周五和周日加工作日”）(v1.9.73)
         if let regex = multiDaysWithKeywordRegex,
            let match = regex.firstMatch(in: text, options: [], range: fullRange),
@@ -1276,7 +1306,7 @@ public struct VoiceCommandParser {
             }
         }
 
-        // 2. 复合语义优先匹配：核心关键词 + 附加星期（如“工作日和周六”、“工作日及周日”、“工作日加周末”、“周末和周一”、“周末以及周五”、“单休和周日”）(v1.9.67, v1.9.71, v1.9.95)
+        // 5.1 复合语义匹配：核心关键词 + 附加星期（如“工作日和周六”、“工作日及周日”、“工作日加周末”、“周末和周一”、“周末以及周五”、“单休和周日”）(v1.9.67, v1.9.71, v1.9.95)
         if let regex = keywordWithExtraDayRegex,
            let match = regex.firstMatch(in: text, options: [], range: fullRange),
            match.numberOfRanges >= 3 {
@@ -1309,7 +1339,7 @@ public struct VoiceCommandParser {
             }
         }
 
-        // 3. 复合语义优先匹配：附加星期在前 + 核心关键词在后（如“周六和工作日”、“周一和周末”、“周日和单休”）(v1.9.67, v1.9.71, v1.9.95)
+        // 5.2 复合语义匹配：附加星期在前 + 核心关键词在后（如“周六和工作日”、“周一和周末”、“周日和单休”）(v1.9.67, v1.9.71, v1.9.95)
         if let regex = extraDayWithKeywordRegex,
            let match = regex.firstMatch(in: text, options: [], range: fullRange),
            match.numberOfRanges >= 3 {
@@ -1675,7 +1705,7 @@ public struct VoiceCommandParser {
                               normalized.contains("整夜") || normalized.contains("彻夜") || normalized.contains("隔夜") ||
                               normalized.contains("后夜") || normalized.contains("夜半") ||
                               hasColloquialEvening
-        let isAfternoonPM = normalized.contains("下午") || normalized.contains("傍晚") || normalized.contains("午后")
+        let isAfternoonPM = normalized.contains("下午") || normalized.contains("傍晚") || normalized.contains("黄昏") || normalized.contains("天黑") || normalized.contains("午后")
         let isNoon = normalized.contains("中午") || normalized.contains("正午") || normalized.contains("晌午")
 
         var hour: Int?
@@ -2968,8 +2998,8 @@ public struct VoiceCommandParser {
         }
 
         // 2. 温度与时间小数转换：匹配小数点五或点5（如“26点5” -> 26.5，“20点五” -> 20.5，“18点5” -> 18.5，“0点5” -> 0.5，“零点五度” -> 0.5度）
-        // 排除后接“分/分钟”的钟点分表达（如“十点五分” -> 10点5分），彻底杜绝无上下文粗暴替换导致误判为倒计时或误判为定时开关机 (v1.9.47, v1.9.50, v1.9.52, v1.9.53)
-        let decimalPointPattern = #"([零0一二两三四五六七八九\d]+)点(?:五|5)(?![分分钟])"#
+        // 排除后接“分/分钟”的钟点分表达（如“十点五分” -> 10点5分）及“五十/五十五分”等整十表达，彻底杜绝无上下文粗暴替换导致误判为倒计时或误判为定时开关机 (v1.9.47, v1.9.50, v1.9.52, v1.9.53, v1.9.100)
+        let decimalPointPattern = #"([零0一二两三四五六七八九\d]+)点(?:五|5)(?![分分钟]|十|\d)"#
         if let regex = try? NSRegularExpression(pattern: decimalPointPattern) {
             let ns = str as NSString
             let matches = regex.matches(in: str, range: NSRange(location: 0, length: ns.length)).reversed()
@@ -3000,6 +3030,13 @@ public struct VoiceCommandParser {
 
         for (cn, val) in digitMap {
             str = str.replacingOccurrences(of: String(cn), with: "\(val)")
+        }
+
+        // 隔离星期数字与紧随其后的钟点，避免“周一8点”转换成“周18点”被误判为18:00 (v1.9.100)
+        let weekdayHourCollisionPattern = #"((?:周|星期|礼拜)[1-7])(?=\d{1,2}(?:点|时|:))"#
+        if let regex = try? NSRegularExpression(pattern: weekdayHourCollisionPattern) {
+            let ns = str as NSString
+            str = regex.stringByReplacingMatches(in: str, options: [], range: NSRange(location: 0, length: ns.length), withTemplate: "$1 ")
         }
 
         return str

@@ -6,6 +6,19 @@ A native SwiftUI app to control Haier / Leader (统帅) smart air conditioners o
 
 ## Features
 
+- 🏷 **Comprehensive Multi-Range Repeat Scheduling, Weekday/Time Boundary Collision Guards & Status Bar Quick Scene Presets Submenu (v1.9.100)**:
+  - ⏱️ **"Multi-Range Repeat Scheduling & Dual-Keyword Combination" Natural Language Parsing Engine (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)**:
+    - **Dual Core Keyword Combination Interception**: Introduced `keywordWithKeywordRegex` (e.g. "工作日加周末", "工作日和双休", "周末和平时") to seamlessly union dual core keyword sets (`[1, 2, 3, 4, 5, 6, 7]`), eliminating word truncation and partial character mismatches;
+    - **Reordered Parsing Pipeline Precedence**: Positioned `keywordWithKeywordRegex` and multi-day sandwich combination regexes ahead of single extra-day matchers, guaranteeing that multi-weekday phrases like "周二周四和周末" retain all discrete days (`[1, 3, 5, 7]`) without clipping "周二";
+    - **Discrete Day "每天" Morpheme Collision Prevention**: Added `(?!(?:每天|天天|每日|每晚|每早|每晨|每夜|日日))` negative lookahead to `keywordWithExtraDayRegex` and `discreteWeekdaysRegex` to prevent "每天" from leaking its "天" character as Sunday (`[1]`);
+    - **Weekday-Hour Collision Boundary Guard**: Introduced lexical separation for weekday digits immediately preceding hours, preventing "周一8点开机" from merging into "周18点" (18:00);
+    - **Hour & Tens-of-Minutes Decimal Conversion Defense**: Added negative lookahead against "十" and digits in `decimalPointPattern`, preventing "十点五十分" from being mistakenly converted to "10.5十分";
+    - **Twilight and Nightfall PM Time-Phase Normalization**: Expanded colloquial time parsing to include "黄昏" and "天黑", accurately mapping them to afternoon/evening PM time phases;
+    - **100% Unit Test Suite Coverage**: All 108 tests pass with 0 failures, verifying multi-range schedules, exclusionary negations, half-hour normalization, and anti-misoperation assertions.
+  - 🖥️ **macOS Native Status Bar Quick Scene Presets Submenu (`StatusItemController.swift`)**:
+    - **New "✨ 一键情景预设..." (Quick Scene Presets) Submenu**: Seamlessly integrated built-in scenes ("睡眠", "离家", "回家") and custom scenes with distinct glyphs (🌙 / 🚪 / 🏠 / ✨) and action summaries directly in the status bar menu;
+    - **Intelligent Dual-Routing Execution**: Supports direct one-click execution in single-device environments and expands into dual routes in multi-device matrices ("应用至「主显设备」" vs. "应用至全屋所有空调 (N台)"), accompanied by native system notifications and status bar updates.
+
 - 🏷 **Comprehensive Inverted Big/Small Weekend & Holiday Scheduling Defect Closed, macOS Native Status Bar Whole-House & Single-Unit Stepper Standby Wakeup Unified & Siri Temperature Limit Fix (v1.9.99)**:
   - ⏱️ **"Big/Small Weekend, Shift Rest & Holiday Inverted Tense" Natural Repeat Scheduling Universal Engine (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)**:
     - **Comprehensive Coverage for Big/Small Weekend, Shift Rest & Holiday Positive & Inverted Colloquial Scheduling**:

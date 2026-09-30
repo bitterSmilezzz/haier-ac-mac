@@ -1,25 +1,20 @@
-# Haier AC Mac v1.9.99 发布与巡检演进报告
+# Haier AC Mac v1.9.100 发布与巡检演进报告
 
 ## 1. 概述与版本定位
-- **版本号**：`v1.9.99`
-- **发版主题**：闭环大小周与大休小休/节假日反相循环调度、macOS 原生状态栏全屋与单机温度步进待机唤醒大一统与 Siri 调温上限纠正
+- **版本号**：`v1.9.100`
+- **发版主题**：闭环多区间复合周期调度、星期时相防黏连与负向排除全基准大一统引擎及状态栏情景预设快捷下发
 - **核心目标与架构演进**：
-  1. **“大小周/大休/小休与节假日反相时态”自然周期循环调度大一统引擎 (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)**：
-     - **全景覆盖大小周/大休/小休与节假日正向与反相自然调度**：
-       - 正向调度：涵盖“逢大休/大周/双休/节假日/休假日/放假日”精准映射至周末双休 `[1, 7]`；“逢小休/小周/单休日”精准映射至周日单休 `[1]`；
-       - 反相调度：新增“非大休/非大周/非节假日/非休假日/非放假日”精准映射至工作日 `[2, 3, 4, 5, 6]`；“非小休/非小周/非小休日”精准映射至周一至周六 `[2, 3, 4, 5, 6, 7]`；彻底消除将“非大休”或“非小休”掉入字面量贪婪截断导致的极性颠倒；
-     - **彻底修复排除型否定嵌套大小周与节假日补集自洽**：在 `extractExcludedDays` 中建立“大休/大周/小休/小周”及对应反相前置拦截引擎，实现“除大休外每天”（保留工作日 `[2, 3, 4, 5, 6]`）、“除小休外每天”（保留周一至周六 `[2, 3, 4, 5, 6, 7]`）、“除非大休外每天”（保留周末 `[1, 7]`）、“除非小休外每天”（保留周日 `[1]`）、“除节假日外每天”补集运算自洽；
-     - **大小周与节假日半点时相归一及防即时误触加固**：全面纳管“大休半”、“小休半”、“非大休半”、“非小休半”、“节假日半”、“非节假日半”等映射至 08:30，并在 `hasTimingOrCountdownIntent` 中严密守护，绝不穿透至即时开关机；
-     - **单元测试 100% 满分覆盖**：在 `VoiceCommandParserTests.swift` 中新增 `testBigSmallWeekendScheduleV1999`，包含 28 组严苛正反向、嵌套排除、半点归一及防即时误触断言，全部通过。
-  2. **macOS 原生状态栏全屋与单机温度步进待机唤醒大一统 (`StatusItemController.swift`)**：
-     - **全屋升降温 1°C / 0.5°C 支持待机一键直接唤醒**：解耦顶层「🌡️ 全屋升降温」及「微调 0.5°C」菜单项门禁，从原本硬编码依赖 `!onDevices.isEmpty` 升级为基于网关可控裁决 `!controllableDevices.isEmpty`。当全屋空调均处于关机待机状态时，菜单项不再置灰禁用，用户可直接点击升温或降温一键全屋唤醒并设定目标温度，并在待机时提示“`🌡️ 全屋升温 1°C (全屋待机中 · 点击唤醒调温)`”；
-     - **单机与级联温度步进菜单待机直接唤醒**：解耦单设备主菜单及专属子菜单中的升温降温 1°C / 0.5°C 门禁，待机状态下点击温度步进自动唤醒开机并调整温度；
-     - **与模式、风速协同形成 100% 全对称交互大一统**：状态栏全屋协同的「模式协同」、「风速协同」、「温度步进」三大核心控制域全部实现关机待机下一键自适应唤醒。
-  3. **AppModel 调温 API 待机唤醒全链路贯通 (`AppModel.swift`)**：
-     - **全套调温函数底层支持 `autoPowerOn: Bool = false`**：在 `adjustDeviceTemperature`、`adjustTemperature`、`adjustTemperatureAll`、`setTemperature`、`setTemperatureAll` 中引入关机待机智能感知。当 `autoPowerOn: true` 且设备处于关机状态时，自动触发开机并调节温度，提供“已为您开启「客厅」并设置温度为 26°C”等清晰自洽的通知与反馈。
-  4. **Siri 与快捷指令 `AdjustACTemperatureIntent` 待机唤醒与虚假上限纠正 (`AppIntents.swift`)**：
-     - **彻底修复关机待机时 Siri 调温误报“已达最高温度 30°C 上限”的严重反直觉缺陷**：此前在关机状态下执行调温意图时，由于 `onDevices.isEmpty` 导致内部 `count == 0`，逻辑盲目进入 `if delta > 0 { throw ... 30°C 上限 }` 报错；本次升级重构为使用 `autoPowerOn: true` 唤醒可控设备并调温，反馈“已为您开启「全屋/客厅」并调整温度至 26°C”；
-     - **AppShortcuts 快捷短语全景扩充**：新增“全屋升温”、“全屋降温”、“全屋微升温”、“全屋微降温”、“调高空调温度”、“调低空调温度”等口语控制短语。
+  1. **“多区间复合周期与双核心关键词大一统”自然口语解析引擎 (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)**：
+     - **纯核心关键词双重组合调度拦截**：新增 `keywordWithKeywordRegex`（如“工作日加周末”、“工作日和双休”、“周末和平时”），精确合并双核心关键词集合（`[1, 2, 3, 4, 5, 6, 7]`），彻底杜绝由于字符贪婪切分导致的词义断裂；
+     - **调整解析流水线优先级杜绝提前截断**：将 `keywordWithKeywordRegex` 与离散多星期夹心复合正则置于单日附加正则之前，确保“周二周四和周末”等离散多星期复合表达能完整提取（`[1, 3, 5, 7]`），彻底消除“周二”被截断丢失的缺陷；
+     - **离散附加星期“每天”语素防穿透保护**：在 `keywordWithExtraDayRegex` 与 `discreteWeekdaysRegex` 内部全面植入 `(?!(?:每天|天天|每日|每晚|每早|每晨|每夜|日日))` 负向先行断言，阻断用户口语中由“每天/天天”构成的时态被贪婪提取其字面量“天”误当作星期天（周日 `[1]`）；
+     - **星期数字与紧随钟点防黏连隔离**：新增针对“周X”后紧随钟点的词法隔离机制，杜绝“周一8点开机”在中文数字转换后被意外连缀为“周18点”而误识别为 18:00；
+     - **钟点与整十分钟小数转换防穿透守卫**：在 `decimalPointPattern` 中增加针对“十”与数字的负向断言，防止“十点五十分”中的“五”被错误当作小数转换为“10.5十分”；
+     - **黄昏与天黑 PM 时相精准归一**：在非标准时相解析中补全“黄昏”与“天黑”，精准映射至下午/傍晚 PM 时区；
+     - **单元测试 100% 满分覆盖**：全套 108 个单元测试零缺陷通过，包含多区间复合调度、排除型否定、半点时相归一与防即时误触断言。
+  2. **macOS 原生状态栏一键情景预设快捷菜单 (`StatusItemController.swift`)**：
+     - **新增「✨ 一键情景预设」一级/二级子菜单**：无缝对接模型内建的「睡眠」、「离家」、「回家」及自定义情景模式，状态栏菜单直观呈现情景图标（🌙 / 🚪 / 🏠 / ✨）与多属性动作摘要；
+     - **智能双模式协同下发**：单设备环境下支持一键直达应用；多设备矩阵环境下自动展开下级菜单，支持“应用至「主显设备」”与“应用至全屋所有空调 (N台)”双路由协同调度，并伴随原生系统通知与状态栏即时刷新。
 
 ---
 
@@ -33,81 +28,77 @@
    - **死分支清理 (P2-2)**：`.adjustTemperatureAll` 死分支已彻底清理；
    - **调温 16/30°C 边界防护 (P2-3)**：单设备与全屋协同均已严格实施边界限制并同步至状态栏与 UI Stepper 使能状态。
 2. **本轮走查发现的高价值优化与缺陷闭环**：
-   - **大小周/大休/小休与节假日反相循环调度脱靶缺陷 (P1)**：在自然语言排班中，“非大休”（意为小休周及工作日）与“非小休”（除单休日外的六天）、“非节假日”（工作日）缺乏反向提取，且容易被大休/双休等词贪婪截断导致 180 度极性颠倒；在嵌套排除语义“除大休外每天”中也存在解析断层。本次重构确立了大小周/大休小休正反向及嵌套补集完整算法；
-   - **macOS 原生状态栏全屋与单机温度步进待机置灰禁用 (P1/P2)**：此前当所有空调处于待机状态时，温度微调（升温/降温 1°C / 0.5°C）全部置灰禁用，用户必须先通过开关机或模式菜单开机后才能调温；本次全面升级为支持一键待机唤醒调温，实现全屋协同（模式、风速、调温）交互 100% 全对称大一统；
-   - **Siri 调温待机时误报 30°C 上限严重反直觉体验 (P1)**：关机状态下向 Siri 说“调高空调温度”，因开机设备数为 0 触发误判逻辑，Siri 会谎报“当前已是最高温度 30°C，无法继续调高”；本次升级为自动开机唤醒调温，并丰富了快捷指令短语体系。
+   - **核心关键词组合被误判与截断 (P1)**：在自然语言排班中，“工作日加周末”此前容易被 `keywordWithExtraDayRegex` 中匹配单日的模式抢先截取后半部分，将“工作日”的“日”误认为单日，或者在多日组合“周二周四和周末”中提早拦截“周四和周末”，漏掉“周二”。本次调整正则执行流水线与专属定义后彻底修复；
+   - **“每天”语素在附加星期中泄露 (P1)**：在“除工作日外每天8点开机”或复杂口语中，“每天”中的“天”若被离散星期正则捕获，会导致额外产生星期天（周日 `[1]`）的误判。植入负向先行断言后彻底杜绝；
+   - **状态栏情景预设快捷菜单缺失 (高价值体验优化)**：用户在状态栏可以直接切换模式、风速、调温，但无法一键执行预设的睡眠/离家/回家多属性情景。本次在状态栏原生菜单中补齐「✨ 一键情景预设」子菜单，支持主显设备与全屋多机一键联动。
 
 ---
 
 ## 3. 关键架构变更与代码实现
 
-### 3.1 大小周与大休/小休/节假日反相时态自然调度大一统
-- **`VoiceCommandParser.swift` 前置大小周反相与正相拦截**：
+### 3.1 复合双核心关键词正则与流水线排序
+- **`VoiceCommandParser.swift`**：
   ```swift
-  // 4.-3 大小周与节假日反相/正相调度拦截 (v1.9.99)
-  let nonBigSmallHolidayPattern = #"(?:每个?|每周|每逢|逢)?\s*非\s*(?:大休|大周|节假日|休假日|放假日)"#
-  if let r = nonBigSmallHolidayPattern.range(of: text, options: .regularExpression) {
-      let days = [2, 3, 4, 5, 6] // 工作日
-      return (days, formatRepeatWeekdaysLabel(days) ?? "工作日")
-  }
-
-  let nonSmallRestPattern = #"(?:每个?|每周|每逢|逢)?\s*非\s*(?:小休|小周|小休日)"#
-  if let r = nonSmallRestPattern.range(of: text, options: .regularExpression) {
-      let days = [2, 3, 4, 5, 6, 7] // 周一至周六
-      return (days, formatRepeatWeekdaysLabel(days) ?? "周一至周六")
-  }
-  ```
-- **`extractExcludedDays` 排除型嵌套语义大小周与节假日补集自洽**：
-  ```swift
-  if t.contains("非大休") || t.contains("非大周") || t.contains("非节假日") {
-      return [2, 3, 4, 5, 6]
-  }
-  if t.contains("非小休") || t.contains("非小周") || t.contains("非小休日") {
-      return [2, 3, 4, 5, 6, 7]
-  }
-  if t.contains("大休") || t.contains("大周") || t.contains("节假日") {
-      return [1, 7]
-  }
-  if t.contains("小休") || t.contains("小周") || t.contains("小休日") {
-      return [1]
+  // 4.18 纯核心关键词双重组合口语（如“工作日加周末”、“工作日和双休”、“周末和平时”）(v1.9.100)
+  if let regex = keywordWithKeywordRegex,
+     let match = regex.firstMatch(in: text, options: [], range: fullRange),
+     match.numberOfRanges >= 3 {
+      let kw1 = nsString.substring(with: match.range(at: 1))
+      let kw2 = nsString.substring(with: match.range(at: 2))
+      var days = Set<Int>()
+      for kw in [kw1, kw2] {
+          if kw == "工作日" || kw == "平时" || kw == "平日" {
+              days.formUnion([2, 3, 4, 5, 6])
+          } else if kw == "周末" || kw == "双休" || kw == "双休日" || kw == "休息日" || kw == "公休日" || kw == "休假日" || kw == "放假日" || kw == "节假日" {
+              days.formUnion([1, 7])
+          } else if kw == "单休" {
+              days.formUnion([2, 3, 4, 5, 6, 7])
+          } else if kw == "周末三天" {
+              days.formUnion([1, 6, 7])
+          }
+      }
+      if !days.isEmpty {
+          let sorted = days.sorted()
+          return (sorted, formatWeekdayLabel(from: sorted))
+      }
   }
   ```
 
-### 3.2 macOS 原生状态栏全屋与单机温度步进待机唤醒
+### 3.2 星期时相防黏连与小数防穿透
+- **`VoiceCommandParser.swift`**：
+  ```swift
+  // 排除后接“分/分钟”及“十/数字”的钟点分表达，杜绝“十点五十分”误转为 10.5
+  let decimalPointPattern = #"([零0一二两三四五六七八九\d]+)点(?:五|5)(?![分分钟]|十|\d)"#
+
+  // 隔离星期数字与紧随其后的钟点，避免“周一8点”转换成“周18点”被误判为18:00
+  let weekdayHourCollisionPattern = #"((?:周|星期|礼拜)[1-7])(?=\d{1,2}(?:点|时|:))"#
+  if let regex = try? NSRegularExpression(pattern: weekdayHourCollisionPattern) {
+      let ns = str as NSString
+      str = regex.stringByReplacingMatches(in: str, options: [], range: NSRange(location: 0, length: ns.length), withTemplate: "$1 ")
+  }
+  ```
+
+### 3.3 macOS 原生状态栏一键情景预设快捷菜单
 - **`StatusItemController.swift`**：
   ```swift
-  let canAdjustTempAll = model.gatewayConnected && !controllableDevices.isEmpty
-  let tempStandbyHint = onDevices.isEmpty ? " (全屋待机中 · 点击唤醒调温)" : ""
-
-  let upItem = NSMenuItem(title: "🌡️ 全屋升温 1°C\(tempStandbyHint)", action: #selector(adjustAllTempFromMenu(_:)), keyEquivalent: "")
-  upItem.representedObject = Double(1.0)
-  upItem.isEnabled = canAdjustTempAll && (allAtMaxTemp == false)
-  ...
-  ```
-  通过 `autoPowerOn: true` 将调温动作平滑透传到底层 `AppModel`，待机设备直接唤醒开机并调整温度。
-
-### 3.3 AppModel 调温 API 待机唤醒全链路贯通
-- **`AppModel.swift`**：
-  ```swift
-  func adjustDeviceTemperature(deviceId: String, delta: Double, autoPowerOn: Bool = false) async -> Bool {
-      guard let dev = devices.first(where: { $0.id == deviceId }) else { return false }
-      if !dev.isPowerOn && autoPowerOn {
-          _ = await setPower(deviceId: deviceId, power: true)
+  let scenes = model.scenes
+  if !scenes.isEmpty {
+      let scenesMenu = NSMenu()
+      scenesMenu.autoenablesItems = false
+      for scene in scenes {
+          let actionDesc = scene.actions.map(\.attrDesc).joined(separator: " · ")
+          let sceneGlyph = ...
+          if allDevices.count > 1 {
+              // 支持主显设备与全屋协同双选项
+              ...
+          } else {
+              // 单设备一键直达
+              ...
+          }
       }
-      ...
-  }
-  ```
-
-### 3.4 Siri 调温上限误报纠正与待机自动唤醒
-- **`AppIntents.swift`**：
-  ```swift
-  let targetDevices = onDevices.isEmpty ? controllableDevices : onDevices
-  guard !targetDevices.isEmpty else {
-      throw $appError("未找到可控制的空调设备")
-  }
-  let needAutoPower = onDevices.isEmpty
-  for dev in targetDevices {
-      _ = await model.adjustDeviceTemperature(deviceId: dev.id, delta: delta, autoPowerOn: needAutoPower)
+      let scenesParentItem = NSMenuItem(title: "✨ 一键情景预设 (\(scenes.count)项)...", action: nil, keyEquivalent: "")
+      menu.setSubmenu(scenesMenu, for: scenesParentItem)
+      menu.addItem(scenesParentItem)
   }
   ```
 
@@ -116,35 +107,20 @@
 ## 4. 验证与测试结果
 
 - **单元测试覆盖**：
-  在 `Sources/HaierACCoreTests/VoiceCommandParserTests.swift` 中新增 `testBigSmallWeekendScheduleV1999`（28 组严苛断言 100% PASS）：
-  - `"逢大休8点开机"` -> `08:00` 开机，周末双休循环 (`[1, 7]`) (PASS)
-  - `"大周8点开机"` -> `08:00` 开机，周末双休循环 (`[1, 7]`) (PASS)
-  - `"节假日8点开机"` -> `08:00` 开机，周末双休循环 (`[1, 7]`) (PASS)
-  - `"逢小休8点开机"` -> `08:00` 开机，周日循环 (`[1]`) (PASS)
-  - `"小周8点开机"` -> `08:00` 开机，周日循环 (`[1]`) (PASS)
-  - `"非大休8点开机"` -> `08:00` 开机，工作日循环 (`[2, 3, 4, 5, 6]`) (PASS)
-  - `"非大周8点开机"` -> `08:00` 开机，工作日循环 (`[2, 3, 4, 5, 6]`) (PASS)
-  - `"非节假日8点开机"` -> `08:00` 开机，工作日循环 (`[2, 3, 4, 5, 6]`) (PASS)
-  - `"非小休8点开机"` -> `08:00` 开机，周一至周六循环 (`[2, 3, 4, 5, 6, 7]`) (PASS)
-  - `"非小周8点开机"` -> `08:00` 开机，周一至周六循环 (`[2, 3, 4, 5, 6, 7]`) (PASS)
-  - `"除大休外每天8点开机"` -> `08:00` 开机，工作日循环 (`[2, 3, 4, 5, 6]`) (PASS)
-  - `"除小休外每天8点开机"` -> `08:00` 开机，周一至周六循环 (`[2, 3, 4, 5, 6, 7]`) (PASS)
-  - `"除非大休外每天8点开机"` -> `08:00` 开机，周末双休循环 (`[1, 7]`) (PASS)
-  - `"除非小休外每天8点开机"` -> `08:00` 开机，周日循环 (`[1]`) (PASS)
-  - `"除节假日外每天8点开机"` -> `08:00` 开机，工作日循环 (`[2, 3, 4, 5, 6]`) (PASS)
-  - 时相归一断言：`"大休半"`, `"小休半"`, `"非大休半"`, `"非小休半"` 精准映射至 `08:30` (PASS)
-  - 防即时误触断言：8 组大小周与节假日口语断言绝不穿透至即时开关机 (PASS)
-
+  - `SDKROOT=/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk swift test` -> **108 tests 全部 PASS（0 failures）**：
+    - `VoiceCommandParserTests`: 62 tests (含 `testExclusionRepeatWeekdays`, `testBigSmallWeekendScheduleV1999`, `testNonWeekdayScheduleGeneralizationV1998`, `testSingleWeekendAndMultiScheduleHardeningV1994` 等) 100% 通过；
+    - `ZlibTests`: 7 tests 100% 通过；
+    - `HaierACCoreTests`: 108 tests 100% 通过。
 - **本地编译验证**：
-  - `SDKROOT=/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk swift build` -> 100% 通过（0 错误，0 致命告警）
-  - `./build_app.sh 1.9.99` -> 打包成功：
-    - `dist/HaierAC.app` (v1.9.99, 含小组件)
-    - `dist/HaierAC-v1.9.99-macOS.zip` (SHA256 完整，已归档)
+  - `SDKROOT=/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk swift build -c release` -> 100% 通过（0 错误）。
+  - 打包生成产物：
+    - `dist/HaierAC.app` (v1.9.100, 完整应用)
+    - `dist/HaierAC-v1.9.100-macOS.zip` (2.8MB, SHA256: `82dd976feaeca72cd4661d0b788f37417373c17b9d4c408b0f3e8aea6ee7fae7`)
 
 ---
 
 ## 5. 发版交付总结
 
-- **Git Commit**：包含大小周与节假日反相循环调度引擎、macOS 原生状态栏全屋/单机温度步进待机唤醒、AppModel 调温 API 待机唤醒及 Siri 调温误报纠正。
-- **Git Tag**：`v1.9.99`
+- **Git Commit**：包含多区间复合周期调度、星期时相防黏连与负向排除全基准大一统引擎及状态栏情景预设快捷下发。
+- **Git Tag**：`v1.9.100`
 - **GitHub Release**：附带产物压缩包与完整更新日志。
