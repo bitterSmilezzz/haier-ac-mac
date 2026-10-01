@@ -341,7 +341,25 @@ public final class EnergyAnalyticsEngine: ObservableObject {
             return min(1.05, 1.0 + penalty)
         }()
 
-        let dynamicMultiplier = soakMultiplier * cleanMultiplier * filterMultiplier
+        // 变频压缩机开机软启动与高压建立动态升频微阻尼模型 (Compressor Soft-Start Dynamic Ramping Model) (v1.9.114):
+        // 直流变频空调压缩机由待机状态启动时，电控变频驱动器为避免冷冻润滑油剧烈吸入（防液击）以及对家庭电网产生冲击电流，
+        // 遵循 GB/T 7725 与微电脑电控程序执行 0 ~ 3 分钟平滑变频软启动策略：
+        // - continuousMinutes == 0 (前 60 秒)：低频起动段 (20~30Hz)，压缩机负荷乘数约为 0.65，平滑建立排气压差；
+        // - continuousMinutes == 1 (第 1~2 分钟)：变频线性升频段 (30~55Hz)，负荷乘数平滑上升至 0.85；
+        // - continuousMinutes == 2 (第 2~3 分钟)：接近目标工况频率段，负荷乘数平滑上升至 0.95；
+        // - continuousMinutes >= 3：达到额定变频温差调频状态，负荷乘数为 1.00。
+        // 送风工况（仅室内风机运转，无压缩机）与自清洁工况不参与软启动乘数折减。
+        let softStartMultiplier: Double = {
+            guard isPowerOn && !isSelfCleaning && continuousMinutes < 3 else { return 1.0 }
+            switch continuousMinutes {
+            case 0: return 0.65
+            case 1: return 0.85
+            case 2: return 0.95
+            default: return 1.0
+            }
+        }()
+
+        let dynamicMultiplier = soakMultiplier * cleanMultiplier * filterMultiplier * softStartMultiplier
 
         // 未识别模式采用物理中性功率估算策略（冷热综合无偏估计 + 恒温维持态平滑热阻尼模型 + 热饱和漂移微补偿，v1.9.86, v1.9.90, v1.9.112）：
         // 1. 若室内温度与设定温度均有效，采用制冷动力曲线与制热动力曲线在温差绝对值 |ΔT| 下的双向无偏中性基准：

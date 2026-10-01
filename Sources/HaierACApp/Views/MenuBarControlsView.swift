@@ -105,10 +105,13 @@ struct MenuBarControlsView: View {
                 // 2.1 智能睡眠快速启停模块 (运行中显示进度与随时停止，空闲时开启受设备可达性门禁保护)
                 sleepControlPod(device: device)
 
-                // 2.2 蒸发器自清洁状态指示 (若处于清洁中)
-                if model.isSelfCleaningActive {
+                // 2.2 蒸发器自清洁状态与洁净保护指示 (若处于清洁中或洁净保护期) (v1.9.114)
+                if model.isSelfCleaningActive || model.isSelfCleaningProtectionActive(for: device.id) {
                     selfCleaningPod(device: device)
                 }
+
+                // 2.25 滤网积尘健康预警与拆洗保养胶囊 (若当前机滤网洁净度 <= 30%) (v1.9.114)
+                filterWarningPod(device: device)
 
                 // 2.3 睡眠助眠白噪音快捷播控 (若正在播放或配置开启)
                 if ambient.isPlaying || model.sleepAmbientSoundEnabled {
@@ -1385,6 +1388,25 @@ struct MenuBarControlsView: View {
 
             Spacer()
 
+            Button {
+                triggerHaptic()
+                NotificationCenter.default.post(name: .haierOpenMainWindow, object: nil)
+                NSApp.activate(ignoringOtherApps: true)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    model.showFilterCareSheet = true
+                }
+            } label: {
+                HStack(spacing: 3) {
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 10))
+                    Text("滤网与清洁")
+                        .font(.system(size: 11, weight: .medium))
+                }
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(Theme.inkMuted)
+            .help("打开空调滤网健康度监测与自清洁保养弹窗")
+
             ThemePickerMenu()
 
             Button {
@@ -1596,60 +1618,163 @@ struct MenuBarControlsView: View {
         }
     }
 
-    // MARK: - 蒸发器自清洁状态卡 (v1.9.21, v1.9.111 全局多设备宿主感知与一键切换)
+    // MARK: - 蒸发器自清洁状态卡 (v1.9.21, v1.9.111 全局多设备宿主感知与一键切换, v1.9.114 洁净保护期感知)
 
+    @ViewBuilder
     private func selfCleaningPod(device: DeviceInfo) -> some View {
-        let isCurrentDevCleaning = model.selfCleaningDeviceId == device.id || (model.selfCleaningDeviceId == nil && model.allUnifiedDevices.count == 1)
-        let hostName = model.selfCleaningDeviceId.map { model.deviceName(for: $0) } ?? device.deviceName
-        let m = model.selfCleaningRemainingSeconds / 60
-        let s = model.selfCleaningRemainingSeconds % 60
+        if model.isSelfCleaningActive {
+            let isCurrentDevCleaning = model.selfCleaningDeviceId == device.id || (model.selfCleaningDeviceId == nil && model.allUnifiedDevices.count == 1)
+            let hostName = model.selfCleaningDeviceId.map { model.deviceName(for: $0) } ?? device.deviceName
+            let m = model.selfCleaningRemainingSeconds / 60
+            let s = model.selfCleaningRemainingSeconds % 60
 
-        return HStack(spacing: 8) {
-            Image(systemName: "flame.fill")
-                .font(.system(size: 12))
-                .foregroundStyle(Color.dynamic(light: 0xF05A28, dark: 0xFF6934))
+            HStack(spacing: 8) {
+                Image(systemName: "flame.fill")
+                    .font(.system(size: 12))
+                    .foregroundStyle(Color.dynamic(light: 0xF05A28, dark: 0xFF6934))
 
-            VStack(alignment: .leading, spacing: 2) {
-                Text(isCurrentDevCleaning ? "「\(device.deviceName)」56°C 自清洁中" : "「\(hostName)」自清洁进行中")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(Theme.ink)
-                    .lineLimit(1)
-                Text(isCurrentDevCleaning
-                    ? "剩余 \(String(format: "%02d:%02d", m, s)) • 翅片凝霜烘干灭菌"
-                    : "剩余 \(String(format: "%02d:%02d", m, s)) • 本机处于待命")
-                    .font(.system(size: 10))
-                    .foregroundStyle(Theme.inkMuted)
-            }
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(isCurrentDevCleaning ? "「\(device.deviceName)」56°C 自清洁中" : "「\(hostName)」自清洁进行中")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(Theme.ink)
+                        .lineLimit(1)
+                    Text(isCurrentDevCleaning
+                        ? "剩余 \(String(format: "%02d:%02d", m, s)) • 翅片凝霜烘干灭菌"
+                        : "剩余 \(String(format: "%02d:%02d", m, s)) • 本机处于待命")
+                        .font(.system(size: 10))
+                        .foregroundStyle(Theme.inkMuted)
+                }
 
-            Spacer()
+                Spacer()
 
-            if !isCurrentDevCleaning && model.reachability(for: device).isControllable {
-                Button("切至本机") {
+                if !isCurrentDevCleaning && model.reachability(for: device).isControllable {
+                    Button("切至本机") {
+                        triggerHaptic()
+                        model.startSelfCleaning(deviceId: device.id)
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.mini)
+                    .help("将 56°C 深度自清洁转移至当前选中的「\(device.deviceName)」执行")
+                }
+
+                Button("中止") {
                     triggerHaptic()
-                    model.startSelfCleaning(deviceId: device.id)
+                    model.stopSelfCleaning()
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.mini)
-                .help("将 56°C 深度自清洁转移至当前选中的「\(device.deviceName)」执行")
+                .help("中止当前正在执行的 56°C 高温除菌自清洁托管")
             }
+            .padding(8)
+            .background(
+                RoundedRectangle(cornerRadius: Theme.radiusMD, style: .continuous)
+                    .fill(Color.dynamic(light: 0xFFF3ED, dark: 0x331C12))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: Theme.radiusMD, style: .continuous)
+                            .strokeBorder(Color.dynamic(light: 0xFFA07A, dark: 0x8B4513).opacity(0.3), lineWidth: 1)
+                    )
+            )
+        } else if model.isSelfCleaningProtectionActive(for: device.id) {
+            // 蒸发器洁净保护期感知（自清洁后 14 天内翅片洁净无尘垢水膜，换热效率提升，v1.9.114）
+            HStack(spacing: 8) {
+                Image(systemName: "checkmark.shield.fill")
+                    .font(.system(size: 12))
+                    .foregroundStyle(Theme.success)
 
-            Button("中止") {
-                triggerHaptic()
-                model.stopSelfCleaning()
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack(spacing: 4) {
+                        Text("蒸发器洁净保护中")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(Theme.ink)
+                        Text("增效 +4%")
+                            .font(.system(size: 9, weight: .bold))
+                            .foregroundStyle(Theme.success)
+                            .padding(.horizontal, 4)
+                            .padding(.vertical, 1)
+                            .background(Theme.success.opacity(0.12))
+                            .clipShape(Capsule())
+                    }
+                    Text("56°C 除菌保护中，换热翅片洁净低热阻")
+                        .font(.system(size: 10))
+                        .foregroundStyle(Theme.inkMuted)
+                        .lineLimit(1)
+                }
+
+                Spacer()
             }
-            .buttonStyle(.bordered)
-            .controlSize(.mini)
-            .help("中止当前正在执行的 56°C 高温除菌自清洁托管")
+            .padding(8)
+            .background(
+                RoundedRectangle(cornerRadius: Theme.radiusMD, style: .continuous)
+                    .fill(Color.dynamic(light: 0xF0FDF4, dark: 0x14281A))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: Theme.radiusMD, style: .continuous)
+                            .strokeBorder(Theme.success.opacity(0.25), lineWidth: 1)
+                    )
+            )
         }
-        .padding(8)
-        .background(
-            RoundedRectangle(cornerRadius: Theme.radiusMD, style: .continuous)
-                .fill(Color.dynamic(light: 0xFFF3ED, dark: 0x331C12))
-                .overlay(
-                    RoundedRectangle(cornerRadius: Theme.radiusMD, style: .continuous)
-                        .strokeBorder(Color.dynamic(light: 0xFFA07A, dark: 0x8B4513).opacity(0.3), lineWidth: 1)
-                )
-        )
+    }
+
+    // MARK: - 滤网健康度预警与拆洗维护胶囊 (v1.9.114)
+
+    @ViewBuilder
+    private func filterWarningPod(device: DeviceInfo) -> some View {
+        let cleanliness = model.filterCleanlinessPercentage(for: device.id)
+        if cleanliness <= 30 {
+            HStack(spacing: 8) {
+                Image(systemName: "exclamationmark.shield.fill")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(cleanliness <= 10 ? Theme.danger : Theme.warning)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack(spacing: 4) {
+                        Text("滤网积尘预警")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(Theme.ink)
+                        Text("剩余 \(cleanliness)%")
+                            .font(.system(size: 9, weight: .bold))
+                            .foregroundStyle(cleanliness <= 10 ? Theme.danger : Theme.warning)
+                            .padding(.horizontal, 4)
+                            .padding(.vertical, 1)
+                            .background((cleanliness <= 10 ? Theme.danger : Theme.warning).opacity(0.12))
+                            .clipShape(Capsule())
+                    }
+                    Text("进风气阻增加致换热负荷上升，建议拆洗")
+                        .font(.system(size: 10))
+                        .foregroundStyle(Theme.inkSubtle)
+                }
+
+                Spacer()
+
+                Button {
+                    triggerHaptic()
+                    NotificationCenter.default.post(name: .haierOpenMainWindow, object: nil)
+                    NSApp.activate(ignoringOtherApps: true)
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                        model.showFilterCareSheet = true
+                    }
+                } label: {
+                    Text("保养重置")
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(Theme.accent)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(Theme.accent.opacity(0.12))
+                        .cornerRadius(Theme.radiusSM)
+                }
+                .buttonStyle(.plain)
+                .help("查看滤网拆洗指南或重置滤网计时")
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(
+                RoundedRectangle(cornerRadius: Theme.radiusMD, style: .continuous)
+                    .fill(cleanliness <= 10 ? Color.dynamic(light: 0xFFF2F2, dark: 0x331414) : Color.dynamic(light: 0xFFF9F0, dark: 0x2E2412))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: Theme.radiusMD, style: .continuous)
+                            .strokeBorder(cleanliness <= 10 ? Color.dynamic(light: 0xFFD0D0, dark: 0x5C2020) : Color.dynamic(light: 0xFFE0B2, dark: 0x543B17), lineWidth: 1)
+                    )
+            )
+        }
     }
 
     // MARK: - 睡眠助眠白噪音迷你播控 (v1.9.21)

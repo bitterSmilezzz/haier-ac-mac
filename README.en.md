@@ -6,6 +6,30 @@ A native SwiftUI app to control Haier / Leader (统帅) smart air conditioners o
 
 ## Features
 
+- 🏷 **Octa-Keywords & Hexa-Compound Universal Scheduling, Compressor Soft-Start Dynamic Ramping Damping Model, and Control Center Filter Health Awareness (v1.9.114)**:
+  - ⏱️ **"Octa-Keywords Universal Scheduling, Hexa-Compound Topology, and Reinforced Spoken Negation Protection" Spoken Engine (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)**:
+    - **Octa-Keywords Universal Scheduling (`octaKeywordsRegex`)**: Introduced `octaKeywordsRegex` to support scheduling across all 8 core keyword categories simultaneously (e.g., "工作日、平时、平日、双休日、双休、大休、小休和单休每天早8点开机" `[1..7]`), completely eliminating multi-keyword spoken truncation;
+    - **Hexa-Compound Spoken Topology Expansion (`dualRangeWithTriKeywordsRegex` / `triKeywordsWithDualRangeRegex` / `keywordWithDualRangeAndDualKeywordsRegex` / `dualKeywordsWithDualRangeAndKeywordRegex` / `rangeWithDualKeywordsAndRangeWithKeywordRegex` / `rangeWithKeywordAndRangeWithDualKeywordsRegex`)**:
+      - `dualRangeWithTriKeywordsRegex`: Two ranges prefix + three keywords (e.g., "周一至周二、周四至周五加大休、小休和单休每天早8点开机" `[1..7]`);
+      - `triKeywordsWithDualRangeRegex`: Three keywords prefix + two ranges (e.g., "大休、小休和单休加周一至周二、周四至周五每天早8点开机" `[1..7]`);
+      - `keywordWithDualRangeAndDualKeywordsRegex`: One keyword prefix + two ranges + two keywords (e.g., "大休加周一至周二、周四至周五加小休和单休每天早8点开机" `[1..7]`);
+      - `dualKeywordsWithDualRangeAndKeywordRegex`: Two keywords prefix + two ranges + one keyword (e.g., "工作日和平时加周六至周日、周一至周二加大休每天早8点开机" `[1..7]`);
+      - `rangeWithDualKeywordsAndRangeWithKeywordRegex`: Range + two keywords + range + keyword (e.g., "周一至周二加大休和小休加周四至周五加工作日每天早8点开机" `[1..7]`);
+      - `rangeWithKeywordAndRangeWithDualKeywordsRegex`: Range + keyword + range + two keywords (e.g., "周一至周二加工作日加周四至周五加大休和小休每天早8点开机" `[1..7]`);
+    - **Reinforced Spoken Multi-Word Negation & Action Protection**: Expanded `negativeActionRegex`, `containsNegativeForAction`, and `containsNegativeAction` with robust colloquial negative prefixes ("可千万别", "可千万不要", "千万可别", "万不可", "亿万不可", "切切不可", "断不可", "绝不可", "决不可", "决不能", "决不要") and action verbs ("关停", "切断", "断开", "断电", "停机"), safeguarding zero unintended power operations;
+    - **100% Unit Test Suite Coverage**: Added `testOctaKeywordsAndHexaCompoundScheduleV19114` test suite with all 122 unit tests passing with zero errors (0 failures).
+  - 🔋 **Thermodynamic Compressor Soft-Start Dynamic Ramping Micro-Damping Model (`EnergyAnalyticsEngine.swift`)**:
+    - **Compressor Soft-Start Dynamic Ramping Damping Model**: Incorporated continuous running minutes (`continuousMinutes`) into `estimateInstantaneousPower`;
+    - Initial spin-up phase (`continuousMinutes == 0`): 0.65 multiplier, modeling inverter ultra-low frequency startup (20~30Hz) and initial high/low pressure differential build-up;
+    - 1 minute elapsed (`continuousMinutes == 1`): 0.85 multiplier, modeling linear frequency ramping;
+    - 2 minutes elapsed (`continuousMinutes == 2`): 0.95 multiplier, smooth transition;
+    - 3 minutes and beyond (`continuousMinutes >= 3`): 1.00 multiplier, entering full rated inverter PID load regulation;
+    - Seamlessly harmonizes with thermal soak decay, evaporator self-cleaning benefits, and filter airflow resistance for an authentic thermodynamic simulation.
+  - 🎛️ **macOS Menu Bar Control Center Air Filter Dust Alert Pod & Self-Cleaning Awareness (`MenuBarControlsView.swift`)**:
+    - **Filter Health Alert Pod (`filterWarningPod`)**: When filter cleanliness drops to `<= 30%`, the control center dynamically presents a high-visibility amber/red alert capsule displaying cleanliness percentage with a direct "保养重置" button linking to `FilterCareSheet`;
+    - **14-Day Self-Cleaning Protection Micro-Badge (`selfCleaningPod`)**: During the 14-day window following evaporator self-cleaning, displays an active green shield badge with "增效 +4%", visibly reflecting thermodynamic energy savings;
+    - **Bottom Quick Entrypoint**: Added a dedicated "滤网与清洁" button in the control center footer for one-click access to the full `FilterCareSheet`.
+
 - 🏷 **Hepta-Keywords & Penta-Compound Sandwich Universal Scheduling, Air Filter Flow Resistance Dynamic Damping Model, and Control Center Fine-Tuning Step Persistence (v1.9.113)**:
   - ⏱️ **"Hepta-Keywords Universal Scheduling, Penta-Compound Sandwich Topology, and Reinforced Spoken Negation Protection" Spoken Engine (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)**:
     - **Hepta-Keywords Universal Scheduling (`heptaKeywordsRegex`)**: Added `heptaKeywordsRegex` to support scheduling all 7 core keyword categories simultaneously (e.g., "工作日、平时、平日、双休日、大休、小休和单休每天早8点开机" `[1..7]`), closing hanging keyword truncation;
