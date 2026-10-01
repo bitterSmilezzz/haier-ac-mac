@@ -1,25 +1,26 @@
-# Haier AC Mac v1.9.111 发布与巡检演进报告
+# Haier AC Mac v1.9.112 发布与巡检演进报告
 
 ## 1. 概述与版本定位
-- **版本号**：`v1.9.111`
-- **发版主题**：闭环五核心关键词与口语排除大一统调度、状态栏与控制中心自清洁全生命周期操作闭环及全屋高精微调
+- **版本号**：`v1.9.112`
+- **发版主题**：闭环六核心关键词与五元复合排班大一统调度、控制中心模式风速全屋协同及自清洁能耗连续微补偿
 - **核心目标与架构演进**：
-  1. **“五核心关键词全景排班、口语排除引导词大一统与深层词法拆词断言修复”自然口语调度引擎 (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)**：
-     - **深层正则词法截断 bug 彻底修复**：排查并修复 `implicitExclusionRepeatRegex` 隐式排除负向断言 `(?<![周星期礼拜平定])`，杜绝因包含“时”导致“平时”（工作日）与“定时”被拆分为“平”与“时”（被断言捕获截断）的深层隐患；
-     - **口语排除引导词大一统**：在 `explicitExclusionRepeatRegex`、`implicitExclusionRepeatRegex` 与 `extractExcludedDays` 中全面纳管“除开”、“除去”、“刨除”、“扣除”，与原有“除”、“除了”等完全对称统一；
-     - **五核心关键词全景复合调度闭环**：新增 `pentaKeywordsRegex` 并在 `parseBaseRepeatWeekdays` 中完备纳管五核心关键词复合组合（如“工作日、双休、大休、小休同单休日每天早8点开机” `[1..7]`），彻底消灭多关键词口语遗漏缺陷；
-     - **排除型反相调度自动贯通**：如“除开工作日外每天早8点开机”精准计算为周末 `[1, 7]`、“刨除双休日和单休每天早8点开机”精准计算为单休工作日、“扣除大休和小休每天早8点开机”精准阻断；
-     - **单元测试 100% 满分覆盖**：新增 `testPentaKeywordsAndColloquialExclusionV19111` 严苛测试套件，全套 119 个单元测试零缺陷通过（0 failures）。
-  2. **macOS 原生状态栏与控制中心蒸发器自清洁全生命周期操作闭环 (`StatusItemController.swift` / `MenuBarControlsView.swift`)**：
-     - **状态栏自清洁全入口闭环**：
-       - 单设备独立模式菜单与多设备子菜单中，实时感知自清洁进度并在运行中展示“🛑 中止 56°C 自清洁 (剩余 mm:ss)”、空闲时展示“✨ 启动 56°C 蒸发器自清洁...”；
-       - 顶层滤网子菜单中全面补齐自清洁进行中快捷中止项与全屋多机自清洁启动二级子菜单，消灭从状态栏无法直接发起或中止自清洁的操作断层；
-       - 底层补齐 `@objc` 事件转发至 `AppModel.startSelfCleaning(deviceId:)` 与 `AppModel.stopSelfCleaning()`；
-     - **控制中心（MenuBarControlsView）宿主动态感知与一键切换**：
-       - 升级 `selfCleaningPod`，当全屋任意一台空调处于自清洁中时，动态呈现该机组名称（如“「客厅空调」自清洁进行中”），在非本机自清洁时支持一键“切至本机”与一键“中止”，消灭多机环境下的设备指代歧义。
-  3. **macOS 菜单栏 Bento 控制中心全屋调温高精微调与标准步进双态切换 (`MenuBarControlsView.swift`)**：
-     - **`1.0°C` 标准步进 / `0.5°C` 高精微调动态切换**：在全屋联动调温模式下，顶部操作栏增设 `1.0°` / `0.5°` 切换胶囊；
-     - **全屋统一步进调节**：根据选定步进粒度动态下发全屋调温并自适应更新气泡提示（如“全屋运行中空调统一降温 0.5°C”），满足极端体感对细分温阶的高精度诉求。
+  1. **“六核心关键词全景排班、五元复合拓扑拓展与口语排除词全纳管”自然口语调度引擎 (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)**：
+     - **纯六核心关键词全景调度 (`hexaKeywordsRegex`)**：新增 `hexaKeywordsRegex`，支持六核心关键词复合排班（如“工作日、平时、双休、大休、小休同单休日每天早8点开机” `[1..7]`），彻底根除关键词超多时的口语截断；
+     - **五元复合口语拓扑拓展 (`rangeWithQuadKeywordsRegex` / `quadKeywordsWithRangeRegex`)**：
+       - `rangeWithQuadKeywordsRegex`：连续区间在先、四核心关键词在后（如“周三至周四加工作日、双休、大休和小休每天早8点开机” `[1..7]`）；
+       - `quadKeywordsWithRangeRegex`：四核心关键词在先、连续区间在后（如“工作日、双休、大休和小休加周三至周四每天早8点开机” `[1..7]`）；
+     - **口语排除引导词全面拓展**：在 `extractExcludedDays` 与 `implicitExclusionRepeatRegex` 中新增“除掉”、“排除”、“剔除”、“撇除”，与原有“除开/除去/刨除/扣除/除了”完全对齐；
+     - **否定意图防误触加固**：在 `negativeActionRegex` 中增加“绝不能”、“绝不要”、“暂且别”、“先不用”，防止口语闲聊被误识别为开关机动作；
+     - **单元测试 100% 满分覆盖**：新增 `testHexaKeywordsAndQuadCompositeV19112` 严苛测试套件，全套 120 个单元测试零缺陷通过（0 failures）。
+  2. **能耗动力学蒸发器自清洁洁净度换热效率连续微补偿 (`EnergyAnalyticsEngine.swift` / `AppModel.swift`)**：
+     - **自清洁能耗连续微补偿模型 (Evaporator Cleanliness Efficiency Bonus)**：在 `DeviceEnergySample` 与 `estimateInstantaneousPower` 中接入 `cleanlinessFactor`；
+     - 结合 56°C 高温自清洁后的翅片热阻降低与风阻减小，在 14 天自清洁保护期内引入连续微补偿热阻尼模型，变频压缩机维持恒温所需电耗享受 0% ~ 4% 平滑节能收益，使物理能耗模拟与自清洁保养生态严密自洽。
+  3. **macOS 菜单栏控制中心全屋模式与风速协同 Bento (`MenuBarControlsView.swift`)**：
+     - **运行模式与风速全屋/单机双态切换 (`modeScopeAll`)**：在多设备环境下，`modeAndFanPod` 顶部增设作用域切换胶囊（“当前机” / “全屋 (N台运行)”）；
+     - 开启全屋模式后，一键将全屋空调统一设为指定模式（制冷/制热/送风/除湿/自动）或指定风速（微风/中风/强劲/自动），并动态感知全屋一致性选中态；
+     - 与情景预设 Bento (`sceneScopeAll`)、目标温度 Bento (`tempScopeAll`)、电源快捷管理形成完整的控制中心四位一体全屋协同矩阵。
+  4. **macOS 原生状态栏自清洁看板细节优化 (`StatusItemController.swift`)**：
+     - 状态栏悬浮 Tooltip 动态标明当前处于 56°C 高温自清洁中的具体机组名称（如“「客厅空调」56°C 高温除菌自清洁进行中”），消除多机环境下的指代模糊。
 
 ---
 
@@ -27,60 +28,50 @@
 
 根据本项目设定的外部 Agent Code Review 审查机制，巡检启动阶段对 `docs/code-review/` 目录下审查报告及全仓架构进行了全景复核与缺陷深挖：
 1. **CR 历史问题全面复查闭环**：
-   - **否定意图结构化正则防御 (P1-1)**：`containsNegativeAction` 正则结构稳固，跨字符穿插防御严密；
+   - **否定意图结构化正则防御 (P1-1)**：`containsNegativeAction` 正则结构稳固，本轮进一步纳管“绝不能/绝不要/暂且别/先不用”，穿插插字防御更加严密；
    - **全屋与定向定时解耦 (P1-2)**：`cancelSchedules` 与 `cancelSchedulesAll` 精确分流，多设备批量取消分支全部贯通；
    - **工况占比计算属性消费 (P2-1)**：`EcoEnergySection` 已统一调用 4 个比率属性；
-   - **调温 16/30°C 边界防护 (P2-3)**：单设备与全屋协同均已严格实施边界限制并同步至状态栏与 UI Stepper 使能状态。
+   - **调温 16/30°C 边界防护 (P2-3)**：单设备与全屋协同均已严格实施边界限制并同步至状态栏与 UI 使能状态。
 2. **本轮走查发现的高价值优化与缺陷闭环**：
-   - **词法断言截断与“平时/定时”拆词 bug (P0 修复)**：隐式排除中的时间词负向断言 `(?:\d|早|晚|夜|中|上|下|凌晨|午|点|时|:|开|关|停)` 包含“时”，当遇到口语“平时”或“定时”时，由于断言捕获“时”，导致“平时”被拆分为“平”与“时”，造成周期解析截断。通过在负向断言中增加排除 `[平定]`（即 `(?<![周星期礼拜平定])`），彻底治愈了该深层拆词缺陷；
-   - **口语排除引导词大一统 (P1 修复)**：纳管“除开”、“除去”、“刨除”、“扣除”，解决口语排除词缺失缺陷；
-   - **五核心关键词全景复合调度 (P1 优化)**：新增 `pentaKeywordsRegex` 闭环五核心关键词复合组合；
-   - **状态栏自清洁操作全闭环 (P1 优化)**：在单机模式、多机子菜单以及顶层滤网保养菜单中打通自清洁启动与中止闭环；
-   - **控制中心宿主感知与高精步进切换 (P1 优化)**：多机环境下感知清洁宿主与切至本机，提供 `1.0°` / `0.5°` 步进胶囊。
+   - **六核心关键词排班与五元复合拓扑 (P1 优化)**：补齐 `hexaKeywordsRegex`、`rangeWithQuadKeywordsRegex`、`quadKeywordsWithRangeRegex`，彻底消灭超多关键词排班与连续区间复合排班口语遗漏缺陷；
+   - **口语排除词大一统 (P1 优化)**：纳管“除掉”、“排除”、“剔除”、“撇除”，与全仓现有排除规则达成 100% 结构对称；
+   - **蒸发器自清洁能耗动力学闭环 (P1 优化)**：在瞬时功率与采样聚合中接入 `cleanlinessFactor`，在 14 天自清洁保护期内引入连续微补偿热阻尼模型，物理能耗模拟自洽；
+   - **控制中心全屋模式与风速协同 (P1 优化)**：在 `modeAndFanPod` 中实现“当前机”与“全屋”双态切换，与情景、调温、电源构成完整的四位一体 Bento 矩阵；
+   - **状态栏自清洁机组标头消歧 (P2 优化)**：悬浮 Tooltip 指向明确的自清洁机组名称。
 
 ---
 
 ## 3. 关键架构变更与代码实现
 
-### 3.1 五核心关键词与口语排除大一统引擎
+### 3.1 六核心关键词与五元复合拓扑排班引擎
 - **`VoiceCommandParser.swift`**：
   ```swift
-  // 排除前缀负向断言排除 [平定]，防止“平时”与“定时”被截断
-  #"(?<![周星期礼拜平定])(?:\d|早|晚|夜|中|上|下|凌晨|午|点|时|:|开|关|停)"#
+  // 六核心关键词全景正则
+  private static let hexaKeywordsRegex: NSRegularExpression? = { ... }()
 
-  // 五核心关键词全景正则
-  private static let pentaKeywordsRegex: NSRegularExpression? = {
-      let pattern = #"(工作日|平时|双休|周末三天|大休|小休|周末|双休日|单休|单休日)\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(工作日|平时|双休|周末三天|大休|小休|周末|双休日|单休|单休日)\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(工作日|平时|双休|周末三天|大休|小休|周末|双休日|单休|单休日)\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(工作日|平时|双休|周末三天|大休|小休|周末|双休日|单休|单休日)\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(工作日|平时|双休|周末三天|大休|小休|周末|双休日|单休|单休日)"#
-      return try? NSRegularExpression(pattern: pattern)
-  }()
+  // 连续区间在先、四核心关键词在后
+  private static let rangeWithQuadKeywordsRegex: NSRegularExpression? = { ... }()
+
+  // 四核心关键词在先、连续区间在后
+  private static let quadKeywordsWithRangeRegex: NSRegularExpression? = { ... }()
   ```
 
-### 3.2 状态栏与控制中心自清洁操作闭环
-- **`StatusItemController.swift`**：
-  在单设备模式、多设备子菜单及顶层滤网子菜单中全面补齐自清洁启动与中止项：
+### 3.2 蒸发器自清洁热力学连续微补偿能耗模型
+- **`EnergyAnalyticsEngine.swift`**：
   ```swift
-  if isCleaningThisDev {
-      let stopCleanItem = NSMenuItem(
-          title: "🛑 中止 56°C 自清洁 (剩余 \(String(format: "%02d:%02d", m, s)))",
-          action: #selector(stopSelfCleaningFromMenu),
-          keyEquivalent: ""
-      )
-      ...
-  } else {
-      let cleanItem = NSMenuItem(
-          title: "✨ 启动 56°C 蒸发器自清洁...",
-          action: #selector(startDeviceSelfCleaningFromMenu(_:)),
-          keyEquivalent: ""
-      )
-      ...
-  }
-  ```
-- **`MenuBarControlsView.swift`**：
-  升级 `selfCleaningPod`，多设备自清洁中支持宿主感知与“切至本机”一键转移。
+  // 蒸发器自清洁洁净度热阻力与换热效率连续动力学微补偿
+  let cleanMultiplier: Double = {
+      guard isPowerOn && !isSelfCleaning && cleanlinessFactor < 1.0 else { return 1.0 }
+      let bonus = (1.0 - max(0.90, cleanlinessFactor)) * 0.40
+      return max(0.95, 1.0 - bonus)
+  }()
 
-### 3.3 控制中心全屋联动高精调温步进
+  let dynamicMultiplier = soakMultiplier * cleanMultiplier
+  ```
+
+### 3.3 控制中心模式与风速全屋协同 Bento
 - **`MenuBarControlsView.swift`**：
-  全屋模式下增设 `1.0°` / `0.5°` 步进粒度胶囊，支持高精微调。
+  在 `modeAndFanPod` 顶部增设作用域切换胶囊，支持多设备环境下模式与风速的全屋一键同步。
 
 ---
 
@@ -88,18 +79,18 @@
 
 1. **自动化单元测试全通**：
    - 执行 `SDKROOT=/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk swift test`：
-   - 包含 `VoiceCommandParserTests`、`ZlibTests` 等在内共 **119 个单元测试 100% 成功通过（0 failures, 0 unexpected）**。
+   - 包含 `VoiceCommandParserTests`、`ZlibTests` 等在内共 **120 个单元测试 100% 成功通过（0 failures, 0 unexpected）**。
 2. **Release 编译构建**：
    - 执行 `SDKROOT=/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk swift build -c release`：
    - 编译顺利通过，零警告零报错。
 3. **应用打包与签名**：
-   - 执行 `./build_app.sh 1.9.111`：
-   - 顺利生成 App 产物 `dist/HaierAC.app` 与发布安装包 `dist/HaierAC-v1.9.111-macOS.zip`（SHA256: `b07fe2b5bf518e402602c0be30c1af523ce659c0a7c938ee8d4382fb03fa1452`）。
+   - 执行 `./build_app.sh 1.9.112`：
+   - 顺利生成 App 产物 `dist/HaierAC.app` 与发布安装包 `dist/HaierAC-v1.9.112-macOS.zip`（SHA256: `a9f3b37756b291ef0c64519eee222af2f37203637ab22b59ee53c1f72e7ae9e1`）。
 
 ---
 
 ## 5. 发版信息与提交记录
-- **Git Commit**：`feat & fix: 闭环五核心关键词与口语排除大一统调度、状态栏与控制中心自清洁全生命周期操作闭环及全屋高精微调 (v1.9.111)`
-- **Git Tag**：`v1.9.111`
-- **Release Asset**：`dist/HaierAC-v1.9.111-macOS.zip`
-- **SHA256**：`b07fe2b5bf518e402602c0be30c1af523ce659c0a7c938ee8d4382fb03fa1452`
+- **Git Commit**：`feat & fix: 闭环六核心关键词与五元复合排班大一统调度、控制中心模式风速全屋协同及自清洁能耗连续微补偿 (v1.9.112)`
+- **Git Tag**：`v1.9.112`
+- **Release Asset**：`dist/HaierAC-v1.9.112-macOS.zip`
+- **SHA256**：`a9f3b37756b291ef0c64519eee222af2f37203637ab22b59ee53c1f72e7ae9e1`

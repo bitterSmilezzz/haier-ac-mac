@@ -1330,6 +1330,7 @@ final class AppModel: ObservableObject {
 
             // 自清洁工况归属判定：指定设备精确匹配，未指定仅在单设备时生效，阻断多设备 fail-open 风险 (v1.9.34)
             let isCleaning = isOnline && isSelfCleaningActive && (selfCleaningDeviceId == dev.id || (selfCleaningDeviceId == nil && allUnifiedDevices.count == 1))
+            let cleanFactor = selfCleaningProtectionFactor(for: dev.id)
 
             samples.append(
                 EnergyAnalyticsEngine.DeviceEnergySample(
@@ -1341,7 +1342,8 @@ final class AppModel: ObservableObject {
                     indoorHumidity: indoorHum,
                     windSpeed: windSpeed,
                     isSelfCleaning: isCleaning,
-                    continuousMinutes: deviceContinuousMinutes[dev.id] ?? 0
+                    continuousMinutes: deviceContinuousMinutes[dev.id] ?? 0,
+                    cleanlinessFactor: cleanFactor
                 )
             )
         }

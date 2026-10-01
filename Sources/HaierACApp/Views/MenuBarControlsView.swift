@@ -17,6 +17,8 @@ struct MenuBarControlsView: View {
     @State private var tempScopeAll = false
     /// 全屋联动调温步进：true 为 0.5°C 高精微调，false 为 1.0°C 标准温阶 (v1.9.111)
     @State private var wholeHouseFineStep = false
+    /// 运行模式与风速调节生效范围：false 为当前机，true 为全屋多联联动 (v1.9.112)
+    @State private var modeScopeAll = false
 
     private var selectedSleepCurve: SleepCurveConfig {
         if let id = selectedSleepCurveId, let curve = model.allSleepCurves.first(where: { $0.id == id }) {
@@ -1076,7 +1078,7 @@ struct MenuBarControlsView: View {
         }
     }
 
-    // MARK: - 4. 模式与风速分段矩阵
+    // MARK: - 4. 模式与风速分段矩阵 (v1.9.112 支持当前机/全屋多联联动切换)
 
     @ViewBuilder
     private func modeAndFanPod(
@@ -1084,20 +1086,99 @@ struct MenuBarControlsView: View {
         attrs: [String: DeviceAttribute],
         tint: Color
     ) -> some View {
+        let allDevices = model.allUnifiedDevices
+        let onDevices = allDevices.filter {
+            model.reachability(for: $0.id) == .available &&
+            (model.attributes[$0.id]?["onOffStatus"]?.boolValue == true)
+        }
+
         VStack(spacing: 8) {
+            // 若全屋多联机（>1台），展示顶部作用域切换条，与目标温度/情景 Bento 保持设计语言完全统一 (v1.9.112)
+            if allDevices.count > 1 {
+                HStack {
+                    Image(systemName: "slider.horizontal.3")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(tint)
+                    Text(modeScopeAll ? "全屋模式与风速" : "模式与风速")
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(Theme.inkSubtle)
+
+                    Spacer()
+
+                    HStack(spacing: 2) {
+                        Button {
+                            withAnimation(Theme.springFast) {
+                                modeScopeAll = false
+                                triggerHaptic()
+                            }
+                        } label: {
+                            Text("当前机")
+                                .font(.system(size: 9, weight: !modeScopeAll ? .semibold : .regular))
+                                .padding(.horizontal, 5)
+                                .padding(.vertical, 2)
+                                .foregroundStyle(!modeScopeAll ? Theme.ink : Theme.inkTertiary)
+                                .background(
+                                    Capsule().fill(!modeScopeAll ? Theme.surface3 : Color.clear)
+                                )
+                        }
+                        .buttonStyle(.plain)
+
+                        Button {
+                            withAnimation(Theme.springFast) {
+                                modeScopeAll = true
+                                triggerHaptic()
+                            }
+                        } label: {
+                            Text("全屋 (\(onDevices.count)台运行)")
+                                .font(.system(size: 9, weight: modeScopeAll ? .semibold : .regular))
+                                .padding(.horizontal, 5)
+                                .padding(.vertical, 2)
+                                .foregroundStyle(modeScopeAll ? Theme.ink : Theme.inkTertiary)
+                                .background(
+                                    Capsule().fill(modeScopeAll ? Theme.surface3 : Color.clear)
+                                )
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    .padding(2)
+                    .background(Capsule().fill(Theme.surface2))
+                }
+                .padding(.horizontal, 2)
+            }
+
             // 模式选择分段矩阵
             if let mode = attrs["operationMode"], mode.writable, case .list(let opts) = mode.valueRange {
                 let currentVal = mode.value?.stringValue ?? ""
 
                 HStack(spacing: 4) {
                     ForEach(opts) { opt in
-                        let isSelected = opt.data.stringValue == currentVal
+                        let isSelected: Bool = {
+                            if !modeScopeAll || allDevices.count <= 1 {
+                                return opt.data.stringValue == currentVal
+                            } else {
+                                guard !onDevices.isEmpty else { return false }
+                                return onDevices.allSatisfy { dev in
+                                    let raw = model.attribute("operationMode", deviceId: dev.id)?.value?.stringValue
+                                    return raw == opt.data.stringValue
+                                }
+                            }
+                        }()
                         let optCat = Theme.modeCategory(modeDesc: opt.desc, isOn: true)
 
                         Button {
                             triggerHaptic()
                             withAnimation(Theme.springFast) {
-                                model.sendAttribute("operationMode", value: opt.data, deviceId: device.id)
+                                if modeScopeAll && allDevices.count > 1 {
+                                    let modeCode = ACModeCode(rawValue: opt.data.stringValue) ?? .cooling
+                                    if !onDevices.isEmpty {
+                                        let onIds = onDevices.map(\.id)
+                                        _ = model.setMode(deviceIds: onIds, mode: modeCode)
+                                    } else {
+                                        _ = model.setModeAll(mode: modeCode)
+                                    }
+                                } else {
+                                    model.sendAttribute("operationMode", value: opt.data, deviceId: device.id)
+                                }
                             }
                         } label: {
                             VStack(spacing: 3) {
@@ -1115,6 +1196,7 @@ struct MenuBarControlsView: View {
                             )
                         }
                         .buttonStyle(.plain)
+                        .help(modeScopeAll && allDevices.count > 1 ? (!onDevices.isEmpty ? "为全屋 \(onDevices.count) 台运行中的空调统一设为「\(opt.desc)」模式" : "开启全屋空调并统一设为「\(opt.desc)」模式") : "为「\(device.deviceName)」设为「\(opt.desc)」模式")
                     }
                 }
                 .padding(3)
@@ -1139,12 +1221,32 @@ struct MenuBarControlsView: View {
                         .frame(width: 14)
 
                     ForEach(opts) { opt in
-                        let isSelected = opt.data.stringValue == currentVal
+                        let isSelected: Bool = {
+                            if !modeScopeAll || allDevices.count <= 1 {
+                                return opt.data.stringValue == currentVal
+                            } else {
+                                guard !onDevices.isEmpty else { return false }
+                                let targetNorm = AppModel.normalizeWindSpeed(opt.desc)
+                                return onDevices.allSatisfy { dev in
+                                    let raw = model.attribute("windSpeed", deviceId: dev.id)?.value?.stringValue ?? ""
+                                    return AppModel.normalizeWindSpeed(raw) == targetNorm
+                                }
+                            }
+                        }()
 
                         Button {
                             triggerHaptic()
                             withAnimation(Theme.springFast) {
-                                model.sendAttribute("windSpeed", value: opt.data, deviceId: device.id)
+                                if modeScopeAll && allDevices.count > 1 {
+                                    if !onDevices.isEmpty {
+                                        let onIds = onDevices.map(\.id)
+                                        _ = model.setWindSpeed(deviceIds: onIds, speedName: opt.desc, autoPowerOn: false)
+                                    } else {
+                                        _ = model.setWindSpeedAll(speedName: opt.desc, autoPowerOn: false)
+                                    }
+                                } else {
+                                    model.sendAttribute("windSpeed", value: opt.data, deviceId: device.id)
+                                }
                             }
                         } label: {
                             Text(opt.desc)
@@ -1162,6 +1264,7 @@ struct MenuBarControlsView: View {
                                 )
                         }
                         .buttonStyle(.plain)
+                        .help(modeScopeAll && allDevices.count > 1 ? (!onDevices.isEmpty ? "为全屋 \(onDevices.count) 台运行中的空调统一设为「\(opt.desc)」风速" : "为全屋空调统一设为「\(opt.desc)」风速") : "为「\(device.deviceName)」设为「\(opt.desc)」风速")
                     }
                 }
                 .padding(.horizontal, 6)

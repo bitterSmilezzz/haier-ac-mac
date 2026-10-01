@@ -271,7 +271,11 @@ final class StatusItemController: NSObject {
         if model.isSelfCleaningActive {
             let m = model.selfCleaningRemainingSeconds / 60
             let s = model.selfCleaningRemainingSeconds % 60
-            tooltipParts.append("✨ 56°C 高温除菌自清洁进行中 (剩余 \(String(format: "%02d:%02d", m, s)))")
+            if let devId = model.selfCleaningDeviceId, let dev = allDevices.first(where: { $0.id == devId }) {
+                tooltipParts.append("✨ 「\(dev.name)」56°C 高温除菌自清洁进行中 (剩余 \(String(format: "%02d:%02d", m, s)))")
+            } else {
+                tooltipParts.append("✨ 56°C 高温除菌自清洁进行中 (剩余 \(String(format: "%02d:%02d", m, s)))")
+            }
         }
 
         if let session = model.activeSleepSession {

@@ -8,6 +8,25 @@
 
 ## 功能
 
+- 🏷 **闭环六核心关键词与五元复合排班大一统调度、控制中心模式风速全屋协同及自清洁能耗连续微补偿 (v1.9.112)**：
+  - ⏱️ **“六核心关键词全景排班、五元复合拓扑拓展与口语排除词全纳管”自然口语调度引擎 (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)**：
+    - **纯六核心关键词全景调度 (`hexaKeywordsRegex`)**：新增 `hexaKeywordsRegex`，支持六核心关键词复合排班（如“工作日、平时、双休、大休、小休同单休日每天早8点开机” `[1..7]`），彻底根除关键词超多时的口语截断；
+    - **五元复合口语拓扑拓展 (`rangeWithQuadKeywordsRegex` / `quadKeywordsWithRangeRegex`)**：
+      - `rangeWithQuadKeywordsRegex`：连续区间在先、四核心关键词在后（如“周三至周四加工作日、双休、大休和小休每天早8点开机” `[1..7]`）；
+      - `quadKeywordsWithRangeRegex`：四核心关键词在先、连续区间在后（如“工作日、双休、大休和小休加周三至周四每天早8点开机” `[1..7]`）；
+    - **口语排除引导词全面拓展**：在 `extractExcludedDays` 与 `implicitExclusionRepeatRegex` 中新增“除掉”、“排除”、“剔除”、“撇除”，与原有“除开/除去/刨除/扣除/除了”完全对齐；
+    - **否定意图防误触加固**：在 `negativeActionRegex` 中增加“绝不能”、“绝不要”、“暂且别”、“先不用”，防止口语闲聊被误识别为开关机动作；
+    - **单元测试 100% 满分覆盖**：新增 `testHexaKeywordsAndQuadCompositeV19112` 严苛测试套件，全套 120 个单元测试零缺陷通过（0 failures）。
+  - 🔋 **能耗动力学蒸发器自清洁洁净度换热效率连续微补偿 (`EnergyAnalyticsEngine.swift` / `AppModel.swift`)**：
+    - **自清洁能耗连续微补偿模型 (Evaporator Cleanliness Efficiency Bonus)**：在 `DeviceEnergySample` 与 `estimateInstantaneousPower` 中接入 `cleanlinessFactor`；
+    - 结合 56°C 高温自清洁后的翅片热阻降低与风阻减小，在 14 天自清洁保护期内引入连续微补偿热阻尼模型，变频压缩机维持恒温所需电耗享受 0% ~ 4% 平滑节能收益，使物理能耗模拟与自清洁保养生态严密自洽。
+  - 🎛️ **macOS 菜单栏控制中心全屋模式与风速协同 Bento (`MenuBarControlsView.swift`)**：
+    - **运行模式与风速全屋/单机双态切换 (`modeScopeAll`)**：在多设备环境下，`modeAndFanPod` 顶部增设作用域切换胶囊（“当前机” / “全屋 (N台运行)”）；
+    - 开启全屋模式后，一键将全屋空调统一设为指定模式（制冷/制热/送风/除湿/自动）或指定风速（微风/中风/强劲/自动），并动态感知全屋一致性选中态；
+    - 与情景预设 Bento (`sceneScopeAll`)、目标温度 Bento (`tempScopeAll`)、电源快捷管理形成完整的控制中心四位一体全屋协同矩阵。
+  - 🧼 **macOS 原生状态栏自清洁看板细节优化 (`StatusItemController.swift`)**：
+    - 状态栏悬浮 Tooltip 动态标明当前处于 56°C 高温自清洁中的具体机组名称（如“「客厅空调」56°C 高温除菌自清洁进行中”），消除多机环境下的指代模糊。
+
 - 🏷 **闭环五核心关键词与口语排除大一统调度、状态栏与控制中心自清洁全生命周期操作闭环及全屋高精微调 (v1.9.111)**：
   - ⏱️ **“五核心关键词全景排班、口语排除引导词大一统与深层词法拆词断言修复”自然口语调度引擎 (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)**：
     - **深层正则词法截断 bug 彻底修复**：排查并修复 `implicitExclusionRepeatRegex` 隐式排除负向断言 `(?<![周星期礼拜平定])`，杜绝因包含“时”导致“平时”（工作日）与“定时”被拆分为“平”与“时”（被断言捕获截断）的深层隐患；

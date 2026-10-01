@@ -6,6 +6,25 @@ A native SwiftUI app to control Haier / Leader (统帅) smart air conditioners o
 
 ## Features
 
+- 🏷 **Hexa-Keywords & Quintuple-Compound Universal Scheduling, Control Center Whole-House Mode/Fan Sync, and Evaporator Self-Cleaning Continuous Micro-Compensated Energy Damping (v1.9.112)**:
+  - ⏱️ **"Hexa-Keywords Universal Scheduling, Quintuple-Compound Topology Expansion, and Spoken Exclusion Broadening" Spoken Engine (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)**:
+    - **Hexa-Keywords Universal Scheduling (`hexaKeywordsRegex`)**: Introduced `hexaKeywordsRegex` to support complex six-keyword composite scheduling (e.g., "工作日、平时、双休、大休、小休同单休日每天早8点开机" `[1..7]`), closing hanging keyword truncation;
+    - **Quintuple-Compound Topology Expansion (`rangeWithQuadKeywordsRegex` / `quadKeywordsWithRangeRegex`)**:
+      - `rangeWithQuadKeywordsRegex`: Range prefix + 4 keywords (e.g., "周三至周四加工作日、双休、大休和小休每天早8点开机" `[1..7]`);
+      - `quadKeywordsWithRangeRegex`: 4 keywords prefix + range (e.g., "工作日、双休、大休和小休加周三至周四每天早8点开机" `[1..7]`);
+    - **Colloquial Exclusion Lead-in Broadening**: Added "除掉", "排除", "剔除", and "撇除" across `extractExcludedDays` and `implicitExclusionRepeatRegex`, completely aligning with existing exclusion terms;
+    - **Spoken Negation Protection Hardening**: Enhanced `negativeActionRegex` with "绝不能", "绝不要", "暂且别", and "先不用", strictly preventing spoken chatter from triggering accidental power actions;
+    - **100% Unit Test Suite Coverage**: Added `testHexaKeywordsAndQuadCompositeV19112` test suite with all 120 unit tests passing with zero errors (0 failures).
+  - 🔋 **Thermodynamic Evaporator Self-Cleaning Continuous Micro-Compensation Energy Model (`EnergyAnalyticsEngine.swift` / `AppModel.swift`)**:
+    - **Evaporator Cleanliness Efficiency Bonus**: Incorporated `cleanlinessFactor` into `DeviceEnergySample` and `estimateInstantaneousPower`;
+    - Physical heat-transfer gains and reduced air drag following 56°C self-cleaning yield a smooth 0% ~ 4% electrical power reduction across the 14-day protection curve, harmonizing physical simulation with filter maintenance.
+  - 🎛️ **macOS Menu Bar Control Center Whole-House Mode & Fan Speed Bento (`MenuBarControlsView.swift`)**:
+    - **Whole-House / Current-Device Mode & Fan Toggle (`modeScopeAll`)**: Added scope capsules ("当前机" / "全屋 (N台运行)") atop `modeAndFanPod` for multi-device environments;
+    - In whole-house mode, one click synchronizes operating mode (Cool/Heat/Fan/Dehumidify/Auto) or fan speed (Quiet/Medium/Turbo/Auto) across all online AC units with dynamic consistency feedback;
+    - Integrates with Scenes Bento (`sceneScopeAll`), Target Temperature Bento (`tempScopeAll`), and Power Management into a unified four-in-one whole-house control system.
+  - 🧼 **macOS Status Bar Self-Cleaning Awareness Refinement (`StatusItemController.swift`)**:
+    - Hover Tooltip dynamically indicates the specific unit name undergoing 56°C self-cleaning (e.g., "「客厅空调」56°C 高温除菌自清洁进行中"), eliminating multi-device ambiguity.
+
 - 🏷 **Penta-Keywords and Colloquial Exclusion Universal Scheduling, Status Bar & Control Center Self-Cleaning Lifecycle Operation Closure, and High-Precision Whole-House Step Fine-Tuning (v1.9.111)**:
   - ⏱️ **"Penta-Keywords Universal Scheduling, Colloquial Exclusion Unification, and Deep Regex Lexical Splitting Fix" Spoken Engine (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)**:
     - **Deep Regex Lexical Splitting Bug Resolved**: Identified and eliminated a hidden lexical split in `implicitExclusionRepeatRegex` where `(?<![周星期礼拜平定])` prevents words like "平时" (weekdays) or "定时" from having their trailing "时" stripped by assertion, resolving word corruption;

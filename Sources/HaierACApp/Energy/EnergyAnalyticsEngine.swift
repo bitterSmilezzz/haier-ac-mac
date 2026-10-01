@@ -235,7 +235,8 @@ public final class EnergyAnalyticsEngine: ObservableObject {
         indoorHumidity: Double? = nil,
         windSpeed: String?,
         isSelfCleaning: Bool = false,
-        continuousMinutes: Int = 0
+        continuousMinutes: Int = 0,
+        cleanlinessFactor: Double = 1.0
     ) -> Double {
         let windOffset: Double = {
             let wind = windSpeed?.lowercased()
@@ -318,7 +319,19 @@ public final class EnergyAnalyticsEngine: ObservableObject {
             return 1.0 + (progress * 0.045)
         }()
 
-        // 未识别模式采用物理中性功率估算策略（冷热综合无偏估计 + 恒温维持态平滑热阻尼模型 + 热饱和漂移微补偿，v1.9.86, v1.9.90）：
+        // 蒸发器自清洁洁净度热阻力与换热效率连续动力学微补偿 (Evaporator Cleanliness Efficiency Bonus) (v1.9.112):
+        // 完成 56°C 自清洁后，换热翅片洁净无尘垢水膜，空气阻力降低且传热系数提升，
+        // 在 14 天自清洁保护期内（cleanlinessFactor 介于 0.90 ~ 1.00），变频压缩机维持恒温所需能耗享受 0% ~ 4% 平滑节能收益：
+        // 0.90 对应 0.96 负荷乘数（节能 4%），随微尘累积平滑过渡至 1.00（无衰减）。
+        let cleanMultiplier: Double = {
+            guard isPowerOn && !isSelfCleaning && cleanlinessFactor < 1.0 else { return 1.0 }
+            let bonus = (1.0 - max(0.90, cleanlinessFactor)) * 0.40
+            return max(0.95, 1.0 - bonus)
+        }()
+
+        let dynamicMultiplier = soakMultiplier * cleanMultiplier
+
+        // 未识别模式采用物理中性功率估算策略（冷热综合无偏估计 + 恒温维持态平滑热阻尼模型 + 热饱和漂移微补偿，v1.9.86, v1.9.90, v1.9.112）：
         // 1. 若室内温度与设定温度均有效，采用制冷动力曲线与制热动力曲线在温差绝对值 |ΔT| 下的双向无偏中性基准：
         //    - 恒温稳态区 (|ΔT| <= 0.0°C)：制冷(220W)与制热(300W)平衡态无偏均值基准 260.0W + (windOffset * 0.6)；
         //    - 接近平衡区 (0.0 < |ΔT| < 1.0°C)：平滑阻尼动态插值过渡至 465.0W (windFactor = 0.6 + |ΔT|*0.4, P = 260.0 + |ΔT|*205.0 + windOffset*windFactor)；
@@ -338,10 +351,10 @@ public final class EnergyAnalyticsEngine: ObservableObject {
                 } else {
                     neutralPower = 465.0 + ((delta - 1.0) * 102.5) + windOffset
                 }
-                return min(max(neutralPower * soakMultiplier, 200.0), 1550.0)
+                return min(max(neutralPower * dynamicMultiplier, 200.0), 1550.0)
             } else {
                 let neutralPower = 350.0 + windOffset
-                return min(max(neutralPower * soakMultiplier, 180.0), 600.0)
+                return min(max(neutralPower * dynamicMultiplier, 180.0), 600.0)
             }
         }
 
@@ -391,7 +404,7 @@ public final class EnergyAnalyticsEngine: ObservableObject {
             }()
 
             let power = basePower + (windOffset * 0.5) + tempComp
-            return min(max(power * soakMultiplier, 200.0), 730.0)
+            return min(max(power * dynamicMultiplier, 200.0), 730.0)
 
         case .heating:
             // 制热模式：变频温差动力学模型 + 恒温平衡区低频维持态阻尼 + 环境湿度结霜化霜/干燥热焓补偿 + 低温速热 PTC 辅助电热动力学 (v1.9.36, v1.9.39, v1.9.46)
@@ -441,7 +454,7 @@ public final class EnergyAnalyticsEngine: ObservableObject {
                 }()
                 power = 550.0 + ((delta - 1.0) * 110.0) + windOffset + coldBoost + heatHumComp
             }
-            return min(max(power * soakMultiplier, 220.0), 1950.0)
+            return min(max(power * dynamicMultiplier, 220.0), 1950.0)
 
         case .cooling:
             // 制冷模式：变频温差动力学模型 + 恒温平衡区低频维持态阻尼 + 环境湿度潜热冷凝补偿 + 酷暑高温大温差重载动力学校准 (v1.9.36, v1.9.40, v1.9.45)
@@ -492,7 +505,7 @@ public final class EnergyAnalyticsEngine: ObservableObject {
                 }()
                 power = 380.0 + ((delta - 1.0) * 95.0) + windOffset + heatBoost + latentHumComp
             }
-            return min(max(power * soakMultiplier, 180.0), 1800.0)
+            return min(max(power * dynamicMultiplier, 180.0), 1800.0)
 
         case .auto:
             // 自动模式：根据室内与设定温差智能判别制冷或制热动力曲线，融合环境湿度微调与全气候极端温差超频动力学 (v1.9.36, v1.9.38, v1.9.41, v1.9.47, v1.9.48 全气候双向物理对称)
@@ -534,7 +547,7 @@ public final class EnergyAnalyticsEngine: ObservableObject {
                     }()
                     power = 380.0 + ((delta - 1.0) * 95.0) + windOffset + latentHumComp + heatBoost
                 }
-                return min(max(power * soakMultiplier, 180.0), 1800.0)
+                return min(max(power * dynamicMultiplier, 180.0), 1800.0)
             } else {
                 let delta = target - indoor
                 let power: Double
@@ -571,7 +584,7 @@ public final class EnergyAnalyticsEngine: ObservableObject {
                     }()
                     power = 550.0 + ((delta - 1.0) * 110.0) + windOffset + heatHumOffset + coldBoost
                 }
-                return min(max(power * soakMultiplier, 220.0), 1950.0)
+                return min(max(power * dynamicMultiplier, 220.0), 1950.0)
             }
         }
     }
@@ -589,6 +602,7 @@ public final class EnergyAnalyticsEngine: ObservableObject {
         public let windSpeed: String?
         public let isSelfCleaning: Bool
         public let continuousMinutes: Int
+        public let cleanlinessFactor: Double
 
         public init(
             deviceId: String,
@@ -599,7 +613,8 @@ public final class EnergyAnalyticsEngine: ObservableObject {
             indoorHumidity: Double? = nil,
             windSpeed: String?,
             isSelfCleaning: Bool = false,
-            continuousMinutes: Int = 0
+            continuousMinutes: Int = 0,
+            cleanlinessFactor: Double = 1.0
         ) {
             self.deviceId = deviceId
             self.isPowerOn = isPowerOn
@@ -610,10 +625,11 @@ public final class EnergyAnalyticsEngine: ObservableObject {
             self.windSpeed = windSpeed
             self.isSelfCleaning = isSelfCleaning
             self.continuousMinutes = continuousMinutes
+            self.cleanlinessFactor = cleanlinessFactor
         }
     }
 
-    /// 多设备全场景瞬时功率聚合与运行采样积分 (v1.9.21)
+    /// 多设备全场景瞬时功率聚合与运行采样积分 (v1.9.21, v1.9.112 接入自清洁洁净度换热效率连续微补偿)
     /// - Parameters:
     ///   - deviceSamples: 所有已绑定空调的运行状态样本列表
     ///   - elapsedSeconds: 距离上次采样的流逝秒数（支持动态微补偿与休眠唤醒精确积分）
@@ -644,7 +660,8 @@ public final class EnergyAnalyticsEngine: ObservableObject {
                 indoorHumidity: sample.indoorHumidity,
                 windSpeed: sample.windSpeed,
                 isSelfCleaning: sample.isSelfCleaning,
-                continuousMinutes: sample.continuousMinutes
+                continuousMinutes: sample.continuousMinutes,
+                cleanlinessFactor: sample.cleanlinessFactor
             )
             totalInstantaneousPower += power
 
