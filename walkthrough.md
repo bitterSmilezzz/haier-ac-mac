@@ -85,7 +85,7 @@
    - 编译顺利通过，零警告零报错。
 3. **应用打包与签名**：
    - 执行 `./build_app.sh 1.9.112`：
-   - 顺利生成 App 产物 `dist/HaierAC.app` 与发布安装包 `dist/HaierAC-v1.9.112-macOS.zip`（SHA256: `a9f3b37756b291ef0c64519eee222af2f37203637ab22b59ee53c1f72e7ae9e1`）。
+   - 顺利生成 App 产物 `dist/HaierAC.app` 与发布安装包 `dist/HaierAC-v1.9.112-macOS.zip`（SHA256: `0bd0979bcfe42ac55a1675bb8b37a5b7de44d02be4fda56ab140ad550ebb5f3e`）。
 
 ---
 
@@ -93,4 +93,4 @@
 - **Git Commit**：`feat & fix: 闭环六核心关键词与五元复合排班大一统调度、控制中心模式风速全屋协同及自清洁能耗连续微补偿 (v1.9.112)`
 - **Git Tag**：`v1.9.112`
 - **Release Asset**：`dist/HaierAC-v1.9.112-macOS.zip`
-- **SHA256**：`a9f3b37756b291ef0c64519eee222af2f37203637ab22b59ee53c1f72e7ae9e1`
+- **SHA256**：`0bd0979bcfe42ac55a1675bb8b37a5b7de44d02be4fda56ab140ad550ebb5f3e`
