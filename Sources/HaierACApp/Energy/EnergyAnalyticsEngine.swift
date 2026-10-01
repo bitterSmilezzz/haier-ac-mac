@@ -239,6 +239,11 @@ public final class EnergyAnalyticsEngine: ObservableObject {
         cleanlinessFactor: Double = 1.0,
         filterCleanlinessPct: Int = 100
     ) -> Double {
+        // 待机状态快速短路返回（待机微功耗 1.5W，避免关机时无意义的风机风速与室内温差计算开销） (v1.9.115)
+        guard isPowerOn || isSelfCleaning else {
+            return 1.5
+        }
+
         let windOffset: Double = {
             let wind = windSpeed?.lowercased()
             if let wind = wind {

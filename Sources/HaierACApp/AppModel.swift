@@ -1312,6 +1312,7 @@ final class AppModel: ObservableObject {
             let indoorHum = Self.indoorHumidityAttribute(in: attrs)?.doubleValue
             let windSpeed = attrs["windSpeed"]?.stringValue ?? "微风"
 
+            let initialContinuousMinutes = deviceContinuousMinutes[dev.id] ?? 0
             if isPowerOn {
                 let wearFactor = calculateFilterWearFactor(
                     mode: mode,
@@ -1349,7 +1350,7 @@ final class AppModel: ObservableObject {
                     indoorHumidity: indoorHum,
                     windSpeed: windSpeed,
                     isSelfCleaning: isCleaning,
-                    continuousMinutes: deviceContinuousMinutes[dev.id] ?? 0,
+                    continuousMinutes: initialContinuousMinutes,
                     cleanlinessFactor: cleanFactor,
                     filterCleanlinessPct: filterPct
                 )

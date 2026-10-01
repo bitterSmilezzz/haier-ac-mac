@@ -6,6 +6,24 @@ A native SwiftUI app to control Haier / Leader (统帅) smart air conditioners o
 
 ## Features
 
+- 🏷 **Ennea-Keywords & Tri-Range Universal Compound Scheduling, Soft-Start Baseline Timing Calibration, and Native Status Bar Aerodynamic Filter Health Awareness (v1.9.115)**:
+  - ⏱️ **"Ennea-Keywords Universal Scheduling, Tri-Range Compound Topology, and Reinforced Spoken Negation Protection" Spoken Engine (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)**:
+    - **Ennea-Keywords Universal Scheduling (`enneaKeywordsRegex`)**: Introduced `enneaKeywordsRegex` supporting scheduling across all 9 core keyword variants simultaneously (e.g., "工作日、平时、平日、双休、双休日、大休、小休、单休和单休日每天早8点开机" `[1..7]`), closing hanging multi-keyword spoken truncation;
+    - **Tri-Range Compound Spoken Topology Expansion (`triRangeWithDualKeywordsRegex` / `dualKeywordsWithTriRangeRegex` / `keywordWithTriRangeAndKeywordRegex` / `rangeWithTriKeywordsAndRangeRegex`)**:
+      - `triRangeWithDualKeywordsRegex`: Three continuous ranges prefix + two keywords (e.g., "周一至周二、周三至周四、周五至周六加双休和大休每天早8点开机" `[1..7]`);
+      - `dualKeywordsWithTriRangeRegex`: Two keywords prefix + three continuous ranges (e.g., "工作日和平时加周一到周二同周三到周四同周五至周六每天早8点开机" `[2..7]`);
+      - `keywordWithTriRangeAndKeywordRegex`: Single keyword prefix + three continuous ranges + single keyword suffix (e.g., "工作日加周一到周二、周三到周四、周五至周六加双休日每天早8点开机" `[1..7]`);
+      - `rangeWithTriKeywordsAndRangeRegex`: First range prefix + three keywords center + second range suffix (e.g., "周一至周二加工作日、双休和大休加周五至周六每天早8点开机" `[1..7]`);
+    - **Reinforced Spoken Multi-Word Negation & Action Protection**: Expanded `negativeActionRegex`, `containsNegativeForAction`, and `containsNegativeAction` with colloquial negative prefixes ("切莫", "切勿", "切莫要", "千万切莫", "断断不可", "决计不可") and action verbs ("关机", "开机", "通电"), safeguarding zero unintended power operations;
+    - **100% Unit Test Suite Coverage**: Added `testEnneaKeywordsAndHexaCompoundScheduleV19115` test suite with all 123 unit tests passing with zero errors (0 failures).
+  - 🔋 **Thermodynamic Compressor Soft-Start Initial Sampling Sequence Rectification & Fast Standby Short-Circuiting (`AppModel.swift` / `EnergyAnalyticsEngine.swift`)**:
+    - **Soft-Start Initial State Sampling Sequence Rectification**: Fixed a sampling order defect where `deviceContinuousMinutes` was incremented prior to sample creation, properly restoring the `0.65` startup low-frequency damping multiplier during minute 0;
+    - **Standby Compute Short-Circuiting**: Added early return in `estimateInstantaneousPower` for powered-off non-self-cleaning units, returning rated 1.5W immediately and eliminating redundant string parsing and aerodynamic floating-point calculations.
+  - 🎛️ **macOS Native Status Bar Menu Aerodynamic Filter Health Alert & Airflow Impedance Awareness (`StatusItemController.swift`)**:
+    - **Hover Tooltip Dynamic Aerodynamic Load Percentage**: Directly displays real-time aerodynamic power penalty (e.g., `🚨滤网严重积尘 (气阻负荷 +5.0%)`, `⚠️滤网需保养 (气阻负荷 +2.5%)`) in the status bar tooltip and subtitle;
+    - **Right-Click Device Card Impedance Annotation**: Surfaces high air resistance states (`🚨滤网严重积尘 (风道阻抗极高)` / `⚠️滤网需保养 (循环气阻偏高)`) and provides 4-tier health scale maintenance cues (`极度受阻/建议拆洗/正常/良好`);
+    - **Unified Native Menu & Control Center Perception**: Empowers users to inspect real-time whole-house filter health and aerodynamic compensation without needing to open the main window.
+
 - 🏷 **Octa-Keywords & Hexa-Compound Universal Scheduling, Compressor Soft-Start Dynamic Ramping Damping Model, and Control Center Filter Health Awareness (v1.9.114)**:
   - ⏱️ **"Octa-Keywords Universal Scheduling, Hexa-Compound Topology, and Reinforced Spoken Negation Protection" Spoken Engine (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)**:
     - **Octa-Keywords Universal Scheduling (`octaKeywordsRegex`)**: Introduced `octaKeywordsRegex` to support scheduling across all 8 core keyword categories simultaneously (e.g., "工作日、平时、平日、双休日、双休、大休、小休和单休每天早8点开机" `[1..7]`), completely eliminating multi-keyword spoken truncation;

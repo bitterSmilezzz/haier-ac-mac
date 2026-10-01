@@ -304,13 +304,15 @@ final class StatusItemController: NSObject {
         }
         if !lowCleanDevices.isEmpty {
             if lowCleanDevices.count == 1, let item = lowCleanDevices.first {
-                tooltipParts.append("⚠️ 「\(item.name)」滤网洁净度较低 (\(item.pct)%)，建议拆洗保养")
+                let penalty = (Double(50 - max(0, item.pct)) / 50.0) * 5.0
+                let penaltyStr = penalty > 0 ? String(format: " · 气阻负荷 +%.1f%%", penalty) : ""
+                tooltipParts.append("⚠️ 「\(item.name)」滤网积尘偏多 (洁净度 \(item.pct)%\(penaltyStr))，建议拆洗保养")
             } else {
                 let summary = lowCleanDevices.map { "「\($0.name)」\($0.pct)%" }.joined(separator: "、")
-                tooltipParts.append("⚠️ 全屋 \(lowCleanDevices.count) 台空调滤网洁净度较低（\(summary)），建议拆洗保养")
+                tooltipParts.append("⚠️ 全屋 \(lowCleanDevices.count) 台空调滤网积尘偏多（\(summary)），气阻增加，建议拆洗保养")
             }
         } else if !allDevices.isEmpty {
-            tooltipParts.append("✨ 全屋空调滤网状态良好")
+            tooltipParts.append("✨ 全屋空调滤网状态良好 (额定空气通量)")
         }
 
         let protectedDevices = allDevices.filter { model.isSelfCleaningProtectionActive(for: $0.id) }
@@ -714,13 +716,24 @@ final class StatusItemController: NSObject {
                         }
                         return ""
                     }()
+                    let devFilterPct = model.filterCleanlinessPercentage(for: devId)
+                    let filterBadge: String = {
+                        if devFilterPct <= 10 {
+                            return " · 🚨滤网严重积尘"
+                        } else if devFilterPct <= 30 {
+                            return " · ⚠️滤网需保养"
+                        } else if model.isSelfCleaningProtectionActive(for: devId) {
+                            return " · ✨自清洁增效中"
+                        }
+                        return ""
+                    }()
                     if !isControllable {
-                        return "⚡️ \(dev.name): 离线\(envStr)"
+                        return "⚡️ \(dev.name): 离线\(envStr)\(filterBadge)"
                     }
                     if isPowerOn {
-                        return "🟢 \(dev.name): \(devModeStr) \(curTempStr)°C [\(devWindStr)]\(envStr)"
+                        return "🟢 \(dev.name): \(devModeStr) \(curTempStr)°C [\(devWindStr)]\(envStr)\(filterBadge)"
                     } else {
-                        return "⚪️ \(dev.name): 待机\(envStr)"
+                        return "⚪️ \(dev.name): 待机\(envStr)\(filterBadge)"
                     }
                 }()
                 let headerItem = NSMenuItem(title: devConditionTitle, action: nil, keyEquivalent: "")
@@ -745,8 +758,19 @@ final class StatusItemController: NSObject {
                             let humStr = devIndoorHum.map { " · 相对湿度 \(Int(round($0)))% RH" } ?? ""
                             details.append("• 室内环境：温度 \(String(format: "%.1f", indoor))°C\(humStr)")
                         }
+                        let curCleanPct = model.filterCleanlinessPercentage(for: devId)
+                        if curCleanPct <= 30 {
+                            let penalty = (Double(50 - max(0, curCleanPct)) / 50.0) * 5.0
+                            details.append(String(format: "• 滤网状况：洁净度 %d%% (气阻受阻，负荷补偿 +%.1f%%)", curCleanPct, penalty))
+                        } else if model.isSelfCleaningProtectionActive(for: devId) {
+                            details.append("• 蒸发器状态：56°C 洁净保护期 (翅片低热阻，节能增效 +4%)")
+                        }
                         return details.joined(separator: "\n")
                     } else {
+                        let curCleanPct = model.filterCleanlinessPercentage(for: devId)
+                        if curCleanPct <= 30 {
+                            return "「\(dev.name)」当前待机（微功耗 1.5W），滤网洁净度 \(curCleanPct)% 偏低，建议开机前拆洗保养"
+                        }
                         return "「\(dev.name)」当前待机（微功耗 1.5W），点击开机可快速启动"
                     }
                 }()
@@ -953,9 +977,9 @@ final class StatusItemController: NSObject {
                 devSubmenu.setSubmenu(devWindMenu, for: devWindParentItem)
                 devSubmenu.addItem(devWindParentItem)
 
-                // 滤网洁净度与快速重置 (v1.9.45, v1.9.76 增加全景悬浮感知提示)
+                // 滤网洁净度与快速重置 (v1.9.45, v1.9.76 增加全景悬浮感知提示, v1.9.115 气阻动力学分级)
                 let filterPct = model.filterCleanlinessPercentage(for: devId)
-                let filterStatus = filterPct <= 20 ? "⚠️ 需拆洗" : "良好"
+                let filterStatus = filterPct <= 10 ? "🚨 极度受阻" : (filterPct <= 30 ? "⚠️ 建议拆洗" : (filterPct <= 60 ? "正常" : "良好"))
                 let resetFilterItem = NSMenuItem(
                     title: "🧼 重置滤网计时 (当前 \(filterPct)%，\(filterStatus))",
                     action: #selector(resetDeviceFilterFromMenu(_:)),
@@ -2405,6 +2429,10 @@ final class StatusItemController: NSObject {
         lines.append("滤网健康度：\(cleanPct)%")
         lines.append("累计运行：\(accHours) 小时 (\(accMins) 分钟)")
         lines.append("建议保养剩余：约 \(remHours) 小时")
+        if cleanPct < 50 {
+            let penalty = (Double(50 - max(0, cleanPct)) / 50.0) * 5.0
+            lines.append(String(format: "⚠️ 滤网积尘气阻增加：机组换热负荷动态微补偿 +%.1f%%，建议拆洗", penalty))
+        }
         if isProtected {
             let discount = model.selfCleaningDiscountPercentage(for: deviceId)
             if discount >= 9.9 {

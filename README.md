@@ -8,6 +8,24 @@
 
 ## 功能
 
+- 🏷 **闭环九核心关键词与三连续区间复合排班大一统调度、软启动初态零阻尼校准及状态栏气阻健康感知 (v1.9.115)**：
+  - ⏱️ **“九核心关键词全景排班、三连续区间复合拓扑与口语多重否定强化拦截”自然口语调度引擎 (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)**：
+    - **纯九核心关键词全景调度 (`enneaKeywordsRegex`)**：新增 `enneaKeywordsRegex`，支持全部 9 种核心关键词（“工作日、平时、平日、双休、双休日、大休、小休、单休和单休日每天早8点开机” `[1..7]`），全面终结极端复合口语排班截断；
+    - **三连续区间复合口语拓扑拓展 (`triRangeWithDualKeywordsRegex` / `dualKeywordsWithTriRangeRegex` / `keywordWithTriRangeAndKeywordRegex` / `rangeWithTriKeywordsAndRangeRegex`)**：
+      - `triRangeWithDualKeywordsRegex`：三连续区间在先、双核心关键词在后（如“周一至周二、周三至周四、周五至周六加双休和大休每天早8点开机” `[1..7]`）；
+      - `dualKeywordsWithTriRangeRegex`：双核心关键词在先、三连续区间在后（如“工作日和平时加周一到周二同周三到周四同周五至周六每天早8点开机” `[2..7]`）；
+      - `keywordWithTriRangeAndKeywordRegex`：单核心词在先、三连续区间居中、单核心词在后（如“工作日加周一到周二、周三到周四、周五至周六加双休日每天早8点开机” `[1..7]`）；
+      - `rangeWithTriKeywordsAndRangeRegex`：首区间在先、三核心关键词居中、尾区间在后（如“周一至周二加工作日、双休和大休加周五至周六每天早8点开机” `[1..7]`）；
+    - **强化口语多重否定与动作防误触拦截**：在 `negativeActionRegex`、`containsNegativeForAction` 与 `containsNegativeAction` 中扩充否定前缀（“切莫”、“切勿”、“切莫要”、“千万切莫”、“断断不可”、“决计不可”）及动作谓词（“关机”、“开机”、“通电”），守住零误关零误开底线；
+    - **单元测试 100% 满分覆盖**：新增 `testEnneaKeywordsAndHexaCompoundScheduleV19115` 严苛测试套件，全套 123 个单元测试零缺陷通过（0 failures）。
+  - 🔋 **能耗动力学变频压缩机软启动初始采样时序校准与待机快速短路优化 (`AppModel.swift` / `EnergyAnalyticsEngine.swift`)**：
+    - **软启动初始状态采样顺序缺陷修复**：修复 `deviceContinuousMinutes` 累加早于采样导致的开机第 0 分钟初始阻尼乘数（0.65 压缩机软启动超低频建立压差）被跳过的时序缺陷，确保开机第一分钟真实体现压缩机软启动物理规律；
+    - **待机设备算力超轻量快速短路**：在 `estimateInstantaneousPower` 中加入关机与非自清洁状态快速卫语句短路，直接返回待机额定 1.5W，消除待机状态下多余的字符串匹配与复杂空气流阻动力学浮点运算开销。
+  - 🎛️ **macOS 原生状态栏菜单全景滤网健康预警与气阻负荷感知 (`StatusItemController.swift`)**：
+    - **菜单悬停提示动态接入气阻功耗补偿**：在状态栏 Tooltip 与设备副标题中直观呈现积尘风道气阻功耗补偿百分比（如 `🚨滤网严重积尘 (气阻负荷 +5.0%)`、`⚠️滤网需保养 (气阻负荷 +2.5%)`）；
+    - **设备状态卡片气阻阻抗标定**：在右键菜单设备详情中注入 `🚨滤网严重积尘 (风道阻抗极高)` 与 `⚠️滤网需保养 (循环气阻偏高)`，并集成 4 级洁净度分级保养提示（`极度受阻/建议拆洗/正常/良好`）；
+    - **原生菜单与控制中心双向健康感知**：让用户在不打开主窗口的情况下，仅通过状态栏原生菜单即可秒级掌握全屋滤网状态与流阻动力学负荷。
+
 - 🏷 **闭环八核心关键词与六元复合排班大一统调度、变频压缩机软启动动态升频微阻尼模型及控制中心滤网健康感知 (v1.9.114)**：
   - ⏱️ **“八核心关键词全景排班、六元复合拓扑与口语多重否定强化拦截”自然口语调度引擎 (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)**：
     - **纯八核心关键词全景调度 (`octaKeywordsRegex`)**：新增 `octaKeywordsRegex`，支持全部 8 种核心关键词（“工作日、平时、平日、双休日、双休、大休、小休和单休每天早8点开机” `[1..7]`），全面终结极端复合口语排班截断；
