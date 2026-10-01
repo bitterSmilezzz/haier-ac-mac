@@ -366,14 +366,14 @@ public final class EnergyAnalyticsEngine: ObservableObject {
 
         let dynamicMultiplier = soakMultiplier * cleanMultiplier * filterMultiplier * softStartMultiplier
 
-        // 未识别模式采用物理中性功率估算策略（冷热综合无偏估计 + 恒温维持态平滑热阻尼模型 + 热饱和漂移微补偿，v1.9.86, v1.9.90, v1.9.112）：
+        // 未识别模式采用物理中性功率估算策略（冷热综合无偏估计 + 恒温维持态平滑热阻尼模型 + 热饱和漂移微补偿 + 软启动无截断自洽，v1.9.86, v1.9.90, v1.9.112, v1.9.117）：
         // 1. 若室内温度与设定温度均有效，采用制冷动力曲线与制热动力曲线在温差绝对值 |ΔT| 下的双向无偏中性基准：
         //    - 恒温稳态区 (|ΔT| <= 0.0°C)：制冷(220W)与制热(300W)平衡态无偏均值基准 260.0W + (windOffset * 0.6)；
         //    - 接近平衡区 (0.0 < |ΔT| < 1.0°C)：平滑阻尼动态插值过渡至 465.0W (windFactor = 0.6 + |ΔT|*0.4, P = 260.0 + |ΔT|*205.0 + windOffset*windFactor)；
         //    - 变频重载区 (|ΔT| >= 1.0°C)：465.0 + ((|ΔT| - 1.0) * 102.5) + windOffset；
         //    实现严格 C^0 级平滑连续，彻底消除恒温态估算高达 465W+ 导致的能耗倒挂与虚标；
-        //    clamp 限制在 [200.0, 1550.0] W 区间；
-        // 2. 若温度字段缺失（室内或设定温度为 nil），则采用 1.5 匹直流变频压缩机典型低频维持中性基准功率 (350W + windOffset，clamp [180.0, 600.0] W)，避免盲目套用大温差曲线导致功率虚标。
+        //    clamp 限制在 [200.0 * softStartMultiplier, 1550.0] W 区间；
+        // 2. 若温度字段缺失（室内或设定温度为 nil），则采用 1.5 匹直流变频压缩机典型低频维持中性基准功率 (350W + windOffset，clamp [180.0 * softStartMultiplier, 600.0] W)，避免盲目套用大温差曲线导致功率虚标。
         guard let mode = ACModeCode.match(from: modeCode) else {
             if let indoor = indoorTemp, let target = targetTemp {
                 let delta = abs(indoor - target)
@@ -386,10 +386,12 @@ public final class EnergyAnalyticsEngine: ObservableObject {
                 } else {
                     neutralPower = 465.0 + ((delta - 1.0) * 102.5) + windOffset
                 }
-                return min(max(neutralPower * dynamicMultiplier, 200.0), 1550.0)
+                let minFloor = 200.0 * softStartMultiplier
+                return min(max(neutralPower * dynamicMultiplier, minFloor), 1550.0)
             } else {
                 let neutralPower = 350.0 + windOffset
-                return min(max(neutralPower * dynamicMultiplier, 180.0), 600.0)
+                let minFloor = 180.0 * softStartMultiplier
+                return min(max(neutralPower * dynamicMultiplier, minFloor), 600.0)
             }
         }
 
@@ -408,7 +410,7 @@ public final class EnergyAnalyticsEngine: ObservableObject {
             return min(max(power, 14.0), 80.0)
 
         case .dehumidify:
-            // 除湿模式：多维环境湿度自适应变频能耗动力学模型 + 室内温度显热负荷与防结霜降频动态补偿 (v1.9.37, v1.9.44, v1.9.87 C^0 级平滑连续热阻尼重构)
+            // 除湿模式：多维环境湿度自适应变频能耗动力学模型 + 室内温度显热负荷与防结霜降频动态补偿 (v1.9.37, v1.9.44, v1.9.87 C^0 级平滑连续热阻尼重构, v1.9.117 软启动升频无截断自洽)
             // 典型变频空调除湿机制：
             // 1. 高湿析水重载区 (RH >= 70%)：蒸发器深度过冷持续冷凝析水，压缩机高频运转 (520W 基准 + 潜热补偿，最高 619W)
             // 2. 中湿温湿度平衡过渡区 (50% <= RH < 70%)：温湿度平衡变频除湿，双线性无缝连续热阻尼插值 (340W ~ 520W)
@@ -447,10 +449,11 @@ public final class EnergyAnalyticsEngine: ObservableObject {
             }()
 
             let power = basePower + (windOffset * 0.5) + tempComp
-            return min(max(power * dynamicMultiplier, 200.0), 730.0)
+            let minFloor = 200.0 * softStartMultiplier
+            return min(max(power * dynamicMultiplier, minFloor), 730.0)
 
         case .heating:
-            // 制热模式：变频温差动力学模型 + 恒温平衡区低频维持态阻尼 + 环境湿度结霜化霜/干燥热焓补偿 + 低温速热 PTC 辅助电热动力学 (v1.9.36, v1.9.39, v1.9.46)
+            // 制热模式：变频温差动力学模型 + 恒温平衡区低频维持态阻尼 + 环境湿度结霜化霜/干燥热焓补偿 + 低温速热 PTC 辅助电热动力学 (v1.9.36, v1.9.39, v1.9.46, v1.9.117 软启动升频无截断自洽)
             let indoor = indoorTemp ?? 18.0
             let target = targetTemp ?? 20.0
             let delta = target - indoor
@@ -497,10 +500,11 @@ public final class EnergyAnalyticsEngine: ObservableObject {
                 }()
                 power = 550.0 + ((delta - 1.0) * 110.0) + windOffset + coldBoost + heatHumComp
             }
-            return min(max(power * dynamicMultiplier, 220.0), 1950.0)
+            let minFloor = 220.0 * softStartMultiplier
+            return min(max(power * dynamicMultiplier, minFloor), 1950.0)
 
         case .cooling:
-            // 制冷模式：变频温差动力学模型 + 恒温平衡区低频维持态阻尼 + 环境湿度潜热冷凝补偿 + 酷暑高温大温差重载动力学校准 (v1.9.36, v1.9.40, v1.9.45)
+            // 制冷模式：变频温差动力学模型 + 恒温平衡区低频维持态阻尼 + 环境湿度潜热冷凝补偿 + 酷暑高温大温差重载动力学校准 (v1.9.36, v1.9.40, v1.9.45, v1.9.117 软启动升频无截断自洽)
             let indoor = indoorTemp ?? 26.0
             let target = targetTemp ?? 25.0
             let delta = indoor - target
@@ -548,10 +552,11 @@ public final class EnergyAnalyticsEngine: ObservableObject {
                 }()
                 power = 380.0 + ((delta - 1.0) * 95.0) + windOffset + heatBoost + latentHumComp
             }
-            return min(max(power * dynamicMultiplier, 180.0), 1800.0)
+            let minFloor = 180.0 * softStartMultiplier
+            return min(max(power * dynamicMultiplier, minFloor), 1800.0)
 
         case .auto:
-            // 自动模式：根据室内与设定温差智能判别制冷或制热动力曲线，融合环境湿度微调与全气候极端温差超频动力学 (v1.9.36, v1.9.38, v1.9.41, v1.9.47, v1.9.48 全气候双向物理对称)
+            // 自动模式：根据室内与设定温差智能判别制冷或制热动力曲线，融合环境湿度微调与全气候极端温差超频动力学 (v1.9.36, v1.9.38, v1.9.41, v1.9.47, v1.9.48 全气候双向物理对称, v1.9.117 软启动升频无截断自洽)
             let indoor = indoorTemp ?? 25.0
             let target = targetTemp ?? 24.0
             if indoor >= target {
@@ -590,7 +595,8 @@ public final class EnergyAnalyticsEngine: ObservableObject {
                     }()
                     power = 380.0 + ((delta - 1.0) * 95.0) + windOffset + latentHumComp + heatBoost
                 }
-                return min(max(power * dynamicMultiplier, 180.0), 1800.0)
+                let minFloor = 180.0 * softStartMultiplier
+                return min(max(power * dynamicMultiplier, minFloor), 1800.0)
             } else {
                 let delta = target - indoor
                 let power: Double
@@ -627,7 +633,8 @@ public final class EnergyAnalyticsEngine: ObservableObject {
                     }()
                     power = 550.0 + ((delta - 1.0) * 110.0) + windOffset + heatHumOffset + coldBoost
                 }
-                return min(max(power * dynamicMultiplier, 220.0), 1950.0)
+                let minFloor = 220.0 * softStartMultiplier
+                return min(max(power * dynamicMultiplier, minFloor), 1950.0)
             }
         }
     }

@@ -309,7 +309,9 @@ final class StatusItemController: NSObject {
                 tooltipParts.append("⚠️ 「\(item.name)」滤网积尘偏多 (洁净度 \(item.pct)%\(penaltyStr))，建议拆洗保养")
             } else {
                 let summary = lowCleanDevices.map { "「\($0.name)」\($0.pct)%" }.joined(separator: "、")
-                tooltipParts.append("⚠️ 全屋 \(lowCleanDevices.count) 台空调滤网积尘偏多（\(summary)），气阻增加，建议拆洗保养")
+                let maxPenalty = lowCleanDevices.map { (Double(50 - max(0, $0.pct)) / 50.0) * 5.0 }.max() ?? 0
+                let penaltyStr = maxPenalty > 0 ? String(format: " · 气阻负荷最高 +%.1f%%", maxPenalty) : ""
+                tooltipParts.append("⚠️ 全屋 \(lowCleanDevices.count) 台空调滤网积尘偏多（\(summary)\(penaltyStr)），气阻增加，建议拆洗保养")
             }
         } else if !allDevices.isEmpty {
             tooltipParts.append("✨ 全屋空调滤网状态良好 (额定空气通量)")
@@ -1617,12 +1619,16 @@ final class StatusItemController: NSObject {
             }
             if allDevices.count > 1 {
                 let minClean = allDevices.map { model.filterCleanlinessPercentage(for: $0.id) }.min() ?? model.filterCleanlinessPercentage
-                let warn = minClean <= 30 ? "⚠️ " : ""
-                return "\(warn)滤网保养与自清洁 (全屋最低 \(minClean)%)..."
+                let warn = minClean <= 10 ? "🚨 " : (minClean <= 30 ? "⚠️ " : "")
+                let penalty = (Double(50 - max(0, minClean)) / 50.0) * 5.0
+                let penaltyStr = penalty > 0 ? String(format: " · 气阻负荷 +%.1f%%", penalty) : ""
+                return "\(warn)滤网保养与自清洁 (全屋最低 \(minClean)%\(penaltyStr))..."
             } else {
                 let clean = model.filterCleanlinessPercentage
-                let warn = clean <= 30 ? "⚠️ " : ""
-                return "\(warn)滤网保养与自清洁 (洁净度 \(clean)%)..."
+                let warn = clean <= 10 ? "🚨 " : (clean <= 30 ? "⚠️ " : "")
+                let penalty = (Double(50 - max(0, clean)) / 50.0) * 5.0
+                let penaltyStr = penalty > 0 ? String(format: " · 气阻负荷 +%.1f%%", penalty) : ""
+                return "\(warn)滤网保养与自清洁 (洁净度 \(clean)%\(penaltyStr))..."
             }
         }()
 
@@ -2431,7 +2437,8 @@ final class StatusItemController: NSObject {
         lines.append("建议保养剩余：约 \(remHours) 小时")
         if cleanPct < 50 {
             let penalty = (Double(50 - max(0, cleanPct)) / 50.0) * 5.0
-            lines.append(String(format: "⚠️ 滤网积尘气阻增加：机组换热负荷动态微补偿 +%.1f%%，建议拆洗", penalty))
+            let fanPenalty = (Double(50 - max(0, cleanPct)) / 50.0) * 6.0
+            lines.append(String(format: "⚠️ 滤网积尘气阻增加：机组换热负荷动态微补偿 +%.1f%%（送风流阻 +%.1f%%），建议拆洗", penalty, fanPenalty))
         }
         if isProtected {
             let discount = model.selfCleaningDiscountPercentage(for: deviceId)

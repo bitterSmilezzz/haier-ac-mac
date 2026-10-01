@@ -8,6 +8,24 @@
 
 ## 功能
 
+- 🏷 **闭环十一核心关键词与五连续区间复合排班大一统、变频压缩机软启动升频无截断自洽及状态栏气阻流阻精细感知 (v1.9.117)**：
+  - ⏱️ **“十一核心关键词全景排班、五连续区间复合拓扑与口语极端否定防御”自然口语调度引擎 (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)**：
+    - **纯十一核心关键词全景调度 (`hendecaKeywordsRegex`)**：新增 `hendecaKeywordsRegex`，支持全部 11 种核心周期关键词（“工作日、平时、平日、双休日、双休、周末三天、周末、大休日、大休、小休、单休和单休日每天早8点开机” `[1..7]`），十全十美闭环排班口语死角；
+    - **五连续区间与复合拓扑拓展 (`quinqueRangeRegex` / `quadRangeWithKeywordRegex` / `keywordWithQuadRangeRegex` / `quadKeywordsWithDualRangeRegex`)**：
+      - `quinqueRangeRegex`：五连续独立区间复合口语调度（如“周一至周一、周二至周二、周三至周三、周四至周四加周五到周日每天早8点开机” `[1..7]`）；
+      - `quadRangeWithKeywordRegex`：四连续区间在先、核心关键词在后（如“周一至周二、周三至周四、周五至周六、周日到周日加单休每天早8点开机” `[1..7]`）；
+      - `keywordWithQuadRangeRegex`：核心关键词在先、四连续区间在后（如“工作日加周一至周二、周三至周三、周四至周四、周五至周日每天早8点开机” `[1..7]`）；
+      - `quadKeywordsWithDualRangeRegex`：四核心关键词在先、双连续区间在后（如“工作日、平时、双休和大休加周一至周二、周四至周五每天早8点开机” `[1..7]`）；
+    - **区间连字符负向零截断修复与前置优先级大一统**：在 `rangeWithMultiDaysRegex`、`dualRangeWithMultiDaysRegex`、`triRangeWithMultiDaysRegex`、`rangeWithMultiDaysAndRangeRegex` 及 `multiDaysWithRangeAndMultiDaysRegex` 等正则中全面注入连字符负向断言 `(?!\s*(?:到|至|-|~))`，防止多区间口语中将后续连续区间首日误吸纳为离散单日；同时将五连续区间、四区间复合及四连续独立区间优先放置于三区间之前，根除多区间贪婪截断隐患；
+    - **强化口语动作否定与复合前缀拦截**：扩充“千千万万不要再”、“无论何种情况都不要”、“断断不能再”、“切切不可再”、“万万不能再”、“决计不可再”、“绝不能再”等否定句式，及“制冷”、“制热”、“除湿”、“抽湿”、“送风”、“吹风”、“开热气”、“吹冷风”、“通风”、“强劲”、“辅热”等谓词，彻底阻断极限否定误触发；
+    - **单元测试 100% 满分覆盖**：新增 `testHendecaKeywordsAndCompoundScheduleV19117` 测试套件，全套 125 个单元测试零缺陷通过（0 failures）。
+  - 🔋 **能耗动力学变频压缩机软启动升频无截断自洽标定 (`EnergyAnalyticsEngine.swift`)**：
+    - **下限钳位解除截断 (Unclipped Soft-Start Thermodynamics)**：在开机前 0~2 分钟变频压缩机软启动爬升期（乘数 0.65~0.92），将各工况（制冷、制热、自动、除湿、保底）的基础功率下限阈值（Floor）同步按 `softStartMultiplier` 线性缩放（`minFloor = floor * softStartMultiplier`），解除以往硬编码下限对 20~30Hz 超低频软启动的直接截断，使初态功率严格符合 GB/T 7725 变频空调软起动热动力学曲线。
+  - 🎛️ **macOS 原生状态栏菜单气阻流阻精细负荷透传与极端阻抗报警 (`StatusItemController.swift`)**：
+    - **状态栏悬停多设备气阻负荷峰值动态透传**：在状态栏悬停 Tooltip 呈现滤网健康时，自动计算并展示全屋最高气阻额外电负荷（如 `气阻负荷最高 +5.0%`）；
+    - **根菜单滤网状态条动态负荷标定**：在状态栏根菜单“滤网状态”项中注入精确气阻电负荷（如 `(全屋最低 25% · 气阻负荷 +2.5%)`），并在洁净度 $\le 10\%$ 时升级为 `🚨` 极端阻抗报警；
+    - **流道阻抗全景知识库 Tooltip**：在滤网维护悬浮提示中详细解析压缩机风阻损耗（最高 +5.0%）与贯流风机流阻损耗（最高 +6.0%）的动力学成因与节能建议。
+
 - 🏷 **闭环十核心关键词与四连续区间复合排班大一统调度、送风工况微气阻动力学衰减模型及控制中心气阻负荷精细感知 (v1.9.116)**：
   - ⏱️ **“十核心关键词全景排班、四连续区间复合拓扑与口语强化否定防御”自然口语调度引擎 (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)**：
     - **纯十核心关键词全景调度 (`decaKeywordsRegex`)**：新增 `decaKeywordsRegex`，支持全部 10 种核心周期关键词（“工作日、平时、平日、双休日、双休、周末三天、周末、大休、小休、单休和单休日每天早8点开机” `[1..7]`），十全十美闭环排班口语死角；

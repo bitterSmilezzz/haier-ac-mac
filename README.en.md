@@ -6,6 +6,24 @@ A native SwiftUI app to control Haier / Leader (统帅) smart air conditioners o
 
 ## Features
 
+- 🏷 **Hendeca-Keywords & Quinque-Range Universal Compound Scheduling, Unclipped Soft-Start Thermodynamics, and Native Status Bar Aerodynamic Resistance Awareness (v1.9.117)**:
+  - ⏱️ **"Hendeca-Keywords Universal Scheduling, Quinque-Range Compound Topology, and Extreme Spoken Negation Protection" Spoken Engine (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)**:
+    - **Hendeca-Keywords Universal Scheduling (`hendecaKeywordsRegex`)**: Introduced `hendecaKeywordsRegex` supporting scheduling across all 11 core cycle keyword variants simultaneously (e.g., "工作日、平时、平日、双休日、双休、周末三天、周末、大休日、大休、小休、单休和单休日每天早8点开机" `[1..7]`), closing hanging multi-keyword spoken truncation;
+    - **Quinque-Range & Compound Topology Expansion (`quinqueRangeRegex` / `quadRangeWithKeywordRegex` / `keywordWithQuadRangeRegex` / `quadKeywordsWithDualRangeRegex`)**:
+      - `quinqueRangeRegex`: Five continuous independent ranges compound spoken scheduling (e.g., "周一至周一、周二至周二、周三至周三、周四至周四加周五到周日每天早8点开机" `[1..7]`);
+      - `quadRangeWithKeywordRegex`: Four continuous ranges prefix + core keyword suffix (e.g., "周一至周二、周三至周四、周五至周六、周日到周日加单休每天早8点开机" `[1..7]`);
+      - `keywordWithQuadRangeRegex`: Core keyword prefix + four continuous ranges suffix (e.g., "工作日加周一至周二、周三至周三、周四至周四、周五至周日每天早8点开机" `[1..7]`);
+      - `quadKeywordsWithDualRangeRegex`: Four core keywords prefix + two continuous ranges suffix (e.g., "工作日、平时、双休和大休加周一至周二、周四至周五每天早8点开机" `[1..7]`);
+    - **Negative Lookahead Range Delimiter Protection & Rule Evaluation Ordering**: Injected negative lookahead `(?!\s*(?:到|至|-|~))` into `rangeWithMultiDaysRegex`, `dualRangeWithMultiDaysRegex`, `triRangeWithMultiDaysRegex`, `rangeWithMultiDaysAndRangeRegex`, and `multiDaysWithRangeAndMultiDaysRegex` to prevent swallowing subsequent continuous ranges into discrete days; moved higher-order 5-range, 4-range, and compound rules ahead of tri-range rules to eliminate greedy truncation;
+    - **Reinforced Spoken Multi-Word Negation & Action Protection**: Expanded `negativeActionRegex`, `containsNegativeForAction`, and `containsNegativeAction` with colloquial negative prefixes ("千千万万不要再", "无论何种情况都不要", "断断不能再", "切切不可再", "万万不能再", "决计不可再", "绝不能再") and action verbs ("制冷", "制热", "除湿", "抽湿", "送风", "吹风", "开热气", "吹冷风", "通风", "强劲", "辅热"), eliminating unintended voice triggers;
+    - **100% Unit Test Suite Coverage**: Added `testHendecaKeywordsAndCompoundScheduleV19117` test suite with all 125 unit tests passing with zero errors (0 failures).
+  - 🔋 **Thermodynamic Unclipped Soft-Start Baseline Calibration (`EnergyAnalyticsEngine.swift`)**:
+    - **Unclipped Soft-Start Dynamic Ramping (GB/T 7725 Compliance)**: During compressor soft-start ramping (minutes 0~2, multiplier 0.65~0.92), dynamically scales minimum operating power limits by `softStartMultiplier` (`minFloor = floor * softStartMultiplier`) across all operational modes, unblocking 20~30Hz ultra-low frequency inverter soft starts from hardcoded minimum power floor clipping.
+  - 🎛️ **macOS Native Status Bar Menu Aerodynamic Filter Health Alert & Airflow Impedance Awareness (`StatusItemController.swift`)**:
+    - **Hover Tooltip Dynamic Aerodynamic Load Percentage**: Directly displays real-time maximum whole-house aerodynamic power penalty (e.g., `气阻负荷最高 +5.0%`) in the status bar tooltip;
+    - **Root Menu Status Item Dynamic Aerodynamic Annotation**: Annotates calculated air resistance load percentage on the root menu filter item (e.g., `(全屋最低 25% · 气阻负荷 +2.5%)`) and escalates to `🚨` extreme alert when cleanliness $\le 10\%$;
+    - **Comprehensive Flow Resistance Knowledge Base**: Outlines aerodynamic compressor windage loss (+5.0% max) and cross-flow fan flow resistance (+6.0% max) dynamics in filter maintenance guidance.
+
 - 🏷 **Deca-Keywords & Quad-Range Universal Compound Scheduling, Fan Mode Aerodynamic Impedance Dynamic Damping Model, and Control Center Airflow Resistance Awareness (v1.9.116)**:
   - ⏱️ **"Deca-Keywords Universal Scheduling, Quad-Range Compound Topology, and Reinforced Spoken Negation Protection" Spoken Engine (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)**:
     - **Deca-Keywords Universal Scheduling (`decaKeywordsRegex`)**: Introduced `decaKeywordsRegex` supporting scheduling across all 10 core cycle keyword variants simultaneously (e.g., "工作日、平时、平日、双休、双休日、周末三天、周末、大休、小休、单休和单休日每天早8点开机" `[1..7]`), closing hanging multi-keyword spoken truncation;
