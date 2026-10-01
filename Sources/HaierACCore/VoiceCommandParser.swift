@@ -579,6 +579,30 @@ public struct VoiceCommandParser {
         return try? NSRegularExpression(pattern: pattern)
     }()
 
+    /// 匹配连续区间在先、核心关键词居中、连续区间、核心关键词在后的交替四元复合口语（如“周一至周二加大休同周四至周五加小休”、“周一到周二加工作日和周六至周日加单休”） (v1.9.110)
+    private static let rangeWithKeywordAndRangeWithKeywordRegex: NSRegularExpression? = {
+        let pattern = #"(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(工作日|平时|平日|双休日|双休|周末三天|周末|休息日|公休日|休假日|放假日|节假日|单休日|单休|大休日|大休|大周|小休日|小休|小周)\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(工作日|平时|平日|双休日|双休|周末三天|周末|休息日|公休日|休假日|放假日|节假日|单休日|单休|大休日|大休|大周|小休日|小休|小周)"#
+        return try? NSRegularExpression(pattern: pattern)
+    }()
+
+    /// 匹配核心关键词在先、连续区间、核心关键词、连续区间在后的交替四元复合口语（如“大休加周一至周二同小休加周四至周五”、“工作日加周六至周日和单休加周一至周二”） (v1.9.110)
+    private static let keywordWithRangeAndKeywordWithRangeRegex: NSRegularExpression? = {
+        let pattern = #"(工作日|平时|平日|双休日|双休|周末三天|周末|休息日|公休日|休假日|放假日|节假日|单休日|单休|大休日|大休|大周|小休日|小休|小周)\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(工作日|平时|平日|双休日|双休|周末三天|周末|休息日|公休日|休假日|放假日|节假日|单休日|单休|大休日|大休|大周|小休日|小休|小周)\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])"#
+        return try? NSRegularExpression(pattern: pattern)
+    }()
+
+    /// 匹配纯四核心关键词全景调度口语（如“工作日、双休、大休和小休”、“大休、小休、单休和工作日”） (v1.9.110)
+    private static let quadKeywordsRegex: NSRegularExpression? = {
+        let pattern = #"(工作日|平时|平日|双休日|双休|周末三天|周末|休息日|公休日|休假日|放假日|节假日|单休日|单休|大休日|大休|大周|小休日|小休|小周)\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(工作日|平时|平日|双休日|双休|周末三天|周末|休息日|公休日|休假日|放假日|节假日|单休日|单休|大休日|大休|大周|小休日|小休|小周)\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(工作日|平时|平日|双休日|双休|周末三天|周末|休息日|公休日|休假日|放假日|节假日|单休日|单休|大休日|大休|大周|小休日|小休|小周)\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(工作日|平时|平日|双休日|双休|周末三天|周末|休息日|公休日|休假日|放假日|节假日|单休日|单休|大休日|大休|大周|小休日|小休|小周)"#
+        return try? NSRegularExpression(pattern: pattern)
+    }()
+
+    /// 匹配纯三核心关键词全景调度口语（如“大休、小休和单休”、“工作日、双休同单休”、“工作日、大休和小休”） (v1.9.110)
+    private static let triKeywordsRegex: NSRegularExpression? = {
+        let pattern = #"(工作日|平时|平日|双休日|双休|周末三天|周末|休息日|公休日|休假日|放假日|节假日|单休日|单休|大休日|大休|大周|小休日|小休|小周)\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(工作日|平时|平日|双休日|双休|周末三天|周末|休息日|公休日|休假日|放假日|节假日|单休日|单休|大休日|大休|大周|小休日|小休|小周)\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(工作日|平时|平日|双休日|双休|周末三天|周末|休息日|公休日|休假日|放假日|节假日|单休日|单休|大休日|大休|大周|小休日|小休|小周)"#
+        return try? NSRegularExpression(pattern: pattern)
+    }()
+
     /// 匹配核心关键词在前、连续区间居中、核心关键词在后夹心复合口语（如“大休、周一至周三加小休”、“工作日加周六至周日和单休”、“平时加周六至周日和大休”、“双休加周一至周三和平日”） (v1.9.107)
     private static let keywordWithRangeAndKeywordRegex: NSRegularExpression? = {
         let pattern = #"(工作日|平时|平日|双休日|双休|周末三天|周末|休息日|公休日|休假日|放假日|节假日|单休日|单休|大休日|大休|大周|小休日|小休|小周)\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(工作日|平时|平日|双休日|双休|周末三天|周末|休息日|公休日|休假日|放假日|节假日|单休日|单休|大休日|大休|大周|小休日|小休|小周)"#
@@ -1364,6 +1388,111 @@ public struct VoiceCommandParser {
                 if let kw3Days = daysFromKeyword(kw3) {
                     days.formUnion(kw3Days)
                 }
+                let sorted = days.sorted()
+                return (sorted, formatWeekdayLabel(from: sorted))
+            }
+        }
+
+        // 0.000085 连续区间在前、核心关键词居中、连续区间、核心关键词在后（交替四元调度，如“周一至周二加大休同周四至周五加小休”、“周一到周二加工作日和周六至周日加单休”） (v1.9.110)
+        if let regex = rangeWithKeywordAndRangeWithKeywordRegex,
+           let match = regex.firstMatch(in: text, options: [], range: fullRange),
+           match.numberOfRanges >= 7 {
+            let s1 = nsString.substring(with: match.range(at: 1))
+            let e1 = nsString.substring(with: match.range(at: 2))
+            let kw1 = nsString.substring(with: match.range(at: 3))
+            let s2 = nsString.substring(with: match.range(at: 4))
+            let e2 = nsString.substring(with: match.range(at: 5))
+            let kw2 = nsString.substring(with: match.range(at: 6))
+            if let s1Ch = s1.first, let s1Wd = chineseDayCharToWeekday(s1Ch),
+               let e1Ch = e1.first, let e1Wd = chineseDayCharToWeekday(e1Ch),
+               let s2Ch = s2.first, let s2Wd = chineseDayCharToWeekday(s2Ch),
+               let e2Ch = e2.first, let e2Wd = chineseDayCharToWeekday(e2Ch) {
+                var days = Set(generateWeeklyRange(start: s1Wd, end: e1Wd))
+                if let kw1Days = daysFromKeyword(kw1) {
+                    days.formUnion(kw1Days)
+                }
+                days.formUnion(generateWeeklyRange(start: s2Wd, end: e2Wd))
+                if let kw2Days = daysFromKeyword(kw2) {
+                    days.formUnion(kw2Days)
+                }
+                let sorted = days.sorted()
+                return (sorted, formatWeekdayLabel(from: sorted))
+            }
+        }
+
+        // 0.000086 核心关键词在先、连续区间、核心关键词、连续区间在后（交替四元调度，如“大休加周一至周二同小休加周四至周五”、“工作日加周六至周日和单休加周一至周二”） (v1.9.110)
+        if let regex = keywordWithRangeAndKeywordWithRangeRegex,
+           let match = regex.firstMatch(in: text, options: [], range: fullRange),
+           match.numberOfRanges >= 7 {
+            let kw1 = nsString.substring(with: match.range(at: 1))
+            let s1 = nsString.substring(with: match.range(at: 2))
+            let e1 = nsString.substring(with: match.range(at: 3))
+            let kw2 = nsString.substring(with: match.range(at: 4))
+            let s2 = nsString.substring(with: match.range(at: 5))
+            let e2 = nsString.substring(with: match.range(at: 6))
+            if let s1Ch = s1.first, let s1Wd = chineseDayCharToWeekday(s1Ch),
+               let e1Ch = e1.first, let e1Wd = chineseDayCharToWeekday(e1Ch),
+               let s2Ch = s2.first, let s2Wd = chineseDayCharToWeekday(s2Ch),
+               let e2Ch = e2.first, let e2Wd = chineseDayCharToWeekday(e2Ch) {
+                var days = Set<Int>()
+                if let kw1Days = daysFromKeyword(kw1) {
+                    days.formUnion(kw1Days)
+                }
+                days.formUnion(generateWeeklyRange(start: s1Wd, end: e1Wd))
+                if let kw2Days = daysFromKeyword(kw2) {
+                    days.formUnion(kw2Days)
+                }
+                days.formUnion(generateWeeklyRange(start: s2Wd, end: e2Wd))
+                let sorted = days.sorted()
+                return (sorted, formatWeekdayLabel(from: sorted))
+            }
+        }
+
+        // 0.000087 纯四核心关键词全景调度（如“工作日、双休、大休和小休”、“大休、小休、单休和工作日”） (v1.9.110)
+        if let regex = quadKeywordsRegex,
+           let match = regex.firstMatch(in: text, options: [], range: fullRange),
+           match.numberOfRanges >= 5 {
+            let kw1 = nsString.substring(with: match.range(at: 1))
+            let kw2 = nsString.substring(with: match.range(at: 2))
+            let kw3 = nsString.substring(with: match.range(at: 3))
+            let kw4 = nsString.substring(with: match.range(at: 4))
+            var days = Set<Int>()
+            if let kw1Days = daysFromKeyword(kw1) {
+                days.formUnion(kw1Days)
+            }
+            if let kw2Days = daysFromKeyword(kw2) {
+                days.formUnion(kw2Days)
+            }
+            if let kw3Days = daysFromKeyword(kw3) {
+                days.formUnion(kw3Days)
+            }
+            if let kw4Days = daysFromKeyword(kw4) {
+                days.formUnion(kw4Days)
+            }
+            if !days.isEmpty {
+                let sorted = days.sorted()
+                return (sorted, formatWeekdayLabel(from: sorted))
+            }
+        }
+
+        // 0.000088 纯三核心关键词全景调度（如“大休、小休和单休”、“工作日、双休同单休”、“工作日、大休和小休”） (v1.9.110)
+        if let regex = triKeywordsRegex,
+           let match = regex.firstMatch(in: text, options: [], range: fullRange),
+           match.numberOfRanges >= 4 {
+            let kw1 = nsString.substring(with: match.range(at: 1))
+            let kw2 = nsString.substring(with: match.range(at: 2))
+            let kw3 = nsString.substring(with: match.range(at: 3))
+            var days = Set<Int>()
+            if let kw1Days = daysFromKeyword(kw1) {
+                days.formUnion(kw1Days)
+            }
+            if let kw2Days = daysFromKeyword(kw2) {
+                days.formUnion(kw2Days)
+            }
+            if let kw3Days = daysFromKeyword(kw3) {
+                days.formUnion(kw3Days)
+            }
+            if !days.isEmpty {
                 let sorted = days.sorted()
                 return (sorted, formatWeekdayLabel(from: sorted))
             }

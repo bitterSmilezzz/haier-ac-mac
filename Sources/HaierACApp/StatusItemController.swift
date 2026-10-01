@@ -309,6 +309,17 @@ final class StatusItemController: NSObject {
             tooltipParts.append("✨ 全屋空调滤网状态良好")
         }
 
+        let protectedDevices = allDevices.filter { model.isSelfCleaningProtectionActive(for: $0.id) }
+        if !protectedDevices.isEmpty {
+            if protectedDevices.count == 1, let dev = protectedDevices.first {
+                let discount = model.selfCleaningDiscountPercentage(for: dev.id)
+                let desc = discount >= 9.9 ? "全效减免 10%" : String(format: "阻尼减免 %.1f%%", discount)
+                tooltipParts.append("✨ 「\(dev.name)」蒸发器自清洁健康保护生效中 (\(desc)负荷)")
+            } else {
+                tooltipParts.append("✨ 全屋 \(protectedDevices.count) 台空调蒸发器自清洁健康保护生效中 (动态阻尼节能减负)")
+            }
+        }
+
         tooltipParts.append("💡 左键呼出快捷控制面板，右键展开系统菜单")
         button.toolTip = tooltipParts.joined(separator: "\n")
     }
@@ -2227,7 +2238,15 @@ final class StatusItemController: NSObject {
             let accHours = accMins / 60
             let remHours = max(0, AppModel.filterServiceLifeMinutes - accMins) / 60
             let isProtected = model.isSelfCleaningProtectionActive(for: dev.id)
-            let protectTag = isProtected ? " ✨[自清洁保护期]" : ""
+            let protectTag: String
+            if isProtected {
+                let discount = model.selfCleaningDiscountPercentage(for: dev.id)
+                protectTag = discount >= 9.9
+                    ? " ✨[自清洁全效激励 -10%]"
+                    : String(format: " ✨[自清洁阻尼激励 -%.1f%%]", discount)
+            } else {
+                protectTag = ""
+            }
             lines.append("• \(dev.name)：洁净度 \(cleanPct)%，累计 \(accHours)h (建议保养剩余约 \(remHours)h)\(protectTag)")
         }
         lines.append("展开子菜单可进行单台或全屋一键滤网重置与深度保养")
@@ -2250,7 +2269,12 @@ final class StatusItemController: NSObject {
         lines.append("累计运行：\(accHours) 小时 (\(accMins) 分钟)")
         lines.append("建议保养剩余：约 \(remHours) 小时")
         if isProtected {
-            lines.append("✨ 处于蒸发器自清洁健康保护期（7天内）")
+            let discount = model.selfCleaningDiscountPercentage(for: deviceId)
+            if discount >= 9.9 {
+                lines.append("✨ 处于蒸发器自清洁全效健康保护期（负荷减免 10%）")
+            } else {
+                lines.append(String(format: "✨ 处于蒸发器自清洁平滑阻尼过渡期（动态减免 %.1f%% 负荷）", discount))
+            }
         }
         lines.append("点击重置此设备滤网计时，洁净度恢复 100%")
         return lines.joined(separator: "\n")

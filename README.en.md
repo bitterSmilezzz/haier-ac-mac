@@ -6,6 +6,22 @@ A native SwiftUI app to control Haier / Leader (统帅) smart air conditioners o
 
 ## Features
 
+- 🏷 **Alternating Quad-Compound and Pure Quad/Tri-Keywords Universal Scheduling, Status Bar Self-Cleaning Damping Awareness, and Eco-Energy Dynamic Load Deduction Incentive (v1.9.110)**:
+  - ⏱️ **"Alternating Quad-Compound Scheduling Topology Completion, Pure Quad/Tri-Keywords Universal Engine, and Conjunction Coverage" Spoken Engine (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)**:
+    - **Alternating Quad-Compound Topology Completion**: Added the final 2 alternating permutation topologies for 2 ranges and 2 core keywords:
+      - `rangeWithKeywordAndRangeWithKeywordRegex` (range prefix + keyword + range + keyword, e.g., "周一至周二加大休同周四至周五加小休每天晚8点开机" `[1, 2, 3, 5, 6, 7]`, "周一到周二加工作日和周六至周日加单休每天早8点开机" `[1..7]`);
+      - `keywordWithRangeAndKeywordWithRangeRegex` (keyword prefix + range + keyword + range, e.g., "大休加周一至周二同小休加周四至周五每天晚8点开机" `[1, 2, 3, 5, 6, 7]`, "工作日加周六至周日和单休加周一至周二每天早7点关机" `[1..7]`);
+      Completing all 6 permutations $\binom{4}{2} = 6$ of 2 ranges & 2 keywords with 100% mathematical closure;
+    - **Pure Quad & Tri-Keywords Universal Engine**: Added `quadKeywordsRegex` (e.g., "工作日、双休、大休和小休每天晚8点开机" `[1..7]`) and `triKeywordsRegex` (e.g., "大休、小休和单休每天晚8点开机" `[1..7]`, "工作日、双休同单休每天早7点关机" `[1..7]`, "大休、小休和单休日每天晚8点开机" `[1, 7]`), completely eliminating spoken language truncation and hanging keyword omissions;
+    - **Exclusion Schedule Automatic Penetration**: Alternating quad-compound and pure quad/tri-keywords support seamlessly powers `parseExclusionRepeatWeekdays` (e.g., "除周一至周二加大休同周四至周五加小休外每天早8点开机" precisely evaluates to `[4]` Wednesday, "除了大休、小休和单休日外每天早8点开机" precisely evaluates to `[2, 3, 4, 5, 6]` weekdays, "除了工作日、双休、大休和小休每天早8点开机" safely intercepts zero-day execution);
+    - **100% Unit Test Suite Coverage**: Added `testAlternatingQuadScheduleAndPureQuadTriKeywordsV19110` test suite with all 118 unit tests passing with zero errors.
+  - 🧼 **macOS Status Bar Evaporator Self-Cleaning Full-Lifecycle Damping Panoramic Awareness (`StatusItemController.swift`)**:
+    - **Status Bar Hover Tooltip Self-Cleaning Damping State**: Hovering over the menu bar icon dynamically detects the 14-day protection status across all indoor units, reporting "✨「Device」蒸发器自清洁健康保护生效中 (全效减免 10%/阻尼减免 X.X%负荷)" or "✨ 全屋 N 台空调蒸发器自清洁健康保护生效中 (动态阻尼节能减负)";
+    - **Filter Panoramic & Single Device Maintenance Tooltip Harmonization**: Replaced hardcoded "within 7 days" descriptions with dynamic discount indicators (`✨[自清洁全效激励 -10%]` / `✨[自清洁阻尼激励 -X.X%]`), resolving information severance.
+  - 🔋 **Eco Energy Bento Card Evaporator Self-Cleaning Energy Efficiency Dynamic Incentive (`EcoEnergySection.swift` / `MenuBarControlsView.swift`)**:
+    - **Dynamic Self-Cleaning Energy Efficiency Capsule**: Embedded physical model awareness into the Energy Analytics Bento card, presenting a green incentive banner when units are under active 56°C thermal disinfection protection;
+    - **Reachability Consistency Hardening**: Aligned reachability verification in Control Center quick action pods to `.isControllable`.
+
 - 🏷 **Tri-Keywords and Range Quad-Compound Scheduling Topology Unification, Full-Lifecycle Self-Cleaning Damping Awareness, and Control Center Whole-House Power Matrix (v1.9.109)**:
   - ⏱️ **"Tri-Keywords and Single Range Quad-Compound Scheduling, Conjunction '同' Coverage" Spoken Engine (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)**:
     - **Quad-Compound Topology Unification**: Added `triKeywordsWithRangeRegex` (tri-keywords prefix + range suffix, e.g., "大休、小休和单休日加周一至周三每天晚8点开机" `[1, 2, 3, 4, 7]`, "工作日、双休同单休加周六至周日每天晚8点开机" `[1..7]`) and `rangeWithTriKeywordsRegex` (range prefix + tri-keywords suffix, e.g., "周一至周三加双休、大休和小休每天晚8点开机" `[1, 2, 3, 4, 7]`, "周六至周日同工作日、大休和单休每天早7点开机" `[1..7]`), completely unifying the permutation set of 3 keywords and 1 continuous range, eliminating truncation and omission bugs;

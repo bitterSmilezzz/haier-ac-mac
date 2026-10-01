@@ -338,7 +338,7 @@ struct MenuBarControlsView: View {
     ) -> some View {
         let allDevices = model.allUnifiedDevices
         let onDevices = allDevices.filter {
-            model.reachability(for: $0.id) == .available &&
+            model.reachability(for: $0.id).isControllable &&
             (model.attributes[$0.id]?["onOffStatus"]?.boolValue == true)
         }
         let anyDeviceOn = !onDevices.isEmpty

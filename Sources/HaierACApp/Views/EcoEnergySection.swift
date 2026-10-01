@@ -122,6 +122,34 @@ struct EcoEnergySection: View {
                 // 7 日用电柱状图
                 durationBarChart
 
+                // 蒸发器自清洁健康保养能耗减免感知 (v1.9.110)
+                let protectedDevs = model.allUnifiedDevices.filter { model.isSelfCleaningProtectionActive(for: $0.id) }
+                if !protectedDevs.isEmpty {
+                    HStack(spacing: 6) {
+                        Image(systemName: "sparkles")
+                            .font(.system(size: 11))
+                            .foregroundStyle(Color.dynamic(light: 0x34C759, dark: 0x30D158))
+
+                        let summary: String = {
+                            if protectedDevs.count == 1, let d = protectedDevs.first {
+                                let disc = model.selfCleaningDiscountPercentage(for: d.id)
+                                return "自清洁能效激励：「\(d.name)」56°C 高温除菌保护生效中，享动态减免 \(String(format: "%.1f%%", disc)) 能耗负荷。"
+                            } else {
+                                return "自清洁能效激励：全屋 \(protectedDevs.count) 台空调 56°C 高温除菌保护生效中，享 C^0 级平滑阻尼能耗负荷减免。"
+                            }
+                        }()
+
+                        Text(summary)
+                            .font(.system(size: 11))
+                            .foregroundStyle(Theme.inkSubtle)
+
+                        Spacer()
+                    }
+                    .padding(8)
+                    .background(Color.dynamic(light: 0x34C759, dark: 0x30D158).opacity(0.08))
+                    .cornerRadius(Theme.radiusSM)
+                }
+
                 // 节能减排微建议
                 HStack(spacing: 6) {
                     Image(systemName: "leaf.fill")
