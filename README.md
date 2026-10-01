@@ -8,6 +8,23 @@
 
 ## 功能
 
+- 🏷 **闭环七核心关键词与五元夹心排班大一统调度、滤网积尘气阻动力学衰减模型及控制中心微调持久化 (v1.9.113)**：
+  - ⏱️ **“七核心关键词全景排班、五元夹心复合拓扑与口语多重否定强化拦截”自然口语调度引擎 (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)**：
+    - **纯七核心关键词全景调度 (`heptaKeywordsRegex`)**：新增 `heptaKeywordsRegex`，支持全部 7 种核心关键词（“工作日、平时、平日、双休日、大休、小休和单休每天早8点开机” `[1..7]`），全面终结极端复合口语排班截断；
+    - **五元夹心复合口语拓扑拓展 (`keywordWithRangeAndTriKeywordsRegex` / `triKeywordsWithRangeAndKeywordRegex` / `dualKeywordsWithRangeAndDualKeywordsRegex`)**：
+      - `keywordWithRangeAndTriKeywordsRegex`：核心关键词在先、连续区间居中、三核心关键词在后（如“大休加周一至周三加小休、单休和工作日每天早8点开机” `[1..7]`）；
+      - `triKeywordsWithRangeAndKeywordRegex`：三核心关键词在先、连续区间居中、核心关键词在后（如“大休、小休和单休加周一至周三加工作日每天早8点开机” `[1..7]`）；
+      - `dualKeywordsWithRangeAndDualKeywordsRegex`：双核心关键词在先、连续区间居中、双核心关键词在后（如“工作日和平时加周六至周日加大休和小休每天早8点开机” `[1..7]`）；
+    - **强化口语多重否定与动作防误触拦截**：在 `negativeActionRegex`、`containsNegativeForAction` 与 `containsNegativeAction` 中扩充否定前缀（“无论如何都不要”、“千万千万别”、“暂时先别”、“万万不可”、“万万不能”、“断不可”、“任何时候都不要”）及动作谓词（“关掉”、“停掉”、“开启”、“启动运行”、“调温”、“升温”、“降温”），守住零误关零误开底线；
+    - **单元测试 100% 满分覆盖**：新增 `testHeptaKeywordsAndPentaCompoundScheduleV19113` 严苛测试套件，全套 121 个单元测试零缺陷通过（0 failures）。
+  - 🔋 **能耗动力学滤网积尘气阻动力学衰减连续微补偿模型 (`EnergyAnalyticsEngine.swift` / `AppModel.swift`)**：
+    - **滤网积尘气阻动力学衰减连续微补偿 (Air Filter Flow Resistance Impedance Model)**：在 `DeviceEnergySample` 与 `estimateInstantaneousPower` 中正式接入 `filterCleanlinessPct`（0 ~ 100%）；
+    - 当空调滤网洁净度处于良好区间（50% ~ 100%）时，风道流阻处于额定标称工况（乘数 1.00）；当滤网洁净度处于受阻积尘区间（0% ~ 50%）时，系统自动进行连续平滑线性插值（乘数从 1.00 上升至 1.05），反映循环风量衰减下变频压缩机与风机需输出的微幅额外功耗补偿；
+    - 与自清洁洁净度微收益（0.96 ~ 1.00）及机组热容量连续散热模型共同构成完备自洽的空气热动力学全景闭环。
+  - 🎛️ **macOS 菜单栏控制中心与原生状态栏微调精度状态持久化与双向联动 (`MenuBarControlsView.swift` / `StatusItemController.swift` / `AppModel.swift`)**：
+    - **全屋调温微调步进持久化 (`wholeHouseFineStep`)**：在 `AppModel` 中将 `wholeHouseFineStep` 接入 `UserDefaults` 持久化，用户在控制中心切换 1.0°C / 0.5°C 步进精度后在窗口重新打开或应用重启时得以准确保持；
+    - **控制中心与状态栏菜单双向联动**：状态栏全屋相对升降温 0.5°C 微调操作与 1.0°C 标准升降温操作自动同步更新 `model.wholeHouseFineStep`，消除原生状态栏与 SwiftUI 控制中心之间的状态断层。
+
 - 🏷 **闭环六核心关键词与五元复合排班大一统调度、控制中心模式风速全屋协同及自清洁能耗连续微补偿 (v1.9.112)**：
   - ⏱️ **“六核心关键词全景排班、五元复合拓扑拓展与口语排除词全纳管”自然口语调度引擎 (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)**：
     - **纯六核心关键词全景调度 (`hexaKeywordsRegex`)**：新增 `hexaKeywordsRegex`，支持六核心关键词复合排班（如“工作日、平时、双休、大休、小休同单休日每天早8点开机” `[1..7]`），彻底根除关键词超多时的口语截断；

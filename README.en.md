@@ -6,6 +6,23 @@ A native SwiftUI app to control Haier / Leader (统帅) smart air conditioners o
 
 ## Features
 
+- 🏷 **Hepta-Keywords & Penta-Compound Sandwich Universal Scheduling, Air Filter Flow Resistance Dynamic Damping Model, and Control Center Fine-Tuning Step Persistence (v1.9.113)**:
+  - ⏱️ **"Hepta-Keywords Universal Scheduling, Penta-Compound Sandwich Topology, and Reinforced Spoken Negation Protection" Spoken Engine (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)**:
+    - **Hepta-Keywords Universal Scheduling (`heptaKeywordsRegex`)**: Added `heptaKeywordsRegex` to support scheduling all 7 core keyword categories simultaneously (e.g., "工作日、平时、平日、双休日、大休、小休和单休每天早8点开机" `[1..7]`), closing hanging keyword truncation;
+    - **Penta-Compound Sandwich Topology Expansion (`keywordWithRangeAndTriKeywordsRegex` / `triKeywordsWithRangeAndKeywordRegex` / `dualKeywordsWithRangeAndDualKeywordsRegex`)**:
+      - `keywordWithRangeAndTriKeywordsRegex`: 1 keyword prefix + range + 3 keywords (e.g., "大休加周一至周三加小休、单休和工作日每天早8点开机" `[1..7]`);
+      - `triKeywordsWithRangeAndKeywordRegex`: 3 keywords prefix + range + 1 keyword (e.g., "大休、小休和单休加周一至周三加工作日每天早8点开机" `[1..7]`);
+      - `dualKeywordsWithRangeAndDualKeywordsRegex`: 2 keywords prefix + range + 2 keywords (e.g., "工作日和平时加周六至周日加大休和小休每天早8点开机" `[1..7]`);
+    - **Reinforced Spoken Multi-Word Negation & Action Protection**: Expanded `negativeActionRegex`, `containsNegativeForAction`, and `containsNegativeAction` with robust colloquial negative prefixes ("无论如何都不要", "千万千万别", "暂时先别", "万万不可", "万万不能", "断不可", "任何时候都不要") and action verbs ("关掉", "停掉", "开启", "启动运行", "调温", "升温", "降温"), strictly preventing false-triggering;
+    - **100% Unit Test Suite Coverage**: Added `testHeptaKeywordsAndPentaCompoundScheduleV19113` test suite with all 121 unit tests passing with zero errors (0 failures).
+  - 🔋 **Thermodynamic Air Filter Flow Resistance Continuous Micro-Compensation Dynamic Model (`EnergyAnalyticsEngine.swift` / `AppModel.swift`)**:
+    - **Air Filter Flow Resistance Impedance Model**: Incorporated `filterCleanlinessPct` (0 ~ 100%) into `DeviceEnergySample` and `estimateInstantaneousPower`;
+    - When filter cleanliness is healthy (50% ~ 100%), airflow is rated (multiplier 1.00); when filter cleanliness drops into the heavily loaded range (0% ~ 50%), the model applies a smooth linear penalty (rising from 1.00 up to 1.05 at 0% clogged state), simulating the additional power required by the compressor and fan to overcome airflow restriction;
+    - Harmonizes with evaporator cleanliness benefits (0.96 ~ 1.00) and thermal mass dissipation for full thermodynamic consistency.
+  - 🎛️ **macOS Menu Bar Control Center & Native Status Bar Step Granularity State Persistence & Bidirectional Sync (`MenuBarControlsView.swift` / `StatusItemController.swift` / `AppModel.swift`)**:
+    - **Whole-House Temperature Step Granularity Persistence (`wholeHouseFineStep`)**: Wired `wholeHouseFineStep` into `UserDefaults` within `AppModel`, preserving user selection (1.0°C standard vs. 0.5°C fine-step) across popover dismissals and app restarts;
+    - **Control Center and Status Bar Menu Bidirectional Sync**: Status bar relative temperature stepping (0.5°C vs 1.0°C) automatically synchronizes with `model.wholeHouseFineStep`, eliminating state drift.
+
 - 🏷 **Hexa-Keywords & Quintuple-Compound Universal Scheduling, Control Center Whole-House Mode/Fan Sync, and Evaporator Self-Cleaning Continuous Micro-Compensated Energy Damping (v1.9.112)**:
   - ⏱️ **"Hexa-Keywords Universal Scheduling, Quintuple-Compound Topology Expansion, and Spoken Exclusion Broadening" Spoken Engine (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)**:
     - **Hexa-Keywords Universal Scheduling (`hexaKeywordsRegex`)**: Introduced `hexaKeywordsRegex` to support complex six-keyword composite scheduling (e.g., "工作日、平时、双休、大休、小休同单休日每天早8点开机" `[1..7]`), closing hanging keyword truncation;

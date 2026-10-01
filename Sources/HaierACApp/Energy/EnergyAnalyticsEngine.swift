@@ -236,7 +236,8 @@ public final class EnergyAnalyticsEngine: ObservableObject {
         windSpeed: String?,
         isSelfCleaning: Bool = false,
         continuousMinutes: Int = 0,
-        cleanlinessFactor: Double = 1.0
+        cleanlinessFactor: Double = 1.0,
+        filterCleanlinessPct: Int = 100
     ) -> Double {
         let windOffset: Double = {
             let wind = windSpeed?.lowercased()
@@ -329,7 +330,18 @@ public final class EnergyAnalyticsEngine: ObservableObject {
             return max(0.95, 1.0 - bonus)
         }()
 
-        let dynamicMultiplier = soakMultiplier * cleanMultiplier
+        // 滤网积尘气道流阻与换热动力学衰减连续微补偿 (Air Filter Flow Resistance Impedance Model) (v1.9.113):
+        // 进风滤网积尘阻塞时，回风道气阻增大且通过蒸发器的循环风量衰减，机组为达到同等设定温控效果需额外付出 0% ~ 5% 的风机与压缩机负荷：
+        // - 洁净度 >= 50%：额定空气动力学通量，气阻负荷因子为 1.00；
+        // - 洁净度 < 50%：气道受阻，负荷乘数平滑单调线性插值上升至 1.05 (0% 极重堵塞状态)，彻底消除阶跃与虚标断崖。
+        let filterMultiplier: Double = {
+            guard isPowerOn && !isSelfCleaning && filterCleanlinessPct < 50 else { return 1.0 }
+            let clampedPct = max(0, filterCleanlinessPct)
+            let penalty = (Double(50 - clampedPct) / 50.0) * 0.05
+            return min(1.05, 1.0 + penalty)
+        }()
+
+        let dynamicMultiplier = soakMultiplier * cleanMultiplier * filterMultiplier
 
         // 未识别模式采用物理中性功率估算策略（冷热综合无偏估计 + 恒温维持态平滑热阻尼模型 + 热饱和漂移微补偿，v1.9.86, v1.9.90, v1.9.112）：
         // 1. 若室内温度与设定温度均有效，采用制冷动力曲线与制热动力曲线在温差绝对值 |ΔT| 下的双向无偏中性基准：
@@ -603,6 +615,7 @@ public final class EnergyAnalyticsEngine: ObservableObject {
         public let isSelfCleaning: Bool
         public let continuousMinutes: Int
         public let cleanlinessFactor: Double
+        public let filterCleanlinessPct: Int
 
         public init(
             deviceId: String,
@@ -614,7 +627,8 @@ public final class EnergyAnalyticsEngine: ObservableObject {
             windSpeed: String?,
             isSelfCleaning: Bool = false,
             continuousMinutes: Int = 0,
-            cleanlinessFactor: Double = 1.0
+            cleanlinessFactor: Double = 1.0,
+            filterCleanlinessPct: Int = 100
         ) {
             self.deviceId = deviceId
             self.isPowerOn = isPowerOn
@@ -626,10 +640,11 @@ public final class EnergyAnalyticsEngine: ObservableObject {
             self.isSelfCleaning = isSelfCleaning
             self.continuousMinutes = continuousMinutes
             self.cleanlinessFactor = cleanlinessFactor
+            self.filterCleanlinessPct = filterCleanlinessPct
         }
     }
 
-    /// 多设备全场景瞬时功率聚合与运行采样积分 (v1.9.21, v1.9.112 接入自清洁洁净度换热效率连续微补偿)
+    /// 多设备全场景瞬时功率聚合与运行采样积分 (v1.9.21, v1.9.112 接入自清洁洁净度换热效率连续微补偿, v1.9.113 接入滤网积尘气阻动力学衰减连续微补偿)
     /// - Parameters:
     ///   - deviceSamples: 所有已绑定空调的运行状态样本列表
     ///   - elapsedSeconds: 距离上次采样的流逝秒数（支持动态微补偿与休眠唤醒精确积分）
@@ -661,7 +676,8 @@ public final class EnergyAnalyticsEngine: ObservableObject {
                 windSpeed: sample.windSpeed,
                 isSelfCleaning: sample.isSelfCleaning,
                 continuousMinutes: sample.continuousMinutes,
-                cleanlinessFactor: sample.cleanlinessFactor
+                cleanlinessFactor: sample.cleanlinessFactor,
+                filterCleanlinessPct: sample.filterCleanlinessPct
             )
             totalInstantaneousPower += power
 

@@ -2001,24 +2001,28 @@ final class StatusItemController: NSObject {
     }
 
     @objc private func stepUpAllTemperature() {
+        model.wholeHouseFineStep = false
         let hasActive = model.allUnifiedDevices.contains { model.reachability(for: $0.id).isControllable && model.attribute("onOffStatus", deviceId: $0.id)?.boolValue == true }
         _ = model.adjustTemperatureAll(delta: 1.0, autoPowerOn: !hasActive)
         refreshTemperature()
     }
 
     @objc private func stepUpHalfAllTemperature() {
+        model.wholeHouseFineStep = true
         let hasActive = model.allUnifiedDevices.contains { model.reachability(for: $0.id).isControllable && model.attribute("onOffStatus", deviceId: $0.id)?.boolValue == true }
         _ = model.adjustTemperatureAll(delta: 0.5, autoPowerOn: !hasActive)
         refreshTemperature()
     }
 
     @objc private func stepDownHalfAllTemperature() {
+        model.wholeHouseFineStep = true
         let hasActive = model.allUnifiedDevices.contains { model.reachability(for: $0.id).isControllable && model.attribute("onOffStatus", deviceId: $0.id)?.boolValue == true }
         _ = model.adjustTemperatureAll(delta: -0.5, autoPowerOn: !hasActive)
         refreshTemperature()
     }
 
     @objc private func stepDownAllTemperature() {
+        model.wholeHouseFineStep = false
         let hasActive = model.allUnifiedDevices.contains { model.reachability(for: $0.id).isControllable && model.attribute("onOffStatus", deviceId: $0.id)?.boolValue == true }
         _ = model.adjustTemperatureAll(delta: -1.0, autoPowerOn: !hasActive)
         refreshTemperature()

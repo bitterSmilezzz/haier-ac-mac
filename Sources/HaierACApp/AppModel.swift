@@ -454,6 +454,12 @@ final class AppModel: ObservableObject {
             UserDefaults.standard.set(menuBarShowTemperature, forKey: "menuBarShowTemperature")
         }
     }
+    /// 全屋统一步进调温是否采用 0.5°C 高精微调模式（持久化到 UserDefaults，v1.9.113）
+    @Published public var wholeHouseFineStep: Bool {
+        didSet {
+            UserDefaults.standard.set(wholeHouseFineStep, forKey: "wholeHouseFineStep")
+        }
+    }
     /// 菜单栏温度取自哪台设备（nil = 第一台设备）
     @Published var menuBarDeviceId: String?
 
@@ -1331,6 +1337,7 @@ final class AppModel: ObservableObject {
             // 自清洁工况归属判定：指定设备精确匹配，未指定仅在单设备时生效，阻断多设备 fail-open 风险 (v1.9.34)
             let isCleaning = isOnline && isSelfCleaningActive && (selfCleaningDeviceId == dev.id || (selfCleaningDeviceId == nil && allUnifiedDevices.count == 1))
             let cleanFactor = selfCleaningProtectionFactor(for: dev.id)
+            let filterPct = filterCleanlinessPercentage(for: dev.id)
 
             samples.append(
                 EnergyAnalyticsEngine.DeviceEnergySample(
@@ -1343,7 +1350,8 @@ final class AppModel: ObservableObject {
                     windSpeed: windSpeed,
                     isSelfCleaning: isCleaning,
                     continuousMinutes: deviceContinuousMinutes[dev.id] ?? 0,
-                    cleanlinessFactor: cleanFactor
+                    cleanlinessFactor: cleanFactor,
+                    filterCleanlinessPct: filterPct
                 )
             )
         }
@@ -2823,6 +2831,7 @@ final class AppModel: ObservableObject {
         themeMode = ThemeMode(rawValue: saved ?? "") ?? .system
         launchAtLogin = UserDefaults.standard.bool(forKey: "launchAtLogin")
         menuBarShowTemperature = UserDefaults.standard.object(forKey: "menuBarShowTemperature") as? Bool ?? true
+        wholeHouseFineStep = UserDefaults.standard.bool(forKey: "wholeHouseFineStep")
 
         if let data = UserDefaults.standard.data(forKey: "manualDevices"),
            let saved = try? JSONDecoder().decode([ManualDevice].self, from: data) {

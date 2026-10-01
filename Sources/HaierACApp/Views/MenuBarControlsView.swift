@@ -15,8 +15,11 @@ struct MenuBarControlsView: View {
     @State private var sceneScopeAll = false
     /// 目标温度调节生效范围：false 为当前机，true 为全屋多联联动 (v1.9.108)
     @State private var tempScopeAll = false
-    /// 全屋联动调温步进：true 为 0.5°C 高精微调，false 为 1.0°C 标准温阶 (v1.9.111)
-    @State private var wholeHouseFineStep = false
+    /// 全屋联动调温步进：true 为 0.5°C 高精微调，false 为 1.0°C 标准温阶 (持久化同步至 AppModel, v1.9.111, v1.9.113)
+    private var wholeHouseFineStep: Bool {
+        get { model.wholeHouseFineStep }
+        nonmutating set { model.wholeHouseFineStep = newValue }
+    }
     /// 运行模式与风速调节生效范围：false 为当前机，true 为全屋多联联动 (v1.9.112)
     @State private var modeScopeAll = false
 

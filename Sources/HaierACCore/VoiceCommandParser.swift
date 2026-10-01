@@ -605,6 +605,30 @@ public struct VoiceCommandParser {
         return try? NSRegularExpression(pattern: pattern)
     }()
 
+    /// 匹配核心关键词在先、连续区间居中、三核心关键词在后的五元夹心复合口语（如“大休加周一至周三加小休、单休和工作日”、“平时同周二至周四加双休、大休和小休”） (v1.9.113)
+    private static let keywordWithRangeAndTriKeywordsRegex: NSRegularExpression? = {
+        let pattern = #"(工作日|平时|平日|双休日|双休|周末三天|周末|休息日|公休日|休假日|放假日|节假日|单休日|单休|大休日|大休|大周|小休日|小休|小周)\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(工作日|平时|平日|双休日|双休|周末三天|周末|休息日|公休日|休假日|放假日|节假日|单休日|单休|大休日|大休|大周|小休日|小休|小周)\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(工作日|平时|平日|双休日|双休|周末三天|周末|休息日|公休日|休假日|放假日|节假日|单休日|单休|大休日|大休|大周|小休日|小休|小周)\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(工作日|平时|平日|双休日|双休|周末三天|周末|休息日|公休日|休假日|放假日|节假日|单休日|单休|大休日|大休|大周|小休日|小休|小周)"#
+        return try? NSRegularExpression(pattern: pattern)
+    }()
+
+    /// 匹配三核心关键词在先、连续区间居中、核心关键词在后的五元夹心复合口语（如“大休、小休和单休加周一至周三加工作日”、“工作日、平时同单休加周六至周日加大休”） (v1.9.113)
+    private static let triKeywordsWithRangeAndKeywordRegex: NSRegularExpression? = {
+        let pattern = #"(工作日|平时|平日|双休日|双休|周末三天|周末|休息日|公休日|休假日|放假日|节假日|单休日|单休|大休日|大休|大周|小休日|小休|小周)\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(工作日|平时|平日|双休日|双休|周末三天|周末|休息日|公休日|休假日|放假日|节假日|单休日|单休|大休日|大休|大周|小休日|小休|小周)\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(工作日|平时|平日|双休日|双休|周末三天|周末|休息日|公休日|休假日|放假日|节假日|单休日|单休|大休日|大休|大周|小休日|小休|小周)\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(工作日|平时|平日|双休日|双休|周末三天|周末|休息日|公休日|休假日|放假日|节假日|单休日|单休|大休日|大休|大周|小休日|小休|小周)"#
+        return try? NSRegularExpression(pattern: pattern)
+    }()
+
+    /// 匹配双核心关键词在先、连续区间居中、双核心关键词在后的五元夹心复合口语（如“工作日和平时加周六至周日加大休和小休”、“双休日同休息日加周一至周五加单休和大休”） (v1.9.113)
+    private static let dualKeywordsWithRangeAndDualKeywordsRegex: NSRegularExpression? = {
+        let pattern = #"(工作日|平时|平日|双休日|双休|周末三天|周末|休息日|公休日|休假日|放假日|节假日|单休日|单休|大休日|大休|大周|小休日|小休|小周)\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(工作日|平时|平日|双休日|双休|周末三天|周末|休息日|公休日|休假日|放假日|节假日|单休日|单休|大休日|大休|大周|小休日|小休|小周)\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(工作日|平时|平日|双休日|双休|周末三天|周末|休息日|公休日|休假日|放假日|节假日|单休日|单休|大休日|大休|大周|小休日|小休|小周)\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(工作日|平时|平日|双休日|双休|周末三天|周末|休息日|公休日|休假日|放假日|节假日|单休日|单休|大休日|大休|大周|小休日|小休|小周)"#
+        return try? NSRegularExpression(pattern: pattern)
+    }()
+
+    /// 匹配纯七核心关键词全景调度口语（如“工作日、平日、平时、双休日、大休、小休和单休”） (v1.9.113)
+    private static let heptaKeywordsRegex: NSRegularExpression? = {
+        let pattern = #"(工作日|平时|平日|双休日|双休|周末三天|周末|休息日|公休日|休假日|放假日|节假日|单休日|单休|大休日|大休|大周|小休日|小休|小周)\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(工作日|平时|平日|双休日|双休|周末三天|周末|休息日|公休日|休假日|放假日|节假日|单休日|单休|大休日|大休|大周|小休日|小休|小周)\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(工作日|平时|平日|双休日|双休|周末三天|周末|休息日|公休日|休假日|放假日|节假日|单休日|单休|大休日|大休|大周|小休日|小休|小周)\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(工作日|平时|平日|双休日|双休|周末三天|周末|休息日|公休日|休假日|放假日|节假日|单休日|单休|大休日|大休|大周|小休日|小休|小周)\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(工作日|平时|平日|双休日|双休|周末三天|周末|休息日|公休日|休假日|放假日|节假日|单休日|单休|大休日|大休|大周|小休日|小休|小周)\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(工作日|平时|平日|双休日|双休|周末三天|周末|休息日|公休日|休假日|放假日|节假日|单休日|单休|大休日|大休|大周|小休日|小休|小周)\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(工作日|平时|平日|双休日|双休|周末三天|周末|休息日|公休日|休假日|放假日|节假日|单休日|单休|大休日|大休|大周|小休日|小休|小周)"#
+        return try? NSRegularExpression(pattern: pattern)
+    }()
+
     /// 匹配纯六核心关键词全景调度口语（如“工作日、平时、双休、大休、小休同单休日”、“工作日、平时、双休日、大休、小休和单休”） (v1.9.112)
     private static let hexaKeywordsRegex: NSRegularExpression? = {
         let pattern = #"(工作日|平时|平日|双休日|双休|周末三天|周末|休息日|公休日|休假日|放假日|节假日|单休日|单休|大休日|大休|大周|小休日|小休|小周)\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(工作日|平时|平日|双休日|双休|周末三天|周末|休息日|公休日|休假日|放假日|节假日|单休日|单休|大休日|大休|大周|小休日|小休|小周)\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(工作日|平时|平日|双休日|双休|周末三天|周末|休息日|公休日|休假日|放假日|节假日|单休日|单休|大休日|大休|大周|小休日|小休|小周)\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(工作日|平时|平日|双休日|双休|周末三天|周末|休息日|公休日|休假日|放假日|节假日|单休日|单休|大休日|大休|大周|小休日|小休|小周)\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(工作日|平时|平日|双休日|双休|周末三天|周末|休息日|公休日|休假日|放假日|节假日|单休日|单休|大休日|大休|大周|小休日|小休|小周)\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(工作日|平时|平日|双休日|双休|周末三天|周末|休息日|公休日|休假日|放假日|节假日|单休日|单休|大休日|大休|大周|小休日|小休|小周)"#
@@ -1375,6 +1399,75 @@ public struct VoiceCommandParser {
             }
         }
 
+        // 0.000067 核心关键词在先、连续区间居中、三核心关键词在后（如“大休加周一至周三加小休、单休和工作日”、“平时同周二至周四加双休、大休和小休”） (v1.9.113)
+        if let regex = keywordWithRangeAndTriKeywordsRegex,
+           let match = regex.firstMatch(in: text, options: [], range: fullRange),
+           match.numberOfRanges >= 7 {
+            let kw1 = nsString.substring(with: match.range(at: 1))
+            let s1 = nsString.substring(with: match.range(at: 2))
+            let e1 = nsString.substring(with: match.range(at: 3))
+            let kw2 = nsString.substring(with: match.range(at: 4))
+            let kw3 = nsString.substring(with: match.range(at: 5))
+            let kw4 = nsString.substring(with: match.range(at: 6))
+            if let s1Ch = s1.first, let s1Wd = chineseDayCharToWeekday(s1Ch),
+               let e1Ch = e1.first, let e1Wd = chineseDayCharToWeekday(e1Ch) {
+                var days = Set<Int>()
+                if let kw1Days = daysFromKeyword(kw1) { days.formUnion(kw1Days) }
+                days.formUnion(generateWeeklyRange(start: s1Wd, end: e1Wd))
+                if let kw2Days = daysFromKeyword(kw2) { days.formUnion(kw2Days) }
+                if let kw3Days = daysFromKeyword(kw3) { days.formUnion(kw3Days) }
+                if let kw4Days = daysFromKeyword(kw4) { days.formUnion(kw4Days) }
+                let sorted = days.sorted()
+                return (sorted, formatWeekdayLabel(from: sorted))
+            }
+        }
+
+        // 0.0000672 三核心关键词在先、连续区间居中、核心关键词在后（如“大休、小休和单休加周一至周三加工作日”、“工作日、平时同单休加周六至周日加大休”） (v1.9.113)
+        if let regex = triKeywordsWithRangeAndKeywordRegex,
+           let match = regex.firstMatch(in: text, options: [], range: fullRange),
+           match.numberOfRanges >= 7 {
+            let kw1 = nsString.substring(with: match.range(at: 1))
+            let kw2 = nsString.substring(with: match.range(at: 2))
+            let kw3 = nsString.substring(with: match.range(at: 3))
+            let s1 = nsString.substring(with: match.range(at: 4))
+            let e1 = nsString.substring(with: match.range(at: 5))
+            let kw4 = nsString.substring(with: match.range(at: 6))
+            if let s1Ch = s1.first, let s1Wd = chineseDayCharToWeekday(s1Ch),
+               let e1Ch = e1.first, let e1Wd = chineseDayCharToWeekday(e1Ch) {
+                var days = Set<Int>()
+                if let kw1Days = daysFromKeyword(kw1) { days.formUnion(kw1Days) }
+                if let kw2Days = daysFromKeyword(kw2) { days.formUnion(kw2Days) }
+                if let kw3Days = daysFromKeyword(kw3) { days.formUnion(kw3Days) }
+                days.formUnion(generateWeeklyRange(start: s1Wd, end: e1Wd))
+                if let kw4Days = daysFromKeyword(kw4) { days.formUnion(kw4Days) }
+                let sorted = days.sorted()
+                return (sorted, formatWeekdayLabel(from: sorted))
+            }
+        }
+
+        // 0.0000675 双核心关键词在先、连续区间居中、双核心关键词在后（如“工作日和平时加周六至周日加大休和小休”、“双休日同休息日加周一至周五加单休和大休”） (v1.9.113)
+        if let regex = dualKeywordsWithRangeAndDualKeywordsRegex,
+           let match = regex.firstMatch(in: text, options: [], range: fullRange),
+           match.numberOfRanges >= 7 {
+            let kw1 = nsString.substring(with: match.range(at: 1))
+            let kw2 = nsString.substring(with: match.range(at: 2))
+            let s1 = nsString.substring(with: match.range(at: 3))
+            let e1 = nsString.substring(with: match.range(at: 4))
+            let kw3 = nsString.substring(with: match.range(at: 5))
+            let kw4 = nsString.substring(with: match.range(at: 6))
+            if let s1Ch = s1.first, let s1Wd = chineseDayCharToWeekday(s1Ch),
+               let e1Ch = e1.first, let e1Wd = chineseDayCharToWeekday(e1Ch) {
+                var days = Set<Int>()
+                if let kw1Days = daysFromKeyword(kw1) { days.formUnion(kw1Days) }
+                if let kw2Days = daysFromKeyword(kw2) { days.formUnion(kw2Days) }
+                days.formUnion(generateWeeklyRange(start: s1Wd, end: e1Wd))
+                if let kw3Days = daysFromKeyword(kw3) { days.formUnion(kw3Days) }
+                if let kw4Days = daysFromKeyword(kw4) { days.formUnion(kw4Days) }
+                let sorted = days.sorted()
+                return (sorted, formatWeekdayLabel(from: sorted))
+            }
+        }
+
         // 0.000068 四核心关键词在先、连续区间在后（如“工作日、双休、大休和小休加周三至周四”、“大休、小休、单休和工作日加周一至周三”） (v1.9.112)
         if let regex = quadKeywordsWithRangeRegex,
            let match = regex.firstMatch(in: text, options: [], range: fullRange),
@@ -1523,6 +1616,31 @@ public struct VoiceCommandParser {
                     days.formUnion(kw2Days)
                 }
                 days.formUnion(generateWeeklyRange(start: s2Wd, end: e2Wd))
+                let sorted = days.sorted()
+                return (sorted, formatWeekdayLabel(from: sorted))
+            }
+        }
+
+        // 0.0000862 纯七核心关键词全景调度（如“工作日、平时、平日、双休日、大休、小休和单休”） (v1.9.113)
+        if let regex = heptaKeywordsRegex,
+           let match = regex.firstMatch(in: text, options: [], range: fullRange),
+           match.numberOfRanges >= 8 {
+            let kw1 = nsString.substring(with: match.range(at: 1))
+            let kw2 = nsString.substring(with: match.range(at: 2))
+            let kw3 = nsString.substring(with: match.range(at: 3))
+            let kw4 = nsString.substring(with: match.range(at: 4))
+            let kw5 = nsString.substring(with: match.range(at: 5))
+            let kw6 = nsString.substring(with: match.range(at: 6))
+            let kw7 = nsString.substring(with: match.range(at: 7))
+            var days = Set<Int>()
+            if let kw1Days = daysFromKeyword(kw1) { days.formUnion(kw1Days) }
+            if let kw2Days = daysFromKeyword(kw2) { days.formUnion(kw2Days) }
+            if let kw3Days = daysFromKeyword(kw3) { days.formUnion(kw3Days) }
+            if let kw4Days = daysFromKeyword(kw4) { days.formUnion(kw4Days) }
+            if let kw5Days = daysFromKeyword(kw5) { days.formUnion(kw5Days) }
+            if let kw6Days = daysFromKeyword(kw6) { days.formUnion(kw6Days) }
+            if let kw7Days = daysFromKeyword(kw7) { days.formUnion(kw7Days) }
+            if !days.isEmpty {
                 let sorted = days.sorted()
                 return (sorted, formatWeekdayLabel(from: sorted))
             }
@@ -2857,16 +2975,16 @@ public struct VoiceCommandParser {
     }
 
     private static let negativeActionRegex: NSRegularExpression? = {
-        // 否定词（别/不要/不用/不必/无需/先别/先不要/先不用/暂不/暂不要/暂且别/千万别/千万不要/不能/不可以/绝不能/绝不要/切勿/切莫/不要再/别再/暂时不用/暂时不要）
-        // 允许中间插入 0~10 个任意非标点非空白字符（如“周一到周六定时”、“星期一到星期五”、“给我”、“帮我”、“急着”、“现在”等，彻底杜绝插字绕过漏洞） (v1.9.40, v1.9.57, v1.9.112)
-        // 动作谓词（关/停/开/启动/运转/打开/关闭/调/设/升/降/重置/复位/清零/吹/送/抽/除/暂停/恢复/取消/清除/删除/撤销/清空） (v1.9.39 扩展调温与变频动作否定, v1.9.45 扩展滤网重置否定, v1.9.50 扩展吹风除湿动作否定, v1.9.60 扩展计划调度暂停恢复动作否定, v1.9.61 扩展取消删除调度动作否定, v1.9.63 扩展清空任务动作否定)
-        let pattern = #"(?:别|不要|不用|不必|无需|先别|先不要|先不用|暂不|暂不要|暂且别|千万别|千万不要|不能|不可以|绝不能|绝不要|切勿|切莫|不要再|别再|暂时不用|暂时不要)[^，。！？\s]{0,10}?(?:关|停|开|启动|运转|打开|关闭|调|设|升|降|重置|复位|清零|吹|送|抽|除|暂停|恢复|取消|清除|删除|撤销|清空)"#
+        // 否定词（别/不要/不用/不必/无需/先别/先不要/先不用/暂不/暂不要/暂且别/暂且不要/暂时先别/暂时先不要/千万别/千万不要/千万千万别/千万千万不要/不能/不可以/绝不能/绝不要/断不可/万万不可/万万不能/千万不能/切勿/切莫/不要再/别再/千万不要再/暂时不用/暂时不要/无论如何都不要/无论如何都不/无论怎样都不要/任何时候都不要）
+        // 允许中间插入 0~10 个任意非标点非空白字符（如“周一到周六定时”、“星期一到星期五”、“给我”、“帮我”、“急着”、“现在”等，彻底杜绝插字绕过漏洞） (v1.9.40, v1.9.57, v1.9.112, v1.9.113)
+        // 动作谓词（关/关掉/停/停掉/开/开启/启动/启动运行/运转/打开/关闭/调/调温/设/升/升温/降/降温/加热/重置/复位/清零/吹/送/抽/除/暂停/恢复/取消/清除/删除/撤销/清空） (v1.9.39 扩展调温与变频动作否定, v1.9.45 扩展滤网重置否定, v1.9.50 扩展吹风除湿动作否定, v1.9.60 扩展计划调度暂停恢复动作否定, v1.9.61 扩展取消删除调度动作否定, v1.9.63 扩展清空任务动作否定, v1.9.113 扩展多字口语强化否定)
+        let pattern = #"(?:别|不要|不用|不必|无需|先别|先不要|先不用|暂不|暂不要|暂且别|暂且不要|暂时先别|暂时先不要|千万别|千万不要|千万千万别|千万千万不要|不能|不可以|绝不能|绝不要|断不可|万万不可|万万不能|千万不能|切勿|切莫|不要再|别再|千万不要再|暂时不用|暂时不要|无论如何都不要|无论如何都不|无论怎样都不要|任何时候都不要)[^，。！？\s]{0,10}?(?:关掉|关|停掉|停|开启|开|启动运行|启动|运转|打开|关闭|调温|调|设|升温|升|降温|降|加热|重置|复位|清零|吹|送|抽|除|暂停|恢复|取消|清除|删除|撤销|清空)"#
         return try? NSRegularExpression(pattern: pattern)
     }()
 
-    /// 结构化匹配特定动作的否定意图（允许中间插入 0~10 个任意非标点非空白字符，彻底杜绝插字绕过漏洞） (v1.9.61, v1.9.112)
+    /// 结构化匹配特定动作的否定意图（允许中间插入 0~10 个任意非标点非空白字符，彻底杜绝插字绕过漏洞） (v1.9.61, v1.9.112, v1.9.113)
     private static func containsNegativeForAction(text: String, actionPattern: String) -> Bool {
-        let pattern = #"(?:别|不要|不用|不必|无需|先别|先不要|先不用|暂不|暂不要|暂且别|千万别|千万不要|不能|不可以|绝不能|绝不要|切勿|切莫|不要再|别再|暂时不用|暂时不要)[^，。！？\s]{0,10}?"# + actionPattern
+        let pattern = #"(?:别|不要|不用|不必|无需|先别|先不要|先不用|暂不|暂不要|暂且别|暂且不要|暂时先别|暂时先不要|千万别|千万不要|千万千万别|千万千万不要|不能|不可以|绝不能|绝不要|断不可|万万不可|万万不能|千万不能|切勿|切莫|不要再|别再|千万不要再|暂时不用|暂时不要|无论如何都不要|无论如何都不|无论怎样都不要|任何时候都不要)[^，。！？\s]{0,10}?"# + actionPattern
         guard let regex = try? NSRegularExpression(pattern: pattern) else {
             return false
         }
@@ -2874,7 +2992,7 @@ public struct VoiceCommandParser {
         return regex.firstMatch(in: text, options: [], range: range) != nil
     }
 
-    /// 检测文本中是否包含针对开关机/调温/模式动作的否定意图（如“别关”、“不要开”、“先别急着关”、“别给我关了”、“千万别现在关”、“别开制冷”、“不要调”、“别重置”、“别吹风”、“别暂停定时”等，防止误触发） (v1.9.36, v1.9.40, v1.9.45, v1.9.50, v1.9.60, v1.9.61, v1.9.112)
+    /// 检测文本中是否包含针对开关机/调温/模式动作的否定意图（如“别关”、“不要开”、“先别急着关”、“别给我关了”、“千万别现在关”、“别开制冷”、“不要调”、“别重置”、“别吹风”、“别暂停定时”等，防止误触发） (v1.9.36, v1.9.40, v1.9.45, v1.9.50, v1.9.60, v1.9.61, v1.9.112, v1.9.113)
     private static func containsNegativeAction(_ text: String) -> Bool {
         // 特例：“别吹了”属于日常高频关机意图（显式关机口令，非动作否定拦截）
         if text.contains("别吹了") {
@@ -2883,7 +3001,9 @@ public struct VoiceCommandParser {
         guard let regex = negativeActionRegex else {
             let fallbackPatterns = [
                 "别关", "不要关", "不用关", "先别关", "先不要关", "先不用关", "暂不关", "暂且别关", "不能关", "不可以关", "绝不能关", "绝不要关", "别停", "不要停", "不用停",
+                "暂时先别关", "暂时先不要关", "千万千万别关", "千万千万不要关", "无论如何都不要关", "断不可关", "万万不可关", "万万不能关", "千万不能关",
                 "别开", "不要开", "不用开", "先别开", "先不要开", "先不用开", "暂不开", "暂且别开", "不能开", "不可以开", "绝不能开", "绝不要开", "别启动", "不要启动",
+                "暂时先别开", "暂时先不要开", "千万千万别开", "千万千万不要开", "无论如何都不要开", "断不可开", "万万不可开", "万万不能开", "千万不能开",
                 "别调", "不要调", "不用调", "别设", "不要设", "别升", "不要升", "别降", "不要降",
                 "别重置", "不要重置", "不用重置", "别复位", "不要复位", "别清零",
                 "别吹", "不要吹", "不用吹", "别送风", "不要送风", "别抽湿", "不要抽湿", "别除湿", "不要除湿",
