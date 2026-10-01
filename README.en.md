@@ -6,6 +6,24 @@ A native SwiftUI app to control Haier / Leader (统帅) smart air conditioners o
 
 ## Features
 
+- 🏷 **Penta-Keywords and Colloquial Exclusion Universal Scheduling, Status Bar & Control Center Self-Cleaning Lifecycle Operation Closure, and High-Precision Whole-House Step Fine-Tuning (v1.9.111)**:
+  - ⏱️ **"Penta-Keywords Universal Scheduling, Colloquial Exclusion Unification, and Deep Regex Lexical Splitting Fix" Spoken Engine (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)**:
+    - **Deep Regex Lexical Splitting Bug Resolved**: Identified and eliminated a hidden lexical split in `implicitExclusionRepeatRegex` where `(?<![周星期礼拜平定])` prevents words like "平时" (weekdays) or "定时" from having their trailing "时" stripped by assertion, resolving word corruption;
+    - **Colloquial Exclusion Lead-in Words Unification**: Expanded `explicitExclusionRepeatRegex`, `implicitExclusionRepeatRegex`, and `extractExcludedDays` to support "除开", "除去", "刨除", and "扣除", establishing full colloquial symmetry;
+    - **Penta-Keywords Universal Compound Scheduling**: Added `pentaKeywordsRegex` and integrated it into `parseBaseRepeatWeekdays` for full penta-keyword compound combinations (e.g., "工作日、双休、大休、小休同单休日每天早8点开机" `[1..7]`), closing hanging keyword omissions;
+    - **Exclusion Schedule Automatic Penetration**: Natural exclusion phrases such as "除开工作日外每天早8点开机" (evaluates to weekends `[1, 7]`) and "刨除双休日和单休" seamlessly compute accurate schedules;
+    - **100% Unit Test Suite Coverage**: Added `testPentaKeywordsAndColloquialExclusionV19111` test suite with all 119 unit tests passing with zero errors (0 failures).
+  - 🧼 **macOS Status Bar and Control Center Evaporator Self-Cleaning Full-Lifecycle Operation Closure (`StatusItemController.swift` / `MenuBarControlsView.swift`)**:
+    - **Status Bar Self-Cleaning Entrypoints**:
+      - Dynamically displays "🛑 中止 56°C 自清洁 (剩余 mm:ss)" while running and "✨ 启动 56°C 蒸发器自清洁..." while idle across both single-device menus and multi-device submenus;
+      - Added quick abort and multi-device start submenus under the top-level Filter Maintenance menu, eliminating operational friction;
+      - Implemented `@objc` event forwarding to `AppModel.startSelfCleaning(deviceId:)` and `AppModel.stopSelfCleaning()`;
+    - **Control Center (MenuBarControlsView) Host Device Awareness & One-Click Switching**:
+      - Upgraded `selfCleaningPod` to dynamically announce the host device undergoing cleaning (e.g., "「客厅空调」自清洁进行中") and provide "切至本机" (switch to current device) and "中止" (abort) buttons, eliminating multi-device ambiguity.
+  - 🌡️ **macOS Menu Bar Bento Control Center Whole-House High-Precision (0.5°C) and Standard (1.0°C) Step Toggle (`MenuBarControlsView.swift`)**:
+    - **`1.0°C` / `0.5°C` Step Granularity Capsule**: Added a compact `1.0°` / `0.5°` toggle in the whole-house temperature control header;
+    - **Synchronized Whole-House Temperature Adjustments**: Automatically adapts delta commands and tooltip descriptions based on the chosen granularity to meet demanding thermal comfort requirements.
+
 - 🏷 **Alternating Quad-Compound and Pure Quad/Tri-Keywords Universal Scheduling, Status Bar Self-Cleaning Damping Awareness, and Eco-Energy Dynamic Load Deduction Incentive (v1.9.110)**:
   - ⏱️ **"Alternating Quad-Compound Scheduling Topology Completion, Pure Quad/Tri-Keywords Universal Engine, and Conjunction Coverage" Spoken Engine (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)**:
     - **Alternating Quad-Compound Topology Completion**: Added the final 2 alternating permutation topologies for 2 ranges and 2 core keywords:

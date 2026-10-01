@@ -962,6 +962,33 @@ final class StatusItemController: NSObject {
                 resetFilterItem.toolTip = filterMaintenanceTooltip(for: devId, deviceName: dev.name)
                 devSubmenu.addItem(resetFilterItem)
 
+                // 蒸发器 56°C 高温自清洁全生命周期操作闭环 (v1.9.111)
+                let isCleaningThisDev = model.isSelfCleaningActive && (model.selfCleaningDeviceId == devId || (model.selfCleaningDeviceId == nil && allDevices.count == 1))
+                if isCleaningThisDev {
+                    let m = model.selfCleaningRemainingSeconds / 60
+                    let s = model.selfCleaningRemainingSeconds % 60
+                    let stopCleanItem = NSMenuItem(
+                        title: "🛑 中止 56°C 自清洁 (剩余 \(String(format: "%02d:%02d", m, s)))",
+                        action: #selector(stopSelfCleaningFromMenu),
+                        keyEquivalent: ""
+                    )
+                    stopCleanItem.target = self
+                    stopCleanItem.toolTip = "中止「\(dev.name)」正在进行的 56°C 蒸发器高温除菌自清洁托管"
+                    devSubmenu.addItem(stopCleanItem)
+                } else {
+                    let cleanTitle = model.isSelfCleaningActive ? "✨ 切换至此设备自清洁..." : "✨ 启动 56°C 蒸发器自清洁..."
+                    let cleanItem = NSMenuItem(
+                        title: cleanTitle,
+                        action: #selector(startDeviceSelfCleaningFromMenu(_:)),
+                        keyEquivalent: ""
+                    )
+                    cleanItem.target = self
+                    cleanItem.representedObject = devId
+                    cleanItem.isEnabled = isControllable
+                    cleanItem.toolTip = "为「\(dev.name)」开启 56°C 高温除菌自清洁（凝霜剥离、冲洗与高温烘干灭菌，享受 14 天平滑阻尼能耗减免保护）"
+                    devSubmenu.addItem(cleanItem)
+                }
+
                 // 单设备快捷倒计时调度 (v1.9.57)
                 let devCountdownMenu = NSMenu()
                 devCountdownMenu.autoenablesItems = false
@@ -1351,6 +1378,32 @@ final class StatusItemController: NSObject {
             singleResetFilterItem.toolTip = filterMaintenanceTooltip(for: dev.id, deviceName: dev.name)
             menu.addItem(singleResetFilterItem)
 
+            // 蒸发器 56°C 高温自清洁全生命周期操作闭环 (v1.9.111)
+            let isSingleCleaning = model.isSelfCleaningActive && (model.selfCleaningDeviceId == dev.id || model.selfCleaningDeviceId == nil)
+            if isSingleCleaning {
+                let m = model.selfCleaningRemainingSeconds / 60
+                let s = model.selfCleaningRemainingSeconds % 60
+                let stopCleanItem = NSMenuItem(
+                    title: "🛑 中止 56°C 自清洁 (剩余 \(String(format: "%02d:%02d", m, s)))",
+                    action: #selector(stopSelfCleaningFromMenu),
+                    keyEquivalent: ""
+                )
+                stopCleanItem.target = self
+                stopCleanItem.toolTip = "中止「\(dev.name)」正在进行的 56°C 蒸发器高温除菌自清洁托管"
+                menu.addItem(stopCleanItem)
+            } else {
+                let cleanItem = NSMenuItem(
+                    title: "✨ 启动 56°C 蒸发器自清洁...",
+                    action: #selector(startDeviceSelfCleaningFromMenu(_:)),
+                    keyEquivalent: ""
+                )
+                cleanItem.target = self
+                cleanItem.representedObject = dev.id
+                cleanItem.isEnabled = isControllable
+                cleanItem.toolTip = "为「\(dev.name)」开启 56°C 高温除菌自清洁（凝霜剥离、冲洗与高温烘干灭菌，享受 14 天平滑阻尼能耗减免保护）"
+                menu.addItem(cleanItem)
+            }
+
             // 单设备快捷倒计时调度 (v1.9.62 单设备与多设备矩阵全景对称)
             let singleCountdownMenu = NSMenu()
             singleCountdownMenu.autoenablesItems = false
@@ -1553,6 +1606,22 @@ final class StatusItemController: NSObject {
         openCareItem.toolTip = "打开空调滤网健康监测与 56°C 蒸发器高温除菌自清洁保养管理面板"
         filterMenu.addItem(openCareItem)
 
+        // 自清洁进行中快捷中止项 (v1.9.111)
+        if model.isSelfCleaningActive {
+            let cleaningTargetName = model.selfCleaningDeviceId.map { model.deviceName(for: $0) } ?? "当前设备"
+            let m = model.selfCleaningRemainingSeconds / 60
+            let s = model.selfCleaningRemainingSeconds % 60
+            let stopCleanItem = NSMenuItem(
+                title: "🛑 中止「\(cleaningTargetName)」56°C 自清洁 (剩余 \(String(format: "%02d:%02d", m, s)))",
+                action: #selector(stopSelfCleaningFromMenu),
+                keyEquivalent: ""
+            )
+            stopCleanItem.target = self
+            stopCleanItem.toolTip = "立即中止「\(cleaningTargetName)」当前正在运行的 56°C 深度自清洁灭菌程序并恢复常态"
+            filterMenu.addItem(stopCleanItem)
+            filterMenu.addItem(.separator())
+        }
+
         if allDevices.count > 1 {
             let resetAllFilterItem = NSMenuItem(title: "🧼 一键重置全屋滤网计时 (恢复100%)", action: #selector(resetAllFiltersFromMenu), keyEquivalent: "")
             resetAllFilterItem.target = self
@@ -1568,11 +1637,60 @@ final class StatusItemController: NSObject {
                 item.toolTip = filterMaintenanceTooltip(for: dev.id, deviceName: dev.name)
                 filterMenu.addItem(item)
             }
+
+            // 多设备自清洁启动/切换入口 (v1.9.111)
+            filterMenu.addItem(.separator())
+            let cleanSubmenu = NSMenu()
+            cleanSubmenu.autoenablesItems = false
+            for dev in allDevices {
+                let devControllable = model.gatewayConnected && model.reachability(for: dev.id).isControllable
+                let isThisCleaning = model.isSelfCleaningActive && (model.selfCleaningDeviceId == dev.id || (model.selfCleaningDeviceId == nil && allDevices.count == 1))
+                if isThisCleaning {
+                    let m = model.selfCleaningRemainingSeconds / 60
+                    let s = model.selfCleaningRemainingSeconds % 60
+                    let stopDevItem = NSMenuItem(
+                        title: "🛑 中止「\(dev.name)」自清洁 (剩余 \(String(format: "%02d:%02d", m, s)))",
+                        action: #selector(stopSelfCleaningFromMenu),
+                        keyEquivalent: ""
+                    )
+                    stopDevItem.target = self
+                    stopDevItem.toolTip = "立即中止「\(dev.name)」当前正在执行的 56°C 自清洁灭菌程序"
+                    cleanSubmenu.addItem(stopDevItem)
+                } else {
+                    let cleanDevItem = NSMenuItem(
+                        title: "✨ 启动「\(dev.name)」56°C 自清洁",
+                        action: #selector(startDeviceSelfCleaningFromMenu(_:)),
+                        keyEquivalent: ""
+                    )
+                    cleanDevItem.target = self
+                    cleanDevItem.representedObject = dev.id
+                    cleanDevItem.isEnabled = devControllable
+                    cleanDevItem.toolTip = "一键为「\(dev.name)」启动 56°C 高温自清洁循环，凝霜剥离、深度化霜并烘干抑菌"
+                    cleanSubmenu.addItem(cleanDevItem)
+                }
+            }
+            let cleanParent = NSMenuItem(title: "✨ 启动设备深度自清洁...", action: nil, keyEquivalent: "")
+            filterMenu.setSubmenu(cleanSubmenu, for: cleanParent)
+            filterMenu.addItem(cleanParent)
         } else if let dev = allDevices.first {
             let resetItem = NSMenuItem(title: "🧼 重置「\(dev.name)」滤网计时 (恢复100%)", action: #selector(resetPrimaryFilterFromMenu), keyEquivalent: "")
             resetItem.target = self
             resetItem.toolTip = filterMaintenanceTooltip(for: dev.id, deviceName: dev.name)
             filterMenu.addItem(resetItem)
+
+            if !model.isSelfCleaningActive {
+                let cleanItem = NSMenuItem(
+                    title: "✨ 启动「\(dev.name)」56°C 自清洁",
+                    action: #selector(startDeviceSelfCleaningFromMenu(_:)),
+                    keyEquivalent: ""
+                )
+                cleanItem.target = self
+                cleanItem.representedObject = dev.id
+                let devControllable = model.gatewayConnected && model.reachability(for: dev.id).isControllable
+                cleanItem.isEnabled = devControllable
+                cleanItem.toolTip = "一键为「\(dev.name)」启动 56°C 高温自清洁循环，凝霜剥离、深度化霜并烘干抑菌"
+                filterMenu.addItem(cleanItem)
+            }
         }
 
         let filterParentItem = NSMenuItem(title: filterTitle, action: #selector(openFilterCare), keyEquivalent: "")
@@ -2057,6 +2175,17 @@ final class StatusItemController: NSObject {
         } else {
             model.resetAllFilterMaintenance()
         }
+        refreshTemperature()
+    }
+
+    @objc private func startDeviceSelfCleaningFromMenu(_ sender: NSMenuItem) {
+        guard let devId = sender.representedObject as? String else { return }
+        model.startSelfCleaning(deviceId: devId)
+        refreshTemperature()
+    }
+
+    @objc private func stopSelfCleaningFromMenu() {
+        model.stopSelfCleaning()
         refreshTemperature()
     }
 

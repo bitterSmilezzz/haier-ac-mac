@@ -15,6 +15,8 @@ struct MenuBarControlsView: View {
     @State private var sceneScopeAll = false
     /// 目标温度调节生效范围：false 为当前机，true 为全屋多联联动 (v1.9.108)
     @State private var tempScopeAll = false
+    /// 全屋联动调温步进：true 为 0.5°C 高精微调，false 为 1.0°C 标准温阶 (v1.9.111)
+    @State private var wholeHouseFineStep = false
 
     private var selectedSleepCurve: SleepCurveConfig {
         if let id = selectedSleepCurveId, let curve = model.allSleepCurves.first(where: { $0.id == id }) {
@@ -833,6 +835,45 @@ struct MenuBarControlsView: View {
 
                         Spacer()
 
+                        if tempScopeAll {
+                            // 全屋步进粒度切换 (v1.9.111)
+                            HStack(spacing: 2) {
+                                Button {
+                                    withAnimation(Theme.springFast) {
+                                        wholeHouseFineStep = false
+                                        triggerHaptic()
+                                    }
+                                } label: {
+                                    Text("1.0°")
+                                        .font(.system(size: 8.5, weight: !wholeHouseFineStep ? .bold : .regular))
+                                        .padding(.horizontal, 4)
+                                        .padding(.vertical, 2)
+                                        .foregroundStyle(!wholeHouseFineStep ? Theme.ink : Theme.inkTertiary)
+                                        .background(Capsule().fill(!wholeHouseFineStep ? Theme.surface3 : Color.clear))
+                                }
+                                .buttonStyle(.plain)
+                                .help("标准 1.0°C 步进")
+
+                                Button {
+                                    withAnimation(Theme.springFast) {
+                                        wholeHouseFineStep = true
+                                        triggerHaptic()
+                                    }
+                                } label: {
+                                    Text("0.5°")
+                                        .font(.system(size: 8.5, weight: wholeHouseFineStep ? .bold : .regular))
+                                        .padding(.horizontal, 4)
+                                        .padding(.vertical, 2)
+                                        .foregroundStyle(wholeHouseFineStep ? Theme.ink : Theme.inkTertiary)
+                                        .background(Capsule().fill(wholeHouseFineStep ? Theme.surface3 : Color.clear))
+                                }
+                                .buttonStyle(.plain)
+                                .help("高精 0.5°C 微调")
+                            }
+                            .padding(2)
+                            .background(Capsule().fill(Theme.surface2))
+                        }
+
                         HStack(spacing: 2) {
                             Button {
                                 withAnimation(Theme.springFast) {
@@ -976,12 +1017,13 @@ struct MenuBarControlsView: View {
 
                         Spacer()
 
-                        // 全屋统一步进胶囊
+                        // 全屋统一步进胶囊 (支持 1.0°C / 0.5°C 动态步进, v1.9.111)
+                        let stepDelta = wholeHouseFineStep ? 0.5 : 1.0
                         HStack(spacing: 12) {
                             Button {
                                 triggerHaptic()
                                 withAnimation(Theme.spring) {
-                                    _ = model.adjustTemperatureAll(delta: -1.0)
+                                    _ = model.adjustTemperatureAll(delta: -stepDelta)
                                 }
                             } label: {
                                 Image(systemName: "minus")
@@ -993,12 +1035,12 @@ struct MenuBarControlsView: View {
                             .buttonStyle(.plain)
                             .foregroundStyle(canStepDownAll ? Theme.ink : Theme.inkTertiary)
                             .disabled(!canStepDownAll)
-                            .help(hasRunning ? "全屋运行中空调统一降温 1°C" : "开启全屋空调并统一降温 1°C")
+                            .help(hasRunning ? "全屋运行中空调统一降温 \(String(format: "%.1f", stepDelta))°C" : "开启全屋空调并统一降温 \(String(format: "%.1f", stepDelta))°C")
 
                             Button {
                                 triggerHaptic()
                                 withAnimation(Theme.spring) {
-                                    _ = model.adjustTemperatureAll(delta: 1.0)
+                                    _ = model.adjustTemperatureAll(delta: stepDelta)
                                 }
                             } label: {
                                 Image(systemName: "plus")
@@ -1010,7 +1052,7 @@ struct MenuBarControlsView: View {
                             .buttonStyle(.plain)
                             .foregroundStyle(canStepUpAll ? Theme.ink : Theme.inkTertiary)
                             .disabled(!canStepUpAll)
-                            .help(hasRunning ? "全屋运行中空调统一升温 1°C" : "开启全屋空调并统一升温 1°C")
+                            .help(hasRunning ? "全屋运行中空调统一升温 \(String(format: "%.1f", stepDelta))°C" : "开启全屋空调并统一升温 \(String(format: "%.1f", stepDelta))°C")
                         }
                         .padding(3)
                         .background(
@@ -1448,32 +1490,50 @@ struct MenuBarControlsView: View {
         }
     }
 
-    // MARK: - 蒸发器自清洁状态卡 (v1.9.21)
+    // MARK: - 蒸发器自清洁状态卡 (v1.9.21, v1.9.111 全局多设备宿主感知与一键切换)
 
     private func selfCleaningPod(device: DeviceInfo) -> some View {
-        HStack(spacing: 8) {
+        let isCurrentDevCleaning = model.selfCleaningDeviceId == device.id || (model.selfCleaningDeviceId == nil && model.allUnifiedDevices.count == 1)
+        let hostName = model.selfCleaningDeviceId.map { model.deviceName(for: $0) } ?? device.deviceName
+        let m = model.selfCleaningRemainingSeconds / 60
+        let s = model.selfCleaningRemainingSeconds % 60
+
+        return HStack(spacing: 8) {
             Image(systemName: "flame.fill")
                 .font(.system(size: 12))
                 .foregroundStyle(Color.dynamic(light: 0xF05A28, dark: 0xFF6934))
 
             VStack(alignment: .leading, spacing: 2) {
-                Text("56°C 高温自清洁中")
+                Text(isCurrentDevCleaning ? "「\(device.deviceName)」56°C 自清洁中" : "「\(hostName)」自清洁进行中")
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(Theme.ink)
-                let m = model.selfCleaningRemainingSeconds / 60
-                let s = model.selfCleaningRemainingSeconds % 60
-                Text("剩余 \(String(format: "%02d:%02d", m, s)) • 翅片凝霜烘干")
+                    .lineLimit(1)
+                Text(isCurrentDevCleaning
+                    ? "剩余 \(String(format: "%02d:%02d", m, s)) • 翅片凝霜烘干灭菌"
+                    : "剩余 \(String(format: "%02d:%02d", m, s)) • 本机处于待命")
                     .font(.system(size: 10))
                     .foregroundStyle(Theme.inkMuted)
             }
 
             Spacer()
 
+            if !isCurrentDevCleaning && model.reachability(for: device).isControllable {
+                Button("切至本机") {
+                    triggerHaptic()
+                    model.startSelfCleaning(deviceId: device.id)
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.mini)
+                .help("将 56°C 深度自清洁转移至当前选中的「\(device.deviceName)」执行")
+            }
+
             Button("中止") {
+                triggerHaptic()
                 model.stopSelfCleaning()
             }
             .buttonStyle(.bordered)
             .controlSize(.mini)
+            .help("中止当前正在执行的 56°C 高温除菌自清洁托管")
         }
         .padding(8)
         .background(

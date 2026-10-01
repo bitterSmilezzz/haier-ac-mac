@@ -376,7 +376,8 @@ public struct VoiceCommandParser {
         // 必须包含关机/开机/停意图或“启动/运转”或“定时/预约”，避免“大风一点”、“调高一点”等“一点”被误判为 1 点钟 (v1.9.48, v1.9.50, v1.9.78)
         if (text.contains("关") || text.contains("开") || text.contains("停") || text.contains("启动") || text.contains("运转") || text.contains("定时") || text.contains("预约")),
            let time = parseScheduleTime(from: text) {
-            let isPowerOn = (text.contains("开") || text.contains("启动") || text.contains("运转")) && !text.contains("关") && !text.contains("停")
+            let actionText = text.replacingOccurrences(of: "除开", with: "除了")
+            let isPowerOn = (actionText.contains("开") || actionText.contains("启动") || actionText.contains("运转")) && !actionText.contains("关") && !actionText.contains("停")
             let actionStr = isPowerOn ? "开机" : "关机"
             let timeStr = String(format: "%02d:%02d", time.hour, time.minute)
 
@@ -425,7 +426,8 @@ public struct VoiceCommandParser {
         if isCountdownTrigger || hasDuration {
             if let minutes = parseCountdownMinutes(from: text), minutes > 0 {
                 if text.contains("关") || text.contains("开") || text.contains("停") || text.contains("启动") || text.contains("运转") || text.contains("定时") || text.contains("倒计时") {
-                    let isPowerOn = (text.contains("开") || text.contains("启动") || text.contains("运转")) && !text.contains("关") && !text.contains("停")
+                    let actionText = text.replacingOccurrences(of: "除开", with: "除了")
+                    let isPowerOn = (actionText.contains("开") || actionText.contains("启动") || actionText.contains("运转")) && !actionText.contains("关") && !actionText.contains("停")
                     let actionStr = isPowerOn ? "开机" : "关机"
                     let timeStr: String
                     if minutes >= 60 && minutes % 60 == 0 {
@@ -591,6 +593,12 @@ public struct VoiceCommandParser {
         return try? NSRegularExpression(pattern: pattern)
     }()
 
+    /// 匹配纯五核心关键词全景调度口语（如“工作日、平时、双休、大休和小休”、“工作日、双休、大休、小休和单休”） (v1.9.111)
+    private static let pentaKeywordsRegex: NSRegularExpression? = {
+        let pattern = #"(工作日|平时|平日|双休日|双休|周末三天|周末|休息日|公休日|休假日|放假日|节假日|单休日|单休|大休日|大休|大周|小休日|小休|小周)\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(工作日|平时|平日|双休日|双休|周末三天|周末|休息日|公休日|休假日|放假日|节假日|单休日|单休|大休日|大休|大周|小休日|小休|小周)\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(工作日|平时|平日|双休日|双休|周末三天|周末|休息日|公休日|休假日|放假日|节假日|单休日|单休|大休日|大休|大周|小休日|小休|小周)\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(工作日|平时|平日|双休日|双休|周末三天|周末|休息日|公休日|休假日|放假日|节假日|单休日|单休|大休日|大休|大周|小休日|小休|小周)\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(工作日|平时|平日|双休日|双休|周末三天|周末|休息日|公休日|休假日|放假日|节假日|单休日|单休|大休日|大休|大周|小休日|小休|小周)"#
+        return try? NSRegularExpression(pattern: pattern)
+    }()
+
     /// 匹配纯四核心关键词全景调度口语（如“工作日、双休、大休和小休”、“大休、小休、单休和工作日”） (v1.9.110)
     private static let quadKeywordsRegex: NSRegularExpression? = {
         let pattern = #"(工作日|平时|平日|双休日|双休|周末三天|周末|休息日|公休日|休假日|放假日|节假日|单休日|单休|大休日|大休|大周|小休日|小休|小周)\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(工作日|平时|平日|双休日|双休|周末三天|周末|休息日|公休日|休假日|放假日|节假日|单休日|单休|大休日|大休|大周|小休日|小休|小周)\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(工作日|平时|平日|双休日|双休|周末三天|周末|休息日|公休日|休假日|放假日|节假日|单休日|单休|大休日|大休|大周|小休日|小休|小周)\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(工作日|平时|平日|双休日|双休|周末三天|周末|休息日|公休日|休假日|放假日|节假日|单休日|单休|大休日|大休|大周|小休日|小休|小周)"#
@@ -729,19 +737,19 @@ public struct VoiceCommandParser {
         return try? NSRegularExpression(pattern: pattern)
     }()
 
-    /// 匹配显式带“外/之外/以外”的排除型否定星期口语模式（如“除周一至周二和周五至周六外每天早8点开机”、“除周一至周二，周三至周四外每天早8点开机”、“除周末和大休外每天早8点开机”、“除单休外每天早8点开机”） (v1.9.105, v1.9.106 容错逗号与空格分界)
+    /// 匹配显式带“外/之外/以外”的排除型否定星期口语模式（如“除周一至周二和周五至周六外每天早8点开机”、“除开周一至周二外每天早8点开机”、“除去大休和小休外每天早8点开机”、“除周末和大休外每天早8点开机”、“除单休外每天早8点开机”） (v1.9.105, v1.9.106, v1.9.111 纳管除开/除去/刨除/扣除)
     private static let explicitExclusionRepeatRegex: NSRegularExpression? = {
-        let pattern = #"(?:除了|除)\s*([^。！？\n]+?)\s*(?:之|以)?外"#
+        let pattern = #"(?:除了|除开|除去|刨除|扣除|除)\s*([^。！？\n]+?)\s*(?:之|以)?外"#
         return try? NSRegularExpression(pattern: pattern)
     }()
 
-    /// 匹配隐式无“外”的排除型否定星期口语模式（如“除了周末和大休每天早8点开机”、“除了周末跟大休每天早8点开机”、“除了周末同大休每天早8点开机”、“除了大休和小休每天早8点开机”、“除了单休日和双休日每天早8点开机”、“除了周三工作日每天早8点开机”） (v1.9.105, v1.9.106, v1.9.107 全景纳管跟/同/或者/或/并/并且连词防断裂)
+    /// 匹配隐式无“外”的排除型否定星期口语模式（如“除了周末和大休每天早8点开机”、“除开周末和大休每天早8点开机”、“除去大休和小休每天早8点开机”、“除了周末跟大休每天早8点开机”、“除了周末同大休每天早8点开机”、“除了单休日和双休日每天早8点开机”、“除了周三工作日每天早8点开机”） (v1.9.105, v1.9.106, v1.9.107, v1.9.111 纳管除开/除去/刨除/扣除并阻断平定字误判时间断裂)
     private static let implicitExclusionRepeatRegex: NSRegularExpression? = {
-        let pattern = #"(?:除了|除)\s*([^，,。！？\s]+?)(?=[，,。！？\s]|(?<!(?:和|与|及|加|以及|还有|另外|、|跟|同|或者|或|并且|并|\s))\s*(?<!非)(?:工作日|平时|平日|双休日|双休|周末三天|周末|休息日|公休日|休假日|放假日|节假日|单休日|单休|大休日|大休|大周|小休日|小休|小周|一三五|二四六)(?=\s*(?:每天|天天|每日|每晚|每早|每晨|每夜|日日|\d|早|晚|夜|中|上|下|凌晨|午|点|时|:|开|关|停))|每天|天天|每日|每晚|每早|每晨|每夜|日日|(?<![周星期礼拜])(?:\d|早|晚|夜|中|上|下|凌晨|午|点|时|:|$|开|关|停))"#
+        let pattern = #"(?:除了|除开|除去|刨除|扣除|除)\s*([^，,。！？\s]+?)(?=[，,。！？\s]|(?<!(?:和|与|及|加|以及|还有|另外|、|跟|同|或者|或|并且|并|\s))\s*(?<!非)(?:工作日|平时|平日|双休日|双休|周末三天|周末|休息日|公休日|休假日|放假日|节假日|单休日|单休|大休日|大休|大周|小休日|小休|小周|一三五|二四六)(?=\s*(?:每天|天天|每日|每晚|每早|每晨|每夜|日日|\d|早|晚|夜|中|上|下|凌晨|午|点|时|:|开|关|停))|每天|天天|每日|每晚|每早|每晨|每夜|日日|(?<![周星期礼拜平定])(?:\d|早|晚|夜|中|上|下|凌晨|午|点|时|:|$|开|关|停))"#
         return try? NSRegularExpression(pattern: pattern)
     }()
 
-    /// 从排除文本中提取被排除的星期集合 (v1.9.68, v1.9.71 纳管周末三天与单休排除, v1.9.95 纳管双休日与休息日, v1.9.96 闭环前置反相时态与单休日精准排除, v1.9.106 规范口语连词解耦与多标点分界, v1.9.107 补齐同/跟等口语连词)
+    /// 从排除文本中提取被排除的星期集合 (v1.9.68, v1.9.71 纳管周末三天与单休排除, v1.9.95 纳管双休日与休息日, v1.9.96 闭环前置反相时态与单休日精准排除, v1.9.106 规范口语连词解耦与多标点分界, v1.9.107 补齐同/跟等口语连词, v1.9.111 纳管除开/除去/刨除/扣除前缀清理)
     private static func extractExcludedDays(from target: String) -> Set<Int>? {
         var excluded = Set<Int>()
         var remainingTarget = target
@@ -753,6 +761,11 @@ public struct VoiceCommandParser {
             .replacingOccurrences(of: "并且", with: " ")
             .replacingOccurrences(of: "还有", with: " ")
             .replacingOccurrences(of: "另外", with: " ")
+            .replacingOccurrences(of: "除开", with: " ")
+            .replacingOccurrences(of: "除去", with: " ")
+            .replacingOccurrences(of: "刨除", with: " ")
+            .replacingOccurrences(of: "扣除", with: " ")
+            .replacingOccurrences(of: "除了", with: " ")
 
         // 1. 前置反相时态与否定周期的排除拦截（杜绝被下方正相词贪婪截断导致排除极性反向） (v1.9.96, v1.9.99 拓展大休小休与节假日反相)
         if remainingTarget.contains("非工作日") || remainingTarget.contains("非平时") || remainingTarget.contains("非平日") {
@@ -1443,6 +1456,27 @@ public struct VoiceCommandParser {
                     days.formUnion(kw2Days)
                 }
                 days.formUnion(generateWeeklyRange(start: s2Wd, end: e2Wd))
+                let sorted = days.sorted()
+                return (sorted, formatWeekdayLabel(from: sorted))
+            }
+        }
+
+        // 0.0000865 纯五核心关键词全景调度（如“工作日、平时、双休、大休和小休”、“工作日、双休、大休、小休和单休”） (v1.9.111)
+        if let regex = pentaKeywordsRegex,
+           let match = regex.firstMatch(in: text, options: [], range: fullRange),
+           match.numberOfRanges >= 6 {
+            let kw1 = nsString.substring(with: match.range(at: 1))
+            let kw2 = nsString.substring(with: match.range(at: 2))
+            let kw3 = nsString.substring(with: match.range(at: 3))
+            let kw4 = nsString.substring(with: match.range(at: 4))
+            let kw5 = nsString.substring(with: match.range(at: 5))
+            var days = Set<Int>()
+            if let kw1Days = daysFromKeyword(kw1) { days.formUnion(kw1Days) }
+            if let kw2Days = daysFromKeyword(kw2) { days.formUnion(kw2Days) }
+            if let kw3Days = daysFromKeyword(kw3) { days.formUnion(kw3Days) }
+            if let kw4Days = daysFromKeyword(kw4) { days.formUnion(kw4Days) }
+            if let kw5Days = daysFromKeyword(kw5) { days.formUnion(kw5Days) }
+            if !days.isEmpty {
                 let sorted = days.sorted()
                 return (sorted, formatWeekdayLabel(from: sorted))
             }

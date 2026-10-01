@@ -4898,6 +4898,45 @@ final class VoiceCommandParserTests: XCTestCase {
         XCTAssertNotEqual(VoiceCommandParser.parse("大休、小休和单休每天晚8点开机")?.command, .setPower(true))
     }
 
+    // MARK: - 纯五核心关键词排班与口语排除引导词大一统测试 (v1.9.111)
+
+    func testPentaKeywordsAndColloquialExclusionV19111() {
+        // 1. 纯五核心关键词全景调度
+        let p1 = VoiceCommandParser.parse("工作日、平时、双休、大休和小休每天早8点开机")
+        XCTAssertEqual(p1?.command, .scheduleRepeatPower(hour: 8, minute: 0, power: true, repeatWeekdays: [1, 2, 3, 4, 5, 6, 7], repeatLabel: "周一至周日"))
+
+        let p2 = VoiceCommandParser.parse("工作日、双休、大休、小休和单休每天晚8点关机")
+        XCTAssertEqual(p2?.command, .scheduleRepeatPower(hour: 20, minute: 0, power: false, repeatWeekdays: [1, 2, 3, 4, 5, 6, 7], repeatLabel: "周一至周日"))
+
+        // 2. 口语排除引导词（除开/除去/刨除/扣除）显式带“外”
+        let ex1 = VoiceCommandParser.parse("除开周末每天早8点开机")
+        XCTAssertEqual(ex1?.command, .scheduleRepeatPower(hour: 8, minute: 0, power: true, repeatWeekdays: [2, 3, 4, 5, 6], repeatLabel: "工作日"))
+
+        let ex2 = VoiceCommandParser.parse("除开周一至周三外每天早8点开机")
+        XCTAssertEqual(ex2?.command, .scheduleRepeatPower(hour: 8, minute: 0, power: true, repeatWeekdays: [1, 5, 6, 7], repeatLabel: "周四至周日"))
+
+        let ex3 = VoiceCommandParser.parse("除去大休和小休外每天早8点开机")
+        XCTAssertEqual(ex3?.command, .scheduleRepeatPower(hour: 8, minute: 0, power: true, repeatWeekdays: [2, 3, 4, 5, 6], repeatLabel: "工作日"))
+
+        let ex4 = VoiceCommandParser.parse("扣除工作日每天早8点关机")
+        XCTAssertEqual(ex4?.command, .scheduleRepeatPower(hour: 8, minute: 0, power: false, repeatWeekdays: [1, 7], repeatLabel: "周末"))
+
+        let ex5 = VoiceCommandParser.parse("刨除双休日每天早8点开机")
+        XCTAssertEqual(ex5?.command, .scheduleRepeatPower(hour: 8, minute: 0, power: true, repeatWeekdays: [2, 3, 4, 5, 6], repeatLabel: "工作日"))
+
+        // 3. 隐式排除与矛盾集拦截
+        let ex6 = VoiceCommandParser.parse("除开工作日和大休每天早8点开机")
+        XCTAssertNil(ex6)
+
+        let ex7 = VoiceCommandParser.parse("除去双休和平时每天晚10点关空调")
+        XCTAssertNil(ex7)
+
+        // 4. 防误触发安全断言：杜绝“除开”被识别为开机或即时动作
+        XCTAssertNotEqual(VoiceCommandParser.parse("除开周末每天早8点关机")?.command, .setPower(true))
+        XCTAssertNotEqual(VoiceCommandParser.parse("除开周末每天早8点关机")?.command, .turnOnAll)
+        XCTAssertNotEqual(VoiceCommandParser.parse("工作日、平时、双休、大休和小休每天早8点开机")?.command, .setPower(true))
+    }
+
     // MARK: - 无效输入测试
 
     func testInvalidCommands() {
