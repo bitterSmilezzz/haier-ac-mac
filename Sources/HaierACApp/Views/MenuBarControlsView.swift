@@ -1720,6 +1720,8 @@ struct MenuBarControlsView: View {
     private func filterWarningPod(device: DeviceInfo) -> some View {
         let cleanliness = model.filterCleanlinessPercentage(for: device.id)
         if cleanliness <= 30 {
+            let penalty = (Double(50 - max(0, cleanliness)) / 50.0) * 5.0
+            let penaltyStr = penalty > 0 ? String(format: " · 负荷+%.1f%%", penalty) : ""
             HStack(spacing: 8) {
                 Image(systemName: "exclamationmark.shield.fill")
                     .font(.system(size: 13, weight: .semibold))
@@ -1730,7 +1732,7 @@ struct MenuBarControlsView: View {
                         Text("滤网积尘预警")
                             .font(.system(size: 11, weight: .semibold))
                             .foregroundStyle(Theme.ink)
-                        Text("剩余 \(cleanliness)%")
+                        Text("剩余 \(cleanliness)%\(penaltyStr)")
                             .font(.system(size: 9, weight: .bold))
                             .foregroundStyle(cleanliness <= 10 ? Theme.danger : Theme.warning)
                             .padding(.horizontal, 4)
@@ -1738,7 +1740,7 @@ struct MenuBarControlsView: View {
                             .background((cleanliness <= 10 ? Theme.danger : Theme.warning).opacity(0.12))
                             .clipShape(Capsule())
                     }
-                    Text("进风气阻增加致换热负荷上升，建议拆洗")
+                    Text(cleanliness <= 10 ? "进风通道极度受阻，气阻剧增建议立即拆洗" : "进风气阻增加致换热负荷上升，建议拆洗")
                         .font(.system(size: 10))
                         .foregroundStyle(Theme.inkSubtle)
                 }

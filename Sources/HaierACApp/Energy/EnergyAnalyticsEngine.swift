@@ -395,9 +395,17 @@ public final class EnergyAnalyticsEngine: ObservableObject {
 
         switch mode {
         case .fan:
-            // 送风模式：仅室内风机运转，阶梯风速动力学梯度 (v1.9.39, v1.9.42 拓展强劲风量上限)
-            let power = 14.0 + windOffset * 0.42
-            return min(max(power, 14.0), 75.0)
+            // 送风模式：仅室内风机运转，阶梯风速动力学梯度 (v1.9.39, v1.9.42 拓展强劲风量上限, v1.9.116 滤网积尘流阻电动力学连续微补偿)
+            // 贯流风机由无刷直流电机（BLDC）驱动，当进风滤网积尘气阻上升时，电机需增加扭矩以克服回风道静压差维持对流循环：
+            // - 洁净度 >= 50%：额定空气动力学通量，气阻负荷因子为 1.00；
+            // - 洁净度 < 50%：进风截面受阻，气阻电功率产生 0% ~ 6% 的微补偿线性平滑上升。
+            let fanFilterMultiplier: Double = {
+                guard filterCleanlinessPct < 50 else { return 1.0 }
+                let clampedPct = max(0, filterCleanlinessPct)
+                return 1.0 + (Double(50 - clampedPct) / 50.0) * 0.06
+            }()
+            let power = (14.0 + windOffset * 0.42) * fanFilterMultiplier
+            return min(max(power, 14.0), 80.0)
 
         case .dehumidify:
             // 除湿模式：多维环境湿度自适应变频能耗动力学模型 + 室内温度显热负荷与防结霜降频动态补偿 (v1.9.37, v1.9.44, v1.9.87 C^0 级平滑连续热阻尼重构)
