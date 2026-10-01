@@ -336,8 +336,16 @@ struct MenuBarControlsView: View {
         isPowerOn: Bool,
         tint: Color
     ) -> some View {
-        HStack(spacing: 8) {
-            // 电源主开关
+        let allDevices = model.allUnifiedDevices
+        let onDevices = allDevices.filter {
+            model.reachability(for: $0.id) == .available &&
+            (model.attributes[$0.id]?["onOffStatus"]?.boolValue == true)
+        }
+        let anyDeviceOn = !onDevices.isEmpty
+        let controllableDevices = allDevices.filter { model.reachability(for: $0.id).isControllable }
+
+        return HStack(spacing: 8) {
+            // 本机电源主开关
             Button {
                 triggerHaptic()
                 withAnimation(Theme.spring) {
@@ -363,6 +371,42 @@ struct MenuBarControlsView: View {
                 )
             }
             .buttonStyle(.plain)
+            .help(isPowerOn ? "关闭「\(device.deviceName)」" : "开启「\(device.deviceName)」")
+
+            // 多设备全屋电源快捷联动 (v1.9.109: 达成控制中心情景/温控/电源三位一体全屋对称)
+            if allDevices.count > 1 {
+                Button {
+                    triggerHaptic()
+                    withAnimation(Theme.spring) {
+                        if anyDeviceOn {
+                            _ = model.turnOffAllDevices()
+                        } else {
+                            _ = model.turnOnAllDevices()
+                        }
+                    }
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: anyDeviceOn ? "poweroff" : "power")
+                            .font(.system(size: 10, weight: .semibold))
+                        Text(anyDeviceOn ? "全屋全关 (\(onDevices.count))" : "全屋开机")
+                            .font(.system(size: 11, weight: .medium))
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 7)
+                    .foregroundStyle(anyDeviceOn ? Theme.danger : Theme.accent)
+                    .background(
+                        RoundedRectangle(cornerRadius: Theme.radiusSM, style: .continuous)
+                            .fill(anyDeviceOn ? Theme.danger.opacity(0.10) : Theme.accent.opacity(0.10))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: Theme.radiusSM, style: .continuous)
+                                    .strokeBorder(anyDeviceOn ? Theme.danger.opacity(0.3) : Theme.accent.opacity(0.3), lineWidth: 1)
+                            )
+                    )
+                }
+                .buttonStyle(.plain)
+                .disabled(!model.gatewayConnected || controllableDevices.isEmpty)
+                .help(anyDeviceOn ? "一键关闭全屋 \(onDevices.count) 台运行中的空调" : "一键开启全屋 \(controllableDevices.count) 台在线空调")
+            }
 
             // 情景灯光（若支持）
             if let light = attrs["lightStatus"], light.writable {

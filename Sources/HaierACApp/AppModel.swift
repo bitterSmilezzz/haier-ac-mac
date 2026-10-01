@@ -626,10 +626,17 @@ final class AppModel: ObservableObject {
         deviceSelfCleaningDates[deviceId]
     }
 
-    /// 判断指定设备是否处于蒸发器自清洁健康保护期（完成自清洁 7 天内，翅片无积尘霉变，风阻低，衰减减缓）
+    /// 判断指定设备是否处于蒸发器自清洁健康保护期（完成自清洁 14 天内，含 7 天全效期与 7~14 天 C^0 级平滑阻尼过渡期） (v1.9.109)
     public func isSelfCleaningProtectionActive(for deviceId: String) -> Bool {
         guard let lastDate = deviceSelfCleaningDates[deviceId] else { return false }
-        return Date().timeIntervalSince(lastDate) < 7 * 86400
+        let elapsed = Date().timeIntervalSince(lastDate)
+        return elapsed >= 0 && elapsed < 14 * 86400
+    }
+
+    /// 获取指定设备蒸发器自清洁当前负荷减免折扣百分比（0.0% ~ 10.0%） (v1.9.109)
+    public func selfCleaningDiscountPercentage(for deviceId: String) -> Double {
+        let factor = selfCleaningProtectionFactor(for: deviceId)
+        return max(0.0, (1.0 - factor) * 100.0)
     }
 
     /// 计算指定设备蒸发器自清洁健康保护系数（C^0 级平滑连续热阻尼模型） (v1.9.108)

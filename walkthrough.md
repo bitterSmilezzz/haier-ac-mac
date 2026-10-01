@@ -1,21 +1,20 @@
-# Haier AC Mac v1.9.108 发布与巡检演进报告
+# Haier AC Mac v1.9.109 发布与巡检演进报告
 
 ## 1. 概述与版本定位
-- **版本号**：`v1.9.108`
-- **发版主题**：闭环双关键词夹心四元调度全景大一统、蒸发器自清洁 C^0 级平滑阻尼模型及菜单栏控制中心全屋联动调温
+- **版本号**：`v1.9.109`
+- **发版主题**：闭环三关键词与区间四元调度全景大一统、自清洁全生命周期阻尼感知及菜单栏控制中心全屋电源快捷联动
 - **核心目标与架构演进**：
-  1. **“四元夹心全拓扑闭环与调度意图击穿拦截”自然口语调度引擎 (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)**：
-     - **双关键词在先夹心四元调度**：新增 `dualKeywordsWithRangeAndKeywordRegex`（双核心关键词在先+连续区间居中+核心词在后，如“大休和小休、周一至周三加单休日每天晚8点开机” `[1, 2, 3, 4, 7]`、“工作日同双休、周六至周日加单休每天晚8点开机” `[1..7]`），消灭前置双词截断漏洞；
-     - **双关键词在后夹心四元调度**：新增 `keywordWithRangeAndDualKeywordsRegex`（核心关键词在先+连续区间居中+双核心词在后，如“大休、周一至周三加小休和单休日每天晚8点开机” `[1, 2, 3, 4, 7]`、“工作日同周二至周四加双休和大休每天晚8点开机” `[1..7]`），四元周期全排列拓扑自洽闭环；
-     - **调度落空防击穿即时调温拦截门禁**：在 `parseRelativeTemperature` 中接入时钟调度语义过滤门禁，当语句中包含明确排班/定时意图（如“每天”、“定时”、“工作日”、“小时后”等）且带有开关机动作时，坚决拦截相对调温，根除因口语“加/高/升”导致的调度击穿为即时调温误操作；
-     - **单元测试 100% 满分覆盖**：新增 `testQuadScheduleDualKeywordsAndTongConjunctionV19108` 测试套件，全套 116 个单元测试零缺陷通过，杜绝误触。
-  2. **蒸发器自清洁健康度动力学 C^0 平滑连续阻尼物理模型 (`AppModel.swift`)**：
-     - 重构 `selfCleaningProtectionFactor(for:)` 算法，从历史粗暴的第 7 天 10% 阶跃断崖式跳变，演进为 0~7 天 0.90 全效保护，7~14 天线性平滑阻尼过渡（`0.90 + 0.10 * (days - 7.0) / 7.0`），14 天后恒定为 1.00；
-     - 建立了热负荷与滤网积灰动力学中的 C^0 连续物理模型，彻底消除能耗预测与健康评估中的台阶突变。
-  3. **macOS 菜单栏控制中心温度 Bento 卡片全屋联动对称架构 (`MenuBarControlsView.swift`)**：
-     - **当前机 / 全屋双态无缝切换**：温度 Bento 卡片依据顶部模式选择器（当前机/全屋）动态切换 UI 呈现；
-     - **全屋状态深度感知**：在全屋模式下自动计算运行中机组的实时均温及温区分布（如“24~26°C 均温 · 统一步进”或“全屋同步中”），全待机时支持点击唤醒；
-     - **统一步进与越界防卫**：提供全屋 `+/-` 统一步进胶囊按钮，调用 `adjustTemperatureAll(delta:)` 并严格执行 16~30°C 越界门禁。
+  1. **“三核心关键词与单区间四元全景复合调度、连词‘同’全纳管”自然口语调度引擎 (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)**：
+     - **三关键词在先四元调度拓扑补全**：新增 `triKeywordsWithRangeRegex`（三核心关键词在先+单连续区间在后，如“大休、小休和单休日加周一至周三每天晚8点开机” `[1, 2, 3, 4, 7]`、“工作日、双休同单休加周六至周日每天晚8点开机” `[1..7]`），消灭前置三词贪婪无法匹配漏洞；
+     - **区间在先三关键词在后四元调度拓扑补全**：新增 `rangeWithTriKeywordsRegex`（单连续区间在先+三核心关键词在后，如“周一至周三加双休、大休和小休每天晚8点开机” `[1, 2, 3, 4, 7]`、“周六至周日同工作日、大休和单休每天早7点开机” `[1..7]`），彻底补齐四元排班拓扑中 3 关键词与 1 区间的全部组合；
+     - **自然口语连词“同”全纳管**：在 `rangeWithDualKeywordsRegex`、`dualRangeWithDualKeywordsRegex`、`dualKeywordsWithDualRangeRegex`、`dualKeywordsWithRangeRegex` 等正则中全面补齐口语常见连词 `同`（如“大休同小休加周一至周三”、“周一至周三同大休和小休”），根除连词断裂导致的漏词缺陷；
+     - **单元测试 100% 满分覆盖**：新增 `testQuadScheduleTriKeywordsAndRangeV19109` 严苛测试套件，全套 117 个单元测试零缺陷通过，杜绝误触。
+  2. **蒸发器自清洁全生命周期阻尼感知与健康度动力学自洽 (`AppModel.swift` / `FilterCareSheet.swift`)**：
+     - **自清洁保护期全生命周期纳管**：重构 `isSelfCleaningProtectionActive(for:)`，从固定 7 天扩充至覆盖自清洁后 14 天完整周期（含 7 天全效期及 7~14 天 C^0 级平滑阻尼过渡期），消除第 7 天后台仍在享受减免而 UI 保护状态截断消失的割裂；
+     - **健康度与负荷减免动态感知**：新增 `selfCleaningDiscountPercentage(for:)`，在保养弹窗中动态感知当前实际负荷减免（0~7天显示“56°C除菌保养激励 (-10%负荷)”，7~14天动态显示“56°C除菌阻尼激励 (-X.X%负荷)”），达成 UI 与热物理动力学模型之间的严密自洽。
+  3. **macOS 菜单栏 Bento 控制中心快捷开关 Bento 全屋电源快捷联动 (`MenuBarControlsView.swift`)**：
+     - **多设备全屋电源快捷管理**：在多联机（>1台）环境下，快捷开关矩阵在单机开关旁提供“全屋电源快捷联动”按钮（全屋有开机时直观展示“全屋全关 (N)”，全待机时支持“全屋开机”）；
+     - **三位一体全屋对称架构**：与一键情景 Bento、目标温度 Bento 完美呼应，构成 macOS 菜单栏控制中心的情景、温控、电源三位一体全屋/单机双态对称体系。
 
 ---
 
@@ -29,53 +28,50 @@
    - **死分支清理 (P2-2)**：`.adjustTemperatureAll` 死分支已彻底清理；
    - **调温 16/30°C 边界防护 (P2-3)**：单设备与全屋协同均已严格实施边界限制并同步至状态栏与 UI Stepper 使能状态。
 2. **本轮走查发现的高价值优化与缺陷闭环**：
-   - **蒸发器自清洁台阶断崖跳变消除 (P1 优化)**：消除了第 7 天从 0.90 瞬间跃升到 1.00 的断崖，建立平滑过渡；
-   - **双关键词夹心四元排班拓扑补齐 (P0 修复)**：补齐了前后双关键词与连续区间夹心的两类四元排班正则，解决了极端复合排班的词尾丢失问题；
-   - **调度意图击穿相对调温拦截 (P1 修复)**：杜绝排班语句被误判为即时加减温。
+   - **自清洁全生命周期阻尼感知断层消除 (P1 优化)**：消除了第 7~14 天 UI 激励徽章提前消失的断层，建立动态减免百分比展示；
+   - **三关键词与单区间四元排班拓扑补齐 (P0 修复)**：补齐了三关键词在前与在后的两类四元排班正则，统一纳管口语连词“同”，消灭了极端复合排班的词尾丢失问题；
+   - **菜单栏控制中心全屋电源快捷联动闭环 (P1 优化)**：让菜单栏快捷控制在多联机环境下具备一键管理全屋电源的能力，形成全屋三位一体对称架构。
 
 ---
 
 ## 3. 关键架构变更与代码实现
 
-### 3.1 双关键词夹心四元复合排班与防击穿门禁
+### 3.1 三核心关键词与单区间四元复合排班与连词“同”纳管
 - **`VoiceCommandParser.swift`**：
   ```swift
-  // 双核心关键词在先、连续区间居中、核心关键词在后
-  private static let dualKeywordsWithRangeAndKeywordRegex: NSRegularExpression? = {
-      let pattern = #"(工作日|平时|...)\s*(?:[、,，和与及跟以及还有或者或加/／同\s]+)\s*(工作日|平时|...)\s*(?:[、,，和与及跟以及还有或者或加/／同\s]+)\s*(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])\s*(?:[、,，和与及跟以及还有或者或加/／同\s]+)\s*(工作日|平时|...)"#
+  // 三核心关键词在先、连续区间在后
+  private static let triKeywordsWithRangeRegex: NSRegularExpression? = {
+      let pattern = #"(工作日|平时|...)\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(工作日|平时|...)\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(工作日|平时|...)\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])"#
       return try? NSRegularExpression(pattern: pattern)
   }()
 
-  // 调度防击穿门禁
-  private static func parseRelativeTemperature(_ text: String) -> VoiceParseResult? {
-      guard !containsNegativeAction(text) else { return nil }
-      if (text.contains("开") || text.contains("关") || text.contains("停")) &&
-         (text.contains("定时") || text.contains("倒计时") || text.contains("预约") || text.contains("每天") || text.contains("天天") || text.contains("每晚") || text.contains("每早") || text.contains("每日") || text.contains("每周") || text.contains("除") || text.contains("小时后") || text.contains("分钟后")) {
-          return nil
-      }
-      ...
-  }
+  // 连续区间在先、三核心关键词在后
+  private static let rangeWithTriKeywordsRegex: NSRegularExpression? = {
+      let pattern = #"(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(工作日|平时|...)\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(工作日|平时|...)\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(工作日|平时|...)"#
+      return try? NSRegularExpression(pattern: pattern)
+  }()
   ```
 
-### 3.2 自清洁健康度平滑阻尼连续物理模型
+### 3.2 自清洁全生命周期阻尼感知与动态减免
 - **`AppModel.swift`**：
   ```swift
-  private func selfCleaningProtectionFactor(for deviceId: String) -> Double {
-      guard let cleanDate = deviceLastSelfCleanDate[deviceId] else { return 1.0 }
-      let days = Date().timeIntervalSince(cleanDate) / 86400.0
-      if days <= 7.0 {
-          return 0.90 // 0~7天全效自清洁保护
-      } else if days <= 14.0 {
-          return 0.90 + 0.10 * ((days - 7.0) / 7.0) // 7~14天线性平滑阻尼过渡至1.00
-      } else {
-          return 1.00
-      }
+  public func isSelfCleaningProtectionActive(for deviceId: String) -> Bool {
+      guard let lastDate = deviceSelfCleaningDates[deviceId] else { return false }
+      let elapsed = Date().timeIntervalSince(lastDate)
+      return elapsed >= 0 && elapsed < 14 * 86400
+  }
+
+  public func selfCleaningDiscountPercentage(for deviceId: String) -> Double {
+      let factor = selfCleaningProtectionFactor(for: deviceId)
+      return max(0.0, (1.0 - factor) * 100.0)
   }
   ```
+- **`FilterCareSheet.swift`**：
+  依据 `selfCleaningDiscountPercentage` 动态渲染 0~7 天全效激励与 7~14 天平滑阻尼过渡激励。
 
-### 3.3 控制中心温控卡片全屋联动架构
+### 3.3 控制中心快捷开关 Bento 全屋电源快捷联动
 - **`MenuBarControlsView.swift`**：
-  在全屋模式下展示 `avgTemp`、温区范围，并支持一键统一步进调温 `model.adjustTemperatureAll(delta:)`。
+  在多设备（`allDevices.count > 1`）场景下，快捷开关 Bento 增加全屋电源操作按键（`全屋全关 (N)` / `全屋开机`），调用 `turnOffAllDevices()` 与 `turnOnAllDevices()`。
 
 ---
 
@@ -83,18 +79,18 @@
 
 1. **自动化单元测试全通**：
    - 执行 `SDKROOT=/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk swift test`：
-   - 包含 `VoiceCommandParserTests`、`ZlibTests` 等在内共 **116 个单元测试 100% 成功通过（0 failures, 0 unexpected）**。
+   - 包含 `VoiceCommandParserTests`、`ZlibTests` 等在内共 **117 个单元测试 100% 成功通过（0 failures, 0 unexpected）**。
 2. **Release 编译构建**：
    - 执行 `SDKROOT=/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk swift build -c release`：
    - 编译顺利通过，零警告零报错。
 3. **应用打包与签名**：
-   - 执行 `./build_app.sh 1.9.108`：
-   - 顺利生成 App 产物 `dist/HaierAC.app` 与发布安装包 `dist/HaierAC-v1.9.108-macOS.zip`（体积 2.9MB，SHA256: `3f5141887f8ade57b7c80a763040a4558c7b44e5660c0e4a335069995f38f94c`）。
+   - 执行 `./build_app.sh 1.9.109`：
+   - 顺利生成 App 产物 `dist/HaierAC.app` 与发布安装包 `dist/HaierAC-v1.9.109-macOS.zip`（体积 2.9MB，SHA256: `7536c51c8ca1c99a8497b32b8f047f2596e19663f4f1741d4745fa19b3fbd29f`）。
 
 ---
 
 ## 5. 发版信息与提交记录
-- **Git Commit**：`feat & fix: 闭环双关键词夹心四元调度全景大一统、蒸发器自清洁 C^0 级平滑阻尼模型及菜单栏控制中心全屋联动调温 (v1.9.108)`
-- **Git Tag**：`v1.9.108`
-- **Release Asset**：`dist/HaierAC-v1.9.108-macOS.zip`
-- **SHA256**：`3f5141887f8ade57b7c80a763040a4558c7b44e5660c0e4a335069995f38f94c`
+- **Git Commit**：`feat & fix: 闭环三关键词与区间四元调度全景大一统、自清洁全生命周期阻尼感知及菜单栏控制中心全屋电源快捷联动 (v1.9.109)`
+- **Git Tag**：`v1.9.109`
+- **Release Asset**：`dist/HaierAC-v1.9.109-macOS.zip`
+- **SHA256**：`7536c51c8ca1c99a8497b32b8f047f2596e19663f4f1741d4745fa19b3fbd29f`

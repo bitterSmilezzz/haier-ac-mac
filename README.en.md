@@ -6,6 +6,18 @@ A native SwiftUI app to control Haier / Leader (统帅) smart air conditioners o
 
 ## Features
 
+- 🏷 **Tri-Keywords and Range Quad-Compound Scheduling Topology Unification, Full-Lifecycle Self-Cleaning Damping Awareness, and Control Center Whole-House Power Matrix (v1.9.109)**:
+  - ⏱️ **"Tri-Keywords and Single Range Quad-Compound Scheduling, Conjunction '同' Coverage" Spoken Engine (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)**:
+    - **Quad-Compound Topology Unification**: Added `triKeywordsWithRangeRegex` (tri-keywords prefix + range suffix, e.g., "大休、小休和单休日加周一至周三每天晚8点开机" `[1, 2, 3, 4, 7]`, "工作日、双休同单休加周六至周日每天晚8点开机" `[1..7]`) and `rangeWithTriKeywordsRegex` (range prefix + tri-keywords suffix, e.g., "周一至周三加双休、大休和小休每天晚8点开机" `[1, 2, 3, 4, 7]`, "周六至周日同工作日、大休和单休每天早7点开机" `[1..7]`), completely unifying the permutation set of 3 keywords and 1 continuous range, eliminating truncation and omission bugs;
+    - **Oral Conjunction "同" Coverage**: Added missing conjunction `同` across `rangeWithDualKeywordsRegex`, `dualRangeWithDualKeywordsRegex`, `dualKeywordsWithDualRangeRegex`, and `dualKeywordsWithRangeRegex` (e.g., "大休同小休加周一至周三", "周一至周三同大休和小休"), ensuring 100% natural spoken language conjunction compatibility;
+    - **100% Unit Test Suite Coverage**: Added `testQuadScheduleTriKeywordsAndRangeV19109` test suite with all 117 tests passing with zero errors.
+  - 🧼 **Evaporator Self-Cleaning Full-Lifecycle Damping Awareness and Dynamic Load Deduction (`AppModel.swift` / `FilterCareSheet.swift`)**:
+    - **Full-Lifecycle Self-Cleaning Protection Scope**: Refactored `isSelfCleaningProtectionActive(for:)` to span the entire 14-day duration (including 7-day full protection and 7–14 days C^0 smooth continuous damping transition), eliminating UI state severance while backend load deductions are still active;
+    - **Dynamic Load Deduction Metric**: Added `selfCleaningDiscountPercentage(for:)` to dynamically reflect current load deduction (days 0–7: "-10% load", days 7–14: dynamic "-X.X% load" transition), ensuring complete consistency between UI indicators and thermodynamic models.
+  - 🖥️ **macOS Menu Bar Bento Control Center Whole-House Power Matrix (`MenuBarControlsView.swift`)**:
+    - **Whole-House Power Rapid Management**: In multi-device setups (>1 unit), the quick action pod now provides a whole-house power button ("全屋全关 (N)" when units are running, "全屋开机" during standby);
+    - **Unified Whole-House Symmetrical Architecture**: Complements Scenes Bento and Target Temperature Bento to form an integrated, symmetrical triad of Scenes, Temperature, and Power whole-house controls.
+
 - 🏷 **Universal Dual-Keyword Interleaved Quad-Compound Scheduling, Evaporator Self-Cleaning C^0 Continuous Damping Model, and Control Center Synchronized Whole-House Temperature Control (v1.9.108)**:
   - ⏱️ **"Dual-Keyword Interleaved Quad-Compound Scheduling, Timing Guard Breakdown Prevention, and Conjunction '同' Unification" Engine (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)**:
     - **Quad-Compound Topology Unification**: Added `dualKeywordsWithRangeAndKeywordRegex` (dual keywords prefix + continuous range infix + keyword suffix, e.g., "大休和小休、周一至周三加单休日每天晚8点开机" `[1, 2, 3, 4, 7]`, "工作日同双休、周六至周日加单休每天晚8点开机" `[1..7]`) and `keywordWithRangeAndDualKeywordsRegex` (keyword prefix + continuous range infix + dual keywords suffix, e.g., "大休、周一至周三加小休和单休日每天晚8点开机" `[1, 2, 3, 4, 7]`, "工作日同周二至周四加双休和大休每天晚8点开机" `[1..7]`), closing the complete set of all 6 quad-compound topological combinations;

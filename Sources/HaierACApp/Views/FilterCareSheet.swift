@@ -162,12 +162,20 @@ struct FilterCareSheet: View {
                         .background(Theme.surface2)
                         .clipShape(Capsule())
 
-                        // 蒸发器自清洁 7 天保养激励徽章 (v1.9.28: 策略性深度保养激励)
+                        // 蒸发器自清洁全生命周期保养激励徽章 (v1.9.28, v1.9.109 C^0 平滑阻尼自洽感知)
                         if model.isSelfCleaningProtectionActive(for: currentDeviceId) {
+                            let discount = model.selfCleaningDiscountPercentage(for: currentDeviceId)
+                            let isFull = discount >= 9.9
+                            let badgeTitle = isFull
+                                ? "56°C除菌保养激励 (-10%负荷)"
+                                : String(format: "56°C除菌阻尼激励 (-%.1f%%负荷)", discount)
+                            let tooltipDesc = isFull
+                                ? "主动保养激励：7 天内享受整机深度健康维护期，折算等效负荷减免 10%"
+                                : String(format: "平滑阻尼过渡：第 8~14 天微尘积聚过渡期，折算动态减免 -%.1f%% 负荷", discount)
                             HStack(spacing: 3) {
                                 Image(systemName: "sparkles")
                                     .font(.system(size: 9))
-                                Text("56°C除菌保养激励 (-10%负荷)")
+                                Text(badgeTitle)
                                     .font(.system(size: 10, weight: .medium))
                             }
                             .foregroundStyle(Theme.success)
@@ -175,7 +183,7 @@ struct FilterCareSheet: View {
                             .padding(.vertical, 2)
                             .background(Theme.success.opacity(0.12))
                             .clipShape(Capsule())
-                            .help("主动保养激励：7 天内享受整机深度健康维护期，折算等效负荷减免 10%")
+                            .help(tooltipDesc)
                         }
                     }
 
@@ -305,7 +313,11 @@ struct FilterCareSheet: View {
                         .font(.system(size: 11))
                         .foregroundStyle(Theme.inkTertiary)
                     if model.isSelfCleaningProtectionActive(for: currentDeviceId) {
-                        Text("• ✨ 7天翅片洁净保护生效中（负荷衰减减免 10%）")
+                        let discount = model.selfCleaningDiscountPercentage(for: currentDeviceId)
+                        let text = discount >= 9.9
+                            ? "• ✨ 7天全效洁净保护生效中（负荷衰减减免 10%）"
+                            : String(format: "• ✨ 翅片洁净平滑阻尼过渡中（动态减免 %.1f%% 负荷）", discount)
+                        Text(text)
                             .font(.system(size: 11, weight: .medium))
                             .foregroundStyle(Theme.success)
                     }
