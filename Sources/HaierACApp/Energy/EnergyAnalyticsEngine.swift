@@ -308,25 +308,41 @@ public final class EnergyAnalyticsEngine: ObservableObject {
 
         if isSelfCleaning {
             // 56°C 蒸发器高温除菌自清洁工况（急冷结霜、微波解冻与 56°C 恒温烘干灭菌）：
-            // 动态四阶段相变热力学动力学模型 (v1.9.119):
-            // 阶段 1 (0~5 分钟, 深冷结霜凝水): 压缩机高频运转快速降温至 0°C 以下使翅片凝霜凝固尘垢，基准功率 ~880W ~ 960W + windOffset*0.4;
+            // 动态四阶段相变热力学动力学模型 (v1.9.119, v1.9.120 耦合环境显热与潜热连续微补偿):
+            // 阶段 1 (0~5 分钟, 深冷结霜凝水): 压缩机高频运转快速降温至 0°C 以下使翅片凝霜凝固尘垢，基准功率 ~880W ~ 960W + windOffset*0.4
+            //        若室内高湿(RH >= 60%)，空气凝华结霜潜热负荷提升 (+0W ~ 50W)；若室内温高(indoor >= 25°C)，降温初始显热负荷提升 (+0W ~ 40W)；
             // 阶段 2 (5~10 分钟, 逆循环微解冻冲刷): 四通阀换向快速化霜，利用大量融水强力冲刷剥离翅片积尘，基准功率 ~780W + windOffset*0.3;
-            // 阶段 3 (10~18 分钟, 56°C 高温恒温烘干杀菌): 变频压缩机制热大压比持续输出，蒸发器表面维持 56°C 恒温 8 分钟以上灭菌烘干，基准功率 ~1000W ~ 1040W + windOffset*0.5;
-            // 阶段 4 (>= 18 分钟, 降温送风排湿恢复): 压缩机停机降压，贯流风机以常温微风排出残余水汽并冷却翅片，基准功率 ~48W + windOffset*0.2;
+            // 阶段 3 (10~18 分钟, 56°C 高温恒温烘干杀菌): 变频压缩机制热大压比持续输出，蒸发器表面维持 56°C 恒温 8 分钟以上灭菌烘干，基准功率 ~1000W ~ 1040W + windOffset*0.5
+            //        若室内偏冷(indoor <= 18°C)，蒸发器向室内自然散热加剧，需额外提高压比维持 56°C 灭菌温区 (+0W ~ 50W)；
+            // 阶段 4 (>= 18 分钟, 降温送风排湿恢复): 压缩机停机降压，贯流风机以常温微风排出残余水汽并冷却翅片，基准功率 ~48W + windOffset*0.2
+            //        同时受滤网积尘气阻微阻尼调制 (1.00 ~ 1.05)。
             let cleaningMinutes = continuousMinutes
             let cleaningPower: Double
             if cleaningMinutes < 5 {
                 let ramp = min(1.0, Double(cleaningMinutes) / 5.0)
-                cleaningPower = 880.0 + (ramp * 80.0) + (windOffset * 0.4)
+                let latentFrost: Double = {
+                    guard let hum = indoorHumidity, hum >= 60.0 else { return 0.0 }
+                    return min(50.0, (hum - 60.0) * 1.25)
+                }()
+                let sensibleFrost: Double = {
+                    guard let indoor = indoorTemp, indoor >= 25.0 else { return 0.0 }
+                    return min(40.0, (indoor - 25.0) * 4.0)
+                }()
+                cleaningPower = 880.0 + (ramp * 80.0) + (windOffset * 0.4) + latentFrost + sensibleFrost
             } else if cleaningMinutes < 10 {
                 cleaningPower = 780.0 + (windOffset * 0.3)
             } else if cleaningMinutes < 18 {
                 let heatPhase = min(1.0, Double(cleaningMinutes - 10) / 8.0)
-                cleaningPower = 1000.0 + (heatPhase * 40.0) + (windOffset * 0.5)
+                let coldLoss: Double = {
+                    guard let indoor = indoorTemp, indoor <= 18.0 else { return 0.0 }
+                    return min(50.0, (18.0 - indoor) * 5.0)
+                }()
+                cleaningPower = 1000.0 + (heatPhase * 40.0) + (windOffset * 0.5) + coldLoss
             } else {
-                cleaningPower = 48.0 + (windOffset * 0.2)
+                let fanFilter = filterCleanlinessPct < 50 ? 1.0 + (Double(50 - max(0, filterCleanlinessPct)) / 50.0) * 0.05 : 1.0
+                cleaningPower = (48.0 + (windOffset * 0.2)) * fanFilter
             }
-            return min(max(cleaningPower, 40.0), 1150.0)
+            return min(max(cleaningPower, 40.0), 1250.0)
         }
 
         guard isPowerOn else {
@@ -756,8 +772,14 @@ public final class EnergyAnalyticsEngine: ObservableObject {
                 totalIncrementalKWh += devKWh
 
                 if sample.isSelfCleaning {
-                    // 自清洁归入高温热力学工况
-                    runningHeating += 1
+                    // 自清洁依据执行时相精确映射至动力学分类 (v1.9.120: 消除全程笼统归入制热导致的机时失真)
+                    if sample.continuousMinutes < 10 {
+                        runningCooling += 1 // 阶段 1&2 急速深冷与微解冻冲刷归入冷冻相变工况
+                    } else if sample.continuousMinutes < 18 {
+                        runningHeating += 1 // 阶段 3 56°C 恒温烘干灭菌归入高温热力学工况
+                    } else {
+                        runningFan += 1     // 阶段 4 常温微风排湿冷却归入平稳送风工况
+                    }
                 } else if let sampleMode = ACModeCode.match(from: sample.modeCode) {
                     switch sampleMode {
                     case .cooling: runningCooling += 1

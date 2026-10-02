@@ -4,7 +4,7 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
-VERSION="1.9.119"
+VERSION="1.9.120"
 OPEN=""
 for arg in "$@"; do
     case "$arg" in

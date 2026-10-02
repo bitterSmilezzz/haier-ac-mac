@@ -1612,18 +1612,19 @@ final class StatusItemController: NSObject {
         ambientItem.toolTip = "切换播放白噪音背景音（\(model.sleepAmbientSoundType.displayName)），营造舒适入眠与专注氛围"
         menu.addItem(ambientItem)
 
-        // 滤网健康与自清洁快速入口 (v1.9.21, v1.9.37 多设备全屋最低洁净度预警, v1.9.45 快捷重置子菜单, v1.9.118 极端阻抗报警与非线性气阻负荷标定, v1.9.119 四阶段相变动态感知)
+        // 滤网健康与自清洁快速入口 (v1.9.21, v1.9.37 多设备全屋最低洁净度预警, v1.9.45 快捷重置子菜单, v1.9.118 极端阻抗报警与非线性气阻负荷标定, v1.9.119 四阶段相变动态感知, v1.9.120 时相百分比与相变连续感知)
         let filterTitle: String = {
             if model.isSelfCleaningActive {
                 let rem = model.selfCleaningRemainingSeconds
                 let elapsed = max(0, 1200 - rem)
+                let cleanPct = min(100, max(0, Int(round((Double(elapsed) / 1200.0) * 100))))
                 let phaseTag: String = {
                     if elapsed < 300 { return "凝霜裹尘" }
                     else if elapsed < 600 { return "微解冻冲刷" }
                     else if elapsed < 1080 { return "56°C烘干" }
                     else { return "送风冷却" }
                 }()
-                return "56°C 自清洁中 [\(phaseTag)] (\(rem / 60)m\(rem % 60)s)..."
+                return "56°C 自清洁中 [\(phaseTag) \(cleanPct)%] (\(rem / 60)m\(rem % 60)s)..."
             }
             if allDevices.count > 1 {
                 let minClean = allDevices.map { model.filterCleanlinessPercentage(for: $0.id) }.min() ?? model.filterCleanlinessPercentage

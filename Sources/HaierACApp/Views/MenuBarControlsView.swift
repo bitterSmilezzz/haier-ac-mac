@@ -1629,15 +1629,16 @@ struct MenuBarControlsView: View {
             let m = rem / 60
             let s = rem % 60
             let elapsed = max(0, 1200 - rem)
+            let cleanPct = min(100, max(0, Int(round((Double(elapsed) / 1200.0) * 100))))
             let phaseDesc: String = {
                 if elapsed < 300 {
-                    return "阶段 1/4 • 急速深冷结霜裹尘"
+                    return "阶段 1/4 • 急速深冷结霜裹尘 (\(cleanPct)%)"
                 } else if elapsed < 600 {
-                    return "阶段 2/4 • 逆循环微解冻剥离"
+                    return "阶段 2/4 • 逆循环微解冻剥离 (\(cleanPct)%)"
                 } else if elapsed < 1080 {
-                    return "阶段 3/4 • 56°C 高温杀菌烘干"
+                    return "阶段 3/4 • 56°C 高温杀菌烘干 (\(cleanPct)%)"
                 } else {
-                    return "阶段 4/4 • 送风排湿冷却恢复"
+                    return "阶段 4/4 • 送风排湿冷却恢复 (\(cleanPct)%)"
                 }
             }()
 
