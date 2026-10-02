@@ -115,7 +115,7 @@
    - 运行 `./build_app.sh 1.9.121`：
    - 生成打包应用：`dist/HaierAC.app`（含小组件插件 `HaierACWidget.appex`）
    - 安装包：`dist/HaierAC-v1.9.121-macOS.zip` (大小: ~3.0MB)
-   - SHA-256 校验和：`44a1f41fe08f3e96ec8e35c3d28c66b46c65be4f2b078a3a06b85b7c906fb34d`
+   - SHA-256 校验和：`9eb7743baae69f82f73d54ed40554487e2479b39f34fe45df66454200cd7673e`
 
 ---
 
