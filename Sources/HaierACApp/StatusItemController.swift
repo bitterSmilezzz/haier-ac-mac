@@ -1006,13 +1006,15 @@ final class StatusItemController: NSObject {
                 resetFilterItem.toolTip = filterMaintenanceTooltip(for: devId, deviceName: dev.name)
                 devSubmenu.addItem(resetFilterItem)
 
-                // 蒸发器 56°C 高温自清洁全生命周期操作闭环 (v1.9.111)
+                // 蒸发器 56°C 高温自清洁全生命周期操作闭环 (v1.9.111, v1.9.123 动态时相阶段与百分比感知)
                 let isCleaningThisDev = model.isSelfCleaningActive && (model.selfCleaningDeviceId == devId || (model.selfCleaningDeviceId == nil && allDevices.count == 1))
                 if isCleaningThisDev {
                     let m = model.selfCleaningRemainingSeconds / 60
                     let s = model.selfCleaningRemainingSeconds % 60
+                    let cleanPct = model.selfCleaningProgressPercentage
+                    let phaseTag = model.selfCleaningPhaseShortTag
                     let stopCleanItem = NSMenuItem(
-                        title: "🛑 中止 56°C 自清洁 (剩余 \(String(format: "%02d:%02d", m, s)))",
+                        title: "🛑 中止 56°C 自清洁 [\(phaseTag) \(cleanPct)%] (剩余 \(String(format: "%02d:%02d", m, s)))",
                         action: #selector(stopSelfCleaningFromMenu),
                         keyEquivalent: ""
                     )
@@ -1422,13 +1424,15 @@ final class StatusItemController: NSObject {
             singleResetFilterItem.toolTip = filterMaintenanceTooltip(for: dev.id, deviceName: dev.name)
             menu.addItem(singleResetFilterItem)
 
-            // 蒸发器 56°C 高温自清洁全生命周期操作闭环 (v1.9.111)
+            // 蒸发器 56°C 高温自清洁全生命周期操作闭环 (v1.9.111, v1.9.123 动态时相阶段与百分比感知)
             let isSingleCleaning = model.isSelfCleaningActive && (model.selfCleaningDeviceId == dev.id || model.selfCleaningDeviceId == nil)
             if isSingleCleaning {
                 let m = model.selfCleaningRemainingSeconds / 60
                 let s = model.selfCleaningRemainingSeconds % 60
+                let cleanPct = model.selfCleaningProgressPercentage
+                let phaseTag = model.selfCleaningPhaseShortTag
                 let stopCleanItem = NSMenuItem(
-                    title: "🛑 中止 56°C 自清洁 (剩余 \(String(format: "%02d:%02d", m, s)))",
+                    title: "🛑 中止 56°C 自清洁 [\(phaseTag) \(cleanPct)%] (剩余 \(String(format: "%02d:%02d", m, s)))",
                     action: #selector(stopSelfCleaningFromMenu),
                     keyEquivalent: ""
                 )
@@ -1626,18 +1630,12 @@ final class StatusItemController: NSObject {
         ambientItem.toolTip = "切换播放白噪音背景音（\(model.sleepAmbientSoundType.displayName)），营造舒适入眠与专注氛围"
         menu.addItem(ambientItem)
 
-        // 滤网健康与自清洁快速入口 (v1.9.21, v1.9.37 多设备全屋最低洁净度预警, v1.9.45 快捷重置子菜单, v1.9.118 极端阻抗报警与非线性气阻负荷标定, v1.9.119 四阶段相变动态感知, v1.9.120 时相百分比与相变连续感知)
+        // 滤网健康与自清洁快速入口 (v1.9.21, v1.9.37 多设备全屋最低洁净度预警, v1.9.45 快捷重置子菜单, v1.9.118 极端阻抗报警与非线性气阻负荷标定, v1.9.119 四阶段相变动态感知, v1.9.120 时相百分比与相变连续感知, v1.9.123 状态全局统一收口)
         let filterTitle: String = {
             if model.isSelfCleaningActive {
                 let rem = model.selfCleaningRemainingSeconds
-                let elapsed = max(0, 1200 - rem)
-                let cleanPct = min(100, max(0, Int(round((Double(elapsed) / 1200.0) * 100))))
-                let phaseTag: String = {
-                    if elapsed < 300 { return "凝霜裹尘" }
-                    else if elapsed < 600 { return "微解冻冲刷" }
-                    else if elapsed < 1080 { return "56°C烘干" }
-                    else { return "送风冷却" }
-                }()
+                let cleanPct = model.selfCleaningProgressPercentage
+                let phaseTag = model.selfCleaningPhaseShortTag
                 return "56°C 自清洁中 [\(phaseTag) \(cleanPct)%] (\(rem / 60)m\(rem % 60)s)..."
             }
             if allDevices.count > 1 {
@@ -1714,8 +1712,10 @@ final class StatusItemController: NSObject {
                 if isThisCleaning {
                     let m = model.selfCleaningRemainingSeconds / 60
                     let s = model.selfCleaningRemainingSeconds % 60
+                    let cleanPct = model.selfCleaningProgressPercentage
+                    let phaseTag = model.selfCleaningPhaseShortTag
                     let stopDevItem = NSMenuItem(
-                        title: "🛑 中止「\(dev.name)」自清洁 (剩余 \(String(format: "%02d:%02d", m, s)))",
+                        title: "🛑 中止「\(dev.name)」56°C 自清洁 [\(phaseTag) \(cleanPct)%] (剩余 \(String(format: "%02d:%02d", m, s)))",
                         action: #selector(stopSelfCleaningFromMenu),
                         keyEquivalent: ""
                     )

@@ -321,6 +321,23 @@ struct FilterCareSheet: View {
                     ProgressView(value: Double(model.selfCleaningProgressPercentage), total: 100.0)
                         .progressViewStyle(.linear)
                         .tint(Color.dynamic(light: 0xF05A28, dark: 0xFF6934))
+
+                    // 实时四相态物理动力学微提示 (v1.9.123)
+                    HStack(spacing: 4) {
+                        Image(systemName: model.selfCleaningPhaseIndex == 4 ? "wind" : (model.selfCleaningPhaseIndex == 3 ? "flame" : (model.selfCleaningPhaseIndex == 2 ? "drop.fill" : "snowflake")))
+                            .font(.system(size: 9))
+                            .foregroundStyle(Color.dynamic(light: 0xF05A28, dark: 0xFF6934))
+                        Text(model.selfCleaningPhaseIndex == 4
+                            ? "贯流风机常温微风强力排湿，翅片对流降温防霉干燥中"
+                            : (model.selfCleaningPhaseIndex == 3
+                                ? "56°C 高温持续烘干灭菌，深度汽化残余水膜并杀灭杂菌"
+                                : (model.selfCleaningPhaseIndex == 2
+                                    ? "逆循环微解冻产生大量融水，强力冲刷剥离翅片积尘"
+                                    : "蒸发器深冷至 0°C 以下急速凝霜，深度裹挟瓦解尘垢")))
+                            .font(.system(size: 10))
+                            .foregroundStyle(Theme.inkSubtle)
+                    }
+                    .padding(.top, 1)
                 }
                 .padding(.vertical, 2)
             }

@@ -623,6 +623,30 @@ public struct VoiceCommandParser {
         return try? NSRegularExpression(pattern: pattern)
     }()
 
+    /// 匹配十一连续独立区间调度口语（如“周一至周一、周二至周二、周三至周三、周四至周四、周五至周五、周六至周六、周日至周日、周一到周一、周二到周二、周三到周三加周四到周四”） (v1.9.123)
+    private static let undecemRangeRegex: NSRegularExpression? = {
+        let pattern = #"(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])"#
+        return try? NSRegularExpression(pattern: pattern)
+    }()
+
+    /// 匹配十连续区间在先、核心关键词在后的十一/二十一元复合口语（如“周一至周一、周二至周二、周三至周三、周四至周四、周五至周五、周六至周六、周日至周日、周一到周一、周二到周二、周三到周三加单休”） (v1.9.123)
+    private static let decemRangeWithKeywordRegex: NSRegularExpression? = {
+        let pattern = #"(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(工作日|平时|平日|双休日|双休|周末三天|周末|休息日|公休日|休假日|放假日|节假日|单休日|单休|大休日|大休|大周|小休日|小休|小周)"#
+        return try? NSRegularExpression(pattern: pattern)
+    }()
+
+    /// 匹配核心关键词在先、十连续区间在后的十一/二十一元复合口语（如“单休加周一至周一、周二至周二、周三至周三、周四至周四、周五至周五、周六至周六、周日至周日、周一到周一、周二到周二、周三到周三”） (v1.9.123)
+    private static let keywordWithDecemRangeRegex: NSRegularExpression? = {
+        let pattern = #"(工作日|平时|平日|双休日|双休|周末三天|周末|休息日|公休日|休假日|放假日|节假日|单休日|单休|大休日|大休|大周|小休日|小休|小周)\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])"#
+        return try? NSRegularExpression(pattern: pattern)
+    }()
+
+    /// 匹配十核心关键词在先、双连续区间在后的十二元复合口语（如“工作日、平时、平日、双休日、双休、周末三天、周末、公休日、休假日和大休加周六至周六、周日到周日”） (v1.9.123)
+    private static let decemKeywordsWithDualRangeRegex: NSRegularExpression? = {
+        let pattern = #"(工作日|平时|平日|双休日|双休|周末三天|周末|休息日|公休日|休假日|放假日|节假日|单休日|单休|大休日|大休|大周|小休日|小休|小周)\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(工作日|平时|平日|双休日|双休|周末三天|周末|休息日|公休日|休假日|放假日|节假日|单休日|单休|大休日|大休|大周|小休日|小休|小周)\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(工作日|平时|平日|双休日|双休|周末三天|周末|休息日|公休日|休假日|放假日|节假日|单休日|单休|大休日|大休|大周|小休日|小休|小周)\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(工作日|平时|平日|双休日|双休|周末三天|周末|休息日|公休日|休假日|放假日|节假日|单休日|单休|大休日|大休|大周|小休日|小休|小周)\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(工作日|平时|平日|双休日|双休|周末三天|周末|休息日|公休日|休假日|放假日|节假日|单休日|单休|大休日|大休|大周|小休日|小休|小周)\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(工作日|平时|平日|双休日|双休|周末三天|周末|休息日|公休日|休假日|放假日|节假日|单休日|单休|大休日|大休|大周|小休日|小休|小周)\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(工作日|平时|平日|双休日|双休|周末三天|周末|休息日|公休日|休假日|放假日|节假日|单休日|单休|大休日|大休|大周|小休日|小休|小周)\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(工作日|平时|平日|双休日|双休|周末三天|周末|休息日|公休日|休假日|放假日|节假日|单休日|单休|大休日|大休|大周|小休日|小休|小周)\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(工作日|平时|平日|双休日|双休|周末三天|周末|休息日|公休日|休假日|放假日|节假日|单休日|单休|大休日|大休|大周|小休日|小休|小周)\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(工作日|平时|平日|双休日|双休|周末三天|周末|休息日|公休日|休假日|放假日|节假日|单休日|单休|大休日|大休|大周|小休日|小休|小周)\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])"#
+        return try? NSRegularExpression(pattern: pattern)
+    }()
+
     /// 匹配十连续独立区间调度口语（如“周一至周一、周二至周二、周三至周三、周四至周四、周五至周五、周六至周六、周日至周日、周一到周一、周二到周二加周三到周三”） (v1.9.122)
     private static let decemRangeRegex: NSRegularExpression? = {
         let pattern = #"(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])"#
@@ -848,6 +872,12 @@ public struct VoiceCommandParser {
     /// 匹配连续区间在先、核心关键词居中、连续区间、双核心关键词在后的五/六元交替复合口语（如“周一至周二加工作日同周四至周五加大休和小休”） (v1.9.114)
     private static let rangeWithKeywordAndRangeWithDualKeywordsRegex: NSRegularExpression? = {
         let pattern = #"(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(工作日|平时|平日|双休日|双休|周末三天|周末|休息日|公休日|休假日|放假日|节假日|单休日|单休|大休日|大休|大周|小休日|小休|小周)\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(?:每|逢|每逢)?(?:个)?(?:周|星期|礼拜)([一二三四五六日天1-7])\s*(?:到|至|-|~)\s*(?:周|星期|礼拜)?([一二三四五六日天1-7])\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(工作日|平时|平日|双休日|双休|周末三天|周末|休息日|公休日|休假日|放假日|节假日|单休日|单休|大休日|大休|大周|小休日|小休|小周)\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(工作日|平时|平日|双休日|双休|周末三天|周末|休息日|公休日|休假日|放假日|节假日|单休日|单休|大休日|大休|大周|小休日|小休|小周)"#
+        return try? NSRegularExpression(pattern: pattern)
+    }()
+
+    /// 匹配纯十七核心关键词全景调度口语（如“工作日、平时、平日、双休日、双休、周末三天、周末、公休日、休假日、放假日、节假日、单休日、单休、大休日、大休、大周和小休”） (v1.9.123)
+    private static let septendecaKeywordsRegex: NSRegularExpression? = {
+        let pattern = #"(工作日|平时|平日|双休日|双休|周末三天|周末|休息日|公休日|休假日|放假日|节假日|单休日|单休|大休日|大休|大周|小休日|小休|小周)\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(工作日|平时|平日|双休日|双休|周末三天|周末|休息日|公休日|休假日|放假日|节假日|单休日|单休|大休日|大休|大周|小休日|小休|小周)\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(工作日|平时|平日|双休日|双休|周末三天|周末|休息日|公休日|休假日|放假日|节假日|单休日|单休|大休日|大休|大周|小休日|小休|小周)\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(工作日|平时|平日|双休日|双休|周末三天|周末|休息日|公休日|休假日|放假日|节假日|单休日|单休|大休日|大休|大周|小休日|小休|小周)\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(工作日|平时|平日|双休日|双休|周末三天|周末|休息日|公休日|休假日|放假日|节假日|单休日|单休|大休日|大休|大周|小休日|小休|小周)\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(工作日|平时|平日|双休日|双休|周末三天|周末|休息日|公休日|休假日|放假日|节假日|单休日|单休|大休日|大休|大周|小休日|小休|小周)\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(工作日|平时|平日|双休日|双休|周末三天|周末|休息日|公休日|休假日|放假日|节假日|单休日|单休|大休日|大休|大周|小休日|小休|小周)\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(工作日|平时|平日|双休日|双休|周末三天|周末|休息日|公休日|休假日|放假日|节假日|单休日|单休|大休日|大休|大周|小休日|小休|小周)\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(工作日|平时|平日|双休日|双休|周末三天|周末|休息日|公休日|休假日|放假日|节假日|单休日|单休|大休日|大休|大周|小休日|小休|小周)\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(工作日|平时|平日|双休日|双休|周末三天|周末|休息日|公休日|休假日|放假日|节假日|单休日|单休|大休日|大休|大周|小休日|小休|小周)\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(工作日|平时|平日|双休日|双休|周末三天|周末|休息日|公休日|休假日|放假日|节假日|单休日|单休|大休日|大休|大周|小休日|小休|小周)\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(工作日|平时|平日|双休日|双休|周末三天|周末|休息日|公休日|休假日|放假日|节假日|单休日|单休|大休日|大休|大周|小休日|小休|小周)\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(工作日|平时|平日|双休日|双休|周末三天|周末|休息日|公休日|休假日|放假日|节假日|单休日|单休|大休日|大休|大周|小休日|小休|小周)\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(工作日|平时|平日|双休日|双休|周末三天|周末|休息日|公休日|休假日|放假日|节假日|单休日|单休|大休日|大休|大周|小休日|小休|小周)\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(工作日|平时|平日|双休日|双休|周末三天|周末|休息日|公休日|休假日|放假日|节假日|单休日|单休|大休日|大休|大周|小休日|小休|小周)\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(工作日|平时|平日|双休日|双休|周末三天|周末|休息日|公休日|休假日|放假日|节假日|单休日|单休|大休日|大休|大周|小休日|小休|小周)\s*(?:[、,，和与及跟同以及还有或者或加/／\s]+)\s*(工作日|平时|平日|双休日|双休|周末三天|周末|休息日|公休日|休假日|放假日|节假日|单休日|单休|大休日|大休|大周|小休日|小休|小周)"#
         return try? NSRegularExpression(pattern: pattern)
     }()
 
@@ -1456,6 +1486,218 @@ public struct VoiceCommandParser {
     private static func parseBaseRepeatWeekdays(_ text: String) -> (weekdays: [Int], label: String)? {
         let nsString = text as NSString
         let fullRange = NSRange(location: 0, length: nsString.length)
+
+        // 0.0000000000001 十一连续独立区间调度（如“周一至周一、周二至周二、周三至周三、周四至周四、周五至周五、周六至周六、周日至周日、周一到周一、周二到周二、周三到周三加周四到周四”） (v1.9.123)
+        if let regex = undecemRangeRegex,
+           let match = regex.firstMatch(in: text, options: [], range: fullRange),
+           match.numberOfRanges >= 23 {
+            let s1 = nsString.substring(with: match.range(at: 1))
+            let e1 = nsString.substring(with: match.range(at: 2))
+            let s2 = nsString.substring(with: match.range(at: 3))
+            let e2 = nsString.substring(with: match.range(at: 4))
+            let s3 = nsString.substring(with: match.range(at: 5))
+            let e3 = nsString.substring(with: match.range(at: 6))
+            let s4 = nsString.substring(with: match.range(at: 7))
+            let e4 = nsString.substring(with: match.range(at: 8))
+            let s5 = nsString.substring(with: match.range(at: 9))
+            let e5 = nsString.substring(with: match.range(at: 10))
+            let s6 = nsString.substring(with: match.range(at: 11))
+            let e6 = nsString.substring(with: match.range(at: 12))
+            let s7 = nsString.substring(with: match.range(at: 13))
+            let e7 = nsString.substring(with: match.range(at: 14))
+            let s8 = nsString.substring(with: match.range(at: 15))
+            let e8 = nsString.substring(with: match.range(at: 16))
+            let s9 = nsString.substring(with: match.range(at: 17))
+            let e9 = nsString.substring(with: match.range(at: 18))
+            let s10 = nsString.substring(with: match.range(at: 19))
+            let e10 = nsString.substring(with: match.range(at: 20))
+            let s11 = nsString.substring(with: match.range(at: 21))
+            let e11 = nsString.substring(with: match.range(at: 22))
+            if let s1Ch = s1.first, let s1Wd = chineseDayCharToWeekday(s1Ch),
+               let e1Ch = e1.first, let e1Wd = chineseDayCharToWeekday(e1Ch),
+               let s2Ch = s2.first, let s2Wd = chineseDayCharToWeekday(s2Ch),
+               let e2Ch = e2.first, let e2Wd = chineseDayCharToWeekday(e2Ch),
+               let s3Ch = s3.first, let s3Wd = chineseDayCharToWeekday(s3Ch),
+               let e3Ch = e3.first, let e3Wd = chineseDayCharToWeekday(e3Ch),
+               let s4Ch = s4.first, let s4Wd = chineseDayCharToWeekday(s4Ch),
+               let e4Ch = e4.first, let e4Wd = chineseDayCharToWeekday(e4Ch),
+               let s5Ch = s5.first, let s5Wd = chineseDayCharToWeekday(s5Ch),
+               let e5Ch = e5.first, let e5Wd = chineseDayCharToWeekday(e5Ch),
+               let s6Ch = s6.first, let s6Wd = chineseDayCharToWeekday(s6Ch),
+               let e6Ch = e6.first, let e6Wd = chineseDayCharToWeekday(e6Ch),
+               let s7Ch = s7.first, let s7Wd = chineseDayCharToWeekday(s7Ch),
+               let e7Ch = e7.first, let e7Wd = chineseDayCharToWeekday(e7Ch),
+               let s8Ch = s8.first, let s8Wd = chineseDayCharToWeekday(s8Ch),
+               let e8Ch = e8.first, let e8Wd = chineseDayCharToWeekday(e8Ch),
+               let s9Ch = s9.first, let s9Wd = chineseDayCharToWeekday(s9Ch),
+               let e9Ch = e9.first, let e9Wd = chineseDayCharToWeekday(e9Ch),
+               let s10Ch = s10.first, let s10Wd = chineseDayCharToWeekday(s10Ch),
+               let e10Ch = e10.first, let e10Wd = chineseDayCharToWeekday(e10Ch),
+               let s11Ch = s11.first, let s11Wd = chineseDayCharToWeekday(s11Ch),
+               let e11Ch = e11.first, let e11Wd = chineseDayCharToWeekday(e11Ch) {
+                var days = Set(generateWeeklyRange(start: s1Wd, end: e1Wd))
+                days.formUnion(generateWeeklyRange(start: s2Wd, end: e2Wd))
+                days.formUnion(generateWeeklyRange(start: s3Wd, end: e3Wd))
+                days.formUnion(generateWeeklyRange(start: s4Wd, end: e4Wd))
+                days.formUnion(generateWeeklyRange(start: s5Wd, end: e5Wd))
+                days.formUnion(generateWeeklyRange(start: s6Wd, end: e6Wd))
+                days.formUnion(generateWeeklyRange(start: s7Wd, end: e7Wd))
+                days.formUnion(generateWeeklyRange(start: s8Wd, end: e8Wd))
+                days.formUnion(generateWeeklyRange(start: s9Wd, end: e9Wd))
+                days.formUnion(generateWeeklyRange(start: s10Wd, end: e10Wd))
+                days.formUnion(generateWeeklyRange(start: s11Wd, end: e11Wd))
+                let sorted = days.sorted()
+                return (sorted, formatWeekdayLabel(from: sorted))
+            }
+        }
+
+        // 0.0000000000005 十连续区间在先、核心关键词在后（如“周一至周一、周二至周二、周三至周三、周四至周四、周五至周五、周六至周六、周日至周日、周一到周一、周二到周二、周三到周三加单休”） (v1.9.123)
+        if let regex = decemRangeWithKeywordRegex,
+           let match = regex.firstMatch(in: text, options: [], range: fullRange),
+           match.numberOfRanges >= 22 {
+            let s1 = nsString.substring(with: match.range(at: 1))
+            let e1 = nsString.substring(with: match.range(at: 2))
+            let s2 = nsString.substring(with: match.range(at: 3))
+            let e2 = nsString.substring(with: match.range(at: 4))
+            let s3 = nsString.substring(with: match.range(at: 5))
+            let e3 = nsString.substring(with: match.range(at: 6))
+            let s4 = nsString.substring(with: match.range(at: 7))
+            let e4 = nsString.substring(with: match.range(at: 8))
+            let s5 = nsString.substring(with: match.range(at: 9))
+            let e5 = nsString.substring(with: match.range(at: 10))
+            let s6 = nsString.substring(with: match.range(at: 11))
+            let e6 = nsString.substring(with: match.range(at: 12))
+            let s7 = nsString.substring(with: match.range(at: 13))
+            let e7 = nsString.substring(with: match.range(at: 14))
+            let s8 = nsString.substring(with: match.range(at: 15))
+            let e8 = nsString.substring(with: match.range(at: 16))
+            let s9 = nsString.substring(with: match.range(at: 17))
+            let e9 = nsString.substring(with: match.range(at: 18))
+            let s10 = nsString.substring(with: match.range(at: 19))
+            let e10 = nsString.substring(with: match.range(at: 20))
+            let kw = nsString.substring(with: match.range(at: 21))
+            if let s1Ch = s1.first, let s1Wd = chineseDayCharToWeekday(s1Ch),
+               let e1Ch = e1.first, let e1Wd = chineseDayCharToWeekday(e1Ch),
+               let s2Ch = s2.first, let s2Wd = chineseDayCharToWeekday(s2Ch),
+               let e2Ch = e2.first, let e2Wd = chineseDayCharToWeekday(e2Ch),
+               let s3Ch = s3.first, let s3Wd = chineseDayCharToWeekday(s3Ch),
+               let e3Ch = e3.first, let e3Wd = chineseDayCharToWeekday(e3Ch),
+               let s4Ch = s4.first, let s4Wd = chineseDayCharToWeekday(s4Ch),
+               let e4Ch = e4.first, let e4Wd = chineseDayCharToWeekday(e4Ch),
+               let s5Ch = s5.first, let s5Wd = chineseDayCharToWeekday(s5Ch),
+               let e5Ch = e5.first, let e5Wd = chineseDayCharToWeekday(e5Ch),
+               let s6Ch = s6.first, let s6Wd = chineseDayCharToWeekday(s6Ch),
+               let e6Ch = e6.first, let e6Wd = chineseDayCharToWeekday(e6Ch),
+               let s7Ch = s7.first, let s7Wd = chineseDayCharToWeekday(s7Ch),
+               let e7Ch = e7.first, let e7Wd = chineseDayCharToWeekday(e7Ch),
+               let s8Ch = s8.first, let s8Wd = chineseDayCharToWeekday(s8Ch),
+               let e8Ch = e8.first, let e8Wd = chineseDayCharToWeekday(e8Ch),
+               let s9Ch = s9.first, let s9Wd = chineseDayCharToWeekday(s9Ch),
+               let e9Ch = e9.first, let e9Wd = chineseDayCharToWeekday(e9Ch),
+               let s10Ch = s10.first, let s10Wd = chineseDayCharToWeekday(s10Ch),
+               let e10Ch = e10.first, let e10Wd = chineseDayCharToWeekday(e10Ch),
+               let kwDays = daysFromKeyword(kw) {
+                var days = Set(generateWeeklyRange(start: s1Wd, end: e1Wd))
+                days.formUnion(generateWeeklyRange(start: s2Wd, end: e2Wd))
+                days.formUnion(generateWeeklyRange(start: s3Wd, end: e3Wd))
+                days.formUnion(generateWeeklyRange(start: s4Wd, end: e4Wd))
+                days.formUnion(generateWeeklyRange(start: s5Wd, end: e5Wd))
+                days.formUnion(generateWeeklyRange(start: s6Wd, end: e6Wd))
+                days.formUnion(generateWeeklyRange(start: s7Wd, end: e7Wd))
+                days.formUnion(generateWeeklyRange(start: s8Wd, end: e8Wd))
+                days.formUnion(generateWeeklyRange(start: s9Wd, end: e9Wd))
+                days.formUnion(generateWeeklyRange(start: s10Wd, end: e10Wd))
+                days.formUnion(kwDays)
+                let sorted = days.sorted()
+                return (sorted, formatWeekdayLabel(from: sorted))
+            }
+        }
+
+        // 0.0000000000007 核心关键词在先、十连续区间在后（如“单休加周一至周一、周二至周二、周三至周三、周四至周四、周五至周五、周六至周六、周日至周日、周一到周一、周二到周二、周三到周三”） (v1.9.123)
+        if let regex = keywordWithDecemRangeRegex,
+           let match = regex.firstMatch(in: text, options: [], range: fullRange),
+           match.numberOfRanges >= 22 {
+            let kw = nsString.substring(with: match.range(at: 1))
+            let s1 = nsString.substring(with: match.range(at: 2))
+            let e1 = nsString.substring(with: match.range(at: 3))
+            let s2 = nsString.substring(with: match.range(at: 4))
+            let e2 = nsString.substring(with: match.range(at: 5))
+            let s3 = nsString.substring(with: match.range(at: 6))
+            let e3 = nsString.substring(with: match.range(at: 7))
+            let s4 = nsString.substring(with: match.range(at: 8))
+            let e4 = nsString.substring(with: match.range(at: 9))
+            let s5 = nsString.substring(with: match.range(at: 10))
+            let e5 = nsString.substring(with: match.range(at: 11))
+            let s6 = nsString.substring(with: match.range(at: 12))
+            let e6 = nsString.substring(with: match.range(at: 13))
+            let s7 = nsString.substring(with: match.range(at: 14))
+            let e7 = nsString.substring(with: match.range(at: 15))
+            let s8 = nsString.substring(with: match.range(at: 16))
+            let e8 = nsString.substring(with: match.range(at: 17))
+            let s9 = nsString.substring(with: match.range(at: 18))
+            let e9 = nsString.substring(with: match.range(at: 19))
+            let s10 = nsString.substring(with: match.range(at: 20))
+            let e10 = nsString.substring(with: match.range(at: 21))
+            if let kwDays = daysFromKeyword(kw),
+               let s1Ch = s1.first, let s1Wd = chineseDayCharToWeekday(s1Ch),
+               let e1Ch = e1.first, let e1Wd = chineseDayCharToWeekday(e1Ch),
+               let s2Ch = s2.first, let s2Wd = chineseDayCharToWeekday(s2Ch),
+               let e2Ch = e2.first, let e2Wd = chineseDayCharToWeekday(e2Ch),
+               let s3Ch = s3.first, let s3Wd = chineseDayCharToWeekday(s3Ch),
+               let e3Ch = e3.first, let e3Wd = chineseDayCharToWeekday(e3Ch),
+               let s4Ch = s4.first, let s4Wd = chineseDayCharToWeekday(s4Ch),
+               let e4Ch = e4.first, let e4Wd = chineseDayCharToWeekday(e4Ch),
+               let s5Ch = s5.first, let s5Wd = chineseDayCharToWeekday(s5Ch),
+               let e5Ch = e5.first, let e5Wd = chineseDayCharToWeekday(e5Ch),
+               let s6Ch = s6.first, let s6Wd = chineseDayCharToWeekday(s6Ch),
+               let e6Ch = e6.first, let e6Wd = chineseDayCharToWeekday(e6Ch),
+               let s7Ch = s7.first, let s7Wd = chineseDayCharToWeekday(s7Ch),
+               let e7Ch = e7.first, let e7Wd = chineseDayCharToWeekday(e7Ch),
+               let s8Ch = s8.first, let s8Wd = chineseDayCharToWeekday(s8Ch),
+               let e8Ch = e8.first, let e8Wd = chineseDayCharToWeekday(e8Ch),
+               let s9Ch = s9.first, let s9Wd = chineseDayCharToWeekday(s9Ch),
+               let e9Ch = e9.first, let e9Wd = chineseDayCharToWeekday(e9Ch),
+               let s10Ch = s10.first, let s10Wd = chineseDayCharToWeekday(s10Ch),
+               let e10Ch = e10.first, let e10Wd = chineseDayCharToWeekday(e10Ch) {
+                var days = Set(kwDays)
+                days.formUnion(generateWeeklyRange(start: s1Wd, end: e1Wd))
+                days.formUnion(generateWeeklyRange(start: s2Wd, end: e2Wd))
+                days.formUnion(generateWeeklyRange(start: s3Wd, end: e3Wd))
+                days.formUnion(generateWeeklyRange(start: s4Wd, end: e4Wd))
+                days.formUnion(generateWeeklyRange(start: s5Wd, end: e5Wd))
+                days.formUnion(generateWeeklyRange(start: s6Wd, end: e6Wd))
+                days.formUnion(generateWeeklyRange(start: s7Wd, end: e7Wd))
+                days.formUnion(generateWeeklyRange(start: s8Wd, end: e8Wd))
+                days.formUnion(generateWeeklyRange(start: s9Wd, end: e9Wd))
+                days.formUnion(generateWeeklyRange(start: s10Wd, end: e10Wd))
+                let sorted = days.sorted()
+                return (sorted, formatWeekdayLabel(from: sorted))
+            }
+        }
+
+        // 0.0000000000009 十核心关键词在先、双连续区间在后（如“工作日、平时、平日、双休日、双休、周末三天、周末、公休日、休假日和大休加周六至周六、周日到周日”） (v1.9.123)
+        if let regex = decemKeywordsWithDualRangeRegex,
+           let match = regex.firstMatch(in: text, options: [], range: fullRange),
+           match.numberOfRanges >= 15 {
+            var days = Set<Int>()
+            for i in 1...10 {
+                let kw = nsString.substring(with: match.range(at: i))
+                if let kwDays = daysFromKeyword(kw) { days.formUnion(kwDays) }
+            }
+            let s1 = nsString.substring(with: match.range(at: 11))
+            let e1 = nsString.substring(with: match.range(at: 12))
+            let s2 = nsString.substring(with: match.range(at: 13))
+            let e2 = nsString.substring(with: match.range(at: 14))
+            if let s1Ch = s1.first, let s1Wd = chineseDayCharToWeekday(s1Ch),
+               let e1Ch = e1.first, let e1Wd = chineseDayCharToWeekday(e1Ch),
+               let s2Ch = s2.first, let s2Wd = chineseDayCharToWeekday(s2Ch),
+               let e2Ch = e2.first, let e2Wd = chineseDayCharToWeekday(e2Ch) {
+                days.formUnion(generateWeeklyRange(start: s1Wd, end: e1Wd))
+                days.formUnion(generateWeeklyRange(start: s2Wd, end: e2Wd))
+                let sorted = days.sorted()
+                return (sorted, formatWeekdayLabel(from: sorted))
+            }
+        }
 
         // 0.000000000001 十连续独立区间调度（如“周一至周一、周二至周二、周三至周三、周四至周四、周五至周五、周六至周六、周日至周日、周一到周一、周二到周二加周三到周三”） (v1.9.122)
         if let regex = decemRangeRegex,
@@ -3275,6 +3517,21 @@ public struct VoiceCommandParser {
             }
         }
 
+        // 0.00008560 纯十七核心关键词全景调度（如“工作日、平时、平日、双休日、双休、周末三天、周末、公休日、休假日、放假日、节假日、单休日、单休、大休日、大休、大周和小休”） (v1.9.123)
+        if let regex = septendecaKeywordsRegex,
+           let match = regex.firstMatch(in: text, options: [], range: fullRange),
+           match.numberOfRanges >= 18 {
+            var days = Set<Int>()
+            for i in 1...17 {
+                let kw = nsString.substring(with: match.range(at: i))
+                if let kwDays = daysFromKeyword(kw) { days.formUnion(kwDays) }
+            }
+            if !days.isEmpty {
+                let sorted = days.sorted()
+                return (sorted, formatWeekdayLabel(from: sorted))
+            }
+        }
+
         // 0.00008570 纯十六核心关键词全景调度（如“工作日、平时、平日、双休日、双休、周末三天、周末、公休日、休假日、放假日、节假日、单休日、单休、大休日、大休、小休和小周”） (v1.9.122)
         if let regex = sedecaKeywordsRegex,
            let match = regex.firstMatch(in: text, options: [], range: fullRange),
@@ -4883,7 +5140,7 @@ public struct VoiceCommandParser {
         return regex.firstMatch(in: text, options: [], range: range) != nil
     }
 
-    /// 检测文本中是否包含针对开关机/调温/模式动作的否定意图（如“别关”、“不要开”、“先别急着关”、“别给我关了”、“千万别现在关”、“别开制冷”、“不要调”、“别重置”、“别吹风”、“别暂停定时”等，防止误触发） (v1.9.36, v1.9.40, v1.9.45, v1.9.50, v1.9.60, v1.9.61, v1.9.112, v1.9.113, v1.9.114, v1.9.117, v1.9.118, v1.9.119, v1.9.120, v1.9.121, v1.9.122)
+    /// 检测文本中是否包含针对开关机/调温/模式动作的否定意图（如“别关”、“不要开”、“先别急着关”、“别给我关了”、“千万别现在关”、“别开制冷”、“不要调”、“别重置”、“别吹风”、“别暂停定时”等，防止误触发） (v1.9.36, v1.9.40, v1.9.45, v1.9.50, v1.9.60, v1.9.61, v1.9.112, v1.9.113, v1.9.114, v1.9.117, v1.9.118, v1.9.119, v1.9.120, v1.9.121, v1.9.122, v1.9.123)
     private static func containsNegativeAction(_ text: String) -> Bool {
         // 特例：“别吹了”属于日常高频关机意图（显式关机口令，非动作否定拦截）
         if text.contains("别吹了") {

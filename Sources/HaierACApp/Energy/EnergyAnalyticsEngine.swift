@@ -314,8 +314,9 @@ public final class EnergyAnalyticsEngine: ObservableObject {
             // 阶段 2 (5~10 分钟, 逆循环微解冻冲刷): 四通阀换向快速化霜，利用大量融水强力冲刷剥离翅片积尘，基准功率 ~780W + windOffset*0.3;
             // 阶段 3 (10~18 分钟, 56°C 高温恒温烘干杀菌): 变频压缩机制热大压比持续输出，蒸发器表面维持 56°C 恒温 8 分钟以上灭菌烘干，基准功率 ~1000W ~ 1040W + windOffset*0.5
             //        若室内偏冷(indoor <= 18°C)，蒸发器向室内自然散热加剧，需额外提高压比维持 56°C 灭菌温区 (+0W ~ 50W)；
-            // 阶段 4 (>= 18 分钟, 降温送风排湿恢复): 压缩机停机降压，贯流风机以常温微风排出残余水汽并冷却翅片，基准功率 ~48W + windOffset*0.2
-            //        同时受滤网积尘气阻微阻尼调制 (1.00 ~ 1.05)。
+            // 阶段 4 (>= 18 分钟, 降温送风排湿恢复): 压缩机停机降压，贯流风机从 56°C 翅片高温显热冷却连续平滑衰减至常温微风稳态，
+            //        排出残余水汽并冷却翅片（基准功率 ~42W ~ 58W + windOffset*0.2 + 湿敏气阻微补偿），
+            //        同时受滤网积尘流阻与极端阻抗连续调制 (1.00 ~ 1.065)。 (v1.9.123)
             let cleaningMinutes = continuousMinutes
             let cleaningPower: Double
             if cleaningMinutes < 5 {
@@ -391,14 +392,26 @@ public final class EnergyAnalyticsEngine: ObservableObject {
                 cleaningPower = baseDryPower * heatFilter
             } else {
                 // 阶段 4 (>= 18 分钟, 送风排湿冷却恢复):
-                // 贯流风机以常温微风排出残余水汽并冷却翅片，同时受滤网积尘流阻连续微阻尼与极限阻抗微喘振调制 (1.00 ~ 1.065)。
+                // 贯流风机以微风排出残余水汽并对流冷却翅片 (v1.9.123 翅片显热衰减连续动力学与高湿残余微水滴排湿阻力微补偿)。
+                // 1. 56°C 翅片高温对流冷却显热衰减与风机转速降频过渡 (Sensible Cooling Thermal Decay):
+                //    第 18 分钟刚结束高温灭菌时翅片处于 56°C 高温，贯流风机以较高转速对流带走翅片显热 (+16W 爬坡初态)，
+                //    随着翅片温度向室温连续对流冷却，在第 18~20 分钟单调平滑衰减至 0W，回到 42W 稳态微风基准；
+                // 2. 高湿环境残余微水滴附壁与风道气流阻力微补偿 (Residual Moisture Drag):
+                //    若室内空气相对湿度偏高 (indoorHumidity >= 60%)，风道潮湿与微水滴排出使贯流风机微阻力上升 (+0W ~ 10W)；
+                // 3. 滤网积尘流阻与极端阻抗微喘振调制 (1.00 ~ 1.065)。
+                let coolRamp = max(0.0, (1.0 - (Double(cleaningMinutes - 18) / 2.0)) * 16.0)
+                let latentDrag: Double = {
+                    guard let hum = indoorHumidity, hum >= 60.0 else { return 0.0 }
+                    return min(10.0, (hum - 60.0) * 0.25)
+                }()
                 let clampedPct = max(0, filterCleanlinessPct)
                 let basePenalty = filterCleanlinessPct < 50 ? (Double(50 - clampedPct) / 50.0) * 0.05 : 0.0
                 let extremePenalty = clampedPct <= 10 ? (Double(10 - clampedPct) / 10.0) * 0.015 : 0.0
                 let fanFilter = 1.0 + basePenalty + extremePenalty
-                cleaningPower = (48.0 + (windOffset * 0.2)) * fanFilter
+                let baseFanPower = 42.0 + coolRamp + latentDrag + (windOffset * 0.2)
+                cleaningPower = baseFanPower * fanFilter
             }
-            return min(max(cleaningPower, 40.0), 1250.0)
+            return min(max(cleaningPower, 35.0), 1250.0)
         }
 
         guard isPowerOn else {

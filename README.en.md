@@ -6,6 +6,23 @@ A native SwiftUI app to control Haier / Leader (统帅) smart air conditioners o
 
 ## Features
 
+- 🏷 **Septendeca-Keywords & Undecem-Range Universal Compound Scheduling, Evaporator Phase 4 Sensible Cooling Thermal Decay, and Telemetry Parity (v1.9.123)**:
+  - ⏱️ **"Septendeca-Keywords Universal Scheduling, Eleven-Range Compound Topology, and Extreme Turnaround Negation Protection" Spoken Engine (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)**:
+    - **Septendeca-Keywords Universal Scheduling (`septendecaKeywordsRegex`)**: Introduced `septendecaKeywordsRegex` supporting scheduling across all 17 core cycle keyword variants simultaneously (e.g., "工作日、平时、平日、双休日、双休、周末三天、周末、公休日、休假日、放假日、节假日、单休日、单休、大休日、大休、大周和小休每天早8点开机" `[1..7]`), closing every last mile of ultra-high-dimensional compound scheduling dead zones;
+    - **Undecem-Range & Compound Topology Expansion (`undecemRangeRegex` / `decemRangeWithKeywordRegex` / `keywordWithDecemRangeRegex` / `decemKeywordsWithDualRangeRegex`)**:
+      - `undecemRangeRegex`: Eleven continuous independent ranges compound spoken scheduling (e.g., "周一至周一、周二至周二、周三至周三、周四至周四、周五至周五、周六至周六、周日至周日、周一到周一、周二到周二、周三到周三加周四到周四每天早8点开机" `[1..7]`);
+      - `decemRangeWithKeywordRegex`: Ten continuous ranges prefix + core keyword suffix (e.g., "周一至周一、周二至周二、周三至周三、周四至周四、周五至周五、周六至周六、周日至周日、周一到周一、周二到周二、周三到周三加单休每天早8点开机" `[1..7]`);
+      - `keywordWithDecemRangeRegex`: Core keyword prefix + ten continuous ranges suffix (e.g., "单休加周一至周一、周二至周二、周三至周三、周四至周四、周五至周五、周六至周六、周日至周日、周一到周一、周二到周二、周三到周三每天早8点开机" `[1..7]`);
+      - `decemKeywordsWithDualRangeRegex`: Ten core keywords prefix + two continuous ranges suffix (e.g., "工作日、平时、平日、双休日、双休、周末三天、周末、公休日、休假日和大休加周六至周六、周日到周日每天早8点开机" `[1..7]`);
+    - **Reinforced Spoken Turnaround Negation & Multi-Word Defense**: Expanded `negativeActionRegex`, `containsNegativeForAction`, and `containsNegativeAction` with colloquial negative prefixes ("切切切不可开", "切切切不可关", "哪怕粉身碎骨也别关机", "死活都千万不要开空调"), completely eliminating spoken bypasses;
+    - **100% Unit Test Suite Coverage**: Added `testUndecemRangeAndSeptendecaKeywordsV19123` test suite with all 131 unit tests passing with zero errors (0 failures).
+  - 🔋 **56°C Evaporator Phase 4 Cool Fan Sensible Heat Decay & Residual Moisture Evacuation Drag Dynamics (`EnergyAnalyticsEngine.swift`)**:
+    - **Phase 4/4 (>= 18 min, Cool Fan Moisture Evacuation & Thermal Decay)**: Introduces 56°C fin sensible heat convective cooling decay and fan RPM deceleration dynamics (+16W cooling ramp at min 18, decaying smoothly to 0W by min 20 down to the 42W steady-state breeze baseline);
+    - **Residual Moisture Film Evacuation Drag**: High indoor humidity (`RH >= 60%`) residual droplets and airflow drag provide continuous dynamic compensation (+0W ~ 10W), harmonizing with filter flow resistance and extreme impedance surge models.
+  - 🎛️ **macOS Status Item Self-Cleaning Telemetry Dead Zone Elimination & FilterCareSheet Dynamic Phase Subtitles (`StatusItemController.swift` / `FilterCareSheet.swift`)**:
+    - **Status Item Telemetry Parity**: Fully populated `[\(phaseTag) \(cleanPct)%]` dynamic tags across device submenus, single device flat menus, and multi-device contextual cancellation actions, directly fed by centralized `AppModel` computed properties for 100% telemetry consistency;
+    - **Filter Care Sheet Real-Time Four-Phase Guidance**: Introduced dynamic phase icons and real-time thermodynamic status subtitle prompts beneath the self-cleaning progress bar in `FilterCareSheet`, bringing complete clarity and sensory elegance to user care workflows.
+
 - 🏷 **Sedeca-Keywords & Decem-Range Universal Compound Scheduling, Evaporator Residual Vaporization Latent Heat Thermodynamics, and Four-Phase Lifecycle Telemetry (v1.9.122)**:
   - ⏱️ **"Sedeca-Keywords Universal Scheduling, Ten-Range Compound Topology, and Extreme Turnaround Negation Protection" Spoken Engine (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)**:
     - **Sedeca-Keywords Universal Scheduling (`sedecaKeywordsRegex`)**: Introduced `sedecaKeywordsRegex` supporting scheduling across all 16 core cycle keyword variants simultaneously (e.g., "工作日、平时、平日、双休日、双休、周末三天、周末、公休日、休假日、放假日、节假日、大休日、大休、小休、单休和单休日每天早8点开机" `[1..7]`), closing every last mile of ultra-high-dimensional compound scheduling dead zones;

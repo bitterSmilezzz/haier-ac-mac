@@ -5436,6 +5436,39 @@ final class VoiceCommandParserTests: XCTestCase {
         XCTAssertNotEqual(VoiceCommandParser.parse("工作日、平时、平日、双休日、双休、周末三天、周末、公休日、休假日、放假日、节假日、单休日、单休、大休日、大休和小休每天早8点开机")?.command, .setPower(true))
     }
 
+    // MARK: - 十一连续区间与十七核心关键词全景排班及否定防护测试 (v1.9.123)
+
+    func testUndecemRangeAndSeptendecaKeywordsV19123() {
+        // 1. 纯十七核心关键词全景排班
+        let s1 = VoiceCommandParser.parse("工作日、平时、平日、双休日、双休、周末三天、周末、公休日、休假日、放假日、节假日、单休日、单休、大休日、大休、大周和小休每天早8点开机")
+        XCTAssertEqual(s1?.command, .scheduleRepeatPower(hour: 8, minute: 0, power: true, repeatWeekdays: [1, 2, 3, 4, 5, 6, 7], repeatLabel: "周一至周日"))
+
+        let s2 = VoiceCommandParser.parse("平时、平日、工作日、周末、双休、双休日、公休日、休假日、放假日、大休、大周、小休、小周、单休、单休日、大周和小休每天晚10点关机")
+        XCTAssertEqual(s2?.command, .scheduleRepeatPower(hour: 22, minute: 0, power: false, repeatWeekdays: [1, 2, 3, 4, 5, 6, 7], repeatLabel: "周一至周日"))
+
+        // 2. 十一连续独立区间调度（二十二元全景大一统调度）
+        let s3 = VoiceCommandParser.parse("周一至周一、周二至周二、周三至周三、周四至周四、周五至周五、周六至周六、周日至周日、周一到周一、周二到周二、周三到周三加周四到周四每天早8点开机")
+        XCTAssertEqual(s3?.command, .scheduleRepeatPower(hour: 8, minute: 0, power: true, repeatWeekdays: [1, 2, 3, 4, 5, 6, 7], repeatLabel: "周一至周日"))
+
+        // 3. 十连续区间在先、核心关键词在后（十一/二十一元全景复合排班）
+        let s4 = VoiceCommandParser.parse("周一至周一、周二至周二、周三至周三、周四至周四、周五至周五、周六至周六、周日至周日、周一到周一、周二到周二、周三到周三加单休每天早8点开机")
+        XCTAssertEqual(s4?.command, .scheduleRepeatPower(hour: 8, minute: 0, power: true, repeatWeekdays: [1, 2, 3, 4, 5, 6, 7], repeatLabel: "周一至周日"))
+
+        // 4. 核心关键词在先、十连续区间在后（十一/二十一元全景复合排班）
+        let s5 = VoiceCommandParser.parse("单休日加周一至周一、周二至周二、周三至周三、周四至周四、周五至周五、周六至周六、周日至周日、周一到周一、周二到周二、周三到周三每天早8点开机")
+        XCTAssertEqual(s5?.command, .scheduleRepeatPower(hour: 8, minute: 0, power: true, repeatWeekdays: [1, 2, 3, 4, 5, 6, 7], repeatLabel: "周一至周日"))
+
+        // 5. 十核心关键词在先、双连续区间在后（十二元全景复合排班）
+        let s6 = VoiceCommandParser.parse("工作日、平时、平日、双休日、双休、周末三天、周末、公休日、休假日和大休加周六至周六、周日到周日每天早8点开机")
+        XCTAssertEqual(s6?.command, .scheduleRepeatPower(hour: 8, minute: 0, power: true, repeatWeekdays: [1, 2, 3, 4, 5, 6, 7], repeatLabel: "周一至周日"))
+
+        // 6. 极端口语动作否定拦截测试
+        XCTAssertNil(VoiceCommandParser.parse("切切切不可开空调"))
+        XCTAssertNil(VoiceCommandParser.parse("切切切不可关空调"))
+        XCTAssertNil(VoiceCommandParser.parse("哪怕粉身碎骨也别关机"))
+        XCTAssertNil(VoiceCommandParser.parse("死活都千万不要开空调"))
+    }
+
     // MARK: - 无效输入测试
 
     func testInvalidCommands() {
