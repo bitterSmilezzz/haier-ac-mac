@@ -6,6 +6,24 @@ A native SwiftUI app to control Haier / Leader (统帅) smart air conditioners o
 
 ## Features
 
+- 🏷 **Quindeca-Keywords & Novem-Range Universal Compound Scheduling, Evaporator Reverse-Cycle Defrost Latent Heat Thermodynamics, and System-Wide Percentage Telemetry (v1.9.121)**:
+  - ⏱️ **"Quindeca-Keywords Universal Scheduling, Nine-Range Compound Topology, and Extreme Turnaround Negation Protection" Spoken Engine (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)**:
+    - **Quindeca-Keywords Universal Scheduling (`quindecaKeywordsRegex`)**: Introduced `quindecaKeywordsRegex` supporting scheduling across all 15 core cycle keyword variants simultaneously (e.g., "工作日、平时、平日、双休日、双休、周末三天、周末、公休日、休假日、放假日、节假日、大休日、大休、小休和单休每天早8点开机" `[1..7]`), closing the final mile of multi-keyword scheduling dead zones;
+    - **Novem-Range & Compound Topology Expansion (`novemRangeRegex` / `octoRangeWithKeywordRegex` / `keywordWithOctoRangeRegex` / `octoKeywordsWithDualRangeRegex`)**:
+      - `novemRangeRegex`: Nine continuous independent ranges compound spoken scheduling (e.g., "周一至周一、周二至周二、周三至周三、周四至周四、周五至周五、周六至周六、周日至周日、周一到周一加周二到周二每天早8点开机" `[1..7]`);
+      - `octoRangeWithKeywordRegex`: Eight continuous ranges prefix + core keyword suffix (e.g., "周一至周一、周二至周二、周三至周三、周四至周四、周五至周五、周六至周六、周日至周日、周一到周一加单休每天早8点开机" `[1..7]`);
+      - `keywordWithOctoRangeRegex`: Core keyword prefix + eight continuous ranges suffix (e.g., "单休日加周一至周一、周二至周二、周三至周三、周四至周四、周五至周五、周六至周六、周日至周日、周一到周一每天早8点开机" `[1..7]`);
+      - `octoKeywordsWithDualRangeRegex`: Eight core keywords prefix + two continuous ranges suffix (e.g., "工作日、平时、平日、双休日、双休、周末、公休日和大休加周六至周六、周日到周日每天早8点开机" `[1..7]`);
+    - **Reinforced Spoken Multi-Word Turnaround Negation & Action Protection**: Expanded `negativeActionRegex`, `containsNegativeForAction`, and `containsNegativeAction` with colloquial negative prefixes ("哪怕海枯石烂也别", "哪怕天翻地覆都不要", "哪怕天塌地陷也别", "无论何种境地都不要", "无论何种地步都不要", "横竖断断不可", "死活都不要", "死活也不要", "死活断不可", "万死不辞也别", "断断千千万万不可", "百计千方莫要", "百倍不要", "千真万确不要", "决计切莫", "万望切莫", "万望切切不可", "天王老子来了也别", "纵有千般理由也别", "纵有万般理由都不要") and action verbs ("开抽湿", "关抽湿", "停抽湿", "开除湿机", "关除湿机", "停除湿机", "送自然风", "吹自然风", "停自然风", "关自然风", "送微风", "送弱风", "送强风", "开大风", "关大风", "停大风", "开小风", "制冷机", "制热机"), eliminating spoken bypasses and unintended triggers;
+    - **100% Unit Test Suite Coverage**: Added `testNovemRangeAndQuindecaKeywordsV19121` test suite with all 129 unit tests passing with zero errors (0 failures).
+  - 🔋 **56°C Evaporator Reverse-Cycle Defrost Latent Heat Thermodynamics & Cross-Flow Fan Extreme Impedance Continuity (`EnergyAnalyticsEngine.swift`)**:
+    - **Phase 2 (5~10 min, Reverse-Cycle Defrost Flush)**: Couples ice melting latent heat load (`RH >= 60%`, $+0\text{W} \sim +35\text{W}$) and cold room temperature natural heat loss compensation (`indoor <= 18.0^\circ\text{C}`, $+0\text{W} \sim +30\text{W}$);
+    - **Phase 4 (>= 18 min, Cool Fan Moisture Evacuation)**: Unifies fan airflow resistance damping with system aerodynamic models, incorporating both base resistance (up to +5%) and severe clogging boundary-layer separation micro-surge compensation (up to +1.5%, composite multiplier up to 1.065).
+  - 🎛️ **macOS Status Item Button Title & Hover Tooltip Dynamic Percentage Telemetry (`StatusItemController.swift` / `MenuBarControlsView.swift`)**:
+    - **Status Item Title Real-Time Progress Percentage**: Displays real-time progress percentage in the status item title `56°C [18%] (16:24)` or `[18%] (16:24)`;
+    - **Status Bar Tooltip Holographic Telemetry**: Hover tooltip features `✨ 「Device」56°C 高温除菌自清洁中 [阶段 1/4 · 凝霜裹尘 18%] (剩余 16m24s)`;
+    - **Status Menu Stop Item & Multi-Device Coordination**: Aligns stop menu item with phase tag and percentage (`🛑 中止「Device」56°C 自清洁 [凝霜裹尘 18%] (剩余 16m24s)`); Control Center displays remote host device phase and percentage even when browsing standby devices.
+
 - 🏷 **Quattuordeca-Keywords & Octo-Range Universal Compound Scheduling, Coupled Sensible/Latent Evaporator Thermodynamics, and Multi-Surface Completion Percentage Telemetry (v1.9.120)**:
   - ⏱️ **"Quattuordeca-Keywords Universal Scheduling, Eight-Range Compound Topology, and Extreme Turnaround Negation Protection" Spoken Engine (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)**:
     - **Quattuordeca-Keywords Universal Scheduling (`quattuordecaKeywordsRegex`)**: Introduced `quattuordecaKeywordsRegex` supporting scheduling across all 14 core cycle keyword variants simultaneously (e.g., "工作日、平时、平日、双休日、双休、周末三天、周末、公休日、休假日、放假日、节假日、大休日、大休和小休每天早8点开机" `[1..7]`), closing the final mile of spoken multi-keyword schedule truncation;

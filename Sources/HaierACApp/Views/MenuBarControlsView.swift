@@ -1634,7 +1634,7 @@ struct MenuBarControlsView: View {
                 if elapsed < 300 {
                     return "阶段 1/4 • 急速深冷结霜裹尘 (\(cleanPct)%)"
                 } else if elapsed < 600 {
-                    return "阶段 2/4 • 逆循环微解冻剥离 (\(cleanPct)%)"
+                    return "阶段 2/4 • 逆循环微解冻冲刷 (\(cleanPct)%)"
                 } else if elapsed < 1080 {
                     return "阶段 3/4 • 56°C 高温杀菌烘干 (\(cleanPct)%)"
                 } else {
@@ -1654,7 +1654,7 @@ struct MenuBarControlsView: View {
                         .lineLimit(1)
                     Text(isCurrentDevCleaning
                         ? "剩余 \(String(format: "%02d:%02d", m, s)) • \(phaseDesc)"
-                        : "剩余 \(String(format: "%02d:%02d", m, s)) • 本机处于待命")
+                        : "剩余 \(String(format: "%02d:%02d", m, s)) • \(phaseDesc) (本机待命)")
                         .font(.system(size: 10))
                         .foregroundStyle(Theme.inkMuted)
                 }

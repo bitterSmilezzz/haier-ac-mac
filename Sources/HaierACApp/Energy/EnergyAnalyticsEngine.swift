@@ -330,7 +330,33 @@ public final class EnergyAnalyticsEngine: ObservableObject {
                 }()
                 cleaningPower = 880.0 + (ramp * 80.0) + (windOffset * 0.4) + latentFrost + sensibleFrost
             } else if cleaningMinutes < 10 {
-                cleaningPower = 780.0 + (windOffset * 0.3)
+                // 阶段 2 (5~10 分钟, 逆循环微解冻冲刷剥离):
+                // 四通阀快速换向使高温冷媒逆向流入蒸发器，使冰霜迅速脱落剥离并随融水冲刷排出 (v1.9.121 逆循环相变融霜潜热与防再结冰动力学自洽)。
+                // 1. 冰层相变吸热熔化与冲刷潜热曲线 (Latent Heat Melting Phase Ramp):
+                //    第 5~7 分钟相变剧烈熔化吸热达到峰值 (+0W ~ 40W)，随后平缓回落至稳定冲刷态；
+                // 2. 高湿环境霜层厚度潜热补偿:
+                //    若阶段 1 产生较厚霜层 (高湿 RH >= 60%)，需要更充分的相变熔化潜热 (+0W ~ 40W)；
+                // 3. 低温环境防二次结冰热力补偿:
+                //    若室内温低 (indoor <= 16°C)，翅片融霜向室内温差传热损耗提高且需防化霜水二次再结冰 (+0W ~ 35W)；
+                // 4. 滤网严重积尘气道流阻微补偿:
+                //    若 filterCleanlinessPct < 50，气道阻力对排风冲刷产生微阻尼调制 (1.00 ~ 1.04)。
+                let meltRamp: Double = {
+                    if cleaningMinutes <= 7 {
+                        return Double(cleaningMinutes - 5) / 2.0 * 40.0
+                    } else {
+                        return max(0.0, (1.0 - (Double(cleaningMinutes - 7) / 3.0)) * 40.0)
+                    }
+                }()
+                let latentMelt: Double = {
+                    guard let hum = indoorHumidity, hum >= 60.0 else { return 0.0 }
+                    return min(40.0, (hum - 60.0) * 1.0)
+                }()
+                let sensibleMelt: Double = {
+                    guard let indoor = indoorTemp, indoor <= 16.0 else { return 0.0 }
+                    return min(35.0, (16.0 - indoor) * 4.375)
+                }()
+                let washFilter = filterCleanlinessPct < 50 ? 1.0 + (Double(50 - max(0, filterCleanlinessPct)) / 50.0) * 0.04 : 1.0
+                cleaningPower = (780.0 + meltRamp + (windOffset * 0.3) + latentMelt + sensibleMelt) * washFilter
             } else if cleaningMinutes < 18 {
                 let heatPhase = min(1.0, Double(cleaningMinutes - 10) / 8.0)
                 let coldLoss: Double = {
@@ -339,7 +365,12 @@ public final class EnergyAnalyticsEngine: ObservableObject {
                 }()
                 cleaningPower = 1000.0 + (heatPhase * 40.0) + (windOffset * 0.5) + coldLoss
             } else {
-                let fanFilter = filterCleanlinessPct < 50 ? 1.0 + (Double(50 - max(0, filterCleanlinessPct)) / 50.0) * 0.05 : 1.0
+                // 阶段 4 (>= 18 分钟, 送风排湿冷却恢复):
+                // 贯流风机以常温微风排出残余水汽并冷却翅片，同时受滤网积尘流阻连续微阻尼与极限阻抗微喘振调制 (1.00 ~ 1.065)。
+                let clampedPct = max(0, filterCleanlinessPct)
+                let basePenalty = filterCleanlinessPct < 50 ? (Double(50 - clampedPct) / 50.0) * 0.05 : 0.0
+                let extremePenalty = clampedPct <= 10 ? (Double(10 - clampedPct) / 10.0) * 0.015 : 0.0
+                let fanFilter = 1.0 + basePenalty + extremePenalty
                 cleaningPower = (48.0 + (windOffset * 0.2)) * fanFilter
             }
             return min(max(cleaningPower, 40.0), 1250.0)
