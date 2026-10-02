@@ -338,7 +338,17 @@ public final class EnergyAnalyticsEngine: ObservableObject {
                     let dampProgress = Double(cleaningMinutes) / 2.0
                     return (1.0 - dampProgress) * 25.0
                 }()
-                cleaningPower = 880.0 + (ramp * 80.0) + (windOffset * 0.4) + latentFrost + sensibleFrost + initialSubcoolingDamping
+                // 阶段 1 深冷结霜厚度与霜层绝热热阻动态加深动力学模型 (Frost Thermal Insulation Impedance & Evaporating Pressure Ratio Dynamics Model) (v1.9.125):
+                // 自清洁第 2~5 分钟是蒸发器由初始结露向紧实冰晶铠甲深冷固化的关键期。
+                // 随着霜层物理厚度在翅片及铜管表面迅速增厚，多孔冰霜极低的导热系数（约为 0.15 W/(m·K)）形成严重的绝热热阻层，换热温差急剧扩大；
+                // 为使湿空气中残存水汽持续冻结并形成紧实冰核以强力包裹剥离翅片积尘，电控变频驱动器迫使压缩机拉大吸排气压差、下探至 -15°C ~ -20°C 深度冷冻区，
+                // 压比增大带来稳步上升的吸气做功负荷（产生 +0W ~ 30W 动态霜层绝热热阻加深功）：
+                let frostInsulationDamping: Double = {
+                    guard cleaningMinutes >= 2 && cleaningMinutes < 5 else { return 0.0 }
+                    let frostProgress = Double(cleaningMinutes - 2) / 3.0
+                    return frostProgress * 30.0
+                }()
+                cleaningPower = 880.0 + (ramp * 80.0) + (windOffset * 0.4) + latentFrost + sensibleFrost + initialSubcoolingDamping + frostInsulationDamping
             } else if cleaningMinutes < 10 {
                 // 阶段 2 (5~10 分钟, 逆循环微解冻冲刷剥离):
                 // 四通阀快速换向使高温冷媒逆向流入蒸发器，使冰霜迅速脱落剥离并随融水冲刷排出 (v1.9.121 逆循环相变融霜潜热与防再结冰动力学自洽)。

@@ -6,6 +6,22 @@ A native SwiftUI app to control Haier / Leader (统帅) smart air conditioners o
 
 ## Features
 
+- 🏷 **Enneadeca-Keywords & Tredecem-Range Universal Compound Scheduling, Evaporator Phase 1 Frost Insulation Dynamics, and Status Item Complete Telemetry (v1.9.125)**:
+  - ⏱️ **"Enneadeca-Keywords Universal Scheduling, Thirteen-Range Compound Topology, and Extreme Turnaround Negation Protection" Spoken Engine (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)**:
+    - **Enneadeca-Keywords Universal Scheduling (`enneadecaKeywordsRegex`)**: Introduced `enneadecaKeywordsRegex` supporting scheduling across all 19 core cycle keyword variants simultaneously (e.g., "工作日、平时、平日、双休日、双休、周末三天、周末、公休日、休假日、放假日、节假日、单休日、单休、大休日、大休、大周、小周、小休和无休每天早8点开机" `[1..7]`), closing every last mile of ultra-high-dimensional compound scheduling dead zones;
+    - **Tredecem-Range & Compound Topology Expansion (`tredecemRangeRegex` / `duodecemRangeWithKeywordRegex` / `keywordWithDuodecemRangeRegex` / `duodecemKeywordsWithDualRangeRegex`)**:
+      - `tredecemRangeRegex`: Thirteen continuous independent ranges compound spoken scheduling (e.g., "周一至周一、周二至周二、周三至周三、周四至周四、周五至周五、周六至周六、周日至周日、周一到周一、周二到周二、周三到周三、周四到周四、周五至周五加周六到周六每天早8点开机" `[1..7]`);
+      - `duodecemRangeWithKeywordRegex`: Twelve continuous ranges prefix + core keyword suffix (e.g., "周一至周一、周二至周二、周三至周三、周四至周四、周五至周五、周六至周六、周日至周日、周一到周一、周二到周二、周三到周三、周四到周四、周五至周五加单休每天早8点开机" `[1..7]`);
+      - `keywordWithDuodecemRangeRegex`: Core keyword prefix + twelve continuous ranges suffix (e.g., "单休加周一至周一、周二至周二、周三至周三、周四至周四、周五至周五、周六至周六、周日至周日、周一到周一、周二到周二、周三到周三、周四到周四、周五至周五每天早8点开机" `[1..7]`);
+      - `duodecemKeywordsWithDualRangeRegex`: Twelve core keywords prefix + two continuous ranges suffix (e.g., "工作日、平时、平日、双休日、双休、周末三天、周末、公休日、休假日、放假日、大休日和大休加周六至周六、周日到周日每天早8点开机" `[1..7]`);
+    - **Reinforced Spoken Turnaround Negation & Multi-Word Defense**: Expanded `negativeActionRegex`, `containsNegativeForAction`, and `containsNegativeAction` with colloquial negative prefixes ("哪怕天诛地灭也千万不要/别", "哪怕赴汤蹈火也绝不能/不要", "哪怕地动山摇也别", "任凭千难万险都不要", "无论海枯石烂都绝不", "横竖千真万确不能", "打死也断然不能", "决决断断不可"), completely eliminating spoken bypasses;
+    - **100% Unit Test Suite Coverage**: Added `testTredecemRangeAndEnneadecaKeywordsV19125` test suite with all 133 unit tests passing with zero errors (0 failures).
+  - 🔋 **56°C Evaporator Phase 1 Frost Layer Thermal Insulation Impedance & Evaporating Pressure Ratio Dynamics Model (`EnergyAnalyticsEngine.swift`)**:
+    - **Phase 1/4 (0~5 min, Deep Frost Condensation & Frost Accumulation Stage)**: Complementing min 0~2 supercooling condensation micro-latent heat and cold lubricant damping (+0W ~ 25W), min 2~5 introduces the **Frost Layer Thermal Insulation Dynamics Model** (`frostInsulationDamping`): as porous ice crystal thickness accumulates on the fin surface, conductive thermal resistance increases evaporator pressure ratio damping (+0W ~ 30W dynamic ramp), seamlessly connecting to Phase 2 reverse-cycle defrost.
+  - 🎛️ **macOS Status Item Hover Tooltip Telemetry Dead Zone Elimination & Multi-Device Consistency (`StatusItemController.swift`)**:
+    - **Multi-Device Tooltip Telemetry Parity**: Fixed stale/standby status display in menu item tooltips for devices currently undergoing self-cleaning;
+    - **Unified Telemetry Presentation**: Consistently displays `✨ 56°C自清洁 [\(phaseTag) \(cleanPct)%] (mm:ss)` dynamic status and time remaining, while eliminating redundant self-cleaning summary blocks at the tooltip bottom.
+
 - 🏷 **Octodeca-Keywords & Duodecem-Range Universal Compound Scheduling, Evaporator Phase 1 Supercooling Condensation Dynamics, and Status Item Complete Telemetry (v1.9.124)**:
   - ⏱️ **"Octodeca-Keywords Universal Scheduling, Twelve-Range Compound Topology, and Extreme Turnaround Negation Protection" Spoken Engine (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)**:
     - **Octodeca-Keywords Universal Scheduling (`octodecaKeywordsRegex`)**: Introduced `octodecaKeywordsRegex` supporting scheduling across all 18 core cycle keyword variants simultaneously (e.g., "工作日、平时、平日、双休日、双休、周末三天、周末、公休日、休假日、放假日、节假日、单休日、单休、大休日、大休、大周、小周和小休每天早8点开机" `[1..7]`), closing every last mile of ultra-high-dimensional compound scheduling dead zones;

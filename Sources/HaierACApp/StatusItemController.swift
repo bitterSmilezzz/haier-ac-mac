@@ -129,15 +129,19 @@ final class StatusItemController: NSObject {
         var tooltipParts: [String] = [
             model.gatewayConnected ? "海尔空调控制 (网关在线)" : "⚠️ 海尔云端网关重连中..."
         ]
+        let allDevices = model.allUnifiedDevices
         if model.isSelfCleaningActive {
             let rem = model.selfCleaningRemainingSeconds
             let cleanPct = model.selfCleaningProgressPercentage
             let phaseDesc = model.selfCleaningPhaseDescription
             let m = rem / 60
             let s = rem % 60
-            tooltipParts.append("✨ 蒸发器 56°C 深度自清洁中: [\(phaseDesc) (\(cleanPct)%)] (剩余 \(m)分\(s)秒)")
+            if let devId = model.selfCleaningDeviceId, let dev = allDevices.first(where: { $0.id == devId }) {
+                tooltipParts.append("✨ 「\(dev.name)」蒸发器 56°C 深度自清洁中 [\(phaseDesc) \(cleanPct)%] (剩余 \(String(format: "%02d:%02d", m, s)))")
+            } else {
+                tooltipParts.append("✨ 蒸发器 56°C 深度自清洁中 [\(phaseDesc) \(cleanPct)%] (剩余 \(String(format: "%02d:%02d", m, s)))")
+            }
         }
-        let allDevices = model.allUnifiedDevices
         let activeRunningDevices = allDevices.filter { dev in
             model.reachability(for: dev.id) == .available &&
             (model.attributes[dev.id]?["onOffStatus"]?.boolValue == true)
@@ -213,7 +217,28 @@ final class StatusItemController: NSObject {
                 case .deviceOffline:
                     tooltipParts.append("\(starPrefix) \(devName): ⚡️ 设备离线 (未连网)")
                 case .available:
-                    if isPowerOn {
+                    let isDevCleaning = model.isSelfCleaningActive && (model.selfCleaningDeviceId == devId || (model.selfCleaningDeviceId == nil && allDevices.count == 1))
+                    if isDevCleaning {
+                        let phaseTag = model.selfCleaningPhaseShortTag
+                        let cleanPct = model.selfCleaningProgressPercentage
+                        let remMins = model.selfCleaningRemainingSeconds / 60
+                        let remSecs = model.selfCleaningRemainingSeconds % 60
+                        var line = "\(starPrefix) \(devName): ✨ 56°C自清洁 [\(phaseTag) \(cleanPct)%] (\(String(format: "%02d:%02d", remMins, remSecs)))"
+                        let devHum = model.currentIndoorHumidity(for: devId)
+                        if let indoor = indoorTemp {
+                            let indoorStr = (indoor.truncatingRemainder(dividingBy: 1.0) == 0)
+                                ? "\(Int(indoor))°C"
+                                : String(format: "%.1f°C", indoor)
+                            if let h = devHum {
+                                line += " (室内 \(indoorStr) · \(Int(round(h)))% RH)"
+                            } else {
+                                line += " (室内 \(indoorStr))"
+                            }
+                        } else if let h = devHum {
+                            line += " (室内 \(Int(round(h)))% RH)"
+                        }
+                        tooltipParts.append(line)
+                    } else if isPowerOn {
                         let modeGlyph: String
                         if let modeCode = modeCode {
                             switch modeCode {
@@ -276,19 +301,6 @@ final class StatusItemController: NSObject {
                 tooltipParts.append(String(format: "⚡️ 全屋空调瞬时功率: %.2f kW", instantPower / 1000.0))
             } else {
                 tooltipParts.append("⚡️ 全屋空调瞬时功率: \(Int(round(instantPower))) W")
-            }
-        }
-
-        if model.isSelfCleaningActive {
-            let rem = model.selfCleaningRemainingSeconds
-            let m = rem / 60
-            let s = rem % 60
-            let cleanPct = model.selfCleaningProgressPercentage
-            let phaseDesc = model.selfCleaningPhaseDescription
-            if let devId = model.selfCleaningDeviceId, let dev = allDevices.first(where: { $0.id == devId }) {
-                tooltipParts.append("✨ 「\(dev.name)」56°C 高温除菌自清洁中 [\(phaseDesc) \(cleanPct)%] (剩余 \(String(format: "%02d:%02d", m, s)))")
-            } else {
-                tooltipParts.append("✨ 56°C 高温除菌自清洁中 [\(phaseDesc) \(cleanPct)%] (剩余 \(String(format: "%02d:%02d", m, s)))")
             }
         }
 
