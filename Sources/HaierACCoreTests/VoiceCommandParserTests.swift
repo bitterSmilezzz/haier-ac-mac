@@ -5224,6 +5224,47 @@ final class VoiceCommandParserTests: XCTestCase {
         XCTAssertNotEqual(VoiceCommandParser.parse("工作日、平时、平日、双休日、双休、周末三天、周末、大休日、大休、小休、单休和单休日每天早8点开机")?.command, .setPower(true))
     }
 
+    /// 测试纯十二核心关键词与六连续区间全景复合排班大一统调度与强化口语否定 (v1.9.118)
+    func testDodecaKeywordsAndCompoundScheduleV19118() {
+        // 1. 纯十二核心关键词全景调度
+        let s1 = VoiceCommandParser.parse("工作日、平时、平日、双休日、双休、周末三天、周末、公休日、大休日、大休、小休、单休和单休日每天早8点开机")
+        XCTAssertEqual(s1?.command, .scheduleRepeatPower(hour: 8, minute: 0, power: true, repeatWeekdays: [1, 2, 3, 4, 5, 6, 7], repeatLabel: "周一至周日"))
+
+        let s2 = VoiceCommandParser.parse("平时、平日、工作日、周末、双休、双休日、公休日、大休、大周、小休、单休加单休日每天晚10点关机")
+        XCTAssertEqual(s2?.command, .scheduleRepeatPower(hour: 22, minute: 0, power: false, repeatWeekdays: [1, 2, 3, 4, 5, 6, 7], repeatLabel: "周一至周日"))
+
+        // 2. 六连续独立区间调度（十二元全景复合排班）
+        let s3 = VoiceCommandParser.parse("周一至周一、周二至周二、周三至周三、周四至周四、周五至周五加周六到周日每天早8点开机")
+        XCTAssertEqual(s3?.command, .scheduleRepeatPower(hour: 8, minute: 0, power: true, repeatWeekdays: [1, 2, 3, 4, 5, 6, 7], repeatLabel: "周一至周日"))
+
+        // 3. 五连续区间在先、核心关键词在后（六/十元全景复合排班）
+        let s4 = VoiceCommandParser.parse("周一至周一、周二至周二、周三至周三、周四至周四、周五至周六加单休日每天早8点开机")
+        XCTAssertEqual(s4?.command, .scheduleRepeatPower(hour: 8, minute: 0, power: true, repeatWeekdays: [1, 2, 3, 4, 5, 6, 7], repeatLabel: "周一至周日"))
+
+        // 4. 核心关键词在先、五连续区间在后（六/十元全景复合排班）
+        let s5 = VoiceCommandParser.parse("工作日加周一至周一、周二至周二、周三至周三、周四至周四、周五至周日每天早8点开机")
+        XCTAssertEqual(s5?.command, .scheduleRepeatPower(hour: 8, minute: 0, power: true, repeatWeekdays: [1, 2, 3, 4, 5, 6, 7], repeatLabel: "周一至周日"))
+
+        // 5. 五核心关键词在先、双连续区间在后（七元全景复合排班）
+        let s6 = VoiceCommandParser.parse("工作日、平时、双休、大休和小休加周一至周二、周四至周五每天早8点开机")
+        XCTAssertEqual(s6?.command, .scheduleRepeatPower(hour: 8, minute: 0, power: true, repeatWeekdays: [1, 2, 3, 4, 5, 6, 7], repeatLabel: "周一至周日"))
+
+        // 6. 强化口语否定（切切切莫再/万万不可再/万千不要/断然不能/打死也不要/开暖气/开冷气机/绝绝对对不要）
+        XCTAssertNil(VoiceCommandParser.parse("切切切莫再开空调"))
+        XCTAssertNil(VoiceCommandParser.parse("打死也不要开机"))
+        XCTAssertNil(VoiceCommandParser.parse("断然不能关空调"))
+        XCTAssertNil(VoiceCommandParser.parse("万千不要开暖气"))
+        XCTAssertNil(VoiceCommandParser.parse("千万别开冷气机"))
+        XCTAssertNil(VoiceCommandParser.parse("无论何时何地都不要送风"))
+        XCTAssertNil(VoiceCommandParser.parse("决计不要再开空调"))
+        XCTAssertNil(VoiceCommandParser.parse("绝绝对对不要开辅热"))
+
+        // 7. 安全断言：杜绝误识别
+        XCTAssertNotEqual(VoiceCommandParser.parse("切切切莫再开空调")?.command, .setPower(true))
+        XCTAssertNotEqual(VoiceCommandParser.parse("打死也不要开机")?.command, .setPower(true))
+        XCTAssertNotEqual(VoiceCommandParser.parse("工作日、平时、平日、双休日、双休、周末三天、周末、公休日、大休日、大休、小休、单休和单休日每天早8点开机")?.command, .setPower(true))
+    }
+
     // MARK: - 无效输入测试
 
     func testInvalidCommands() {

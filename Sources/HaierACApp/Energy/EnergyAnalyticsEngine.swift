@@ -335,15 +335,21 @@ public final class EnergyAnalyticsEngine: ObservableObject {
             return max(0.95, 1.0 - bonus)
         }()
 
-        // 滤网积尘气道流阻与换热动力学衰减连续微补偿 (Air Filter Flow Resistance Impedance Model) (v1.9.113):
-        // 进风滤网积尘阻塞时，回风道气阻增大且通过蒸发器的循环风量衰减，机组为达到同等设定温控效果需额外付出 0% ~ 5% 的风机与压缩机负荷：
+        // 滤网积尘气道流阻与换热动力学衰减连续微补偿 (Air Filter Flow Resistance Impedance Model) (v1.9.113, v1.9.118 极端阻抗非线性微喘振动力学自洽):
+        // 进风滤网积尘阻塞时，回风道气阻增大且通过蒸发器的循环风量衰减，机组为达到同等设定温控效果需额外付出风机与压缩机负荷：
         // - 洁净度 >= 50%：额定空气动力学通量，气阻负荷因子为 1.00；
-        // - 洁净度 < 50%：气道受阻，负荷乘数平滑单调线性插值上升至 1.05 (0% 极重堵塞状态)，彻底消除阶跃与虚标断崖。
+        // - 10% < 洁净度 < 50%：气道受阻，负荷乘数平滑单调线性插值上升至 1.04；
+        // - 洁净度 <= 10%（极度重度堵塞态）：流体动力学边界层分离阻力激增，产生非线性二次阻抗补偿 (额外 0% ~ 1.5%，最高综合气阻惩罚达到 1.065 即 +6.5%)。
         let filterMultiplier: Double = {
             guard isPowerOn && !isSelfCleaning && filterCleanlinessPct < 50 else { return 1.0 }
             let clampedPct = max(0, filterCleanlinessPct)
-            let penalty = (Double(50 - clampedPct) / 50.0) * 0.05
-            return min(1.05, 1.0 + penalty)
+            let basePenalty = (Double(50 - clampedPct) / 50.0) * 0.05
+            let extremePenalty: Double = {
+                guard clampedPct <= 10 else { return 0.0 }
+                let progress = Double(10 - clampedPct) / 10.0
+                return progress * 0.015
+            }()
+            return min(1.065, 1.0 + basePenalty + extremePenalty)
         }()
 
         // 变频压缩机开机软启动与高压建立动态升频微阻尼模型 (Compressor Soft-Start Dynamic Ramping Model) (v1.9.114):
@@ -397,17 +403,25 @@ public final class EnergyAnalyticsEngine: ObservableObject {
 
         switch mode {
         case .fan:
-            // 送风模式：仅室内风机运转，阶梯风速动力学梯度 (v1.9.39, v1.9.42 拓展强劲风量上限, v1.9.116 滤网积尘流阻电动力学连续微补偿)
+            // 送风模式：仅室内风机运转，阶梯风速动力学梯度 (v1.9.39, v1.9.42 拓展强劲风量上限, v1.9.116 滤网积尘流阻电动力学连续微补偿, v1.9.118 贯流风机无刷电机起步爬升与极度堵塞流阻二次微补偿)
             // 贯流风机由无刷直流电机（BLDC）驱动，当进风滤网积尘气阻上升时，电机需增加扭矩以克服回风道静压差维持对流循环：
             // - 洁净度 >= 50%：额定空气动力学通量，气阻负荷因子为 1.00；
-            // - 洁净度 < 50%：进风截面受阻，气阻电功率产生 0% ~ 6% 的微补偿线性平滑上升。
+            // - 洁净度 < 50%：进风截面受阻，气阻电功率产生 0% ~ 6% 的微补偿线性平滑上升；
+            // - 洁净度 <= 10%：极端微压湍流阻抗额外补偿 0% ~ 1.5% (最高 +7.5%)。
+            // 软启动爬升段 (continuousMinutes < 2)：无刷电机克服风叶静惯量起步平滑过渡 (0.88 -> 0.96 -> 1.00)
             let fanFilterMultiplier: Double = {
                 guard filterCleanlinessPct < 50 else { return 1.0 }
                 let clampedPct = max(0, filterCleanlinessPct)
-                return 1.0 + (Double(50 - clampedPct) / 50.0) * 0.06
+                let base = (Double(50 - clampedPct) / 50.0) * 0.06
+                let extreme = clampedPct <= 10 ? (Double(10 - clampedPct) / 10.0) * 0.015 : 0.0
+                return 1.0 + base + extreme
             }()
-            let power = (14.0 + windOffset * 0.42) * fanFilterMultiplier
-            return min(max(power, 14.0), 80.0)
+            let fanSoftStartMultiplier: Double = {
+                guard continuousMinutes < 2 else { return 1.0 }
+                return continuousMinutes == 0 ? 0.88 : 0.96
+            }()
+            let power = (14.0 + windOffset * 0.42) * fanFilterMultiplier * fanSoftStartMultiplier
+            return min(max(power, 12.0), 85.0)
 
         case .dehumidify:
             // 除湿模式：多维环境湿度自适应变频能耗动力学模型 + 室内温度显热负荷与防结霜降频动态补偿 (v1.9.37, v1.9.44, v1.9.87 C^0 级平滑连续热阻尼重构, v1.9.117 软启动升频无截断自洽)

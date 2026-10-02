@@ -1675,7 +1675,10 @@ struct MenuBarControlsView: View {
                     )
             )
         } else if model.isSelfCleaningProtectionActive(for: device.id) {
-            // 蒸发器洁净保护期感知（自清洁后 14 天内翅片洁净无尘垢水膜，换热效率提升，v1.9.114）
+            // 蒸发器洁净保护期感知（自清洁后 14 天内翅片洁净无尘垢水膜，换热效率提升，v1.9.114, v1.9.118 动态增效折减自洽）
+            let discount = model.selfCleaningDiscountPercentage(for: device.id)
+            let bonusPct = max(0.5, discount * 0.40)
+            let discountStr = String(format: "增效 +%.1f%%", bonusPct)
             HStack(spacing: 8) {
                 Image(systemName: "checkmark.shield.fill")
                     .font(.system(size: 12))
@@ -1686,7 +1689,7 @@ struct MenuBarControlsView: View {
                         Text("蒸发器洁净保护中")
                             .font(.system(size: 11, weight: .semibold))
                             .foregroundStyle(Theme.ink)
-                        Text("增效 +4%")
+                        Text(discountStr)
                             .font(.system(size: 9, weight: .bold))
                             .foregroundStyle(Theme.success)
                             .padding(.horizontal, 4)
@@ -1714,22 +1717,24 @@ struct MenuBarControlsView: View {
         }
     }
 
-    // MARK: - 滤网健康度预警与拆洗维护胶囊 (v1.9.114)
+    // MARK: - 滤网健康度预警与拆洗维护胶囊 (v1.9.114, v1.9.118 极端阻抗报警与气阻流阻精细感知)
 
     @ViewBuilder
     private func filterWarningPod(device: DeviceInfo) -> some View {
         let cleanliness = model.filterCleanlinessPercentage(for: device.id)
         if cleanliness <= 30 {
             let penalty = (Double(50 - max(0, cleanliness)) / 50.0) * 5.0
-            let penaltyStr = penalty > 0 ? String(format: " · 负荷+%.1f%%", penalty) : ""
+            let extremePenalty = cleanliness <= 10 ? (Double(10 - max(0, cleanliness)) / 10.0) * 1.5 : 0.0
+            let totalPenalty = penalty + extremePenalty
+            let penaltyStr = totalPenalty > 0 ? String(format: " · 气阻+%.1f%%", totalPenalty) : ""
             HStack(spacing: 8) {
-                Image(systemName: "exclamationmark.shield.fill")
+                Image(systemName: cleanliness <= 10 ? "exclamationmark.triangle.fill" : "exclamationmark.shield.fill")
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(cleanliness <= 10 ? Theme.danger : Theme.warning)
 
                 VStack(alignment: .leading, spacing: 2) {
                     HStack(spacing: 4) {
-                        Text("滤网积尘预警")
+                        Text(cleanliness <= 10 ? "🚨 滤网极端阻抗报警" : "滤网积尘预警")
                             .font(.system(size: 11, weight: .semibold))
                             .foregroundStyle(Theme.ink)
                         Text("剩余 \(cleanliness)%\(penaltyStr)")

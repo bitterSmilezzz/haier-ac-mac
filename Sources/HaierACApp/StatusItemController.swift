@@ -1612,7 +1612,7 @@ final class StatusItemController: NSObject {
         ambientItem.toolTip = "切换播放白噪音背景音（\(model.sleepAmbientSoundType.displayName)），营造舒适入眠与专注氛围"
         menu.addItem(ambientItem)
 
-        // 滤网健康与自清洁快速入口 (v1.9.21, v1.9.37 多设备全屋最低洁净度预警, v1.9.45 快捷重置子菜单)
+        // 滤网健康与自清洁快速入口 (v1.9.21, v1.9.37 多设备全屋最低洁净度预警, v1.9.45 快捷重置子菜单, v1.9.118 极端阻抗报警与非线性气阻负荷标定)
         let filterTitle: String = {
             if model.isSelfCleaningActive {
                 return "56°C 自清洁进行中 (\(model.selfCleaningRemainingSeconds / 60)m\(model.selfCleaningRemainingSeconds % 60)s)..."
@@ -1621,14 +1621,20 @@ final class StatusItemController: NSObject {
                 let minClean = allDevices.map { model.filterCleanlinessPercentage(for: $0.id) }.min() ?? model.filterCleanlinessPercentage
                 let warn = minClean <= 10 ? "🚨 " : (minClean <= 30 ? "⚠️ " : "")
                 let penalty = (Double(50 - max(0, minClean)) / 50.0) * 5.0
-                let penaltyStr = penalty > 0 ? String(format: " · 气阻负荷 +%.1f%%", penalty) : ""
-                return "\(warn)滤网保养与自清洁 (全屋最低 \(minClean)%\(penaltyStr))..."
+                let extremePenalty = minClean <= 10 ? (Double(10 - max(0, minClean)) / 10.0) * 1.5 : 0.0
+                let totalPenalty = penalty + extremePenalty
+                let penaltyStr = totalPenalty > 0 ? String(format: " · 气阻负荷 +%.1f%%", totalPenalty) : ""
+                let prefix = minClean <= 10 ? "极端阻抗 " : ""
+                return "\(warn)滤网保养与自清洁 (\(prefix)全屋最低 \(minClean)%\(penaltyStr))..."
             } else {
                 let clean = model.filterCleanlinessPercentage
                 let warn = clean <= 10 ? "🚨 " : (clean <= 30 ? "⚠️ " : "")
                 let penalty = (Double(50 - max(0, clean)) / 50.0) * 5.0
-                let penaltyStr = penalty > 0 ? String(format: " · 气阻负荷 +%.1f%%", penalty) : ""
-                return "\(warn)滤网保养与自清洁 (洁净度 \(clean)%\(penaltyStr))..."
+                let extremePenalty = clean <= 10 ? (Double(10 - max(0, clean)) / 10.0) * 1.5 : 0.0
+                let totalPenalty = penalty + extremePenalty
+                let penaltyStr = totalPenalty > 0 ? String(format: " · 气阻负荷 +%.1f%%", totalPenalty) : ""
+                let prefix = clean <= 10 ? "极端阻抗 " : ""
+                return "\(warn)滤网保养与自清洁 (\(prefix)洁净度 \(clean)%\(penaltyStr))..."
             }
         }()
 
