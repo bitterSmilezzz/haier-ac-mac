@@ -1340,6 +1340,10 @@ final class AppModel: ObservableObject {
             let cleanFactor = selfCleaningProtectionFactor(for: dev.id)
             let filterPct = filterCleanlinessPercentage(for: dev.id)
 
+            let effectiveContinuousMinutes = isCleaning
+                ? max(0, (1200 - selfCleaningRemainingSeconds) / 60)
+                : initialContinuousMinutes
+
             samples.append(
                 EnergyAnalyticsEngine.DeviceEnergySample(
                     deviceId: dev.id,
@@ -1350,7 +1354,7 @@ final class AppModel: ObservableObject {
                     indoorHumidity: indoorHum,
                     windSpeed: windSpeed,
                     isSelfCleaning: isCleaning,
-                    continuousMinutes: initialContinuousMinutes,
+                    continuousMinutes: effectiveContinuousMinutes,
                     cleanlinessFactor: cleanFactor,
                     filterCleanlinessPct: filterPct
                 )

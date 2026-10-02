@@ -308,8 +308,25 @@ public final class EnergyAnalyticsEngine: ObservableObject {
 
         if isSelfCleaning {
             // 56°C 蒸发器高温除菌自清洁工况（急冷结霜、微波解冻与 56°C 恒温烘干灭菌）：
-            // 平均热力学电功率稳定在 880W ~ 1050W 之间
-            return 920.0 + (windOffset * 0.5)
+            // 动态四阶段相变热力学动力学模型 (v1.9.119):
+            // 阶段 1 (0~5 分钟, 深冷结霜凝水): 压缩机高频运转快速降温至 0°C 以下使翅片凝霜凝固尘垢，基准功率 ~880W ~ 960W + windOffset*0.4;
+            // 阶段 2 (5~10 分钟, 逆循环微解冻冲刷): 四通阀换向快速化霜，利用大量融水强力冲刷剥离翅片积尘，基准功率 ~780W + windOffset*0.3;
+            // 阶段 3 (10~18 分钟, 56°C 高温恒温烘干杀菌): 变频压缩机制热大压比持续输出，蒸发器表面维持 56°C 恒温 8 分钟以上灭菌烘干，基准功率 ~1000W ~ 1040W + windOffset*0.5;
+            // 阶段 4 (>= 18 分钟, 降温送风排湿恢复): 压缩机停机降压，贯流风机以常温微风排出残余水汽并冷却翅片，基准功率 ~48W + windOffset*0.2;
+            let cleaningMinutes = continuousMinutes
+            let cleaningPower: Double
+            if cleaningMinutes < 5 {
+                let ramp = min(1.0, Double(cleaningMinutes) / 5.0)
+                cleaningPower = 880.0 + (ramp * 80.0) + (windOffset * 0.4)
+            } else if cleaningMinutes < 10 {
+                cleaningPower = 780.0 + (windOffset * 0.3)
+            } else if cleaningMinutes < 18 {
+                let heatPhase = min(1.0, Double(cleaningMinutes - 10) / 8.0)
+                cleaningPower = 1000.0 + (heatPhase * 40.0) + (windOffset * 0.5)
+            } else {
+                cleaningPower = 48.0 + (windOffset * 0.2)
+            }
+            return min(max(cleaningPower, 40.0), 1150.0)
         }
 
         guard isPowerOn else {

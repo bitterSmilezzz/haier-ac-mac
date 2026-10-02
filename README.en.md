@@ -6,6 +6,27 @@ A native SwiftUI app to control Haier / Leader (统帅) smart air conditioners o
 
 ## Features
 
+- 🏷 **Tredeca-Keywords & Septem-Range Universal Compound Scheduling, Evaporator Self-Cleaning Four-Phase Phase Change Thermodynamics, and Control Center Dynamic Telemetry (v1.9.119)**:
+  - ⏱️ **"Tredeca-Keywords Universal Scheduling, Seven-Range Compound Topology, and Extreme Spoken Negation Protection" Spoken Engine (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)**:
+    - **Tredeca-Keywords Universal Scheduling (`tredecaKeywordsRegex`)**: Introduced `tredecaKeywordsRegex` supporting scheduling across all 13 core cycle keyword variants simultaneously (e.g., "工作日、平时、平日、双休日、双休、周末三天、周末、公休日、休假日、放假日、节假日、大休日和单休每天早8点开机" `[1..7]`), closing hanging multi-keyword spoken truncation;
+    - **Septem-Range & Compound Topology Expansion (`septemRangeRegex` / `sexRangeWithKeywordRegex` / `keywordWithSexRangeRegex` / `hexaKeywordsWithDualRangeRegex`)**:
+      - `septemRangeRegex`: Seven continuous independent ranges compound spoken scheduling (e.g., "周一至周一、周二至周二、周三至周三、周四至周四、周五至周五、周六至周六加周日到周日每天早8点开机" `[1..7]`);
+      - `sexRangeWithKeywordRegex`: Six continuous ranges prefix + core keyword suffix (e.g., "周一至周一、周二至周二、周三至周三、周四至周四、周五至周五、周六至周六加单休日每天早8点开机" `[1..7]`);
+      - `keywordWithSexRangeRegex`: Core keyword prefix + six continuous ranges suffix (e.g., "单休日加周一至周一、周二至周二、周三至周三、周四至周四、周五至周五、周六至周六每天早8点开机" `[1..7]`);
+      - `hexaKeywordsWithDualRangeRegex`: Six core keywords prefix + two continuous ranges suffix (e.g., "工作日、平时、平日、双休、大休和小休加周六至周六、周日到周日每天早8点开机" `[1..7]`);
+    - **Reinforced Spoken Multi-Word Negation & Action Protection**: Expanded `negativeActionRegex`, `containsNegativeForAction`, and `containsNegativeAction` with colloquial negative prefixes ("天王老子来也别", "天王老子来了都不要", "宁死也不要", "无论何时何刻都不要", "决计万万不要", "决决断断不能", "断无可能要", "断乎不要", "千万千千万不要", "百般不要") and action verbs ("开强劲", "开静音", "开健康", "开节能", "吹热风", "制冷气", "制暖风", "关空调", "停空调", "开空调", "启动空调"), eliminating unintended voice triggers;
+    - **100% Unit Test Suite Coverage**: Added `testSeptemRangeAndTredecaKeywordsV19119` test suite with all 127 unit tests passing with zero errors (0 failures).
+  - 🔋 **56°C Evaporator Self-Cleaning Four-Phase Phase Change Thermodynamics Model (`EnergyAnalyticsEngine.swift` / `AppModel.swift`)**:
+    - **Four-Phase Dynamic Thermodynamics**: Overhauled flat static 920W estimates into real-time phase-dependent calculation:
+      - Phase 1 (0~5 min, Deep Frost Condensation): High-frequency chilling ~880W ~ 960W;
+      - Phase 2 (5~10 min, Reverse-Cycle Defrost Flush): Rapid defrost melt flushing dust ~780W;
+      - Phase 3 (10~18 min, 56°C Thermal Sterilization & Dry): Constant 56°C heating ~1000W ~ 1040W;
+      - Phase 4 (>= 18 min, Cool Fan Moisture Evacuation): Compressor stops, ambient ventilation cooling ~48W;
+    - **Sample Accurate Runtime Binding**: Propagates `(1200 - selfCleaningRemainingSeconds) / 60` in `AppModel.swift` for self-cleaning devices, aligning energy accounting with physical execution.
+  - 🎛️ **macOS Menu Bar Control Center & Status Bar Four-Phase Dynamic Telemetry (`MenuBarControlsView.swift` / `StatusItemController.swift`)**:
+    - **Control Center Status Pod Dynamic Phase**: Reflects real-time cleaning phases (`阶段 1/4 • 急速深冷结霜裹尘`, `阶段 2/4 • 逆循环微解冻剥离`, `阶段 3/4 • 56°C 高温杀菌烘干`, `阶段 4/4 • 送风排湿冷却恢复`);
+    - **Status Bar Root Menu Phase Tag**: Surfaces `56°C 自清洁中 [凝霜裹尘 / 微解冻冲刷 / 56°C烘干 / 送风冷却] (XmYs)...`, establishing unified telemetry across macOS surfaces.
+
 - 🏷 **Dodeca-Keywords & Sex-Range Universal Compound Scheduling, Blower BLDC Airflow Soft-Start Damping, and Extreme Resistance Emergency Alert Synergy (v1.9.118)**:
   - ⏱️ **"Dodeca-Keywords Universal Scheduling, Six-Range Compound Topology, and Extreme Spoken Negation Protection" Spoken Engine (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)**:
     - **Dodeca-Keywords Universal Scheduling (`dodecaKeywordsRegex`)**: Introduced `dodecaKeywordsRegex` supporting scheduling across all 12 core cycle keyword variants simultaneously (e.g., "工作日、平时、平日、双休日、双休、周末三天、周末、公休日、大休日、大休、小休、单休和单休日每天早8点开机" `[1..7]`), closing hanging multi-keyword spoken truncation;

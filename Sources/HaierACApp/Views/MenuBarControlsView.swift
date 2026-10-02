@@ -1625,8 +1625,21 @@ struct MenuBarControlsView: View {
         if model.isSelfCleaningActive {
             let isCurrentDevCleaning = model.selfCleaningDeviceId == device.id || (model.selfCleaningDeviceId == nil && model.allUnifiedDevices.count == 1)
             let hostName = model.selfCleaningDeviceId.map { model.deviceName(for: $0) } ?? device.deviceName
-            let m = model.selfCleaningRemainingSeconds / 60
-            let s = model.selfCleaningRemainingSeconds % 60
+            let rem = model.selfCleaningRemainingSeconds
+            let m = rem / 60
+            let s = rem % 60
+            let elapsed = max(0, 1200 - rem)
+            let phaseDesc: String = {
+                if elapsed < 300 {
+                    return "阶段 1/4 • 急速深冷结霜裹尘"
+                } else if elapsed < 600 {
+                    return "阶段 2/4 • 逆循环微解冻剥离"
+                } else if elapsed < 1080 {
+                    return "阶段 3/4 • 56°C 高温杀菌烘干"
+                } else {
+                    return "阶段 4/4 • 送风排湿冷却恢复"
+                }
+            }()
 
             HStack(spacing: 8) {
                 Image(systemName: "flame.fill")
@@ -1639,7 +1652,7 @@ struct MenuBarControlsView: View {
                         .foregroundStyle(Theme.ink)
                         .lineLimit(1)
                     Text(isCurrentDevCleaning
-                        ? "剩余 \(String(format: "%02d:%02d", m, s)) • 翅片凝霜烘干灭菌"
+                        ? "剩余 \(String(format: "%02d:%02d", m, s)) • \(phaseDesc)"
                         : "剩余 \(String(format: "%02d:%02d", m, s)) • 本机处于待命")
                         .font(.system(size: 10))
                         .foregroundStyle(Theme.inkMuted)
