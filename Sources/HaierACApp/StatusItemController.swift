@@ -71,19 +71,13 @@ final class StatusItemController: NSObject {
     private func refreshTemperature() {
         guard let button = statusItem?.button else { return }
 
-        // 状态栏图标与标题动态感知 (v1.9.25: 开机运行态实心展示, v1.9.121 状态栏全息自清洁相变与进度感知)
+        // 状态栏图标与标题动态感知 (v1.9.25: 开机运行态实心展示, v1.9.121 状态栏全息自清洁相变与进度感知, v1.9.122 统一语义感知)
         if model.isSelfCleaningActive {
             let rem = model.selfCleaningRemainingSeconds
             let m = rem / 60
             let s = rem % 60
-            let elapsed = max(0, 1200 - rem)
-            let cleanPct = min(100, max(0, Int(round((Double(elapsed) / 1200.0) * 100))))
-            let phaseTag: String = {
-                if elapsed < 300 { return "凝霜" }
-                else if elapsed < 600 { return "冲刷" }
-                else if elapsed < 1080 { return "烘干" }
-                else { return "送风" }
-            }()
+            let cleanPct = model.selfCleaningProgressPercentage
+            let phaseTag = model.selfCleaningPhaseShortTag
             button.image = NSImage(systemSymbolName: "sparkles", accessibilityDescription: "蒸发器自清洁 [\(phaseTag) \(cleanPct)%]")
             button.image?.isTemplate = true
             if model.menuBarShowTemperature {
@@ -137,14 +131,8 @@ final class StatusItemController: NSObject {
         ]
         if model.isSelfCleaningActive {
             let rem = model.selfCleaningRemainingSeconds
-            let elapsed = max(0, 1200 - rem)
-            let cleanPct = min(100, max(0, Int(round((Double(elapsed) / 1200.0) * 100))))
-            let phaseDesc: String = {
-                if elapsed < 300 { return "阶段 1/4 • 急速深冷结霜裹尘" }
-                else if elapsed < 600 { return "阶段 2/4 • 逆循环微解冻冲刷" }
-                else if elapsed < 1080 { return "阶段 3/4 • 56°C 高温杀菌烘干" }
-                else { return "阶段 4/4 • 送风排湿冷却恢复" }
-            }()
+            let cleanPct = model.selfCleaningProgressPercentage
+            let phaseDesc = model.selfCleaningPhaseDescription
             let m = rem / 60
             let s = rem % 60
             tooltipParts.append("✨ 蒸发器 56°C 深度自清洁中: [\(phaseDesc) (\(cleanPct)%)] (剩余 \(m)分\(s)秒)")
@@ -295,14 +283,8 @@ final class StatusItemController: NSObject {
             let rem = model.selfCleaningRemainingSeconds
             let m = rem / 60
             let s = rem % 60
-            let elapsed = max(0, 1200 - rem)
-            let cleanPct = min(100, max(0, Int(round((Double(elapsed) / 1200.0) * 100))))
-            let phaseDesc: String = {
-                if elapsed < 300 { return "阶段 1/4 · 凝霜裹尘" }
-                else if elapsed < 600 { return "阶段 2/4 · 微解冻冲刷" }
-                else if elapsed < 1080 { return "阶段 3/4 · 56°C高温烘干" }
-                else { return "阶段 4/4 · 送风冷却" }
-            }()
+            let cleanPct = model.selfCleaningProgressPercentage
+            let phaseDesc = model.selfCleaningPhaseDescription
             if let devId = model.selfCleaningDeviceId, let dev = allDevices.first(where: { $0.id == devId }) {
                 tooltipParts.append("✨ 「\(dev.name)」56°C 高温除菌自清洁中 [\(phaseDesc) \(cleanPct)%] (剩余 \(String(format: "%02d:%02d", m, s)))")
             } else {
@@ -1693,14 +1675,8 @@ final class StatusItemController: NSObject {
             let rem = model.selfCleaningRemainingSeconds
             let m = rem / 60
             let s = rem % 60
-            let elapsed = max(0, 1200 - rem)
-            let cleanPct = min(100, max(0, Int(round((Double(elapsed) / 1200.0) * 100))))
-            let phaseTag: String = {
-                if elapsed < 300 { return "凝霜裹尘" }
-                else if elapsed < 600 { return "微解冻冲刷" }
-                else if elapsed < 1080 { return "56°C烘干" }
-                else { return "送风冷却" }
-            }()
+            let cleanPct = model.selfCleaningProgressPercentage
+            let phaseTag = model.selfCleaningPhaseShortTag
             let stopCleanItem = NSMenuItem(
                 title: "🛑 中止「\(cleaningTargetName)」56°C 自清洁 [\(phaseTag) \(cleanPct)%] (剩余 \(String(format: "%02d:%02d", m, s)))",
                 action: #selector(stopSelfCleaningFromMenu),

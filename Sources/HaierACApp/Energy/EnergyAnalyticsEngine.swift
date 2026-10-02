@@ -358,12 +358,37 @@ public final class EnergyAnalyticsEngine: ObservableObject {
                 let washFilter = filterCleanlinessPct < 50 ? 1.0 + (Double(50 - max(0, filterCleanlinessPct)) / 50.0) * 0.04 : 1.0
                 cleaningPower = (780.0 + meltRamp + (windOffset * 0.3) + latentMelt + sensibleMelt) * washFilter
             } else if cleaningMinutes < 18 {
-                let heatPhase = min(1.0, Double(cleaningMinutes - 10) / 8.0)
+                // 阶段 3 (10~18 分钟, 56°C 高温恒温烘干灭菌):
+                // 变频压缩机制热大压比持续输出，蒸发器表面维持 56°C 恒温 8 分钟以上灭菌烘干 (v1.9.122 升温冲顶与残水蒸发汽化潜热动力学连续演进)。
+                // 1. 56°C 升温冲顶与恒温杀菌平台两段式动力学 (Heat Ramp Up & 56°C Thermal Plateau):
+                //    第 10~12 分钟 (升温冲顶期): 压缩机由解冻冲刷常温快速超频拉升至 56°C 灭菌温区，额外产生快速升温爬坡负荷 (+0W ~ 50W)；
+                //    第 12~18 分钟 (恒温灭菌平台期): 维持 56°C 稳态热平衡，基准功率维持在 1010W ~ 1040W；
+                // 2. 翅片融水剧烈汽化蒸发潜热连续动力学补偿 (Latent Heat of Vaporization):
+                //    阶段 2 融水冲刷后残留在换热器翅片及集水槽的大量水膜在 56°C 高温下剧烈蒸发汽化 (水汽化潜热 2260 kJ/kg)。
+                //    若室内环境相对湿度较高 (indoorHumidity >= 60%)，室内空气水蒸气分压高，换热器表面水分汽化扩散阻力增大，
+                //    压缩机需提高排气温度与冷媒质量流量以维持 56°C 换热器壁面温度，产生连续水汽蒸发潜热补偿 (+0W ~ 45W)；
+                // 3. 室内低温向外界散热损耗补偿 (Cold Loss Compensation):
+                //    若室内偏冷 (indoor <= 18°C)，蒸发器向室内自然对流换热温差扩大，需额外提高压比维持 56°C 灭菌温区 (+0W ~ 50W)；
+                // 4. 滤网积尘气道流阻微补偿 (Filter Airflow Impedance):
+                //    若滤网积尘严重 (filterCleanlinessPct < 50)，进风受阻导致换热器内部热对流排出受阻，微风风机与压缩机产生连续气道流阻调制 (1.00 ~ 1.05)。
+                let rampBoost: Double = {
+                    if cleaningMinutes < 12 {
+                        let progress = Double(cleaningMinutes - 10) / 2.0
+                        return (1.0 - progress) * 50.0
+                    }
+                    return 0.0
+                }()
+                let latentVapor: Double = {
+                    guard let hum = indoorHumidity, hum >= 60.0 else { return 0.0 }
+                    return min(45.0, (hum - 60.0) * 1.125)
+                }()
                 let coldLoss: Double = {
                     guard let indoor = indoorTemp, indoor <= 18.0 else { return 0.0 }
                     return min(50.0, (18.0 - indoor) * 5.0)
                 }()
-                cleaningPower = 1000.0 + (heatPhase * 40.0) + (windOffset * 0.5) + coldLoss
+                let heatFilter = filterCleanlinessPct < 50 ? 1.0 + (Double(50 - max(0, filterCleanlinessPct)) / 50.0) * 0.05 : 1.0
+                let baseDryPower = 1010.0 + rampBoost + (windOffset * 0.5) + latentVapor + coldLoss
+                cleaningPower = baseDryPower * heatFilter
             } else {
                 // 阶段 4 (>= 18 分钟, 送风排湿冷却恢复):
                 // 贯流风机以常温微风排出残余水汽并冷却翅片，同时受滤网积尘流阻连续微阻尼与极限阻抗微喘振调制 (1.00 ~ 1.065)。

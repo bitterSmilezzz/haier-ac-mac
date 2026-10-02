@@ -1097,6 +1097,45 @@ final class AppModel: ObservableObject {
     @Published public var selfCleaningDeviceId: String? = nil
     private var selfCleaningTask: Task<Void, Never>?
 
+    /// 蒸发器自清洁已流逝秒数 (0 ~ 1200) (v1.9.122)
+    public var selfCleaningElapsedSeconds: Int {
+        max(0, 1200 - selfCleaningRemainingSeconds)
+    }
+
+    /// 蒸发器自清洁当前进度百分比 (0 ~ 100) (v1.9.122)
+    public var selfCleaningProgressPercentage: Int {
+        min(100, max(0, Int(round((Double(selfCleaningElapsedSeconds) / 1200.0) * 100))))
+    }
+
+    /// 蒸发器自清洁当前所处时相阶段序号 (1 ~ 4) (v1.9.122)
+    public var selfCleaningPhaseIndex: Int {
+        let elapsed = selfCleaningElapsedSeconds
+        if elapsed < 300 { return 1 }
+        else if elapsed < 600 { return 2 }
+        else if elapsed < 1080 { return 3 }
+        else { return 4 }
+    }
+
+    /// 蒸发器自清洁当前时相阶段简略标签 (凝霜 / 冲刷 / 烘干 / 送风) (v1.9.122)
+    public var selfCleaningPhaseShortTag: String {
+        switch selfCleaningPhaseIndex {
+        case 1: return "凝霜"
+        case 2: return "冲刷"
+        case 3: return "烘干"
+        default: return "送风"
+        }
+    }
+
+    /// 蒸发器自清洁当前时相阶段详细描述 (v1.9.122)
+    public var selfCleaningPhaseDescription: String {
+        switch selfCleaningPhaseIndex {
+        case 1: return "阶段 1/4 • 急速深冷结霜裹尘"
+        case 2: return "阶段 2/4 • 逆循环微解冻冲刷"
+        case 3: return "阶段 3/4 • 56°C 高温杀菌烘干"
+        default: return "阶段 4/4 • 送风排湿冷却恢复"
+        }
+    }
+
     /// 启动 56°C 高温除菌自清洁托管程序
     public func startSelfCleaning(deviceId: String) {
         let reach = reachability(for: deviceId)

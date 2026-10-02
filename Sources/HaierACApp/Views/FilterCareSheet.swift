@@ -296,16 +296,34 @@ struct FilterCareSheet: View {
                 Spacer()
 
                 if isCleaningCurrentDevice {
-                    Text("清洁中 \(formatCountdown(model.selfCleaningRemainingSeconds))")
+                    Text("清洁中 [\(model.selfCleaningPhaseShortTag) \(model.selfCleaningProgressPercentage)%] (\(formatCountdown(model.selfCleaningRemainingSeconds)))")
                         .font(.system(size: 11, weight: .medium, design: .rounded))
-                        .foregroundStyle(Theme.accent)
+                        .foregroundStyle(Color.dynamic(light: 0xF05A28, dark: 0xFF6934))
                 }
             }
 
-            Text("利用蒸发器结霜剥离污垢、化霜强力冲洗、56°C高温烘干抑菌三步深度清洁蒸发器翅片，彻底清除霉菌与异味。")
+            Text("利用蒸发器深冷结霜剥离污垢、逆循环微解冻强力冲洗、56°C高温恒温烘干灭菌、常温微风排湿冷却四步深度清洁蒸发器翅片，彻底清除霉菌与异味。")
                 .font(.system(size: 12))
                 .foregroundStyle(Theme.inkSubtle)
                 .lineSpacing(2)
+
+            if isCleaningCurrentDevice {
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack {
+                        Text(model.selfCleaningPhaseDescription)
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(Color.dynamic(light: 0xF05A28, dark: 0xFF6934))
+                        Spacer()
+                        Text("\(model.selfCleaningProgressPercentage)%")
+                            .font(.system(size: 11, weight: .bold, design: .rounded))
+                            .foregroundStyle(Color.dynamic(light: 0xF05A28, dark: 0xFF6934))
+                    }
+                    ProgressView(value: Double(model.selfCleaningProgressPercentage), total: 100.0)
+                        .progressViewStyle(.linear)
+                        .tint(Color.dynamic(light: 0xF05A28, dark: 0xFF6934))
+                }
+                .padding(.vertical, 2)
+            }
 
             if let lastDate = model.lastSelfCleaningDate(for: currentDeviceId) {
                 HStack(spacing: 6) {
@@ -329,12 +347,14 @@ struct FilterCareSheet: View {
             }
 
             HStack {
-                HStack(spacing: 12) {
-                    processBadge(step: "1", title: "急速凝霜")
-                    Image(systemName: "chevron.right").font(.system(size: 10)).foregroundStyle(Theme.inkTertiary)
-                    processBadge(step: "2", title: "化霜冲洗")
-                    Image(systemName: "chevron.right").font(.system(size: 10)).foregroundStyle(Theme.inkTertiary)
-                    processBadge(step: "3", title: "高温烘干除菌")
+                HStack(spacing: 6) {
+                    processBadge(step: 1, title: "深冷结霜", isActive: isCleaningCurrentDevice && model.selfCleaningPhaseIndex == 1)
+                    Image(systemName: "chevron.right").font(.system(size: 8)).foregroundStyle(Theme.inkTertiary)
+                    processBadge(step: 2, title: "解冻冲刷", isActive: isCleaningCurrentDevice && model.selfCleaningPhaseIndex == 2)
+                    Image(systemName: "chevron.right").font(.system(size: 8)).foregroundStyle(Theme.inkTertiary)
+                    processBadge(step: 3, title: "56°C烘干", isActive: isCleaningCurrentDevice && model.selfCleaningPhaseIndex == 3)
+                    Image(systemName: "chevron.right").font(.system(size: 8)).foregroundStyle(Theme.inkTertiary)
+                    processBadge(step: 4, title: "送风排湿", isActive: isCleaningCurrentDevice && model.selfCleaningPhaseIndex == 4)
                 }
 
                 Spacer()
@@ -385,19 +405,29 @@ struct FilterCareSheet: View {
         )
     }
 
-    private func processBadge(step: String, title: String) -> some View {
+    private func processBadge(step: Int, title: String, isActive: Bool = false) -> some View {
         HStack(spacing: 4) {
-            Text(step)
+            Text("\(step)")
                 .font(.system(size: 10, weight: .bold))
-                .foregroundStyle(Theme.accent)
+                .foregroundStyle(isActive ? Color.white : Theme.accent)
                 .frame(width: 16, height: 16)
-                .background(Theme.accent.opacity(0.12))
+                .background(isActive ? Color.dynamic(light: 0xF05A28, dark: 0xFF6934) : Theme.accent.opacity(0.12))
                 .clipShape(Circle())
 
             Text(title)
-                .font(.system(size: 11))
-                .foregroundStyle(Theme.ink)
+                .font(.system(size: 11, weight: isActive ? .semibold : .regular))
+                .foregroundStyle(isActive ? Color.dynamic(light: 0xF05A28, dark: 0xFF6934) : Theme.ink)
         }
+        .padding(.horizontal, isActive ? 6 : 0)
+        .padding(.vertical, isActive ? 2 : 0)
+        .background(
+            Group {
+                if isActive {
+                    Capsule()
+                        .fill(Color.dynamic(light: 0xF05A28, dark: 0xFF6934).opacity(0.12))
+                }
+            }
+        )
     }
 
     // MARK: - 3. 滤网拆洗指南
