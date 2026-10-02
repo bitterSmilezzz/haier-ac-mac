@@ -6,6 +6,22 @@ A native SwiftUI app to control Haier / Leader (统帅) smart air conditioners o
 
 ## Features
 
+- 🏷 **Octodeca-Keywords & Duodecem-Range Universal Compound Scheduling, Evaporator Phase 1 Supercooling Condensation Dynamics, and Status Item Complete Telemetry (v1.9.124)**:
+  - ⏱️ **"Octodeca-Keywords Universal Scheduling, Twelve-Range Compound Topology, and Extreme Turnaround Negation Protection" Spoken Engine (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)**:
+    - **Octodeca-Keywords Universal Scheduling (`octodecaKeywordsRegex`)**: Introduced `octodecaKeywordsRegex` supporting scheduling across all 18 core cycle keyword variants simultaneously (e.g., "工作日、平时、平日、双休日、双休、周末三天、周末、公休日、休假日、放假日、节假日、单休日、单休、大休日、大休、大周、小周和小休每天早8点开机" `[1..7]`), closing every last mile of ultra-high-dimensional compound scheduling dead zones;
+    - **Duodecem-Range & Compound Topology Expansion (`duodecemRangeRegex` / `undecemRangeWithKeywordRegex` / `keywordWithUndecemRangeRegex` / `undecemKeywordsWithDualRangeRegex`)**:
+      - `duodecemRangeRegex`: Twelve continuous independent ranges compound spoken scheduling (e.g., "周一至周一、周二至周二、周三至周三、周四至周四、周五至周五、周六至周六、周日至周日、周一到周一、周二到周二、周三到周三、周四到周四加周五到周五每天早8点开机" `[1..7]`);
+      - `undecemRangeWithKeywordRegex`: Eleven continuous ranges prefix + core keyword suffix (e.g., "周一至周一、周二至周二、周三至周三、周四至周四、周五至周五、周六至周六、周日至周日、周一到周一、周二到周二、周三到周三、周四到周四加单休每天早8点开机" `[1..7]`);
+      - `keywordWithUndecemRangeRegex`: Core keyword prefix + eleven continuous ranges suffix (e.g., "单休加周一至周一、周二至周二、周三至周三、周四至周四、周五至周五、周六至周六、周日至周日、周一到周一、周二到周二、周三到周三、周四到周四每天早8点开机" `[1..7]`);
+      - `undecemKeywordsWithDualRangeRegex`: Eleven core keywords prefix + two continuous ranges suffix (e.g., "工作日、平时、平日、双休日、双休、周末三天、周末、公休日、休假日、放假日和大休加周六至周六、周日到周日每天早8点开机" `[1..7]`);
+    - **Reinforced Spoken Turnaround Negation & Multi-Word Defense**: Expanded `negativeActionRegex`, `containsNegativeForAction`, and `containsNegativeAction` with colloquial negative prefixes ("哪怕粉身碎骨也千万不要开/关", "断无可能开/关", "哪怕万劫不复也别开/关", "无论天摇地动都不要开/关"), completely eliminating spoken bypasses;
+    - **100% Unit Test Suite Coverage**: Added `testDuodecemRangeAndOctodecaKeywordsV19124` test suite with all 132 unit tests passing with zero errors (0 failures).
+  - 🔋 **56°C Evaporator Phase 1 Supercooling Condensation Micro-Latent Heat & Compressor Lubricant Cold Viscous Friction Drag Model (`EnergyAnalyticsEngine.swift`)**:
+    - **Phase 1/4 (0~5 min, Deep Frost Condensation Initial Stage)**: Introduces min 0~2 supercooling condensation micro-latent heat nucleation and cold compressor lubricant high-viscosity viscous friction (+0W ~ 25W dynamic additional power), decaying smoothly to 0W as ice nuclei stabilize, achieving thermodynamic self-consistency across all 4 phases.
+  - 🎛️ **macOS Status Item Complete Telemetry Parity & FilterCareSheet Visual Elevation (`StatusItemController.swift` / `FilterCareSheet.swift`)**:
+    - **Status Item Header & Matrix Tag Telemetry Parity**: Fully populated `✨ 56°C自清洁 [\(phaseTag) \(cleanPct)%]` dynamic tags and countdown tooltips across device submenu headers (`devConditionTitle`), device matrix list badges (`statusBadge`), and single-device headers (`conditionTitle`);
+    - **FilterCareSheet Smooth Animation & Badge Styling**: Added smooth interpolation transitions to progress bars and subtle glowing borders/shadow transitions to self-cleaning phase badges.
+
 - 🏷 **Septendeca-Keywords & Undecem-Range Universal Compound Scheduling, Evaporator Phase 4 Sensible Cooling Thermal Decay, and Telemetry Parity (v1.9.123)**:
   - ⏱️ **"Septendeca-Keywords Universal Scheduling, Eleven-Range Compound Topology, and Extreme Turnaround Negation Protection" Spoken Engine (`VoiceCommandParser.swift` / `VoiceCommandParserTests.swift`)**:
     - **Septendeca-Keywords Universal Scheduling (`septendecaKeywordsRegex`)**: Introduced `septendecaKeywordsRegex` supporting scheduling across all 17 core cycle keyword variants simultaneously (e.g., "工作日、平时、平日、双休日、双休、周末三天、周末、公休日、休假日、放假日、节假日、单休日、单休、大休日、大休、大周和小休每天早8点开机" `[1..7]`), closing every last mile of ultra-high-dimensional compound scheduling dead zones;

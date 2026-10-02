@@ -329,7 +329,16 @@ public final class EnergyAnalyticsEngine: ObservableObject {
                     guard let indoor = indoorTemp, indoor >= 25.0 else { return 0.0 }
                     return min(40.0, (indoor - 25.0) * 4.0)
                 }()
-                cleaningPower = 880.0 + (ramp * 80.0) + (windOffset * 0.4) + latentFrost + sensibleFrost
+                // 阶段 1 初期过冷凝露相变微潜热成核与压缩机润滑油低温粘度机械阻尼动态模型 (Subcooling Condensation Latent Heat & Viscous Damping Model) (v1.9.124):
+                // 自清洁启动初态（第 0~2 分钟），蒸发器翅片从室温快速跌破露点，空气中水汽过冷急剧结露并释放相变凝结潜热（产生 +0W ~ 25W 动态初始露点凝露附加功），
+                // 同时压缩机在冷态快速起振加压时润滑油粘度较高产生瞬态机械附加功；
+                // 随着第 2~5 分钟翅片完全降至 0°C 以下结霜形成稳固冰核，过冷液态水汽全部相变为固态微晶，此过渡阻尼平滑单调衰减归零。
+                let initialSubcoolingDamping: Double = {
+                    guard cleaningMinutes < 2 else { return 0.0 }
+                    let dampProgress = Double(cleaningMinutes) / 2.0
+                    return (1.0 - dampProgress) * 25.0
+                }()
+                cleaningPower = 880.0 + (ramp * 80.0) + (windOffset * 0.4) + latentFrost + sensibleFrost + initialSubcoolingDamping
             } else if cleaningMinutes < 10 {
                 // 阶段 2 (5~10 分钟, 逆循环微解冻冲刷剥离):
                 // 四通阀快速换向使高温冷媒逆向流入蒸发器，使冰霜迅速脱落剥离并随融水冲刷排出 (v1.9.121 逆循环相变融霜潜热与防再结冰动力学自洽)。

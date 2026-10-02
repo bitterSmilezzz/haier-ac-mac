@@ -743,8 +743,16 @@ final class StatusItemController: NSObject {
                         }
                         return ""
                     }()
+                    let isDevSelfCleaning = model.isSelfCleaningActive && (model.selfCleaningDeviceId == devId || (model.selfCleaningDeviceId == nil && allDevices.count == 1))
                     if !isControllable {
                         return "⚡️ \(dev.name): 离线\(envStr)\(filterBadge)"
+                    }
+                    if isDevSelfCleaning {
+                        let phaseTag = model.selfCleaningPhaseShortTag
+                        let cleanPct = model.selfCleaningProgressPercentage
+                        let remMins = model.selfCleaningRemainingSeconds / 60
+                        let remSecs = model.selfCleaningRemainingSeconds % 60
+                        return "✨ \(dev.name): 56°C自清洁 [\(phaseTag) \(cleanPct)%] (\(String(format: "%02d:%02d", remMins, remSecs)))\(envStr)\(filterBadge)"
                     }
                     if isPowerOn {
                         return "🟢 \(dev.name): \(devModeStr) \(curTempStr)°C [\(devWindStr)]\(envStr)\(filterBadge)"
@@ -755,8 +763,24 @@ final class StatusItemController: NSObject {
                 let headerItem = NSMenuItem(title: devConditionTitle, action: nil, keyEquivalent: "")
                 headerItem.isEnabled = false
                 headerItem.toolTip = {
+                    let isDevSelfCleaning = model.isSelfCleaningActive && (model.selfCleaningDeviceId == devId || (model.selfCleaningDeviceId == nil && allDevices.count == 1))
                     if !isControllable {
                         return "「\(dev.name)」当前处于离线状态，无法接收控制指令"
+                    }
+                    if isDevSelfCleaning {
+                        let remMins = model.selfCleaningRemainingSeconds / 60
+                        let remSecs = model.selfCleaningRemainingSeconds % 60
+                        let cleanPct = model.selfCleaningProgressPercentage
+                        var details = ["【\(dev.name) 56°C 深度自清洁灭菌看板】"]
+                        details.append("• 当前阶段：\(model.selfCleaningPhaseDescription)")
+                        details.append("• 总体进度：\(cleanPct)%")
+                        details.append("• 剩余时间：\(remMins)分\(remSecs)秒")
+                        if let indoor = devIndoorTemp {
+                            let humStr = devIndoorHum.map { " · 相对湿度 \(Int(round($0)))% RH" } ?? ""
+                            details.append("• 室内环境：温度 \(String(format: "%.1f", indoor))°C\(humStr)")
+                        }
+                        details.append("• 动力学特性：深冷凝霜成核 ➔ 融水冲刷剥离 ➔ 56°C高温烘干 ➔ 送风排湿冷却四相态自洽")
+                        return details.joined(separator: "\n")
                     }
                     if isPowerOn {
                         var details = ["【\(dev.name) 实时运行看板】"]
@@ -1162,7 +1186,11 @@ final class StatusItemController: NSObject {
                 case .gatewayReconnecting: statusBadge = "⏳ 重连中"
                 case .deviceOffline: statusBadge = "⚡️ 离线"
                 case .available:
-                    if isPowerOn {
+                    if isCleaningThisDev {
+                        let cleanPct = model.selfCleaningProgressPercentage
+                        let phaseTag = model.selfCleaningPhaseShortTag
+                        statusBadge = "✨ 56°C自清洁 [\(phaseTag) \(cleanPct)%]"
+                    } else if isPowerOn {
                         let modeStr: String = {
                             if let code = modeCode {
                                 switch code {
@@ -1236,8 +1264,16 @@ final class StatusItemController: NSObject {
                     }
                     return ""
                 }()
+                let isSingleCleaning = model.isSelfCleaningActive && (model.selfCleaningDeviceId == nil || model.selfCleaningDeviceId == dev.id)
                 if !isControllable {
                     return "⚡️ \(dev.name): 离线\(envStr)"
+                }
+                if isSingleCleaning {
+                    let phaseTag = model.selfCleaningPhaseShortTag
+                    let cleanPct = model.selfCleaningProgressPercentage
+                    let remMins = model.selfCleaningRemainingSeconds / 60
+                    let remSecs = model.selfCleaningRemainingSeconds % 60
+                    return "✨ \(dev.name): 56°C自清洁 [\(phaseTag) \(cleanPct)%] (\(String(format: "%02d:%02d", remMins, remSecs)))\(envStr)"
                 }
                 if isPowerOn {
                     return "🟢 \(dev.name): \(singleModeStr) \(curTempStr)°C [\(windStr)]\(envStr)"
@@ -1248,8 +1284,24 @@ final class StatusItemController: NSObject {
             let headerItem = NSMenuItem(title: conditionTitle, action: nil, keyEquivalent: "")
             headerItem.isEnabled = false
             headerItem.toolTip = {
+                let isSingleCleaning = model.isSelfCleaningActive && (model.selfCleaningDeviceId == nil || model.selfCleaningDeviceId == dev.id)
                 if !isControllable {
                     return "「\(dev.name)」当前处于离线状态，无法接收控制指令"
+                }
+                if isSingleCleaning {
+                    let remMins = model.selfCleaningRemainingSeconds / 60
+                    let remSecs = model.selfCleaningRemainingSeconds % 60
+                    let cleanPct = model.selfCleaningProgressPercentage
+                    var details = ["【\(dev.name) 56°C 深度自清洁灭菌看板】"]
+                    details.append("• 当前阶段：\(model.selfCleaningPhaseDescription)")
+                    details.append("• 总体进度：\(cleanPct)%")
+                    details.append("• 剩余时间：\(remMins)分\(remSecs)秒")
+                    if let indoor = indoorTemp {
+                        let humStr = indoorHum.map { " · 相对湿度 \(Int(round($0)))% RH" } ?? ""
+                        details.append("• 室内环境：温度 \(String(format: "%.1f", indoor))°C\(humStr)")
+                    }
+                    details.append("• 动力学特性：深冷凝霜成核 ➔ 融水冲刷剥离 ➔ 56°C高温烘干 ➔ 送风排湿冷却四相态自洽")
+                    return details.joined(separator: "\n")
                 }
                 if isPowerOn {
                     var details = ["【\(dev.name) 实时运行看板】"]

@@ -321,6 +321,7 @@ struct FilterCareSheet: View {
                     ProgressView(value: Double(model.selfCleaningProgressPercentage), total: 100.0)
                         .progressViewStyle(.linear)
                         .tint(Color.dynamic(light: 0xF05A28, dark: 0xFF6934))
+                        .animation(.easeInOut(duration: 0.4), value: model.selfCleaningProgressPercentage)
 
                     // 实时四相态物理动力学微提示 (v1.9.123)
                     HStack(spacing: 4) {
@@ -430,6 +431,7 @@ struct FilterCareSheet: View {
                 .frame(width: 16, height: 16)
                 .background(isActive ? Color.dynamic(light: 0xF05A28, dark: 0xFF6934) : Theme.accent.opacity(0.12))
                 .clipShape(Circle())
+                .shadow(color: isActive ? Color.dynamic(light: 0xF05A28, dark: 0xFF6934).opacity(0.35) : .clear, radius: 2, x: 0, y: 1)
 
             Text(title)
                 .font(.system(size: 11, weight: isActive ? .semibold : .regular))
@@ -442,9 +444,14 @@ struct FilterCareSheet: View {
                 if isActive {
                     Capsule()
                         .fill(Color.dynamic(light: 0xF05A28, dark: 0xFF6934).opacity(0.12))
+                        .overlay(
+                            Capsule()
+                                .strokeBorder(Color.dynamic(light: 0xF05A28, dark: 0xFF6934).opacity(0.3), lineWidth: 0.8)
+                        )
                 }
             }
         )
+        .animation(.easeInOut(duration: 0.3), value: isActive)
     }
 
     // MARK: - 3. 滤网拆洗指南
